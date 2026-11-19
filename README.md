@@ -134,7 +134,7 @@ HMG-API 앱에서 NX4 KOR를 누르면 무선 기능 설정이 나옵니다. 모
 
 **만들기**
 
-PC마다 다른 경로(Android SDK, 서명 키, HMG-API 소스)는 코드에 기본값이 없습니다. `.env.example`을 `.env.local`로 복사해 채웁니다(`.env.local`은 git에 넣지 않습니다). 명령 앞에 준 값이 `.env.local`보다 앞섭니다. 배포 키는 저장소 맨 위 `.keys/`(git에 넣지 않음)에 두고, 저장소 밖에도 백업합니다.
+저장소 밖 경로(Android SDK, 서명 키, HMG-API 소스)는 코드에 기본값이 없습니다. `.env.example`을 `.env.local`로 복사해 채웁니다(`.env.local`은 git에 넣지 않습니다). 명령 앞에 준 값이 `.env.local`보다 앞섭니다.
 
 ```sh
 cp .env.example .env.local   # ANDROID_HOME, NX4_APP_KEYS, HMGAPI_SRC, NX4_MOD_KEY 채우기
@@ -143,7 +143,7 @@ cp .env.example .env.local   # ANDROID_HOME, NX4_APP_KEYS, HMGAPI_SRC, NX4_MOD_K
 #    NX4_APP_KEYS 폴더에 키가 없으면 처음에 만듭니다. 그 폴더는 따로 백업합니다
 sh scripts/build-app.sh
 
-# 2. 모드 작성자 키(처음 한 번, .keys/mod.key에 만들고 따로 백업. 업데이트도 같은 키로 서명해야 HMG-API가 받습니다)
+# 2. 모드 작성자 키(처음 한 번, 저장소 밖에 보관. 업데이트도 같은 키로 서명해야 HMG-API가 받습니다)
 cd <HMGAPI_SRC에 적은 HMG-API 소스>
 mkdir -p out/engine-host
 javac --release 8 -d out/engine-host core/runtime/java/hmgapi/engine/*.java

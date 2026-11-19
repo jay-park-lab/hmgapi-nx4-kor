@@ -4,7 +4,7 @@
 # 경로는 명령 앞에 주거나 .env.local에 적는다(.env.example, scripts/local-env.sh):
 #   ANDROID_HOME   Android SDK. 그 아래 build-tools/<버전>/, platforms/<이름>/android.jar
 #                  JDK 21이면 build-tools 37 이상(34의 d8은 이 앱의 안쪽 클래스에서 멈춘다)
-#   NX4_APP_KEYS   서명 키 폴더(release.keystore, pass. 저장소 맨 위 .keys(git 제외)나 저장소 밖, 공개하지 않는다). 키가 없으면 처음에 만든다.
+#   NX4_APP_KEYS   서명 키 폴더(release.keystore, pass. 저장소 밖, 공개하지 않는다). 키가 없으면 처음에 만든다.
 #                  업데이트하려면 같은 키로 서명해야 하므로 이 폴더는 따로 백업한다.
 set -e
 B=$(cd "$(dirname "$0")/.." && pwd)

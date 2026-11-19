@@ -1,9 +1,7 @@
 # PC의 저장소 밖 경로(형식은 .env.example)
 /.env.local
 
-# 로컬 배포 키 폴더(release.keystore, pass, mod.key, mod.key.pub). 공개하지 않고 저장소 밖에도 백업한다(docs/release.md)
-/.keys/
-# 다른 곳에 잘못 둔 서명 키도 넣지 않는다
+# 서명 키는 저장소 밖에 둔다(docs/release.md). 잘못 들어온 키도 git에 넣지 않는다
 *.keystore
 *.key
 

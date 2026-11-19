@@ -33,10 +33,10 @@
 - 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는 `release/`·`hotfix/`에서만 바꿉니다.
 - 커밋·푸시·PR·태그는 사용자가 시킬 때만 합니다.
 
-## PC 경로와 배포 키
+## 저장소 밖 경로
 
 - Android SDK, 서명 키, HMG-API 소스 같은 PC 경로는 코드와 문서에 기본값으로 적지 않습니다.
-- 로컬 배포 키(`release.keystore`, `pass`, `mod.key`, `mod.key.pub`)는 저장소 맨 위 `.keys/`(git 제외)에 있습니다. 그 파일의 내용을 읽거나 출력하지 않고, 커밋하지 않습니다. GitHub Actions의 배포 키는 [`docs/release.md`](docs/release.md).
+- 배포 키(`release.keystore`, `pass`, `mod.key`)는 저장소 밖에 둡니다. 저장소 안(git 제외 폴더 포함)에 옮기지 않습니다(`git clean -x`, 폴더 삭제, 다시 받기로 사라집니다). 키 파일의 내용을 읽거나 출력하지 않습니다. GitHub Actions의 배포 키는 [`docs/release.md`](docs/release.md).
 - PC 스크립트는 `scripts/local-env.sh`(`nx4_env`, `nx4_need`)로 저장소 맨 위 `.env.local`(git 제외)에서 읽고, 값이 없으면 멈춥니다. 명령 앞에 준 값이 `.env.local`보다 앞섭니다.
 - 새 경로 변수는 `.env.example`에 설명과 함께 더합니다.
 - `tests/mod-test.sh`는 `.env.local`에서 `HMGAPI_SRC`만 읽고, 시험이 부르는 스크립트는 `.env.local`을 읽지 않게 합니다(`NX4_ENV_FILE=`).
