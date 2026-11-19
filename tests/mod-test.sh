@@ -4,9 +4,16 @@
 #   HMGAPI_SRC=<HMG-API 저장소> sh tests/mod-test.sh
 #                                        + 임시 키로 scripts/build.sh를 끝까지 돌리고, 만든 모드를 HMG-API 엔진
 #                                          (PC JVM)에 설치해 서비스·앱 등록과 차종 제한(NX4.KOR 260902만)을 본다
+#                                          (HMGAPI_SRC는 .env.local에 적어도 된다)
 # 가짜 도구: hmgapid, pm, am, getprop, settings, svc, sleep. 서비스 래퍼는 가짜 스크립트를 부르게 해서 넘기는 값을 보고,
 # post.sh·preun.sh·hotspot.sh(setup_hmgapi)는 진짜를 돌린다.
 B=$(cd "$(dirname "$0")/.." && pwd)
+# .env.local에서는 HMGAPI_SRC만 읽는다. 시험이 부르는 build.sh는 .env.local을 읽지 않게 한다
+# (NX4_PKG_ZIP 같은 개인 설정이 섞이면 시험 결과가 PC마다 달라진다)
+. "$B/scripts/local-env.sh"
+nx4_env "$B" HMGAPI_SRC
+NX4_ENV_FILE=
+export NX4_ENV_FILE
 PKG=$B/mod
 T=$(mktemp -d /tmp/nx4-kor-test.XXXXXX)
 # KEEP=1: 시험 폴더를 남긴다(실패 원인 보기)
@@ -20,7 +27,7 @@ V=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' $PKG/mod.json | head -1)
 # --- 구문 검사: 차의 셸은 mksh. 있는 ksh 계열과 dash로 본다(PC sh만으로는 ksh 계열에서만 틀리는 구문을 못 잡는다) ---
 KSHS=$(for s in mksh ksh dash; do command -v $s; done)
 [ -n "$KSHS" ] || bad "구문 검사: mksh/ksh/dash 없음"
-for f in $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/usb/troubleShooter $B/scripts/build.sh $B/scripts/build-app.sh; do
+for f in $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/usb/troubleShooter $B/scripts/*.sh $B/tests/emu/*.sh; do
   for KSH in $KSHS; do check "구문 검사 $(basename $KSH): ${f#$B/}" '$KSH -n $f'; done
 done
 
