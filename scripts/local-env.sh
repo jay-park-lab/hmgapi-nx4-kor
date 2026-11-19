@@ -1,4 +1,4 @@
-# 저장소 밖 경로(Android SDK, 서명 키, HMG-API 소스 등)를 .env.local에서 읽는다. PC에서 도는 스크립트가 `.`으로 불러 쓴다.
+# PC마다 다른 경로(Android SDK, 서명 키, HMG-API 소스 등)를 .env.local에서 읽는다. PC에서 도는 스크립트가 `.`으로 불러 쓴다.
 # 코드에는 이런 경로의 기본값을 두지 않는다: 값은 명령 앞에 주거나 .env.local에 적는다(형식은 .env.example).
 #
 # .env.local: 저장소 맨 위, git에 넣지 않는다.

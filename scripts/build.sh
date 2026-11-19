@@ -6,7 +6,7 @@
 # 필요한 것: JDK, python3, zip/unzip, HMG-API 소스(서명 도구 tools/mkmodpkg.sh), 상태 화면 앱 APK.
 # 환경 변수(명령 앞에 주거나 .env.local에 적는다. .env.example, scripts/local-env.sh):
 #   HMGAPI_SRC      HMG-API 저장소 위치(필수). 서명은 그 tools/mkmodpkg.sh가 한다
-#   NX4_MOD_KEY      모드 작성자 키(필수, 저장소 밖에 둔다). 처음 한 번:
+#   NX4_MOD_KEY      모드 작성자 키(필수, 저장소 맨 위 .keys(git 제외)나 저장소 밖에 둔다). 처음 한 번:
 #                     (cd $HMGAPI_SRC && mkdir -p out/engine-host && javac --release 8 -d out/engine-host core/runtime/java/hmgapi/engine/*.java)
 #                     java -cp $HMGAPI_SRC/out/engine-host hmgapi.engine.Signing keygen $NX4_MOD_KEY
 #                   HMG-API는 같은 키로 서명한 업데이트만 받는다: 이 키를 잃으면 모드를 지우고 다시 설치해야 한다
