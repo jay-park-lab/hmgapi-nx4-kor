@@ -2,7 +2,7 @@
  * HMG-API(VysseCodes, AGPL-3.0)의 core/app/java/hmgapi/app/QrCode.java를 그대로 가져왔다.
  * 바꾼 것은 package 줄 하나뿐이다. 원본: https://github.com/VysseCodes/HMG-API (커밋 180185d)
  */
-package korea.projection.app;
+package io.github.jayparklab.nx4kor;
 
 /**
  * A QR code for a short text (byte mode, error correction M, the smallest version

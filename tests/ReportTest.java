@@ -1,4 +1,4 @@
-package korea.projection.app;
+package io.github.jayparklab.nx4kor;
 
 /**
  * PC에서 상태 화면의 판단(Report)과 QR 크기를 시험한다. tests/stub-test.sh가 javac로 컴파일해 돌린다.
@@ -70,7 +70,7 @@ public class ReportTest {
         check("예전 상태 파일(mod_on·bridge 없음)도 초록, 칸은 '예'", oldfile.level() == 0 && "예".equals(row(oldfile, "HMG-API 무선 모드")));
         Report hoff = Report.parse(GOOD.replace("hooks=on", "hooks=off\nhookmap=mapped"));
         check("훅 꺼짐(mapped) → 'Check the map on this car' 안내, 노랑(지난 기록일 수 있음)", hoff.verdict().contains("Check the map on this car") && hoff.level() == 1 && row(hoff, "HMG-API 훅").startsWith("꺼짐 (mapped"));
-        check("  none → 지도 없음 제보 안내", Report.parse(GOOD.replace("hooks=on", "hooks=off\nhookmap=none")).verdict().contains("지도가 없어"));
+        check("  none → map 없음 제보 안내", Report.parse(GOOD.replace("hooks=on", "hooks=off\nhookmap=none")).verdict().contains("map이 없어"));
         check("  mismatch → 소프트웨어 불일치 안내", Report.parse(GOOD.replace("hooks=on", "hooks=off\nhookmap=mismatch")).verdict().contains("맞지 않아"));
         check("  상태 모름 → 재부팅 안내", Report.parse(GOOD.replace("hooks=on", "hooks=off")).verdict().contains("마지막 부팅 기록"));
         check("확인 안 된 차는 HMG-API가 없어도 노랑(문구와 색이 맞음)", Report.parse(GOOD.replace("tested=yes", "tested=no").replace("hmgapi=version 1.0.2 build 180185d 2026-11-04\n", "")).level() == 1);
@@ -111,16 +111,16 @@ public class ReportTest {
         check("아주 작은 자리도 칸 1px 이상, 음수 여백 없음", tiny[0] >= 1 && tiny[1] >= 0);
 
         // 1.5.5 설치 진행 기록
-        String PR = "pct=40\nstate=run\nstage=이 차의 지도를 만드는 중입니다(1~2분)\nstart=1000\nt=1100\nboot=abc-123\n";
+        String PR = "pct=40\nstate=run\nstage=이 차의 map을 만드는 중입니다(1~2분)\nstart=1000\nt=1100\nboot=abc-123\n";
         Report pr = Report.parse(PR);
         check("진행 기록: 이번 부팅이면 진행 중, 40%, 경과 2분 05초", pr.progRunning("abc-123\n") && pr.progPct() == 40
             && "2분 05초".equals(Report.mmss(pr.progElapsed(1125))));
         check("  지난 부팅의 기록이면 진행 막대를 보이지 않음", !pr.progRunning("other") && !pr.progRunning(null));
         check("  15분 넘게 새로 쓰이지 않은 기록은 멈춘 것으로 봄", pr.progRunning("abc-123", 1100 + 900) && !pr.progRunning("abc-123", 1100 + 901));
         check("  진행 중이면 맨 위 판정을 바꾸지 않음", pr.progVerdict("abc-123") == null);
-        Report rb = Report.parse(PR.replace("state=run", "state=reboot").replace("stage=이 차의 지도를 만드는 중입니다(1~2분)", "stage=무선 카플레이 설정을 마쳤습니다. 내비를 재부팅해 주세요."));
+        Report rb = Report.parse(PR.replace("state=run", "state=reboot").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=무선 카플레이 설정을 마쳤습니다. 내비를 재부팅해 주세요."));
         check("  재부팅 필요 → 그 문구가 판정, 노랑", "무선 카플레이 설정을 마쳤습니다. 내비를 재부팅해 주세요.".equals(rb.progVerdict("abc-123")) && rb.progLevel() == 1);
-        Report rf = Report.parse(PR.replace("state=run", "state=fail").replace("stage=이 차의 지도를 만드는 중입니다(1~2분)", "stage=HMG-API가 없습니다."));
+        Report rf = Report.parse(PR.replace("state=run", "state=fail").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=HMG-API가 없습니다."));
         check("  실패 → 그 문구가 판정, 빨강", "HMG-API가 없습니다.".equals(rf.progVerdict("abc-123")) && rf.progLevel() == 2);
         check("  준비됨(done)은 판정을 바꾸지 않음(상태표 판정 그대로)", Report.parse(PR.replace("state=run", "state=done")).progVerdict("abc-123") == null);
         check("  진행률이 이상하면 0~100으로", Report.parse("pct=250").progPct() == 100 && Report.parse("pct=x").progPct() == 0 && Report.parse("pct=-5").progPct() == 0);

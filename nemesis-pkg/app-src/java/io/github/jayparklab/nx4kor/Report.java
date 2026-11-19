@@ -1,4 +1,4 @@
-package korea.projection.app;
+package io.github.jayparklab.nx4kor;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -402,9 +402,9 @@ final class Report {
         if ("mapped".equals(m))
             return "HMG-API 훅이 꺼져 있습니다. HMG-API 앱 Settings에서 'Check the map on this car'를 누른 뒤 내비를 재부팅해 주세요.";
         if ("none".equals(m))
-            return "HMG-API에 이 차의 지도가 없어 훅이 꺼져 있습니다. QR로 제보해 주세요.";
+            return "HMG-API에 이 차의 map이 없어 훅이 꺼져 있습니다. QR로 제보해 주세요.";
         if ("mismatch".equals(m))
-            return "HMG-API 지도가 이 차의 소프트웨어와 맞지 않아 훅이 꺼져 있습니다. QR로 제보해 주세요.";
+            return "HMG-API map이 이 차의 소프트웨어와 맞지 않아 훅이 꺼져 있습니다. QR로 제보해 주세요.";
         return "HMG-API 훅이 꺼져 있습니다(마지막 부팅 기록). 내비를 3분 후 재부팅(RESET 버튼 또는 NEMESIS 재부팅)한 뒤 다시 확인해 주세요.";
     }
 

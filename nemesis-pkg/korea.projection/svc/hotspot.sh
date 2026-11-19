@@ -61,10 +61,10 @@ PROC=${PROC:-/proc}
 STOCK_GRACE=${STOCK_GRACE:-90}
 # 이 패키지가 동작하는 차. 목록에 없는 차(해외 차)는 로그만 남기고 대기한다.
 # - CARS_OK: 차에서 동작을 확인한 차 (니로 하이브리드)
-# - CARS_TRY: 제보(Car Report, 순정 체크섬)로 지도를 만들어 패키지에 넣었고, 차에서는 아직 확인하지 않은 차
+# - CARS_TRY: 제보(Car Report, 순정 체크섬)로 map을 만들어 패키지에 넣었고, 차에서는 아직 확인하지 않은 차
 #   (쏘나타 하이브리드 DN8 HMG-API #91, 그랜저 하이브리드 IG #7, 벨로스터 N #8). 확인되면 CARS_OK로 옮긴다.
-# - CARS_AUTO: 그 밖의 모든 한국 차(자동 시험, 1.5.2 소유자 결정). 패키지에 지도가 없으면 HMG-API가 그 차의
-#   파일로 지도를 만들고(engine map-car --write) 그 차에서 확인(verify-map)한 뒤에만 무선 모드를 적용한다.
+# - CARS_AUTO: 그 밖의 모든 한국 차(자동 시험, 1.5.2 소유자 결정). 패키지에 map이 없으면 HMG-API가 그 차의
+#   파일로 map을 만들고(engine map-car --write) 그 차에서 확인(verify-map)한 뒤에만 무선 모드를 적용한다.
 #   무선 모드(한국 차 빌드)도 Wi-Fi 칩이 있는 한국 차만 받는다. 결과는 제보 파일(3-log.txt)로 본다.
 CARS_OK='DEPEHEV.KOR.*.260902'
 CARS_TRY='DN822HEV.KOR.*.260902 IGPEHEV.KOR.*.260902 JSN.KOR.*.260902 IGPE.KOR.*.260902'
@@ -1046,7 +1046,7 @@ take_wlan0() {
 # 자동 설정(fix_perms → setup_hmgapi, 부팅 120초 뒤)이 아직 할 일이 있는가: 무선 모드가 없고, 다시 하지 않기로 한
 # 기록(mod.tried, automap.bad, wifi.nochip)도 없고, wireless.projection도 없을 때. 1.5.3 그랜저IG 2.5(#2)는 서비스가
 # 2분 간격으로 다시 시작돼 자동 설정이 한 번도 돌지 못했다(재부팅 반복 추정). 그래서 설정 중임을 알린다.
-# 안내는 설치마다 한 번만($BK/setup.told): 설정이 조용히 끝나는 경로(지도 실패 기록, 순정 핫스팟 켜짐 등)에서
+# 안내는 설치마다 한 번만($BK/setup.told): 설정이 조용히 끝나는 경로(map 실패 기록, 순정 핫스팟 켜짐 등)에서
 # 부팅마다 뜨지 않게.
 setup_pending() {
   [ ! -f $BK/setup.told ] && [ ! -f $HMGDATA/mods/$MOD_ID/mod.json ] && [ ! -f $BK/mod.tried ] \
@@ -1458,8 +1458,8 @@ ap_tick() {
 PROG=${PROG:-/data/local/tmp/korea-projection-progress.txt}
 PSTART=${PSTART:-$(date +%s 2>/dev/null)}
 # 1.7.3(U-7): 진행 중(run)이면 step=<단계>/<전체>도 쓴다(앱이 "단계 N/M"로 보임). 단계는 진행률로 정한다:
-#   1 시작·HMG-API 준비 기다림(3·5~25) · 2 HMG-API·지도 확인(27·30) · 3 이 차 지도 만들기·확인(40·55) · 4 Wi-Fi 칩(62)
-#   · 5 무선 모드 설치·적용·새 판·마무리(70·85·95). 차에 따라 건너뛰는 단계가 있다(지도가 있는 차는 3을 건너뜀).
+#   1 시작·HMG-API 준비 기다림(3·5~25) · 2 HMG-API·map 확인(27·30) · 3 이 차 map 만들기·확인(40·55) · 4 Wi-Fi 칩(62)
+#   · 5 무선 모드 설치·적용·새 판·마무리(70·85·95). 차에 따라 건너뛰는 단계가 있다(map이 있는 차는 3을 건너뜀).
 # 모드를 새 판으로 바꾸기만 하는 경로(MOD_WAIT=1)는 3단계로 센다(기다림 1 → 확인 2 → 바꾸기·마무리 3, 리뷰 L5: 5/5로 뛰지 않게).
 # 진행률을 바꾸면 여기도 같이 고친다. 옛 앱은 모르는 줄을 무시한다.
 prog_step() {
@@ -1815,9 +1815,9 @@ fix_running() {
 # 상태 화면 앱의 [제보 파일 만들기] 버튼이 앱 개인 폴더에 요청 파일을 쓴다. 내용은 한 줄 "<요청 id> <boot_id> <부팅 뒤 초>"
 # (요청 id는 앱의 부팅 뒤 밀리초, 숫자만). 다른 앱은 이 폴더에 쓸 수 없어 아무나 제보 만들기를 시킬 수 없다.
 # root가 이 파일을 읽고 지울 수 있는지(SELinux·권한)는 차에서 확인해야 한다(확인 안 함). 읽지 못하면 요청이 없는 것으로 넘어간다.
-REQ=${REQ:-/data/data/korea.projection.app/files/report.req}
+REQ=${REQ:-/data/data/io.github.jayparklab.nx4kor/files/report.req}
 # 1.7.3(U-3): [지금 재부팅] 요청. 같은 앱 개인 폴더, 같은 형식. 감시자(status.sh --watch)만 받는다(서비스 점검은 받지 않음).
-RBREQ=${KP_RBREQ:-/data/data/korea.projection.app/files/reboot.req}
+RBREQ=${KP_RBREQ:-/data/data/io.github.jayparklab.nx4kor/files/reboot.req}
 # 요청 파일($1, 기본 $REQ)을 읽어 RQ_ID·RQ_EL을 정한다. 읽은 내용은 RQ_RAW에 둔다(못 읽으면 빈 값). 이번 부팅의 요청이고, 값이 숫자이고, 이미 받은 요청($2 파일의 id,
 # 기본 req.last)이 아니면 0. 받지 않는 요청을 지울 때는 req_drop을 쓴다. 지우지 못해 남은 요청을 다시 받지 않게 하는 판단이 여기 하나뿐이다(서비스 점검과 status.sh가 함께 쓴다).
 req_peek() {
@@ -1887,13 +1887,13 @@ has_line() {
   while IFS= read -r _x; do [ "$_x" = "$1" ] && return 0; done < "$2"
   return 1
 }
-# --- 1.5 자동 설정: HMG-API 무선 모드와 이 차의 지도 (확인된 차에서만) ---
-# HMG-API 공식판에 한국 차 지원(지도, 모드의 지원 차·패치 세트)이 아직 없어(니로: PR VysseCodes/HMG-API#22),
-# 패키지에 든 한국 차 빌드 모드(hmgapi/wireless-carplay-aa.zip)와 차에서 확인한 지도(hmgapi/maps/<제조사>/<차종>/
+# --- 1.5 자동 설정: HMG-API 무선 모드와 이 차의 map (확인된 차에서만) ---
+# HMG-API 공식판에 한국 차 지원(map, 모드의 지원 차·패치 세트)이 아직 없어(니로: PR VysseCodes/HMG-API#22),
+# 패키지에 든 한국 차 빌드 모드(hmgapi/wireless-carplay-aa.zip)와 차에서 확인한 map(hmgapi/maps/<제조사>/<차종>/
 # <지역>/<펌웨어>/)를 HMG-API 명령으로 넣는다. 파일을 직접 고치지 않는다.
-# - 지도: 패키지에 든 차별 지도 가운데 HMG-API에 없는 것(car.json 없음)만 넣고, 넣었으면 HMG-API의 지도 확인
-#   (verify-map, 이 차의 지도를 확인)을 돌린다.
-#   HMG-API를 업데이트하면 지도 폴더가 릴리스 것으로 바뀌므로 부팅마다 본다. 공식판에 지도가 생기면 그것을 쓴다.
+# - map: 패키지에 든 차별 map 가운데 HMG-API에 없는 것(car.json 없음)만 넣고, 넣었으면 HMG-API의 map 확인
+#   (verify-map, 이 차의 map을 확인)을 돌린다.
+#   HMG-API를 업데이트하면 map 폴더가 릴리스 것으로 바뀌므로 부팅마다 본다. 공식판에 map이 생기면 그것을 쓴다.
 # - 모드: 설치돼 있지 않을 때 한 번만 설치한다($BK/mod.tried). 차주가 일부러 지우거나 꺼 둔 것은 다시 하지 않는다.
 #   설치한 것은 $BK/mod.ours로 남겨 이 패키지를 지울 때 그것만 정리한다(preun.sh).
 # - 적용(apply)은 계획이 이 모드의 변경뿐이고 훅이 켜질 때만 한다. 아니면 HMG-API 앱에서 적용하라고 안내한다.
@@ -2000,8 +2000,8 @@ NOPART_MSG="이 차의 내비에는 Wi-Fi 부품이 없어 무선 카플레이�
 NOCHIP_MSG="이 차는 Wi-Fi 칩이 켜지지 않아 지원하기 어렵습니다. $DONGLE_MSG"
 # 1.7.4(P-4, #277): "무선 모드를 넣지 못했습니다"로만 보이던 길의 이유. 진행 기록·상태 화면 판정(status.sh가 문구로 판정 코드
 # mapfail·nomap·wifigone을 정함, QR의 verdict)이 같은 문장을 쓴다
-MAPFAIL_MSG="이 차의 지도를 확인하지 못해 무선 모드를 넣지 않았습니다. 삭제 후 다시 설치해도 같으면 USB를 꽂고 [제보 파일 만들기]로 알려 주세요."
-NOMAP_MSG="HMG-API가 이 차의 지도를 만들지 않아 무선 모드를 넣지 않았습니다. USB를 꽂고 [제보 파일 만들기]로 알려 주세요."
+MAPFAIL_MSG="이 차의 map을 확인하지 못해 무선 모드를 넣지 않았습니다. 삭제 후 다시 설치해도 같으면 USB를 꽂고 [제보 파일 만들기]로 알려 주세요."
+NOMAP_MSG="HMG-API가 이 차의 map을 만들지 않아 무선 모드를 넣지 않았습니다. USB를 꽂고 [제보 파일 만들기]로 알려 주세요."
 WIFIGONE_MSG="전에는 켜지던 Wi-Fi가 지금은 켜지지 않습니다. 3분 후 재부팅해도 같으면 USB를 꽂고 [제보 파일 만들기]로 알려 주세요."
 # 1.7.3(W-1·W-4·G-1): 순정 module_version(마지막 값, 숫자만). 찾으면 $BK/wifi.modver에도 남긴다(로그 버퍼가 밀려도 다음 부팅에 쓰게).
 # 3이면 순정 Wi-Fi 서비스도 Wi-Fi 하드웨어가 없다고 본다(#50·#58·#99). 모르면 빈 값
@@ -2259,7 +2259,7 @@ setup_hmgapi() {
     ptrack 100 fail "HMG-API가 없습니다. HMG-API 1.0.2 이상을 먼저 설치해 주세요."
     return 0
   fi
-  ptrack 30 run "지도와 무선 모드를 확인하는 중입니다"
+  ptrack 30 run "map과 무선 모드를 확인하는 중입니다"
   $BB mkdir -p $BK
   # 1.6.1: 무선 모드가 없으면 "우리가 넣음"(mod.ours) 기록을 지운다. 남겨 두면 차주가 나중에 넣은 다른 판을
   # 우리 것으로 보고 안내하지 않거나, 패키지를 지울 때 그 모드를 지운다.
@@ -2267,20 +2267,20 @@ setup_hmgapi() {
   [ -f $HMGDATA/mods/$MOD_ID/mod.json ] || rm -f $BK/mod.ours
   # _fail: 안내를 이미 남김(알림 기록 또는 LAST_MSG → 마지막 진행 기록 문구) → "설정을 마쳤습니다"로 덮지 않는다
   _restart=0; _fail=0; _upd=0; _wchk=0; _wstop=0
-  # 지도: 차마다 임시 폴더에 다 복사한 뒤 한 번에 옮긴다(도중에 전원이 꺼져 반쪽 지도가 남지 않게).
+  # map: 차마다 임시 폴더에 다 복사한 뒤 한 번에 옮긴다(도중에 전원이 꺼져 반쪽 map이 남지 않게).
   # 임시 폴더는 maps/.kp-tmp: HMG-API는 maps/<제조사>/<차종>/<지역>/<펌웨어>/만 읽으므로 반쪽 car.json을 보지 않는다.
-  # 이 차의 지도만 넣는다: 폴더의 펌웨어가 같고 car.json의 products에 "<모델>.<지역>."이 있는 것.
-  #   다른 차 지도는 HMG-API 공유 폴더에 남기지 않는다(복사 실패로 이 차 설정이 막히지도 않게).
-  # 지도 확인(verify-map)은 지도를 넣었을 때만 한다. 실패하면 넣은 지도를 다시 빼고(차에 있던 다른 지도를
-  #   가리지 않게) $BK/map.bad에 "<폴더> <car.json md5>"를 남긴다. 같은 지도는 다시 넣지 않고 모드도 설치하지
-  #   않는다. 지도가 바뀐 새 버전이면(md5 다름) 다시 시도한다.
-  # map.ours는 기록용이다: 지도는 HMG-API의 다른 모드도 쓰므로 패키지를 지워도 남긴다.
+  # 이 차의 map만 넣는다: 폴더의 펌웨어가 같고 car.json의 products에 "<모델>.<지역>."이 있는 것.
+  #   다른 차 map은 HMG-API 공유 폴더에 남기지 않는다(복사 실패로 이 차 설정이 막히지도 않게).
+  # map 확인(verify-map)은 map을 넣었을 때만 한다. 실패하면 넣은 map을 다시 빼고(차에 있던 다른 map을
+  #   가리지 않게) $BK/map.bad에 "<폴더> <car.json md5>"를 남긴다. 같은 map은 다시 넣지 않고 모드도 설치하지
+  #   않는다. map이 바뀐 새 버전이면(md5 다름) 다시 시도한다.
+  # map.ours는 기록용이다: map은 HMG-API의 다른 모드도 쓰므로 패키지를 지워도 남긴다.
   _mapbad=0; _mine=0; _myrel=
   _prod=$(getprop ro.build.product 2>/dev/null)
   _pm=${_prod%%.*}; _pr=${_prod#*.}; _pr=${_pr%%.*}
   _tmp=$HMGDATA/maps/.kp-tmp
   # 우리가 무선을 맡지 않는 차(확인된 차가 아니고 무선 모드를 아직 넣지 않았을 때만 본다. 모드가 기능 파일을
-  # 바꾸면 결과가 달라지므로). 시험 지원 차(CARS_TRY)와 자동 시험 차 모두 본다. 지도도 넣지 않는다.
+  # 바꾸면 결과가 달라지므로). 시험 지원 차(CARS_TRY)와 자동 시험 차 모두 본다. map도 넣지 않는다.
   # - wireless.projection이 설치된 차: 같은 파일·속성을 다른 패키지가 관리한다(먼저 지워야 한다)
   # - 순정 핫스팟이 지금 켜져 있는 차(우리 것이 아닌 hostapd가 돎): 순정이 wlan0을 쓰고 있으므로 이번 부팅은
   #   건너뛰고 다음 부팅에 다시 본다. 순정 핫스팟 기능이 있어도 꺼져 있으면 우리 방식으로 한다
@@ -2307,35 +2307,35 @@ setup_hmgapi() {
     [ -f "$_c" ] || continue
     _d=${_c%/car.json}; _rel=${_d#$KP_HMG/maps/}
     [ "${_rel##*/}" = "${_prod##*.}" ] && $BB grep -q "\"$_pm\.$_pr\.\"" $_c || continue
-    # 같은 폴더에 지도가 이미 있으면(공식판 등) 그것을 쓴다: 실패 기록보다 먼저 본다
+    # 같은 폴더에 map이 이미 있으면(공식판 등) 그것을 쓴다: 실패 기록보다 먼저 본다
     [ -f $HMGDATA/maps/$_rel/car.json ] && continue
     set -- $($BB md5sum < $_c); _sum=$1
     if has_line "$_rel $_sum" $BK/map.bad; then
-      log "지도 넣지 않음: $_rel (이 차에서 지도 확인에 실패한 지도)"; _mapbad=1; LAST_MSG="$MAPFAIL_MSG"; continue
+      log "map 넣지 않음: $_rel (이 차에서 map 확인에 실패한 map)"; _mapbad=1; LAST_MSG="$MAPFAIL_MSG"; continue
     fi
     $BB rm -rf $_tmp
     if $BB mkdir -p $_tmp ${HMGDATA}/maps/${_rel%/*} && $BB cp $_d/*.json $_tmp/ && $BB chmod -R 700 $_tmp \
         && $BB rm -rf $HMGDATA/maps/$_rel && $BB mv $_tmp $HMGDATA/maps/$_rel; then
       echo "$_rel" >> $BK/map.ours
-      log "지도 넣음: $_rel"
+      log "map 넣음: $_rel"
       _mine=1; _myrel=$_rel; _mysum=$_sum
     else
       $BB rm -rf $_tmp
-      log "지도 넣기 실패: $_rel"; _fail=1; _mapbad=1
+      log "map 넣기 실패: $_rel"; _fail=1; _mapbad=1
     fi
   done
-  # 자동 시험(CARS_OK·CARS_TRY가 아닌 한국 차): 패키지에 이 차 지도가 없으므로, HMG-API에 이 차 지도가 없으면
-  # HMG-API가 이 차의 파일로 지도를 만든다(engine map-car --write, 상태 probed). 아래 verify-map이 이 차에서
-  # 확인해야 훅이 켜진다. 확인에 실패하면 만든 지도를 지우고 $BK/automap.bad를 남긴다(다시 만들지 않고 모드도
+  # 자동 시험(CARS_OK·CARS_TRY가 아닌 한국 차): 패키지에 이 차 map이 없으므로, HMG-API에 이 차 map이 없으면
+  # HMG-API가 이 차의 파일로 map을 만든다(engine map-car --write, 상태 probed). 아래 verify-map이 이 차에서
+  # 확인해야 훅이 켜진다. 확인에 실패하면 만든 map을 지우고 $BK/automap.bad를 남긴다(다시 만들지 않고 모드도
   # 넣지 않음, 패키지를 지우면 같이 지워진다. 업데이트·같은 판 다시 설치·HMG-API 다시 설치로는 지워지지 않는다: 1.7.4 B-9 시험).
-  # automap.bad가 없을 때, HMG-API 업데이트로 지도 폴더가 바뀌면 다음 부팅에 다시 만든다.
-  # 이미 있는 지도(공식판, 차주가 만든 것)는 건드리지 않고, 확인만 한 번 한다(_myrel 없음 → 지우지 않음).
+  # automap.bad가 없을 때, HMG-API 업데이트로 map 폴더가 바뀌면 다음 부팅에 다시 만든다.
+  # 이미 있는 map(공식판, 차주가 만든 것)는 건드리지 않고, 확인만 한 번 한다(_myrel 없음 → 지우지 않음).
   _auto=0
   car_in "$_prod" "$CARS_OK $CARS_TRY" || _auto=1
   # 위에서 건너뛰기로 한 차는 자동 시험도 하지 않는다
   [ $_skip = 1 ] && _auto=0
   if [ $_auto = 1 ] && [ -f $BK/automap.bad ]; then
-    log "자동 시험: 이 차에서 만든 지도가 확인에 실패한 기록이 있어 무선 모드를 넣지 않음"; _mapbad=1; LAST_MSG="$MAPFAIL_MSG"
+    log "자동 시험: 이 차에서 만든 map이 확인에 실패한 기록이 있어 무선 모드를 넣지 않음"; _mapbad=1; LAST_MSG="$MAPFAIL_MSG"
   elif [ $_auto = 1 ] && [ $_mine = 0 ]; then
     _lm=$(echo "$_pm" | $BB awk '{ print tolower($0) }'); _lr=$(echo "$_pr" | $BB awk '{ print tolower($0) }')
     _have=0
@@ -2343,9 +2343,9 @@ setup_hmgapi() {
     if [ $_have = 1 ]; then
       [ -f $BK/automap.checked ] || { _mine=1; : > $BK/automap.checked; }
     elif [ -f $BK/automap.foreign ]; then
-      # 다른 폴더 이름의 이 차 지도(공식판 등)를 쓰기로 했다: 무거운 map-car를 부팅마다 다시 돌리지 않는다
+      # 다른 폴더 이름의 이 차 map(공식판 등)를 쓰기로 했다: 무거운 map-car를 부팅마다 다시 돌리지 않는다
       :
-    elif ptrack 40 run "이 차의 지도를 만드는 중입니다(1~2분)"; hmgapid engine map-car --write > $W/map-car.txt 2>&1; then
+    elif ptrack 40 run "이 차의 map을 만드는 중입니다(1~2분)"; hmgapid engine map-car --write > $W/map-car.txt 2>&1; then
       _nw=0
       while IFS= read -r _l; do
         case "$_l" in
@@ -2354,47 +2354,47 @@ setup_hmgapi() {
         esac
       done < $W/map-car.txt
       case "$_myrel" in
-        */*/*/*) _mine=1; echo "$_myrel" >> $BK/map.ours; log "자동 시험: 이 차의 파일로 지도를 만듦 ($_myrel)" ;;
+        */*/*/*) _mine=1; echo "$_myrel" >> $BK/map.ours; log "자동 시험: 이 차의 파일로 map을 만듦 ($_myrel)" ;;
         *)
           _myrel=
           if [ $_nw = 1 ]; then
-            # 다른 폴더 이름으로 이 차 지도(공식판 등)가 이미 있다: 만들지 않고 그 지도를 한 번 확인한다(지우지 않음)
-            log "자동 시험: HMG-API에 이 차 지도가 이미 있음 (그 지도를 씀)"
+            # 다른 폴더 이름으로 이 차 map(공식판 등)가 이미 있다: 만들지 않고 그 map을 한 번 확인한다(지우지 않음)
+            log "자동 시험: HMG-API에 이 차 map이 이미 있음 (그 map을 씀)"
             : > $BK/automap.foreign
             [ -f $BK/automap.checked ] || { _mine=1; : > $BK/automap.checked; }
           else
-            log "자동 시험: 지도를 만들지 않음 ($W/map-car.txt)"; _mapbad=1; LAST_MSG="$NOMAP_MSG"
+            log "자동 시험: map을 만들지 않음 ($W/map-car.txt)"; _mapbad=1; LAST_MSG="$NOMAP_MSG"
           fi ;;
       esac
     else
-      log "자동 시험: 지도 만들기 실패 ($W/map-car.txt)"; _fail=1; _mapbad=1; : > $BK/automap.bad
-      notice "Korea Projection: 이 차의 HMG-API 지도를 만들지 못했습니다. USB를 꽂고 Launch 화면의 [제보 파일 만들기]를 눌러 보내 주세요."
+      log "자동 시험: map 만들기 실패 ($W/map-car.txt)"; _fail=1; _mapbad=1; : > $BK/automap.bad
+      notice "Korea Projection: 이 차의 HMG-API map을 만들지 못했습니다. USB를 꽂고 Launch 화면의 [제보 파일 만들기]를 눌러 보내 주세요."
     fi
   fi
   if [ $_mine = 1 ] && [ $_mapbad = 0 ]; then
-    if ptrack 55 run "지도를 확인하는 중입니다"; hmgapid engine verify-map > $W/verify-map.txt 2>&1; then
-      log "지도 확인 통과 (다음 시작부터 훅 켜짐)"; _restart=1
+    if ptrack 55 run "map을 확인하는 중입니다"; hmgapid engine verify-map > $W/verify-map.txt 2>&1; then
+      log "map 확인 통과 (다음 시작부터 훅 켜짐)"; _restart=1
       [ $_auto = 1 ] && : > $BK/automap.checked
     else
-      log "지도 확인 실패 ($W/verify-map.txt)"; _fail=1; _mapbad=1
+      log "map 확인 실패 ($W/verify-map.txt)"; _fail=1; _mapbad=1
       [ $_auto = 1 ] && : > $BK/automap.bad
       case "$_myrel" in *..*|/*) _myrel= ;; esac
       if [ -n "$_myrel" ]; then
         $BB rm -rf $HMGDATA/maps/$_myrel
         [ $_auto = 1 ] || echo "$_myrel $_mysum" >> $BK/map.bad
-        log "지도 뺌: $_myrel (다음 부팅에도 넣지 않음)"
-        # 확인 기록(HMG-API state)은 방금 실패로 덮였다. 차에 이 차용 다른 지도(차주가 만든 것 등)가 있으면
-        # 그 지도로 다시 확인해 예전처럼 훅이 켜지게 한다. 다른 지도가 없으면 실패하고 끝난다.
+        log "map 뺌: $_myrel (다음 부팅에도 넣지 않음)"
+        # 확인 기록(HMG-API state)은 방금 실패로 덮였다. 차에 이 차용 다른 map(차주가 만든 것 등)가 있으면
+        # 그 map으로 다시 확인해 예전처럼 훅이 켜지게 한다. 다른 map이 없으면 실패하고 끝난다.
         if hmgapid engine verify-map > $W/verify-map2.txt 2>&1; then
-          log "차에 있던 다른 지도로 다시 확인 통과"
+          log "차에 있던 다른 map으로 다시 확인 통과"
         else
-          log "다른 지도로 다시 확인 안 됨 ($W/verify-map2.txt)"
+          log "다른 map으로 다시 확인 안 됨 ($W/verify-map2.txt)"
         fi
       fi
-      notice "Korea Projection: HMG-API 지도 확인에 실패했습니다."
+      notice "Korea Projection: HMG-API map 확인에 실패했습니다."
     fi
   fi
-  # 무선 모드: 지도가 잘못됐으면 하지 않는다(훅 없이 기능 파일·속성만 바뀌므로).
+  # 무선 모드: map이 잘못됐으면 하지 않는다(훅 없이 기능 파일·속성만 바뀌므로).
   # mod.tried는 설치에 성공했거나 다시 해도 같은 결과일 때(zip md5 다름)만 남긴다. 일시적인 실패
   # (앞의 apply가 안 끝남, 데몬이 바쁨)는 다음 부팅에 다시 한다.
   if [ $_mapbad = 0 ] && [ ! -f $HMGDATA/mods/$MOD_ID/mod.json ] && [ ! -f $BK/mod.tried ]; then
@@ -2414,7 +2414,7 @@ setup_hmgapi() {
         if [ -f $BK/wifi.nopart ]; then LAST_MSG="$NOPART_MSG"; else LAST_MSG="$NOCHIP_MSG"; fi
         pnotice "Korea Projection: $LAST_MSG"
       elif [ $_wk = 2 ] && [ -f $BK/wifi.nochip ]; then
-        # 1.7.4(P-4 리뷰 낮음 1): 칩 실패로 끝난 차. 같은 부팅에 지도 확인이 통과해도(_restart) "설정을 마쳤습니다"가 나가지 않게
+        # 1.7.4(P-4 리뷰 낮음 1): 칩 실패로 끝난 차. 같은 부팅에 map 확인이 통과해도(_restart) "설정을 마쳤습니다"가 나가지 않게
         # 이유를 둔다(화면 판정은 status.sh의 nochip이 맡음). 알림은 처음 끝날 때(_wk=1) 한 번만 했으므로 여기서는 하지 않는다
         _wstop=1; LAST_MSG="$NOCHIP_MSG"
       elif [ $_wk = 2 ] && [ -f $BK/wifi.woke ]; then
@@ -2452,20 +2452,20 @@ setup_hmgapi() {
   # 북미 EV6·아이오닉5용, #25 팰리세이드) 덮어쓰지 않는다(차주 것). 대신 무엇을 하면 되는지 알린다.
   # 토스트는 띄우지 않는다(금방 사라짐, 소유자 결정). 안내는 Launch 화면에 남긴다: 진행 기록의 실패 문구(이번 부팅)와,
   # 부팅이 지나도 상태 파일의 mod_foreign=yes를 앱이 보고 맨 위 판정 줄에 같은 안내를 보인다(Report.verdict).
-  # 차주가 지우면 다음 부팅에 위에서 우리 모드를 넣는다(Wi-Fi 칩·지도 기록 등 다른 이유로 멈출 수 있어 "시도"로 쓴다).
-  # 지도가 잘못됐으면 그 사유를 먼저 보인다.
+  # 차주가 지우면 다음 부팅에 위에서 우리 모드를 넣는다(Wi-Fi 칩·map 기록 등 다른 이유로 멈출 수 있어 "시도"로 쓴다).
+  # map이 잘못됐으면 그 사유를 먼저 보인다.
   if [ $_fail = 0 ] && [ $_mapbad = 0 ] && mod_foreign; then
     log "무선 모드 설치 안 함: 한국 차를 지원하지 않는 다른 무선 모드가 이미 있음(덮어쓰지 않음)"
     LAST_MSG="차에 있는 HMG-API 무선 모드가 한국 차용이 아닙니다. HMG-API 앱에서 그 모드를 지우고 적용한 뒤 재부팅해 주세요."
     _fail=1
   fi
   # 진행 기록의 마지막 결과(상태 화면 앱이 보여 줌)
-  # 1.7.4(P-2, #276·#252·#78·#228): Wi-Fi 확인 중(_wchk)이면 지도 확인이 통과했어도(_restart) "설정을 마쳤습니다"가 아니다(모드를 넣지 않음).
+  # 1.7.4(P-2, #276·#252·#78·#228): Wi-Fi 확인 중(_wchk)이면 map 확인이 통과했어도(_restart) "설정을 마쳤습니다"가 아니다(모드를 넣지 않음).
   # 새 판으로 바꾼 경우(_upd)는 그대로 먼저 본다
   if [ $_restart = 1 ] && [ $_fail = 0 ] && [ $_upd = 1 ]; then
     ptrack 100 reboot "무선 모드를 새 판($MOD_VER)으로 바꿨습니다. 내비를 3분 후 재부팅해 주세요."
   elif [ $_wstop = 1 ] && [ $_fail = 0 ]; then
-    # 1.7.4(P-4 리뷰 낮음 1): 칩을 다시 깨우지 않는 차(칩 실패·칩이 사라짐). 지도 확인이 통과했어도 무선 모드를 넣지 않았다
+    # 1.7.4(P-4 리뷰 낮음 1): 칩을 다시 깨우지 않는 차(칩 실패·칩이 사라짐). map 확인이 통과했어도 무선 모드를 넣지 않았다
     ptrack 100 fail "$LAST_MSG"
   elif [ $_wchk = 1 ] && [ $_fail = 0 ]; then
     ptrack 100 reboot "$WIFI_CHECK_MSG"
@@ -2823,13 +2823,13 @@ perms_revert() {
   return 0
 }
 
-# 상태 화면 앱(korea.projection.app). NEMESIS의 kind=apk 설치를 쓰지 않는다: 2026-11-06 니로에서
+# 상태 화면 앱(io.github.jayparklab.nx4kor). NEMESIS의 kind=apk 설치를 쓰지 않는다: 2026-11-06 니로에서
 # /data/nemesis/apps/... 의 apk를 pm이 못 읽어 설치가 실패했고(시스템 사용자가 그 폴더를 못 연다),
 # 그 실패가 패키지 설치 전체를 막아 핫스팟까지 없어졌다. 그래서 읽을 수 있는 곳(/data/local/tmp, 644)에
 # 복사해 직접 설치하고, 실패해도 패키지는 그대로 둔다 (HMG-API 앱 설치와 같은 방식). APP는 위에서 정한다.
-APK_SRC=${APK_SRC:-$APP/app/KoreaProjection.apk}
+APK_SRC=${APK_SRC:-$APP/app/NX4KOR.apk}
 APK_COPY=${APK_COPY:-/data/local/tmp/korea-projection.apk}
-APP_ID=korea.projection.app
+APP_ID=io.github.jayparklab.nx4kor
 # 앱 설치·확인에 쓰는 명령: busybox가 있으면 busybox로, 없는 내비(K3·K8, tcc803x)는 toolbox의 같은 이름으로.
 # 1.5.5: busybox 없는 내비에도 상태 화면 앱을 설치한다. 앱이 없으면 Launch 때 NEMESIS가 "Error type 3 …
 # StatusActivity does not exist"를 띄워 우리 안내를 가렸다(#15 사진). toolbox에 cp·chmod·mkdir·grep이 있다(K3 탐사).

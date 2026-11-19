@@ -4,8 +4,8 @@
 #   1. NEMESIS판 korea.projection 패키지가 있으면 대기만 한다(둘이 같은 wlan0을 두고 다투지 않게).
 #   2. 처음 한 번 scripts/post.sh를 돌린다(NEMESIS가 설치 때 하던 일: 설치 전 Wi-Fi 상태 기록, 디버그 표시).
 #   3. svc/hotspot.sh를 그대로 띄운다. 출력은 NEMESIS판처럼 $APLOG(덧붙이기)로: hotspot.sh가 그 파일이면 크기 제한을 건다.
-# 이 스크립트 자신의 몇 줄은 hmgapid 기록(/data/hmgapi/logs/korea-projection/ap.log, hmgapid service-log)에 남는다.
-. ${KP_APP:-${HMGAPI_MOD_DIR:-/data/hmgapi/mods/korea-projection}}/standalone/env.sh
+# 이 스크립트 자신의 몇 줄은 hmgapid 기록(/data/hmgapi/logs/nx4-kor/ap.log, hmgapid service-log)에 남는다.
+. ${KP_APP:-${HMGAPI_MOD_DIR:-/data/hmgapi/mods/nx4-kor}}/standalone/env.sh
 umask 077
 mkdir -p $BK ${APLOG%/*}
 if [ -d $KP_NEMESIS_PKG ]; then

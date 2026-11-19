@@ -26,7 +26,7 @@ path=bin/status.sh
 uid=root
 
 [app.1]
-component=korea.projection.app/.StatusActivity
+component=io.github.jayparklab.nx4kor/.StatusActivity
 
 [service.0]
 name=ap

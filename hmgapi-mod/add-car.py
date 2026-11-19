@@ -2,10 +2,10 @@
 """새 한국 차를 "시험 지원"으로 추가한다 (PC에서만 실행, 차에서는 돌리지 않는다).
 
 차주가 GitHub 이슈에 올린 제보 폴더(KoreaProjection-report)의 파일 두 개로 다음을 만든다.
-  - 2-car-report.json (HMG-API Car Report): 그 차에서 직접 찾은 훅 지점 → HMG-API 지도
+  - 2-car-report.json (HMG-API Car Report): 그 차에서 직접 찾은 훅 지점 → HMG-API map
   - 1-report.md (Korea Projection 리포트): 순정 파일 체크섬 13개 → 무선 모드 패치 세트
 그리고 다음을 고친다.
-  1. nemesis-pkg/korea.projection/hmgapi/maps/<제조사>/<차종>/<지역>/<펌웨어>/  (지도)
+  1. nemesis-pkg/korea.projection/hmgapi/maps/<제조사>/<차종>/<지역>/<펌웨어>/  (map)
   2. mod-kor/wireless-carplay-aa/ (한국 차 빌드 모드 소스): mod.json system, patches.json cars, patches/<세트>/
      - 순정 체크섬이 이미 있는 세트와 똑같으면 그 세트를 같이 쓴다(새 세트를 만들지 않음).
   3. 모드를 개발 키로 서명해 nemesis-pkg/korea.projection/hmgapi/wireless-carplay-aa.zip을 바꾸고,
@@ -49,7 +49,7 @@ def paths(root):
 def read_car_report(f):
     r = json.load(open(f, encoding='utf-8'))
     if r.get('report') != 'hmgapi car report 1' or 'map_car' not in r:
-        die('%s: HMG-API Car Report(지도 결과 포함)가 아닙니다' % f)
+        die('%s: HMG-API Car Report(map 결과 포함)가 아닙니다' % f)
     u = r['unit']
     for k in ('model', 'region', 'firmware', 'product'):
         if not u.get(k):
@@ -82,7 +82,7 @@ def precheck(rep, args, ps):
         die('patches.json에 이미 %s가 있습니다(이미 추가된 차)' % key)
     dest = os.path.join(ps['maps'], args.make, args.dir, u['region'].lower(), u['firmware'])
     if os.path.exists(dest):
-        die('지도 폴더가 이미 있습니다: %s' % os.path.relpath(dest, args.root))
+        die('map 폴더가 이미 있습니다: %s' % os.path.relpath(dest, args.root))
     for f in (args.key, os.path.join(args.hmgapi, 'tools', 'mkmodpkg.sh'),
               os.path.join(args.hmgapi, 'tools', 'report-map.py'), ps['hotspot']):
         if not os.path.isfile(f):
@@ -92,11 +92,11 @@ def precheck(rep, args, ps):
 
 
 def make_map(rep, args, dest_root, hmgapi):
-    """HMG-API tools/report-map.py로 지도를 만들고, 니로·쏘나타 지도와 같은 형식으로 맞춘다."""
+    """HMG-API tools/report-map.py로 map을 만들고, 니로·쏘나타 map과 같은 형식으로 맞춘다."""
     u = rep['unit']
     dest = os.path.join(dest_root, args.make, args.dir, u['region'].lower(), u['firmware'])
     if os.path.exists(os.path.join(dest, 'car.json')):
-        die('지도가 이미 있습니다: %s' % os.path.relpath(dest, B))
+        die('map이 이미 있습니다: %s' % os.path.relpath(dest, B))
     with tempfile.TemporaryDirectory() as t:
         fixed = dict(rep)
         fixed['unit'] = dict(u, make=args.make.capitalize(), name=args.name)
@@ -122,7 +122,7 @@ def make_map(rep, args, dest_root, hmgapi):
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         shutil.copytree(src, dest)
     for f in os.listdir(dest):
-        os.chmod(os.path.join(dest, f), 0o700)   # 니로 지도와 같은 권한(차에서 다시 700으로 맞춘다)
+        os.chmod(os.path.join(dest, f), 0o700)   # 니로 map과 같은 권한(차에서 다시 700으로 맞춘다)
     return dest
 
 
@@ -232,8 +232,8 @@ def main():
     vm = rep.get('verify_map') or {}
     print('차: %s (모델 %s, 지역 %s, 펌웨어 %s, Wi-Fi 칩 %s)' % (u['product'], u['model'], u['region'],
                                                          u['firmware'], u.get('wifi_chip')))
-    print('지도: %d개 지점 찾음, 못 찾음 %s' % (rep['map_car'].get('found', 0), list((rep['map_car'].get('not_found') or {}))))
-    print('차에서 지도 확인: %s' % ('통과 (%s개)' % vm.get('points') if vm.get('ok') else '안 함 또는 실패'))
+    print('map: %d개 지점 찾음, 못 찾음 %s' % (rep['map_car'].get('found', 0), list((rep['map_car'].get('not_found') or {}))))
+    print('차에서 map 확인: %s' % ('통과 (%s개)' % vm.get('points') if vm.get('ok') else '안 함 또는 실패'))
     if not u.get('wifi_chip'):
         print('주의: Wi-Fi 칩이 없다고 나옵니다. 무선 카플레이는 불가능합니다.')
     if a.check:
@@ -242,7 +242,7 @@ def main():
         ap.error('--make, --dir, --name이 필요합니다 (예: --make hyundai --dir sonata --name "Hyundai Sonata Hybrid (DN8)")')
     precheck(rep, a, ps)
     dest = make_map(rep, a, ps['maps'], a.hmgapi)
-    print('지도 만듦:', os.path.relpath(dest, a.root))
+    print('map 만듦:', os.path.relpath(dest, a.root))
     st = edit_mod(rep, stock, a, ps['mod'])
     print('모드 소스에 더함: patches.json "%s.%s." → %s' % (u['model'], u['region'], st))
     print('모드 zip md5', sign(ps, a))
@@ -250,8 +250,8 @@ def main():
     print('''
 다음은 사람이 합니다 (docs/car-onboarding.md):
   1. nemesis-pkg/korea.projection/NEMESIS.data의 package-version 올리기, detailed-desc(256자 이하) 확인
-  2. hmgapi/README.txt "지금 들어 있는 차"와 지도 줄, 공개 README 지원 목록에 "🧪 시험 중" 줄 더하기
-  3. sh tests/stub-test.sh, HMG-API tools/check-maps.py(지도를 pr22-rebase 복사본 maps/에 넣고)
+  2. hmgapi/README.txt "지금 들어 있는 차"와 map 줄, 공개 README 지원 목록에 "🧪 시험 중" 줄 더하기
+  3. sh tests/stub-test.sh, HMG-API tools/check-maps.py(map을 pr22-rebase 복사본 maps/에 넣고)
   4. 코드 리뷰 → 패키지 zip·USB 묶음 만들기 → 소유자 승인 후 공개
   5. FINDINGS.md에 "PC에서 확인 / 확인 안 함" 기록''')
 

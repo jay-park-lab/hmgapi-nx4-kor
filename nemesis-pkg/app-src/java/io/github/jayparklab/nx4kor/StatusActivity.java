@@ -1,4 +1,4 @@
-package korea.projection.app;
+package io.github.jayparklab.nx4kor;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -247,7 +247,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         root.setPadding(pad, pad, pad, pad);
         root.setGravity(Gravity.CENTER_VERTICAL);
 
-        root.addView(text("Korea Projection " + appVersion() + " 설치 중", 26, Color.WHITE));
+        root.addView(text("NX4 KOR " + appVersion() + " 설치 중", 26, Color.WHITE));
         stageText = text(p.get("stage"), 20, Color.WHITE);
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
         sp.topMargin = dp(16);
@@ -425,7 +425,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         left.setOrientation(LinearLayout.VERTICAL);
         left.setPadding(0, 0, dp(16), 0);
 
-        left.addView(text("Korea Projection " + r.get("pkgver"), 24, Color.WHITE));
+        left.addView(text("NX4 KOR " + r.get("pkgver"), 24, Color.WHITE));
         // 1.7.3(K-5·U-8): 상태 파일에 판정 결과가 있으면 그것을 쓴다(설치 진행 결과·남은 재부팅 횟수까지 들어 있음). 옛 상태 파일이면
         // 예전처럼 이번 부팅의 진행 결과(재부팅 필요·실패)가 판정을 대신한다
         String pv = r.get("verdict_msg").isEmpty() ? p.progVerdict(boot) : null;

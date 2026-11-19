@@ -828,7 +828,7 @@ report() {
   # 1.7.3(D-6): "확인된 차"는 공개 README 지원 표의 ✅(CARS_SEEN)로 본다
   if car_in "$prod" "$CARS_SEEN"; then echo "- 확인된 차: 예"
   elif car_in "$prod" "$CARS_TRY"; then echo "- 확인된 차: 시험 지원 (이 차용 설정이 패키지에 있음, 결과를 알려 주세요)"
-  elif car_in "$prod" "$CARS_AUTO"; then echo "- 확인된 차: 자동 설정 (HMG-API가 차에서 지도를 만들어 설정, 결과를 알려 주세요)"
+  elif car_in "$prod" "$CARS_AUTO"; then echo "- 확인된 차: 자동 설정 (HMG-API가 차에서 map을 만들어 설정, 결과를 알려 주세요)"
     for _f in automap.bad automap.checked automap.foreign; do [ -f $BK/$_f ] && echo "  - 기록: $_f"; done
   else echo "- 확인된 차: 아니요 (서비스가 대기만 함, 지원 차: $CARS)"; fi
   # 따옴표 없이: 두 줄이 한 줄로 합쳐진다
@@ -964,9 +964,9 @@ bridge_state() { if $BB grep -q '"bridge" *: *false' $HMGSET 2>/dev/null; then e
 # HMG-API가 부팅 때마다 남기는 "hook map: <상태> for …, hooks on|off" 줄 중 마지막 것 (log.log.1이 더 오래됨).
 # 출력: "on|off <상태>" (상태: none, mismatch, mapped, verified 등). 줄이 없으면 빈 값.
 # 이번 부팅의 줄을 놓치면 지난 부팅 기록일 수 있다(HMG-API 로그는 logcat에서 옮겨 적는다).
-# map-check.json은 HMG-API 업데이트로 지도가 바뀌어도 ok로 남을 수 있어 로그를 본다.
+# map-check.json은 HMG-API 업데이트로 map이 바뀌어도 ok로 남을 수 있어 로그를 본다.
 HMGLOG=${HMGLOG:-/data/hmgapi/logs/hmgapi}
-# 1.7.2: 무선 모드의 훅이 실제로 켜졌는가. HMG-API는 모드가 선언한 훅 지점이 하나라도 그 차 지도에 없으면 그 모드의 훅을
+# 1.7.2: 무선 모드의 훅이 실제로 켜졌는가. HMG-API는 모드가 선언한 훅 지점이 하나라도 그 차 map에 없으면 그 모드의 훅을
 # 통째로 끄고 "mods: wireless-carplay-aa not loaded: <이유>"를 남긴다(스포티지 NQ5 260604 #46: 메뉴용 지점이 없어 무선
 # 카플레이까지 꺼짐). 켜지면 "mods: loaded wireless-carplay-aa <판>". 두 로그 파일에서 마지막 줄로 판단한다.
 # 출력: "on", "off <이유>", 또는 빈 값(기록 없음). 이유는 HMG-API가 남긴 영문 그대로(지점 이름뿐, 개인정보 없음), 200자까지.
@@ -1149,8 +1149,8 @@ kp_verdict() {
   elif [ "$K_HK" = off ]; then
     case "$K_HKMAP" in
       mapped) _vs hooksoff 1 "HMG-API 훅이 꺼져 있습니다. HMG-API 앱 Settings에서 'Check the map on this car'를 누른 뒤 내비를 재부팅해 주세요." ;;
-      none) _vs hooksoff 1 "HMG-API에 이 차의 지도가 없어 훅이 꺼져 있습니다. QR로 제보해 주세요." ;;
-      mismatch) _vs hooksoff 1 "HMG-API 지도가 이 차의 소프트웨어와 맞지 않아 훅이 꺼져 있습니다. QR로 제보해 주세요." ;;
+      none) _vs hooksoff 1 "HMG-API에 이 차의 map이 없어 훅이 꺼져 있습니다. QR로 제보해 주세요." ;;
+      mismatch) _vs hooksoff 1 "HMG-API map이 이 차의 소프트웨어와 맞지 않아 훅이 꺼져 있습니다. QR로 제보해 주세요." ;;
       *) _vs hooksoff 1 "HMG-API 훅이 꺼져 있습니다(마지막 부팅 기록). 내비를 3분 후 재부팅(RESET 버튼 또는 NEMESIS 재부팅)한 뒤 다시 확인해 주세요." ;;
     esac
   elif [ "$K_MH" = off ]; then _vs modhooksoff 2 "HMG-API가 이 차에서 무선 모드를 켜지 못했습니다(이 차와 맞지 않는 부분이 있음). 내비를 재부팅해 보시고, 그래도 같으면 USB를 꽂고 [제보 파일 만들기]로 리포트를 보내 주세요."
@@ -1396,7 +1396,7 @@ aplog() { log_ts; echo "$_LT $*" 2>/dev/null >> $APLOG; }
 # 1.7.3(U-3): [지금 재부팅] 요청($RBREQ, hotspot.sh)을 하나 받는다. 재부팅해도 되면 0. 받으면 바로 지운다.
 # 하지 않는 경우(모두 ap.log에 이유 한 줄): 이전 부팅·이미 받은 요청(reboot.last)·깨진 값, 40초(KP_RB_MAX)보다 오래됨·나이를 모름,
 # 이번 부팅 설치 진행 기록이 설치 중(state=run), 설치 마무리(fix_perms: /system remount·
-# 권한 파일·HMG-API 지도·무선 모드 설치·apply를 모두 이 안에서 함)가 돌고 있음, 제보 만들기가 돌고 있음.
+# 권한 파일·HMG-API map·무선 모드 설치·apply를 모두 이 안에서 함)가 돌고 있음, 제보 만들기가 돌고 있음.
 # 감시자만 부른다: 서비스 점검(req_tick)이 늦게 받아 갑자기 재부팅하지 않게.
 # 1.7.3(리뷰 M2): 받지 않은 재부팅 요청·돌아온 재부팅 명령의 결과를 앱이 읽게 남긴다(644, 비밀값 없음, 요청 id를 읽었을 때만).
 # 앱은 RB_WAIT(80초)를 다 기다리지 않고 이유에 맞는 문구를 보인다. RESET 안내는 명령이 돌아왔을 때(cmd)·모르는 코드·아무도 답하지

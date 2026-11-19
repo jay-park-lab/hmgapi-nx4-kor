@@ -66,8 +66,8 @@ rm -f $RPROG $RPROG.tmp
 RBRES=${RBRES:-/data/local/tmp/korea-projection-reboot-result.txt}
 rm -f $RBRES $RBRES.tmp
 # 1.5: 우리가 설치한 HMG-API 무선 모드만 정리한다(mod.ours). 1.6.1: 지금 있는 모드가 한국 차 빌드(mod_kor)일 때만:
-# mod.ours가 오래된 기록이고 차주가 다른 판(HMG-API 기본판)을 넣었으면 그 모드는 지우지 않는다. 원래 있던 모드와 지도는 그대로 둔다
-# (지도는 HMG-API의 다른 모드도 쓴다). 계획이 그 모드의 되돌리기뿐일 때만 적용하고, 아니면 앱에서 적용하라고 안내한다.
+# mod.ours가 오래된 기록이고 차주가 다른 판(HMG-API 기본판)을 넣었으면 그 모드는 지우지 않는다. 원래 있던 모드와 map은 그대로 둔다
+# (map은 HMG-API의 다른 모드도 쓴다). 계획이 그 모드의 되돌리기뿐일 때만 적용하고, 아니면 앱에서 적용하라고 안내한다.
 modmsg=""
 # 1.7.2(P-14, 리뷰 M3): 우리 모드를 지우고 적용까지 끝내지 못했으면 1 (아래 권한 파일 되돌리기를 하지 않는다)
 modhold=0

@@ -1,4 +1,4 @@
-package korea.projection.app;
+package io.github.jayparklab.nx4kor;
 
 import android.content.Context;
 import android.graphics.Canvas;

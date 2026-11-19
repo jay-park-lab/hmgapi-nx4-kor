@@ -1,7 +1,7 @@
 #!/system/bin/sh
-# NEMESIS의 preuninstall 대신: Korea Projection(HMG-API 모드)을 지우거나(인자 없음), 새 판으로 바꾸기 전에 정리한다(--update).
+# NEMESIS의 preuninstall 대신: NX4 KOR 모드(Korea Projection 스크립트)를 지우거나(인자 없음), 새 판으로 바꾸기 전에 정리한다(--update).
 # root로 돈다: USB 설치기(troubleShooter), 또는 adb에서
-#   adb shell "hmgapid sh 'sh /data/hmgapi/mods/korea-projection/standalone/uninstall.sh'"
+#   adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/standalone/uninstall.sh'"
 #   1. 서비스 ap를 멈춘다(NEMESIS도 preuninstall 전에 서비스를 멈춘다).
 #   2. scripts/preun.sh를 그대로 돌린다: 우리 hostapd·dnsmasq를 멈추고, 함께 넣은 무선 모드(wireless-carplay-aa)를 지우고 적용하고,
 #      Wi-Fi 잠금·순정 AP 저장값·무선 권한 파일을 되돌리고, $BK를 지운다. --update면 preun.sh의 업데이트 갈래처럼 작업 파일만 지운다.
@@ -14,14 +14,14 @@
 # 스틱에 든 같은 판의 사본 위치를 넘긴다: 그래도 2번(되돌리기)을 할 수 있다.
 # 종료 코드: 0 끝남, 1 실패(출력에 이유).
 case "$0" in */standalone/uninstall.sh) _d=${0%/standalone/uninstall.sh} ;; *) _d= ;; esac
-KP_APP=${KP_APP:-${_d:-/data/hmgapi/mods/korea-projection}}
+KP_APP=${KP_APP:-${_d:-/data/hmgapi/mods/nx4-kor}}
 . $KP_APP/standalone/env.sh
 umask 077
 UPD=0
 [ "$1" = --update ] && UPD=1
 HMGAPID=${HMGAPID:-hmgapid}
 HMGDATA=${HMGDATA:-/data/hmgapi}
-APP_ID=korea.projection.app
+APP_ID=io.github.jayparklab.nx4kor
 HMG_GONE=0
 if ! command -v $HMGAPID >/dev/null 2>&1 && [ ! -f $HMGDATA/installed.txt ]; then HMG_GONE=1; fi
 
@@ -43,7 +43,7 @@ mod_out() {
   $HMGAPID engine remove $KP_MOD_ID || { echo "HMG-API에서 모드를 지우지 못함: HMG-API 앱에서 지워 주세요"; return 1; }
 }
 
-[ $HMG_GONE = 1 ] && echo "HMG-API가 먼저 지워져 있음: Korea Projection이 직접 바꾼 것을 되돌리고 남은 모드 폴더·앱을 지웁니다"
+[ $HMG_GONE = 1 ] && echo "HMG-API가 먼저 지워져 있음: 이 모드가 직접 바꾼 것을 되돌리고 남은 모드 폴더·앱을 지웁니다"
 
 if [ -d $KP_NEMESIS_PKG ]; then
   # NEMESIS판이 같은 작업 폴더·hostapd 설정을 쓴다: preun.sh를 돌리면 그쪽 핫스팟을 멈춘다. 이 모드는 그동안 대기만 했다
@@ -53,7 +53,7 @@ if [ -d $KP_NEMESIS_PKG ]; then
   if [ $HMG_GONE = 1 ]; then rm -rf $HMGDATA/mods/$KP_MOD_ID
   else $HMGAPID engine remove $KP_MOD_ID || { echo "HMG-API에서 모드를 지우지 못함"; exit 1; }; fi
   rm -rf $KP_ROOT
-  echo "Korea Projection(HMG-API 모드)을 지웠습니다."
+  echo "NX4 KOR 모드를 지웠습니다."
   exit 0
 fi
 
@@ -78,5 +78,5 @@ rc=$?
 [ $rc = 0 ] || echo "scripts/preun.sh 종료 코드 $rc (위 출력 참고). 모드는 계속 지운다"
 mod_out || exit 1
 rm -rf $KP_ROOT
-echo "Korea Projection(HMG-API 모드)을 지웠습니다. 내비를 재부팅해 주세요."
+echo "NX4 KOR 모드를 지웠습니다. 내비를 재부팅해 주세요."
 exit 0
