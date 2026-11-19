@@ -14,9 +14,13 @@
 ### OI-1. USB 설치기가 NEMESIS 패키지를 보면 설치를 거절할지
 
 - 기록: 2026-11-20
-- 지금: 막지 않습니다. 설치한 뒤 서비스가 다른 hostapd에 비켜 주거나(상태 `otherwifi`), 따로 설치된 `wireless-carplay-aa`가 있으면 무선 기능을 적용하지 않습니다(상태 `oldmod`). [`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때".
+- 지금: NEMESIS 패키지를 막지 않습니다. 설치 경로마다 결과가 다릅니다. [`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때".
+  - USB 설치기(`usb/troubleShooter`): Korea Projection이 HMG-API에 넣은 `wireless-carplay-aa`를 누가 넣었는지 가리지 않고 설치 전에 지우고 적용합니다. 그래서 NEMESIS 쪽 설치는 무선 모드 없이 서비스만 남는 반쪽 상태가 됩니다. 그 뒤 NEMESIS의 hostapd가 돌면 처음 자동 설정을 다음 부팅으로 미루고, 상태는 `otherwifi`입니다.
+  - adb 등으로 `engine install`: `wireless-carplay-aa`가 남아 무선 기능을 적용하지 않습니다(상태 `oldmod`).
+  - NEMESIS의 hostapd가 실제로 도는지는 차에서만 확인할 수 있습니다.
 - 안: `usb/troubleShooter`가 `/data/nemesis/apps/korea.projection`이나 `wireless.projection`이 있으면 아무것도 바꾸지 않고 "NEMESIS에서 먼저 지워 주세요"로 끝냅니다.
-- 정할 것: 거절할지, 안내만 하고 설치할지, 지금처럼 둘지. 바꾸면 `tests/mod-test.sh`의 USB 설치기 시험과 README의 설치 안내도 함께 고칩니다.
+- 근거: 이 안은 일부러 뺀 것을 되살리는 결정입니다. 원본의 "NEMESIS판·wireless.projection과의 충돌 확인"은 이 포크에서 뺐고(`NOTICE.md` "뺀 것"), `tests/mod-test.sh`의 "NEMESIS·다른 차·제보 흔적 없음(모드·USB·빌드 스크립트)" 시험은 `usb/troubleShooter`에 `nemesis`·`korea.projection`·`wireless.projection`이 있으면 실패합니다.
+- 정할 것: 거절할지, 안내만 하고 설치할지, 지금처럼 둘지. 바꾸면 위 시험(예외를 둘지), `tests/mod-test.sh`의 USB 설치기 시험, `NOTICE.md`, README의 설치 안내도 함께 고칩니다.
 
 ### OI-2. HMG-API 1.1.0-rc.5를 지원할지
 
@@ -40,6 +44,16 @@
 - 기록: 2026-11-20
 - 지금: `develop`은 만들었고, 합친 브랜치 자동 삭제는 켜져 있습니다. squash·rebase 합치기는 허용되어 있고, `main`·`develop`에 브랜치 보호가 없습니다.
 - 정할 것: [`git-flow.md`](git-flow.md) "처음 한 번"의 2(합치기 방법)와 3(브랜치 보호)을 적용할지. 보호를 관리자에게도 걸면 관리자도 PR로만 합칠 수 있습니다.
+
+### OI-5. 다른 모드와 `replace` 훅이 겹칠 때의 판정과 안내를 고칠지
+
+- 기록: 2026-11-20 (PR #5 리뷰 지적 2)
+- 지금: 같은 지점에 `replace` 훅을 거는 다른 HMG-API 모드가 있으면, 계획(`engine plan`)에 `hooks <id> won't load: conflict: …` 줄이 생깁니다. `mod/svc/hotspot.sh`의 `plan_only_mod`는 어느 모드의 그 줄이든 "다른 변경"으로 보므로 문제가 둘 생깁니다.
+  - 처음 자동 설정은 어느 쪽이 꺼지든 적용하지 않고 `otherplan`("HMG-API 앱에서 변경 사항을 적용하고 재부팅")으로 끝납니다. 다른 모드가 꺼지는 쪽이라 이 모드는 문제없을 때도 그렇습니다. 그 안내로는 풀리지 않습니다.
+  - 이 모드가 꺼지는 쪽이면 상태는 `modhooksoff`입니다. 그 문구(`mod/bin/status.sh`)는 원인을 "이 차의 map에 없는 지점"으로 적습니다.
+  - [`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때".
+- 안: 계획의 `conflict:` 이유를 따로 가려 "다른 모드(<id>)와 같은 훅을 씁니다. HMG-API 앱에서 한쪽을 꺼 주세요" 같은 판정과 문구를 둡니다. 다른 모드만 꺼지는 경우에는 이 모드의 자동 설정을 막지 않을지도 함께 정합니다.
+- 정할 것: 고칠지, 고친다면 위 두 경우를 어떻게 다룰지. 바꾸면 `tests/mod-test.sh`의 자동 설정·상태 판정 시험도 더합니다.
 
 ## 닫힌 것
 
