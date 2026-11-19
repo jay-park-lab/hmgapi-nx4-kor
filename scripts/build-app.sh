@@ -1,13 +1,13 @@
 #!/bin/sh
-# NX4 KOR 상태 화면 앱(APK, 패키지 io.github.jayparklab.nx4kor)을 만든다 → nemesis-pkg/korea.projection/app/NX4KOR.apk
+# NX4 KOR 상태 화면 앱(APK, 패키지 io.github.jayparklab.nx4kor)을 만든다 → mod/app/NX4KOR.apk
 # 필요한 것: JDK, Android SDK build-tools(aapt2, d8, zipalign, apksigner)와 android-19 플랫폼.
 #   SDK=~/.local/share/android-sdk (기본값), 그 아래 build-tools/<버전>/, platforms/<이름>/android.jar
 # 서명 키: ~/.local/share/hmgapi-nx4-kor/keys/ (저장소 밖, 공개하지 않는다). 없으면 처음에 만든다.
 #   업데이트하려면 같은 키로 서명해야 하므로 이 폴더는 따로 백업한다.
 set -e
 B=$(cd "$(dirname "$0")/.." && pwd)
-SRC=$B/nemesis-pkg/app-src
-OUTAPK=$B/nemesis-pkg/korea.projection/app/NX4KOR.apk
+SRC=$B/app
+OUTAPK=$B/mod/app/NX4KOR.apk
 SDK=${SDK:-$HOME/.local/share/android-sdk}
 # 가장 높은 버전 (이름순이면 9.0.0이 34.0.0보다 뒤에 온다)
 BT=$(ls -d "$SDK"/build-tools/*/ | sort -t/ -k1 -V | tail -n 1)

@@ -1,0 +1,48 @@
+NX4 KOR @VERSION@ - USB로 설치 (투싼 NX4 한국 내수 260902, HMG-API 모드)
+==========================================================
+
+무선 카플레이·안드로이드 오토를 내비 핫스팟으로 씁니다. 계기판·HUD 길안내도 함께 들어 있습니다.
+이 폴더 안의 것을 모두 빈 USB(FAT32) 맨 위에 복사합니다.
+  USB
+  ├─ ota_package.tar
+  ├─ README.txt
+  ├─ LICENSE, NOTICE.md (BUSYBOX-LICENSE.txt, HMGAPI-SOURCE.txt: 함께 넣은 경우)
+  └─ NX4
+      ├─ install (hmgapi-nx4-kor.zip, payload)
+      └─ hmgapi (HMG-API USB 묶음을 함께 넣은 경우만)
+
+HMG-API 1.1.0-rc.4 이상이 먼저 있어야 합니다.
+- HMG-API USB 묶음(hmgapi-<버전>-usb.zip)을 이 묶음에 함께 넣어 만들었으면 같은 USB로 두 번 하면 됩니다:
+  첫 번째는 HMG-API를 설치하고 재부팅, 두 번째에 NX4 KOR를 설치합니다.
+- 아니면 HMG-API USB로 먼저 설치하고 재부팅한 뒤 이 USB를 씁니다.
+
+설치·업데이트
+  1. 시동을 걸고(차를 세운 상태) USB를 꽂습니다.
+  2. Engineering Mode > USB Copy > DSP > Update OTA를 누릅니다.
+  3. "설치하는 중" 다음에 상태 화면이 열립니다. OTA 화면의 오류 684는 정상입니다.
+  4. 상태 화면에 "설정을 마쳤습니다"가 나오면(3~5분) [지금 재부팅]을 누릅니다. 그동안 끄지 마세요.
+     처음에는 HMG-API가 이 차의 map을 만들고 확인한 뒤 무선 기능을 적용합니다.
+  5. 재부팅 뒤 폰을 무선 카플레이·안드로이드 오토로 연결합니다.
+  따로 설치한 무선 모드(wireless-carplay-aa)가 있으면 설치기가 먼저 지웁니다(같은 기능이 NX4 KOR에 들어 있습니다).
+
+상태 화면을 다시 열기
+  HMG-API 훅이 켜지면 앱 메뉴에 NX4 KOR 타일이 생깁니다.
+  타일이 없을 때(설정 전, 또는 HMG-API가 이 차에서 훅을 켜지 못했을 때)는 같은 USB로 Update OTA를 다시 누르면
+  상태 화면만 열립니다(다시 설치하지 않음).
+
+지우기
+  NX4 폴더에 빈 파일 UNINSTALL을 만들고 Update OTA를 누릅니다. 되돌린 뒤 재부팅합니다.
+  HMG-API 앱에서 모드를 먼저 지웠거나 HMG-API를 먼저 지웠더라도 이렇게 하면 Wi-Fi 설정까지 되돌립니다.
+  둘 다 지울 때는 NX4 KOR를 먼저, HMG-API를 나중에 지우는 것을 권합니다.
+
+같은 판을 다시 설치: NX4 폴더에 빈 파일 REINSTALL을 만듭니다.
+
+한 일은 USB의 NX4/install.log에 남습니다. 내비의 기록은 /data/nx4-kor/logs/ap.log입니다.
+끝나면 USB를 빼 주세요(꽂혀 있으면 유선 안드로이드 오토가 시작될 수 있습니다).
+
+라이선스
+  NX4 KOR는 GNU AGPL-3.0입니다(LICENSE). Korea Projection(StopDragon)과 HMG-API의 Wireless CarPlay +
+  Android Auto 모드(VysseCodes)를 바탕으로 했습니다.
+  대응 소스: https://github.com/jay-park-lab/hmgapi-nx4-kor (이 묶음: @SOURCE_REV@)
+  원본과 원저작권, 이 저장소에서 바꾼 것은 NOTICE.md에 있습니다.
+  busybox(GPL-2.0)를 함께 넣었으면 BUSYBOX-LICENSE.txt, HMG-API를 함께 넣었으면 HMGAPI-SOURCE.txt를 보세요.

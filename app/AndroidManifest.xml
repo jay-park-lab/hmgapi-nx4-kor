@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.jayparklab.nx4kor"
+    android:versionCode="38"
+    android:versionName="2.0.0">
+
+    <uses-sdk android:minSdkVersion="19" android:targetSdkVersion="19" />
+
+    <!-- 이 헤드유닛의 activity manager는 finish()에서도 GET_TASKS를 확인한다 (HMG-API에서 확인된 점) -->
+    <uses-permission android:name="android.permission.GET_TASKS" />
+
+    <application
+        android:label="@string/app_name"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.Holo.NoActionBar">
+        <!-- 런처 아이콘 없음: HMG-API 앱의 모드 실행 항목(mod.json provides.launcher)으로 연다 -->
+        <activity
+            android:name=".StatusActivity"
+            android:label="@string/app_name"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape" />
+    </application>
+</manifest>

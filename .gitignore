@@ -1,0 +1,5 @@
+# 빌드 결과(scripts/build.sh, scripts/build-app.sh)
+/out/
+/mod/app/
+/mod/bin/busybox
+/mod/bin/busybox-LICENSE.txt

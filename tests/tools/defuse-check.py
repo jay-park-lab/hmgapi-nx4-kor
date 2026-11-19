@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-# 베타 2 차주 제보(#64) 뒤: 패키지 셸 스크립트의 맨 위(함수 밖) 기본값 대입이 그보다 아래에서 처음 정해지는 변수를 참조하는지 찾는다.
+# Korea Projection 베타 2(#64) 뒤: 모드 셸 스크립트의 맨 위(함수 밖) 기본값 대입이 그보다 아래에서 처음 정해지는 변수를 참조하는지 찾는다.
 # 예: KTB=${KTB:-$BK/ktime}이 BK=… 보다 위에 있으면 차에서는 BK가 비어 /ktime이 된다(stub-test는 BK를 환경으로 넘겨 놓쳤다).
 # - ${X:-기본값} 꼴로 기본값을 함께 준 참조는 괜찮은 것으로 본다(AAOFF·APON_ORIG 꼴).
 # - status.sh·post.sh·preun.sh는 svc/hotspot.sh를 . 으로 읽으므로, 그 줄 뒤에서는 hotspot.sh의 맨 위 변수를 정의된 것으로 본다.
 # - 대입 값은 첫 ;까지만 본다(한 줄에 여러 문장).
 # 또 "> 파일 2>/dev/null" 순서(파일을 못 열면 그 오류가 ap.log로 감)도 찾는다. 찾으면 줄마다 한 줄씩 내고 종료 코드 1.
 import re, sys
-PKG = sys.argv[1] if len(sys.argv) > 1 else 'nemesis-pkg/korea.projection'
-FILES = ['svc/hotspot.sh', 'bin/status.sh', 'bin/carreport.sh', 'scripts/post.sh', 'scripts/preun.sh']
+PKG = sys.argv[1] if len(sys.argv) > 1 else 'mod'
+FILES = ['svc/hotspot.sh', 'bin/status.sh', 'scripts/post.sh', 'scripts/preun.sh']
 ASSIGN = re.compile(r'^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$')
 FUNC = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*\(\)\s*\{')
 def toplevel(path):
