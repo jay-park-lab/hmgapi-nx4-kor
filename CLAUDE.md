@@ -17,6 +17,12 @@
 - 설계·시험 문서는 `docs/`에 둡니다. 새로 만들면 위 표와 `README.md`의 "만들기와 시험" 표에 함께 적습니다.
 - 동작을 바꾸면 같은 변경에서 해당 문서도 고칩니다.
 
+## 스킬
+
+| 스킬 | 하는 일 |
+|---|---|
+| `pr-review-cycle` (`.claude/skills/pr-review-cycle/`) | Git Flow 규칙대로 커밋·푸시 → PR → 리뷰 서브에이전트 리뷰 → 수정·답글·재리뷰 반복 → merge commit 으로 합치기·태그 → 브랜치 정리 |
+
 ## 브랜치 (Git Flow, 반드시 지킴)
 
 [`docs/git-flow.md`](docs/git-flow.md)의 규칙을 따릅니다. 특히:

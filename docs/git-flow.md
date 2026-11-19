@@ -39,6 +39,8 @@
 
 명령은 한 줄씩 차례로 칩니다. PR은 `gh`로 만들며 `--base`를 늘 적습니다(GitHub 기본 브랜치는 사용자가 보는 `main`이므로 빠뜨리면 `main`으로 갑니다).
 
+Claude로 PR을 올리고 리뷰·합치기까지 할 때는 `pr-review-cycle` 스킬(`.claude/skills/pr-review-cycle/`)이 이 규칙대로 진행합니다.
+
 ### 기능 (`feature/`)
 
 ```sh
