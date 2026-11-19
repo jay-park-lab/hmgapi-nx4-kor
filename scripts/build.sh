@@ -4,11 +4,11 @@
 #   out/hmgapi-nx4-kor-<버전>-usb.zip  USB 묶음: Engineering Mode > DSP > Update OTA로 설치
 # 모드는 mod/ 폴더(mod.json, 서비스·상태 스크립트, 무선 훅·네이티브 패치)에 상태 화면 앱과 busybox를 더한 것이다.
 # 필요한 것: JDK, python3, zip/unzip, HMG-API 소스(서명 도구 tools/mkmodpkg.sh), 상태 화면 앱 APK.
-# 환경 변수:
+# 환경 변수(명령 앞에 주거나 .env.local에 적는다. .env.example, scripts/local-env.sh):
 #   HMGAPI_SRC      HMG-API 저장소 위치(필수). 서명은 그 tools/mkmodpkg.sh가 한다
 #   NX4_MOD_KEY      모드 작성자 키(필수, 저장소 밖에 둔다). 처음 한 번:
 #                     (cd $HMGAPI_SRC && mkdir -p out/engine-host && javac --release 8 -d out/engine-host core/runtime/java/hmgapi/engine/*.java)
-#                     java -cp $HMGAPI_SRC/out/engine-host hmgapi.engine.Signing keygen ~/.local/share/hmgapi-nx4-kor/keys/mod.key
+#                     java -cp $HMGAPI_SRC/out/engine-host hmgapi.engine.Signing keygen $NX4_MOD_KEY
 #                   HMG-API는 같은 키로 서명한 업데이트만 받는다: 이 키를 잃으면 모드를 지우고 다시 설치해야 한다
 #   NX4_APK          상태 화면 앱(기본 mod/app/NX4KOR.apk, scripts/build-app.sh로 만듦)
 #   NX4_BUSYBOX      함께 넣을 busybox(기본 mod/bin/busybox. 없으면 내비의 /system/bin/busybox만 쓴다)
@@ -22,10 +22,12 @@
 # 그 소스 위치(HMGAPI-SOURCE.txt)를 적는다. USB README.txt에는 이 묶음을 만든 소스 커밋을 적는다.
 set -e
 B=$(cd "$(dirname "$0")/.." && pwd)
+. "$B/scripts/local-env.sh"
+nx4_env "$B"
 PKG=$B/mod
 OUT=${OUT:-$B/out}
-: "${HMGAPI_SRC:?HMG-API 저장소 위치를 HMGAPI_SRC로 주세요}"
-: "${NX4_MOD_KEY:?모드 작성자 키를 NX4_MOD_KEY로 주세요(위 설명의 keygen)}"
+nx4_need HMGAPI_SRC "HMG-API 저장소 위치"
+nx4_need NX4_MOD_KEY "모드 작성자 키 파일. 만드는 법은 이 파일 위 설명의 keygen"
 [ -f "$HMGAPI_SRC/tools/mkmodpkg.sh" ] || { echo "HMGAPI_SRC에 tools/mkmodpkg.sh가 없습니다: $HMGAPI_SRC" >&2; exit 1; }
 [ -f "$NX4_MOD_KEY" ] || { echo "키 파일이 없습니다: $NX4_MOD_KEY" >&2; exit 1; }
 HMGAPI_SRC=$(cd "$HMGAPI_SRC" && pwd)
@@ -35,7 +37,7 @@ case $NX4_MOD_KEY in /*) ;; *) NX4_MOD_KEY=$PWD/$NX4_MOD_KEY ;; esac
 V=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$PKG/mod.json" | head -1)
 [ -n "$V" ] || { echo "mod.json에서 판을 읽지 못했습니다" >&2; exit 1; }
 
-W=$(mktemp -d /tmp/nx4-kor-build.XXXXXX)
+W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
 M=$W/nx4-kor
 mkdir -p "$M"

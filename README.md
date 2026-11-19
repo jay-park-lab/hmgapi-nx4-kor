@@ -127,27 +127,36 @@ HMG-API 앱에서 NX4 KOR를 누르면 무선 기능 설정이 나옵니다. 모
 | `wireless/` | 합친 무선 모드(한국 차 빌드 2.4.5)의 출처·대응 소스 안내, 원래 `mod.json`, 컴파일용 stubs |
 | `scripts/` | `build-app.sh`(상태 화면 앱), `build.sh`(서명한 모드 zip과 USB 묶음) |
 | `docs/design.md` | 설계와 차에서 확인할 것 |
-| `tests/` | PC 시험 |
+| `docs/emulator-test.md` | 에뮬레이터에서 상태 화면 앱 시험 |
+| `docs/git-flow.md` | 브랜치 전략(Git Flow) |
+| `tests/` | PC 시험(`mod-test.sh`), 에뮬레이터 시험 스크립트(`emu/`) |
 
 **만들기**
+
+저장소 밖 경로(Android SDK, 서명 키, HMG-API 소스)는 코드에 기본값이 없습니다. `.env.example`을 `.env.local`로 복사해 채웁니다(`.env.local`은 git에 넣지 않습니다). 명령 앞에 준 값이 `.env.local`보다 앞섭니다.
+
 ```sh
+cp .env.example .env.local   # ANDROID_HOME, NX4_APP_KEYS, HMGAPI_SRC, NX4_MOD_KEY 채우기
+
 # 1. 상태 화면 앱(Android SDK build-tools와 android-19 필요) → mod/app/NX4KOR.apk
+#    NX4_APP_KEYS 폴더에 키가 없으면 처음에 만듭니다. 그 폴더는 따로 백업합니다
 sh scripts/build-app.sh
 
 # 2. 모드 작성자 키(처음 한 번, 저장소 밖에 보관. 업데이트도 같은 키로 서명해야 HMG-API가 받습니다)
-cd <HMG-API 소스>
+cd <HMGAPI_SRC에 적은 HMG-API 소스>
 mkdir -p out/engine-host
 javac --release 8 -d out/engine-host core/runtime/java/hmgapi/engine/*.java
-java -cp out/engine-host hmgapi.engine.Signing keygen ~/.local/share/hmgapi-nx4-kor/keys/mod.key
+java -cp out/engine-host hmgapi.engine.Signing keygen <NX4_MOD_KEY에 적은 경로>
 
 # 3. 묶음(결과: out/hmgapi-nx4-kor-버전.zip, out/hmgapi-nx4-kor-버전-usb.zip)
-HMGAPI_SRC=<HMG-API 소스> NX4_MOD_KEY=~/.local/share/hmgapi-nx4-kor/keys/mod.key \
-  NX4_PKG_ZIP=<Korea Projection 릴리스의 패키지 zip, busybox와 그 라이선스 안내용> HMGAPI_USB_ZIP=<hmgapi-버전-usb.zip, 선택> \
-  sh scripts/build.sh
+#    선택: .env.local에 NX4_PKG_ZIP(Korea Projection 릴리스의 패키지 zip, busybox와 그 라이선스 안내용),
+#          HMGAPI_USB_ZIP(hmgapi-버전-usb.zip)
+sh scripts/build.sh
 ```
 
 **PC 시험**
 - `sh tests/mod-test.sh`: `mod.json`(합친 무선 부분 포함), 서비스 래퍼, 자동 설정(map 만들기·확인·적용), 설치 뒤·삭제 전 정리, 무선 권한 파일 되돌리기, 상태 판정, [지금 재부팅] 요청, USB 설치기, 지우기(HMG-API를 먼저 지운 경우 포함), 상태 화면 앱의 `ReportTest`, 정적 검사. `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치, 차종 제한(NX4.KOR 260902만)까지 봅니다.
+- 에뮬레이터: 상태 화면 앱을 1920x720 에뮬레이터에 띄워 상태별 화면과 [지금 재부팅] 흐름을 봅니다. 준비와 순서는 [`docs/emulator-test.md`](docs/emulator-test.md).
 
 ## 라이선스
 
