@@ -41,6 +41,8 @@
 
 Claude로 PR을 올리고 리뷰·합치기까지 할 때는 `pr-review-cycle` 스킬(`.claude/skills/pr-review-cycle/`)이 이 규칙대로 진행합니다.
 
+**쌓인 PR은 아래 것부터 합칩니다.** 아직 합치지 않은 브랜치 위에 만든 PR(예: #3이 #1의 `feature/dev-setup` 위)을 먼저 합치면, 아래 PR의 커밋이 위 PR의 merge commit에 딸려 들어가고 아래 PR은 merge commit 없이 "합쳐짐"으로 닫힙니다(2026-11-20, #1). 내용은 빠지지 않지만 이력에서 아래 PR 단위가 보이지 않습니다.
+
 ### 기능 (`feature/`)
 
 ```sh
@@ -111,12 +113,12 @@ gh pr create --base develop --head hotfix/<판>
 | 장치 | 막는 것 | 상태 |
 |---|---|---|
 | `CLAUDE.md`의 브랜치 규칙 | Claude가 `main`·`develop`에서 작업, 이름이 틀린 브랜치, `feature/`에서 판 번호 바꾸기 | 적용됨 |
-| GitHub 브랜치 보호(`main`, `develop`) | 직접 푸시, PR 없이 합치기, 강제 푸시, 브랜치 삭제(관리자 포함) | 아래 "처음 한 번" |
-| GitHub 저장소 설정 | squash·rebase 합치기, 합친 브랜치 남기기 | 아래 "처음 한 번" |
+| GitHub 브랜치 보호(`main`, `develop`) | 직접 푸시, PR 없이 합치기, 강제 푸시, 브랜치 삭제(관리자 포함) | 아직(2026-11-20 확인: 두 브랜치 모두 보호 없음). 아래 "처음 한 번" 3 |
+| GitHub 저장소 설정 | squash·rebase 합치기, 합친 브랜치 남기기 | 합친 브랜치 자동 삭제는 켜짐. squash·rebase 합치기는 아직 허용됨(2026-11-20 확인). 아래 "처음 한 번" 2 |
 
 ### 처음 한 번 (저장소 관리자)
 
-1. `develop` 만들기:
+1. `develop` 만들기(2026-11-20에 했습니다):
 
    ```sh
    git switch main
