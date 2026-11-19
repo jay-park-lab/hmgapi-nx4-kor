@@ -76,7 +76,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 
 | 함께 있는 것 | 일어나는 일 | 이 모드가 하는 일 |
 |---|---|---|
-| NEMESIS로 설치한 Korea Projection(`/data/nemesis/apps/korea.projection`)이나 무선 패키지(`wireless.projection`) | 핫스팟이 둘이 되어 wlan0을 다투고, 둘 다 Wi-Fi 설정 파일을 잠그고 지울 때 각자 되돌립니다. Korea Projection은 무선 모드 `wireless-carplay-aa`를 HMG-API에 따로 넣습니다 | 다른 hostapd가 돌면 비켜 주고, 따로 설치된 `wireless-carplay-aa`가 있으면 무선 기능을 적용하지 않습니다(아래 두 줄). **NEMESIS 패키지를 먼저 지워야 합니다.** 설치기는 막지 않습니다("정하지 않은 것") |
+| NEMESIS로 설치한 Korea Projection(`/data/nemesis/apps/korea.projection`)이나 무선 패키지(`wireless.projection`) | 핫스팟이 둘이 되어 wlan0을 다투고, 둘 다 Wi-Fi 설정 파일을 잠그고 지울 때 각자 되돌립니다. Korea Projection은 무선 모드 `wireless-carplay-aa`를 HMG-API에 따로 넣습니다 | 다른 hostapd가 돌면 비켜 주고, 따로 설치된 `wireless-carplay-aa`가 있으면 무선 기능을 적용하지 않습니다(아래 두 줄). **NEMESIS 패키지를 먼저 지워야 합니다.** 설치기는 막지 않습니다([`open-issue.md`](open-issue.md) OI-1) |
 | 따로 설치한 `wireless-carplay-aa` | 같은 훅 지점을 겁니다 | `mod.json` `conflicts`로 함께 켜지지 않습니다. 자동 설정은 적용하지 않고 HMG-API 앱에서 지우라고 안내합니다(상태 `oldmod`). USB 설치기는 설치 전에 지웁니다 |
 | 같은 훅 지점에 `replace` 훅을 거는 다른 HMG-API 모드 | HMG-API는 한 지점에 `replace` 훅을 하나만 올립니다. 다른 모드가 먼저 올라가 있으면 이 모드의 훅이 통째로 꺼지고(HMG-API 로그 `conflict: … both replace <지점>; turn one of them off`) 앱 메뉴 타일도 없어집니다 | 막지 못합니다. HMG-API 앱에서 한쪽을 끕니다. 이 모드가 `replace`로 거는 지점은 `mod/mod.json`의 `hooks.points`(`framework.context_impl.start_service`, `framework.navigation_cluster.*`, `dipo.*` 일부) |
 | HMG-API에 다른 모드의 적용 전 변경이 남아 있음 | `engine plan`에 이 모드 것이 아닌 변경이 섞입니다 | 자동으로 적용하지 않고 HMG-API 앱에서 적용하라고 안내합니다(상태 `otherplan`). 지울 때도 같습니다 |
@@ -93,7 +93,4 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - HMG-API 설치기가 NX4의 `app_process`를 아는지(모르면 `HMGAPI/FORCE`).
 - 순정 무선 카플레이가 있는 트림에서 순정 카플레이 AP 경로(`stock_ap_mode`)가 그대로 도는지.
 
-## 정하지 않은 것
-
-- **USB 설치기가 NEMESIS 패키지를 보면 설치를 거절할지.** `/data/nemesis/apps/korea.projection`이나 `wireless.projection`이 있으면 거절하는 안을 냈지만 정하지 않았습니다. 지금은 막지 않고, 설치한 뒤 서비스가 비켜 주거나(`otherwifi`) 적용하지 않습니다(`oldmod`).
-- **HMG-API 1.1.0-rc.5에서 동작하는지.** 1.1.0-rc.4에서만 확인했습니다(PC 엔진 시험). `mod.json`이 `>=1.1.0-rc.4`라 rc.5에도 설치됩니다. 2026-11-20에 rc.5 태그가 나와 있는 것을 확인했고, 엔진 시험은 돌리지 않았습니다.
+정하지 않은 것은 [`open-issue.md`](open-issue.md)에서 관리합니다.

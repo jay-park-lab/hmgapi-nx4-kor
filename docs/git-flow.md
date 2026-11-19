@@ -143,4 +143,4 @@ gh pr create --base develop --head hotfix/<판>
 
    `develop`도 같은 명령에서 `branches/main`을 `branches/develop`으로 바꿔 한 번 더 실행합니다.
 
-브랜치 보호와 저장소 설정은 GitHub 쪽에 남으므로, 바꾸면 이 표의 "상태"도 고칩니다.
+브랜치 보호와 저장소 설정은 GitHub 쪽에 남으므로, 바꾸면 이 표의 "상태"도 고칩니다. 2·3을 적용할지는 [`open-issue.md`](open-issue.md) OI-4에서 관리합니다.
