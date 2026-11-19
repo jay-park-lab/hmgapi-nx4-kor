@@ -79,6 +79,9 @@ cp "$B/LICENSE" "$B/NOTICE.md" "$M/"
 find "$M" -name '*.sh' -exec chmod 755 {} +
 
 # 서명·묶기: HMG-API의 도구 그대로. 파일 순서·시각은 고정하지만 서명(ECDSA)이 만들 때마다 달라 zip은 매번 다르다
+# mkmodpkg.sh는 모드 폴더의 build.sh를 서명 키를 받은 채로 실행하고 패키지에서는 뺀다(결과물에 남지 않음).
+# 이 모드는 그 파일을 쓰지 않으므로, 있으면 만들지 않는다(docs/release.md "위험")
+[ ! -e "$M/build.sh" ] || { echo "mod/build.sh는 쓰지 않습니다(HMG-API mkmodpkg.sh가 서명 키를 받은 채로 실행합니다). 지우고 다시 만드세요" >&2; exit 1; }
 mkdir -p "$OUT"
 Z=$(sh "$HMGAPI_SRC/tools/mkmodpkg.sh" "$M" "$NX4_MOD_KEY" | tail -1)
 [ -f "$Z" ] || { echo "모드 zip을 만들지 못했습니다" >&2; exit 1; }

@@ -178,6 +178,7 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
 | 아무 브랜치에 워크플로를 새로 올려 저장소 secret을 읽음 | 키를 저장소 secret이 아니라 **환경 secret**으로만 둡니다. 환경 secret은 `production`을 쓰고 그 규칙을 통과한 job만 받습니다 |
 | 다른 브랜치나 PR의 워크플로가 `environment: production`을 씀 | 환경의 배포 ref를 `v*` 태그로 한정합니다. 필수 리뷰어가 승인해야 합니다 |
 | 쓰기 권한자가 `release.yml`이나 job이 부르는 스크립트(`scripts/`, HMG-API 고정 커밋)를 바꾼 커밋에 `v*` 태그를 닮 | 태그 ruleset(관리자만 `v*` 태그를 만듦), 필수 리뷰어. 태그 push로 도는 워크플로는 **태그의 커밋에 있는 `release.yml`**입니다 |
+| 모드 폴더의 `build.sh`: HMG-API `mkmodpkg.sh`가 서명 키를 받은 채로 실행하고, 패키지에서는 빼서 결과물에 남지 않음 | 이 모드는 그 파일을 쓰지 않습니다. `scripts/build.sh`가 `mod/build.sh`를 보면 만들지 않고 멈춥니다(`check`의 시험 빌드에서도 멈춥니다). 이 확인을 없애는 변경은 `scripts/`에 있으므로 아래 diff에 보입니다 |
 | 시험 코드(`tests/`)가 키를 읽음 | 시험은 키가 없는 `check` job에서, 다른 러너로 돕니다. `build` job은 시험을 돌리지 않습니다 |
 | 포크의 PR | 포크 PR에는 secret이 가지 않습니다. 이 저장소는 `pull_request_target`을 쓰지 않습니다 |
 | job이 받아 돌리는 남의 코드(액션, HMG-API) | 액션과 HMG-API를 커밋 SHA로 고정합니다. busybox zip은 돌리지 않고, 파일의 SHA-256을 확인합니다 |
@@ -189,10 +190,10 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
 
 - `check` job이 통과했는지 봅니다. 승인 요청은 `check`가 통과한 태그에만 뜹니다.
 - 태그가 기대한 커밋인지 봅니다. 정식 태그는 `main`의 merge commit, 베타 태그는 `release/<판>`의 끝입니다.
-- 지난 릴리스 태그 이후 `.github/`, `scripts/`, HMG-API 고정 커밋(`HMGAPI_COMMIT`)이 바뀌었으면, 그 변경이 리뷰를 거쳐 합친 것인지 봅니다.
+- 지난 릴리스 태그 이후 `build` job에서 도는 코드가 바뀌었으면, 그 변경이 리뷰를 거쳐 합친 것인지 봅니다. 대상은 `.github/`, `scripts/`, `mod/build.sh`(있으면 안 됨), HMG-API 고정 커밋(`HMGAPI_COMMIT`)입니다.
 
   ```sh
-  git diff --stat <지난 태그> <이번 태그> -- .github scripts
+  git diff --stat <지난 태그> <이번 태그> -- .github scripts mod/build.sh
   ```
 
 - 모르는 태그나 내가 달지 않은 태그면 승인하지 않고 실행을 취소합니다.
