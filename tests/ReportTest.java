@@ -1,7 +1,7 @@
 package io.github.jayparklab.nx4kor;
 
 /**
- * PC에서 상태 화면의 판단(Report)을 시험한다. tests/stub-test.sh가 javac로 컴파일해 돌린다.
+ * PC에서 상태 화면의 판단(Report)을 시험한다. tests/mod-test.sh가 javac로 컴파일해 돌린다.
  * 실패하면 "FAIL ..."을 찍고 종료 코드 1.
  */
 public class ReportTest {
@@ -48,7 +48,7 @@ public class ReportTest {
         Report r = Report.parse(GOOD);
         check("상태 파일 해석", "NX4.KOR.0000.V039.001.260902".equals(r.get("product")) && r.yes("our_ap"));
 
-        // --- 판정: status.sh(kp_verdict)가 정한 문구·수준을 그대로 ---
+        // --- 판정: status.sh(st_verdict)가 정한 문구·수준을 그대로 ---
         check("판정 문구·수준은 상태 파일 값 그대로(준비됨 → 초록)", r.verdict().equals("무선 카플레이·안드로이드 오토 준비됨.") && r.level() == 0);
         String V3 = GOOD.replace("verdict=ready", "verdict=nochip").replace("verdict_lv=0", "verdict_lv=2")
             .replace("verdict_msg=무선 카플레이·안드로이드 오토 준비됨.", "verdict_msg=이 차는 Wi-Fi 칩이 켜지지 않아 지원하기 어렵습니다.")

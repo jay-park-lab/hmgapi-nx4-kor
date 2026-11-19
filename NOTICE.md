@@ -29,7 +29,7 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
     - 이름 "NX4 KOR"(원본 "Korea Projection"), 안드로이드 패키지 `io.github.jayparklab.nx4kor`(원본 `korea.projection.app`)
     - 소스 `app/`, APK `NX4KOR.apk`, 서명 키 `~/.local/share/hmgapi-nx4-kor/keys/`(`scripts/build-app.sh`)
     - 화면이 열릴 때 `hmgapid service-start launch`를 부르고, 상태 파일이 새로 쓰이면 다시 그립니다
-- **시험:** `tests/mod-test.sh`를 새로 넣었습니다. `tests/stub-test.sh`·`tests/ReportTest.java`는 남은 기능에 맞췄습니다.
+- **시험:** `tests/mod-test.sh`를 새로 넣었고 `tests/ReportTest.java`는 남은 기능에 맞췄습니다. 원본의 `tests/stub-test.sh`는 뺐습니다.
 - **문서:** `README.md`, `docs/design.md`, `usb/README.txt`, `wireless/README.md`
 
 ## HMG-API (VysseCodes, AGPL-3.0)

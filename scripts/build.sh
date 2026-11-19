@@ -6,14 +6,14 @@
 # 필요한 것: JDK, python3, zip/unzip, HMG-API 소스(서명 도구 tools/mkmodpkg.sh), 상태 화면 앱 APK.
 # 환경 변수:
 #   HMGAPI_SRC      HMG-API 저장소 위치(필수). 서명은 그 tools/mkmodpkg.sh가 한다
-#   KP_MOD_KEY      모드 작성자 키(필수, 저장소 밖에 둔다). 처음 한 번:
+#   NX4_MOD_KEY      모드 작성자 키(필수, 저장소 밖에 둔다). 처음 한 번:
 #                     (cd $HMGAPI_SRC && mkdir -p out/engine-host && javac --release 8 -d out/engine-host core/runtime/java/hmgapi/engine/*.java)
 #                     java -cp $HMGAPI_SRC/out/engine-host hmgapi.engine.Signing keygen ~/.local/share/hmgapi-nx4-kor/keys/mod.key
 #                   HMG-API는 같은 키로 서명한 업데이트만 받는다: 이 키를 잃으면 모드를 지우고 다시 설치해야 한다
-#   KP_APK          상태 화면 앱(기본 mod/app/NX4KOR.apk, scripts/build-app.sh로 만듦)
-#   KP_BUSYBOX      함께 넣을 busybox(기본 mod/bin/busybox. 없으면 내비의 /system/bin/busybox만 쓴다)
-#   KP_BUSYBOX_LICENSE  그 busybox의 라이선스 안내(GPL-2.0, 대응 소스 위치. 기본 <KP_BUSYBOX>-LICENSE.txt)
-#   KP_PKG_ZIP      Korea Projection 릴리스의 패키지 zip: 위 둘이 없을 때 그 안의
+#   NX4_APK          상태 화면 앱(기본 mod/app/NX4KOR.apk, scripts/build-app.sh로 만듦)
+#   NX4_BUSYBOX      함께 넣을 busybox(기본 mod/bin/busybox. 없으면 내비의 /system/bin/busybox만 쓴다)
+#   NX4_BUSYBOX_LICENSE  그 busybox의 라이선스 안내(GPL-2.0, 대응 소스 위치. 기본 <NX4_BUSYBOX>-LICENSE.txt)
+#   NX4_PKG_ZIP      Korea Projection 릴리스의 패키지 zip: 위 둘이 없을 때 그 안의
 #                   bin/busybox와 bin/busybox-LICENSE.txt를 쓴다(같은 BusyBox 1.36.1, NOTICE.md)
 #   HMGAPI_USB_ZIP  HMG-API USB 묶음(hmgapi-<버전>-usb.zip). 주면 같은 USB에 함께 넣는다(HMG-API가 없으면 그것부터 설치)
 #   OUT             결과 폴더(기본 out)
@@ -25,11 +25,11 @@ B=$(cd "$(dirname "$0")/.." && pwd)
 PKG=$B/mod
 OUT=${OUT:-$B/out}
 : "${HMGAPI_SRC:?HMG-API 저장소 위치를 HMGAPI_SRC로 주세요}"
-: "${KP_MOD_KEY:?모드 작성자 키를 KP_MOD_KEY로 주세요(위 설명의 keygen)}"
+: "${NX4_MOD_KEY:?모드 작성자 키를 NX4_MOD_KEY로 주세요(위 설명의 keygen)}"
 [ -f "$HMGAPI_SRC/tools/mkmodpkg.sh" ] || { echo "HMGAPI_SRC에 tools/mkmodpkg.sh가 없습니다: $HMGAPI_SRC" >&2; exit 1; }
-[ -f "$KP_MOD_KEY" ] || { echo "키 파일이 없습니다: $KP_MOD_KEY" >&2; exit 1; }
+[ -f "$NX4_MOD_KEY" ] || { echo "키 파일이 없습니다: $NX4_MOD_KEY" >&2; exit 1; }
 HMGAPI_SRC=$(cd "$HMGAPI_SRC" && pwd)
-case $KP_MOD_KEY in /*) ;; *) KP_MOD_KEY=$PWD/$KP_MOD_KEY ;; esac
+case $NX4_MOD_KEY in /*) ;; *) NX4_MOD_KEY=$PWD/$NX4_MOD_KEY ;; esac
 
 # 판: mod.json의 version(상태 화면·USB 설치기도 이 값을 읽는다)
 V=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$PKG/mod.json" | head -1)
@@ -42,31 +42,31 @@ mkdir -p "$M"
 cp -R "$PKG/." "$M/"
 # NX4 map은 모드에 없다: 그 차에서 HMG-API가 만든다(svc/hotspot.sh setup_hmgapi, engine map-car --write → verify-map)
 
-APK=${KP_APK:-$PKG/app/NX4KOR.apk}
-[ -f "$APK" ] || { echo "상태 화면 앱이 없습니다: $APK (scripts/build-app.sh로 만들거나 KP_APK로 주세요)" >&2; exit 1; }
+APK=${NX4_APK:-$PKG/app/NX4KOR.apk}
+[ -f "$APK" ] || { echo "상태 화면 앱이 없습니다: $APK (scripts/build-app.sh로 만들거나 NX4_APK로 주세요)" >&2; exit 1; }
 mkdir -p "$M/app"
 [ "$APK" -ef "$M/app/NX4KOR.apk" ] || cp "$APK" "$M/app/NX4KOR.apk"
 
-BBX=${KP_BUSYBOX:-$PKG/bin/busybox}
+BBX=${NX4_BUSYBOX:-$PKG/bin/busybox}
 if [ -f "$BBX" ]; then
   [ "$BBX" -ef "$M/bin/busybox" ] || cp "$BBX" "$M/bin/busybox"
-elif [ -n "$KP_PKG_ZIP" ]; then
-  unzip -p "$KP_PKG_ZIP" bin/busybox > "$M/bin/busybox" || { echo "KP_PKG_ZIP에 bin/busybox가 없습니다" >&2; exit 1; }
+elif [ -n "$NX4_PKG_ZIP" ]; then
+  unzip -p "$NX4_PKG_ZIP" bin/busybox > "$M/bin/busybox" || { echo "NX4_PKG_ZIP에 bin/busybox가 없습니다" >&2; exit 1; }
 else
   echo "참고: busybox를 넣지 않습니다(내비의 /system/bin/busybox가 있어야 무선 설정을 합니다)"
 fi
 [ -f "$M/bin/busybox" ] && chmod 755 "$M/bin/busybox"
 # busybox는 GPL-2.0인 별개 프로그램이다: 넣으면 라이선스 안내(대응 소스 위치)도 넣어야 한다. 없으면 만들지 않는다
 BBNOTE=bin/busybox-LICENSE.txt
-BBL=${KP_BUSYBOX_LICENSE:-$BBX-LICENSE.txt}
+BBL=${NX4_BUSYBOX_LICENSE:-$BBX-LICENSE.txt}
 if [ -f "$M/bin/busybox" ]; then
   if [ -f "$BBL" ]; then
     [ "$BBL" -ef "$M/$BBNOTE" ] || cp "$BBL" "$M/$BBNOTE"
-  elif [ -n "$KP_PKG_ZIP" ] && unzip -p "$KP_PKG_ZIP" $BBNOTE > "$M/$BBNOTE" 2>/dev/null && [ -s "$M/$BBNOTE" ]; then
+  elif [ -n "$NX4_PKG_ZIP" ] && unzip -p "$NX4_PKG_ZIP" $BBNOTE > "$M/$BBNOTE" 2>/dev/null && [ -s "$M/$BBNOTE" ]; then
     :
   else
     rm -f "$M/$BBNOTE"
-    echo "busybox(GPL-2.0)를 넣는데 라이선스 안내($BBNOTE)가 없습니다. KP_BUSYBOX_LICENSE로 주거나 KP_PKG_ZIP에 들어 있어야 합니다." >&2
+    echo "busybox(GPL-2.0)를 넣는데 라이선스 안내($BBNOTE)가 없습니다. NX4_BUSYBOX_LICENSE로 주거나 NX4_PKG_ZIP에 들어 있어야 합니다." >&2
     exit 1
   fi
 else
@@ -78,7 +78,7 @@ find "$M" -name '*.sh' -exec chmod 755 {} +
 
 # 서명·묶기: HMG-API의 도구 그대로(같은 모드와 키면 어느 PC에서나 같은 zip)
 mkdir -p "$OUT"
-Z=$(sh "$HMGAPI_SRC/tools/mkmodpkg.sh" "$M" "$KP_MOD_KEY" | tail -1)
+Z=$(sh "$HMGAPI_SRC/tools/mkmodpkg.sh" "$M" "$NX4_MOD_KEY" | tail -1)
 [ -f "$Z" ] || { echo "모드 zip을 만들지 못했습니다" >&2; exit 1; }
 MZ=$OUT/hmgapi-nx4-kor-$V.zip
 cp "$Z" "$MZ"

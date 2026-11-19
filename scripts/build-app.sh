@@ -13,7 +13,7 @@ SDK=${SDK:-$HOME/.local/share/android-sdk}
 BT=$(ls -d "$SDK"/build-tools/*/ | sort -t/ -k1 -V | tail -n 1)
 JAR=$(ls "$SDK"/platforms/*/android.jar | head -n 1)
 KEYS=${KEYS:-$HOME/.local/share/hmgapi-nx4-kor/keys}
-W=$(mktemp -d /tmp/kp-app.XXXXXX)
+W=$(mktemp -d /tmp/nx4-kor-app.XXXXXX)
 trap 'rm -rf "$W"' EXIT
 
 if [ ! -f "$KEYS/release.keystore" ]; then

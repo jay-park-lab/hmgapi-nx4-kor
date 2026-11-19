@@ -321,7 +321,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         root.setPadding(pad, pad, pad, pad);
 
         root.addView(text("NX4 KOR " + r.get("pkgver"), 24, Color.WHITE));
-        // 상태 파일의 판정(status.sh kp_verdict)을 쓴다. 판정 문구가 없으면 이번 부팅의 진행 결과(재부팅 필요·실패)가 대신한다
+        // 상태 파일의 판정(status.sh st_verdict)을 쓴다. 판정 문구가 없으면 이번 부팅의 진행 결과(재부팅 필요·실패)가 대신한다
         String pv = r.get("verdict_msg").isEmpty() ? p.progVerdict(boot) : null;
         TextView verdict = text(pv != null ? pv : r.verdict(), 19, Color.WHITE);
         int lv = pv != null ? p.progLevel() : r.level();

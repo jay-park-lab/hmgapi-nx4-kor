@@ -33,7 +33,7 @@ ap_mode() {
 # 서비스 기록 위치(hotspot.sh에도 같은 기본값이 있다). 여기서는 그대로 다시 정한다(PC 테스트가 이 줄의 경로를 바꾼다)
 APLOG=/data/nx4-kor/logs/ap.log
 # 서비스 래퍼(svc/env.sh)가 정한 위치
-[ -n "$KP_APLOG" ] && APLOG=$KP_APLOG
+[ -n "$NX4_APLOG" ] && APLOG=$NX4_APLOG
 # busybox가 없으면(모드에 함께 넣은 것까지 없음) 판정을 못 한다. 앱이 "지원하지 않는 내비" 화면을 보이게 짧은 상태 파일만 쓴다.
 # 이 셸에는 printf가 없어 echo만 쓴다. .tmp에 쓴 뒤 바꾼다(열려 있는 화면이 반쯤 쓴 파일을 읽지 않게).
 if ! has_bb; then
@@ -68,7 +68,7 @@ HMGLOG=${HMGLOG:-/data/hmgapi/logs/hmgapi}
 # 통째로 끄고 "mods: nx4-kor not loaded: <이유>"를 남긴다. 켜지면 "mods: loaded nx4-kor <판>".
 # 두 로그 파일에서 마지막 줄로 판단한다.
 # 출력: "on", "off <이유>", 또는 빈 값(기록 없음). 이유는 HMG-API가 남긴 영문 그대로(지점 이름뿐, 개인정보 없음), 200자까지.
-# 1.7.3(K-5): 무선 모드 훅(modhooks)과 HMG-API 훅(hooks) 기록을 HMG-API 로그를 한 번만 읽어 함께 구한다(예전에는 두 번 끝까지 읽음).
+# 무선 모드 훅(modhooks)과 HMG-API 훅(hooks) 기록을 HMG-API 로그를 한 번만 읽어 함께 구한다(예전에는 두 번 끝까지 읽음).
 # _MH: "on", "off <이유>"(200자까지) 또는 빈 값. _HK: "on|off <상태>" 또는 빈 값.
 hmg_hooks_load() {
   [ "$HK_LOADED" = 1 ] && return 0
@@ -88,7 +88,7 @@ $_hh
 HKE
 }
 modhooks_state() { hmg_hooks_load; echo "$_MH"; }
-# --- 베타 2 #64: HMG-API 부팅 보호(boot guard) 알리기(읽기만, 값을 되돌리거나 HMG-API 파일을 쓰지 않음) ---
+# --- HMG-API 부팅 보호(boot guard) 알리기(읽기만, 값을 되돌리거나 HMG-API 파일을 쓰지 않음) ---
 # 근거(HMG-API 포크 core/zygote/zygote.c): zygote가 시작할 때마다 /data/hmgapi/hook/starts를 1 올리고(bump_starts, 올리기 전 값을
 # 돌려줌) 그 값이 MAXSTARTS(3) 이상이면 그 시작의 훅을 모두 끄고 커널 로그에 "hmgapi-hook: zygote, hooks off (boot guard, starts=N)"을
 # 남긴다. 훅이 켜지면 "…, hooks on, start N"이고, GUARD_DELAY(120)초 뒤 zygote가 살아 있으면 watcher가 0으로 되돌린다.
@@ -104,10 +104,10 @@ hook_armed() { [ -f $HOOKDIR/enable ] && [ ! -f $HOOKDIR/disable ]; }
 # HMG-API 설치 판(installed.txt의 version). 설치돼 있지 않으면 빈 값
 hmg_ver() { $BB awk '$1 == "version" { print $2; exit }' ${HMGINST:-/data/hmgapi/installed.txt} 2>/dev/null; }
 # 이번 부팅 zygote의 훅 줄(커널 로그)을 읽어 ZH(마지막 줄: on·guard·off·빈 값 = 이번 부팅 줄 없음)와 ZON(마지막 "hooks on" 줄의
-# 커널 시각, 정수 초, 없으면 빈 값)에 둔다. zygote가 같은 부팅에 다시 시작하면 줄이 여럿이다(마지막 것이 지금). KP_DMESG는 PC 시험용
+# 커널 시각, 정수 초, 없으면 빈 값)에 둔다. zygote가 같은 부팅에 다시 시작하면 줄이 여럿이다(마지막 것이 지금). NX4_DMESG는 PC 시험용
 zygote_info() {
   ZH=; ZON=
-  set -- $({ if [ -n "$KP_DMESG" ]; then cat $KP_DMESG; else dmesg; fi; } 2>/dev/null | $BB grep 'hmgapi-hook: zygote,' 2>/dev/null \
+  set -- $({ if [ -n "$NX4_DMESG" ]; then cat $NX4_DMESG; else dmesg; fi; } 2>/dev/null | $BB grep 'hmgapi-hook: zygote,' 2>/dev/null \
     | $BB awk '{ i = index($0, "["); j = index($0, "]"); t = ""; if (i > 0 && j > i) { t = substr($0, i + 1, j - i - 1); gsub(/ /, "", t); t = int(t + 0) } }
       index($0, "hooks on") > 0 { h = "on"; on = t; next } index($0, "hooks off (boot guard") > 0 { h = "guard"; next } index($0, "hooks off") > 0 { h = "off" }
       END { print (h == "" ? "-" : h), (on == "" ? "-" : on) }')
@@ -118,13 +118,13 @@ zygote_info() {
 hooks_state() { hmg_hooks_load; echo "$_HK"; }
 
 # --- 판정은 한 곳에서 ---
-# kp_collect가 판정에 쓰는 값을 한 번만 구하고(K_*), kp_verdict가 차례대로 판정해 V_*에 둔다. 상태 파일(status_kv)에 쓰고,
+# st_collect가 판정에 쓰는 값을 한 번만 구하고(K_*), st_verdict가 차례대로 판정해 V_*에 둔다. 상태 파일(status_kv)에 쓰고,
 # 상태 화면 앱은 상태 파일의 verdict·verdict_lv·verdict_msg를 그대로 보인다.
 # 판정 순서: HMG-API 부팅 보호 → 설치 중 → 이 모드의 차가 아님 → HMG-API → Wi-Fi 부품·칩(근거 있는 끝) → Wi-Fi 확인 중 →
 # 따로 설치된 무선 모드 → 다른 Wi-Fi 패키지 → 재부팅 필요 → 적용 거절·설정 실패 → 모드·설정·훅 → 무선 기능 → Wi-Fi·핫스팟 → 연결·준비됨.
-kp_collect() {
-  [ "$KC_DONE" = 1 ] && return 0
-  KC_DONE=1
+st_collect() {
+  [ "$SC_DONE" = 1 ] && return 0
+  SC_DONE=1
   K_PROD=$(getprop ro.build.product)
   K_FEATS="$(pm list features 2>/dev/null)
 "
@@ -170,8 +170,8 @@ k_feat() { case "$K_FEATS" in *"feature:$1
 "*) return 0 ;; esac; return 1; }
 # 판정 결과: V_CODE(영문 낱말), V_LV(0 좋음·1 확인 필요·2 문제), V_MSG(한국어 한두 문장), V_END(yes면 "이 차는 안 됨"으로 끝나 지우는 법을
 # 함께 보임), V_S1~3(차주용 요약 3줄: 설치·무선 Wi-Fi·폰 연결)
-kp_verdict() {
-  kp_collect
+st_verdict() {
+  st_collect
   V_CODE=; V_LV=1; V_MSG=; V_END=no
   # 지금 폰이 연결돼 있는가(카플레이 연결 수 또는 이번 부팅 무선 AA 연결). 연결 중이면 핫스팟·Wi-Fi 꺼짐 판정을 내지 않는다
   _vconn=no; { [ "${K_CP:-0}" != 0 ] || [ "$K_AAOK" = yes ]; } && _vconn=yes
@@ -283,8 +283,8 @@ plan_problems() {
   $BB grep '^problem' $W/plan.txt 2>/dev/null | $BB awk 'NR <= 10 { gsub(/[^A-Za-z0-9 ,()\/._:\[\]-]/, ""); print substr($0, 1, 160) }'
 }
 status_kv() {
-  kp_collect
-  kp_verdict
+  st_collect
+  st_verdict
   echo "product=$K_PROD"
   echo "targetdir=$(getprop ro.mobis.targetdir)"
   echo "pkgver=$(mod_ver)"
@@ -330,15 +330,15 @@ status_kv() {
 }
 # 부팅 뒤 초(시계가 바뀌어도 거꾸로 가지 않는다). 읽지 못하면 빈 값
 up_s() { $BB awk '{ print int($1) }' $UPTIME 2>/dev/null; }
-# ap.log에 한 줄(서비스 로그와 같은 꼴). Launch·감시자에서 쓴다
-# 베타 1 리뷰 B: 시계가 맞기 전이면 시각 대신 "부팅 직후"(hotspot.sh log_ts)
+# ap.log에 한 줄(서비스 로그와 같은 꼴). 상태 화면 갱신·감시자에서 쓴다
+# 시계가 맞기 전이면 시각 대신 "부팅 직후"(hotspot.sh log_ts)
 aplog() { log_ts; echo "$_LT $*" 2>/dev/null >> $APLOG; }
-# 1.7.3(U-3): [지금 재부팅] 요청($RBREQ, hotspot.sh)을 하나 받는다. 재부팅해도 되면 0. 받으면 바로 지운다.
-# 하지 않는 경우(모두 ap.log에 이유 한 줄): 이전 부팅·이미 받은 요청(reboot.last)·깨진 값, 40초(KP_RB_MAX)보다 오래됨·나이를 모름,
+# [지금 재부팅] 요청($RBREQ, hotspot.sh)을 하나 받는다. 재부팅해도 되면 0. 받으면 바로 지운다.
+# 하지 않는 경우(모두 ap.log에 이유 한 줄): 이전 부팅·이미 받은 요청(reboot.last)·깨진 값, 40초(NX4_RB_MAX)보다 오래됨·나이를 모름,
 # 이번 부팅 설치 진행 기록이 설치 중(state=run), 설치 마무리(fix_perms: /system remount·
 # 권한 파일·HMG-API map·적용을 모두 이 안에서 함)가 돌고 있음.
 # 감시자만 부른다.
-# 1.7.3(리뷰 M2): 받지 않은 재부팅 요청·돌아온 재부팅 명령의 결과를 앱이 읽게 남긴다(644, 비밀값 없음, 요청 id를 읽었을 때만).
+# 받지 않은 재부팅 요청·돌아온 재부팅 명령의 결과를 앱이 읽게 남긴다(644, 비밀값 없음, 요청 id를 읽었을 때만).
 # 앱은 RB_WAIT(80초)를 다 기다리지 않고 이유에 맞는 문구를 보인다. RESET 안내는 명령이 돌아왔을 때(cmd)·모르는 코드·아무도 답하지
 # 않을 때(감시자 없음), 그리고 설치 중·바깥 작업(install·sysw) 거절이 RB_STUCK_MAX(3)번 넘게 이어질 때(앱이 셈).
 # 버튼은 늘 보이므로 "재부팅 필요"(state=reboot)일 때만 받지 않는다. /system이 rw인지는 보지 않는다(설치 직후 rw로 남을 수 있음).
@@ -358,7 +358,7 @@ take_rbreq() {
   if ! req_peek $RBREQ $W/reboot.last; then
     # req_peek이 읽은 내용만 다룬다(그 뒤 막 들어온 새 요청을 지우지 않게, req_drop). 못 읽었으면(파일 없음) 할 일 없음.
     if [ -n "$RQ_RAW" ]; then
-      # 지우지 못해 같은 파일이 남아도 1초마다 줄을 쌓지 않게, 같은 내용은 한 번만 기록한다(리뷰 M2)
+      # 지우지 못해 같은 파일이 남아도 1초마다 줄을 쌓지 않게, 같은 내용은 한 번만 기록한다
       if [ "$RQ_RAW" != "$(cat $W/reboot.bad 2>/dev/null)" ]; then
         echo "$RQ_RAW" > $W/reboot.bad
         aplog "재부팅 요청 거절: 이번 부팅의 새 요청이 아님(이전 부팅·이미 받은 요청·깨진 값)"
@@ -372,11 +372,11 @@ take_rbreq() {
   echo "$RQ_ID" > $W/reboot.last
   _un=$(up_s)
   case "$_un" in ''|*[!0-9]*) aplog "재부팅 요청 거절: 요청 나이를 알 수 없음"; rb_result old; return 1 ;; esac
-  # 재리뷰(낮음): 한도 40초. 앱의 실패 판정(RB_WAIT 80초)은 이 40초 + sync + 재부팅 명령 기다림 30초보다 길다(재리뷰 L2). 나이가 음수(앞으로 온 요청)도 받지 않는다
+  # 한도 40초. 앱의 실패 판정(RB_WAIT 80초)은 이 40초 + sync + 재부팅 명령 기다림 30초보다 길다. 나이가 음수(앞으로 온 요청)도 받지 않는다
   _ra=$((_un - RQ_EL))
   [ $_ra -ge 0 ] || { aplog "재부팅 요청 거절: 요청 시각이 지금보다 뒤임($_ra초)"; rb_result old; return 1; }
-  [ $_ra -le ${KP_RB_MAX:-40} ] || { aplog "재부팅 요청 거절: 오래된 요청(${_ra}초)"; rb_result old; return 1; }
-  # 베타 1 리뷰 2: 이번 부팅 설치 진행 기록이 run이어도, 마지막으로 쓴 지(ut, 부팅 뒤 초) RB_STALE초(900, 앱의 STALE과 같음)가
+  [ $_ra -le ${NX4_RB_MAX:-40} ] || { aplog "재부팅 요청 거절: 오래된 요청(${_ra}초)"; rb_result old; return 1; }
+  # 이번 부팅 설치 진행 기록이 run이어도, 마지막으로 쓴 지(ut, 부팅 뒤 초) RB_STALE초(900, 앱의 STALE과 같음)가
   # 넘었으면 멈춘 기록으로 보고 이 이유로는 막지 않는다(설치 마무리가 아직 돌면 아래 fix로 막는다). ut가 없거나 숫자가 아니어도
   # 멈춘 기록으로 본다(버튼이 끝없이 "잠시 뒤 다시"만 내지 않게)
   if $BB grep -q '^state=run$' $PROG 2>/dev/null \
@@ -392,11 +392,11 @@ take_rbreq() {
          aplog "설치 진행 기록이 run인 채 $((_un - _put))초 그대로: 멈춘 기록으로 보고 설치 중으로는 막지 않음" ;;
     esac
   fi
-  # 재리뷰 중간 1: 프로세스 확인을 못 하면(명령줄을 못 읽음) 돌고 있는 것으로 본다(pid_busy, 막는 쪽으로)
+  # 프로세스 확인을 못 하면(명령줄을 못 읽음) 돌고 있는 것으로 본다(pid_busy, 막는 쪽으로)
   pid_busy $W/fix.pid hotspot.sh && { aplog "재부팅 요청 거절: 설치 마무리(시스템 파일·HMG-API 적용)가 아직 도는 중"; rb_result fix; return 1; }
-  # 베타 2 #64: HMG-API watcher가 starts를 0으로 되돌리기 전에 다시 부팅하면 쌓여, 지금 값이 2·3이면 다음(또는 그다음) 시작에 훅이
+  # HMG-API watcher가 starts를 0으로 되돌리기 전에 다시 부팅하면 쌓여, 지금 값이 2·3이면 다음(또는 그다음) 시작에 훅이
   # 꺼진다. 앱은 root 파일 starts를 읽을 수 없어 root가 거절한다(code=guard, 앱은 "2~5분 뒤에"). 4 이상(이미 꺼짐)·못 읽음이면 막지 않는다.
-  # 8~9장 리뷰 M1: watcher는 커널 부팅이 아니라 zygote 시작 뒤 GUARD_DELAY(120)초에 돈다(zygote.c start_watcher). 그래서 이번 부팅의
+  # watcher는 커널 부팅이 아니라 zygote 시작 뒤 GUARD_DELAY(120)초에 돈다(zygote.c start_watcher). 그래서 이번 부팅의
   # 마지막 "hooks on" 줄 커널 시각 + 120 + 여유 15초까지 막고, 그 줄이 없으면 부팅 뒤 300초까지 막는다(늘 끝이 있다). watcher가
   # 돌아 starts가 0·1이 되면 바로 풀린다
   # 10장 확인 리뷰 1: HMG-API가 설치돼 있지 않거나(--purge 없이 지워 starts가 남은 차) 이번 부팅 zygote 줄이 off·guard(disable 파일,
@@ -408,30 +408,30 @@ take_rbreq() {
       '') hook_armed && _garm=yes ;;
     esac
   fi
-  if [ -n "$ZON" ]; then _gend=$((ZON + ${KP_GUARD_DELAY:-120} + 15)); else _gend=300; fi
+  if [ -n "$ZON" ]; then _gend=$((ZON + ${NX4_GUARD_DELAY:-120} + 15)); else _gend=300; fi
   if [ $_garm = yes ] && [ -n "$_gst" ] && [ "$_gst" -ge 2 ] && [ "$_gst" -le 3 ] && [ "$_un" -lt $_gend ]; then
     aplog "재부팅 요청 거절: 부팅 뒤 ${_un}초(HMG-API 시작 확인 시각 ${_gend}초 전)이고 HMG-API 부팅 보호 횟수 starts=$_gst(3분 안에 재부팅을 반복하면 훅이 꺼짐)"
     rb_result guard
     return 1
   fi
-  # 베타 1 리뷰 1: 우리 밖에서 /system을 바꾸는 작업이 돌면 막는다(앱 문구는 "설정을 마무리하는 중"과 같은 fix)
-  # 재리뷰 M2: 외부 작업 거절은 code=sysw(앱은 "마무리하는 중", 같은 이유가 이어지면 RESET 안내로 넘김)
+  # 우리 밖에서 /system을 바꾸는 작업이 돌면 막는다(앱 문구는 "설정을 마무리하는 중"과 같은 fix)
+  # 외부 작업 거절은 code=sysw(앱은 "마무리하는 중", 같은 이유가 이어지면 RESET 안내로 넘김)
   if sys_writer_busy; then aplog "재부팅 요청 거절: 시스템 영역을 바꾸는 작업이 도는 중($SYSW)"; rb_result sysw; return 1; fi
   return 0
 }
-# 베타 1 리뷰 1: rw 확인을 뺀 대신, /system을 바꾸는 우리 밖의 프로세스가 지금 도는지 /proc/<pid>/cmdline으로 본다(ps는 80칸에서 잘림).
+# rw 확인을 뺀 대신, /system을 바꾸는 우리 밖의 프로세스가 지금 도는지 /proc/<pid>/cmdline으로 본다(ps는 80칸에서 잘림).
 # 이름의 근거:
 #   - HMG-API 엔진은 데몬이 "app_process /system/bin hmgapi.engine.Engine <op>"로 띄운다(HMG-API 포크 core/hmgapid/hmgapid.c
 #     op_engine). 앱의 Apply changes도 데몬을 거친다(README의 hmgapi.app ops). /system을 바꾸는 op는 apply·restore·recover.
 #   - /system remount는 "hmgapid remount rw|ro"(같은 파일 op_remount).
 #   - HMG-API 부팅 스크립트(install/common/boot.sh)가 부팅마다 "sh /data/hmgapi/hook-check.sh"를 돌린다(remount rw → 쓰기 → ro).
 #     엔진 update-hmgapi도 HMG-API 파일을 바꾼다.
-# 빈 명령줄(커널 스레드)은 건너뛴다. 재리뷰 M2: 명령줄을 하나도 못 읽으면(busybox 1.8.1 tr이 NUL을 못 다루는 등) $PS로 한 번 더
+# 빈 명령줄(커널 스레드)은 건너뛴다. 명령줄을 하나도 못 읽으면(busybox 1.8.1 tr이 NUL을 못 다루는 등) $PS로 한 번 더
 # 본다(엔진 apply 명령줄은 약 60자라 ps의 80칸 안). 그래도 판단이 안 되면 막지 않고 로그만 남긴다(우리 쪽 쓰기는 fix.pid·run 기록이
 # 따로 막는다. 막는 쪽으로 두면 버튼이 영영 "마무리하는 중"만 보인다). SYSW에 찾은 것을 둔다.
 sys_writer_busy() {
   SYSW=; _sn=0
-  # 확인 리뷰 M1: pcmd를 믿을 수 없으면(명령줄이 잘리거나 붙음) /proc 판정을 쓰지 않고 바로 ps로 본다
+  # pcmd를 믿을 수 없으면(명령줄이 잘리거나 붙음) /proc 판정을 쓰지 않고 바로 ps로 본다
   pcmd_ok || aplog "재부팅 요청: 프로세스 명령줄이 잘려 읽힘(tr). ps로 확인함"
   pcmd_ok && for _sd in $PROC/[0-9]*; do
     [ -d "$_sd" ] || continue
@@ -486,11 +486,11 @@ if [ "$1" = --watch ]; then
     rm -rf $W/watch.lock
     $BB mkdir $W/watch.lock 2>/dev/null || exit 0
   fi
-  # 1.7.3(K-7): 1초 반복에서 하위 셸을 줄인다. 끝 시각·부팅 뒤 초는 read로 읽고(up_s의 awk와 같은 정수 초), 요청 파일은
+  # 1초 반복에서 하위 셸을 줄인다. 끝 시각·부팅 뒤 초는 read로 읽고(up_s의 awk와 같은 정수 초), 요청 파일은
   # 있을 때만 본다(없으면 받는 함수가 할 일이 없다). 부팅 id는 요청을 받을 때마다 그대로 읽는다(못 읽으면 거절, 재리뷰)
   _me="$$ $(cat ${BOOT_ID:-/proc/sys/kernel/random/boot_id} 2>/dev/null)"
   echo "$_me" > $W/watch.pid
-  # 재리뷰 L1: 새 감시자는 시작할 때 지금 끝 시각을 다시 쓴다(옛 감시자가 끝나며 덮었더라도 바로 맞게)
+  # 새 감시자는 시작할 때 지금 끝 시각을 다시 쓴다(옛 감시자가 끝나며 덮었더라도 바로 맞게)
   _wu=; { read _wu < $W/watch.until; } 2>/dev/null; case "$_wu" in ''|*[!0-9]*) : ;; *) watch_pub $_wu ;; esac
   while :; do
     _wu=; _wn=
@@ -499,7 +499,7 @@ if [ "$1" = --watch ]; then
     case "$_wu" in ''|*[!0-9]*) break ;; esac
     case "$_wn" in ''|*[!0-9]*) break ;; esac
     if [ "$_wn" -ge "$_wu" ]; then
-      # 베타 1 리뷰 7: 끝내기 전에 1초 뒤 한 번 더 읽는다. Launch가 막 늘렸으면(이 감시자가 살아 있다고 보고 새로 띄우지 않음) 계속
+      # 끝내기 전에 1초 뒤 한 번 더 읽는다. 상태 화면이 막 늘렸으면(이 감시자가 살아 있다고 보고 새로 띄우지 않음) 계속
       sleep 1
       _wu=; { read _wu < $W/watch.until; } 2>/dev/null; { read _wn _wx < $UPTIME; } 2>/dev/null; _wn=${_wn%%.*}
       case "$_wu" in ''|*[!0-9]*) break ;; esac
@@ -510,31 +510,31 @@ if [ "$1" = --watch ]; then
     # 남는 잠금(watch.lock)은 다음 부팅의 감시자가 "지난 부팅 것"으로 보고 지운다. 명령이 돌아오면(실패) 기록하고 계속 감시한다.
     if [ -f $RBREQ ] && take_rbreq; then
       aplog "상태 화면에서 재부팅 요청: 지금 재부팅함(sync 뒤 reboot)"
-      # KP_SYNC는 PC 시험용(KP_REBOOT처럼). 차에서는 sync
-      ${KP_SYNC:-sync}
+      # NX4_SYNC는 PC 시험용(NX4_REBOOT처럼). 차에서는 sync
+      ${NX4_SYNC:-sync}
       # 검사와 재부팅 사이(특히 sync가 길 때) 바깥 작업·설치 마무리가 새로 시작했으면 지금 거절한다
       if sys_writer_busy || pid_busy $W/fix.pid hotspot.sh; then
         aplog "재부팅 요청 거절: sync 뒤 다시 보니 시스템 영역·설치 마무리 작업이 시작됨(${SYSW:-우리 작업})"
         rb_result sysw
       else
-      # 재리뷰(낮음): reboot 명령이 돌아오지 않을 수 있다(4.4 toolbox reboot은 sys.powerctl 뒤 기다릴 수 있음). 뒤에서 띄우고
-      # KP_RB_WAIT초(기본 30)만 기다린다. 끝나는 조건: 명령이 끝남 또는 시간. 그 뒤 기록하고 감시를 계속한다.
+      # reboot 명령이 돌아오지 않을 수 있다(4.4 toolbox reboot은 sys.powerctl 뒤 기다릴 수 있음). 뒤에서 띄우고
+      # NX4_RB_WAIT초(기본 30)만 기다린다. 끝나는 조건: 명령이 끝남 또는 시간. 그 뒤 기록하고 감시를 계속한다.
       # 끝났는지는 하위 셸이 남기는 reboot.rc(종료 코드)로 본다. kill -0은 끝난 자식(좀비)에도 성공해 쓸 수 없다(PC 시험에서 확인).
       rm -f $W/reboot.rc
-      ( ${KP_REBOOT:-/system/bin/reboot} </dev/null >/dev/null 2>&1; echo $? > $W/reboot.rc ) &
+      ( ${NX4_REBOOT:-/system/bin/reboot} </dev/null >/dev/null 2>&1; echo $? > $W/reboot.rc ) &
       _rw=0
-      while [ ! -s $W/reboot.rc ] && [ $_rw -lt ${KP_RB_WAIT:-30} ]; do sleep 1; _rw=$((_rw+1)); done
+      while [ ! -s $W/reboot.rc ] && [ $_rw -lt ${NX4_RB_WAIT:-30} ]; do sleep 1; _rw=$((_rw+1)); done
       if [ -s $W/reboot.rc ]; then
         aplog "재부팅 명령이 끝났지만 재부팅되지 않음(종료 코드 $(cat $W/reboot.rc 2>/dev/null))"
       else
-        aplog "재부팅 명령이 ${KP_RB_WAIT:-30}초 안에 끝나지 않음(아직 재부팅되지 않음)"
+        aplog "재부팅 명령이 ${NX4_RB_WAIT:-30}초 안에 끝나지 않음(아직 재부팅되지 않음)"
       fi
       rb_result cmd
       fi
     fi
     sleep 1
   done
-  # 1.7.4(B-7, 리뷰 반영): 끝내기로 정한 뒤 Launch가 끝 시각을 늘렸으면, 그 Launch는 이 감시자가 살아 있다고 보고 새로 띄우지
+  # 끝내기로 정한 뒤 상태 화면이 끝 시각을 늘렸으면, 그 상태 화면 갱신은 이 감시자가 살아 있다고 보고 새로 띄우지
   # 않았다. 그래서 끝 시각을 watch.pid를 지우기 전과 잠금을 푼 뒤 두 번 보고, 어느 쪽이든 늘어났으면 새 감시자를 **한 번만** 띄운다
   # (띄우는 곳은 아래 한 줄뿐). 부팅 뒤 초를 못 읽으면 띄우지 않는다(못 읽어 0으로 보면 끝 시각이 늘 커 보여 끝없이 띄우게 됨).
   # 새 감시자는 그 끝 시각에 끝나고, 그때 다시 볼 때는 늘어나지 않았으므로 또 띄우지 않는다
@@ -550,7 +550,7 @@ if [ "$1" = --watch ]; then
   watch_more && _again=1
   [ "$(cat $W/watch.pid 2>/dev/null)" = "$_me" ] && rm -f $W/watch.pid
   rm -rf $W/watch.lock
-  # 앱이 "감시자 끝남"을 알게 지금 시각으로 쓴다(못 읽으면 0). 재리뷰 L1: 그 사이 Launch가 새 끝 시각을 썼으면(이 감시자가 본 마지막
+  # 앱이 "감시자 끝남"을 알게 지금 시각으로 쓴다(못 읽으면 0). 그 사이 상태 화면이 새 끝 시각을 썼으면(이 감시자가 본 마지막
   # 값과 다름: 새 감시자가 뜸) 덮지 않는다
   _wn=; { read _wn _wx < $UPTIME; } 2>/dev/null; _wn=${_wn%%.*}; case "$_wn" in ''|*[!0-9]*) _wn=0 ;; esac
   _wf=; [ -f $WATCHF ] && _wf=$($BB awk -F= '$1 == "until" { print $2 }' $WATCHF 2>/dev/null)
@@ -560,9 +560,9 @@ if [ "$1" = --watch ]; then
   exit 0
 fi
 
-# 1.7.3(K-3): 하위 셸 없이 이 셸에서 쓴다(그래야 끝의 한 줄 요약이 방금 구한 값 K_*를 다시 쓸 수 있다: softap.conf·연결 수·AP 판정을
+# 하위 셸 없이 이 셸에서 쓴다(그래야 끝의 한 줄 요약이 방금 구한 값 K_*를 다시 쓸 수 있다: softap.conf·연결 수·AP 판정을
 # 두 번 구하지 않음). 상태 파일만 644로 만들고 umask는 되돌린다. parse_conf가 위치 인자를 바꾸지만 이 뒤에는 $1을 쓰지 않는다.
-# 리뷰 L-4: 이 셸에서 바로 돈다. status_kv 안에 $(( ))를 넣을 때는 값이 숫자인지 먼저 확인하세요(틀린 산술은 Launch 전체를 끝냄)
+# 이 셸에서 바로 돈다. status_kv 안에 $(( ))를 넣을 때는 값이 숫자인지 먼저 확인하세요(틀린 산술은 상태 화면 갱신 전체를 끝냄)
 umask 022
 status_kv 2>/dev/null > $STATUS.tmp && $BB chmod 644 $STATUS.tmp && $BB mv -f $STATUS.tmp $STATUS
 umask 077
@@ -575,7 +575,7 @@ if [ "${RPT_SYNC:-0}" != 1 ]; then
   case "$_wn" in
     ''|*[!0-9]*) : ;;
     # 임시 파일에 쓴 뒤 이름을 바꾼다: 감시자가 1초마다 읽으므로 ">"로 바로 쓰면 비운 순간을 읽고 "값 없음"으로 끝날 수 있다
-    # (PC 시험에서 Launch를 다시 누를 때 재현, 2026-11-10)
+    # (PC 시험에서 화면을 다시 열 때 재현, 2026-11-10)
     *) echo $((_wn + ${WATCH_SECS:-600})) > $W/watch.until.tmp && $BB mv -f $W/watch.until.tmp $W/watch.until
        watch_pub $((_wn + ${WATCH_SECS:-600}))
        st_alive $W/watch.pid --watch || BB=$BB $BB setsid sh $APP/bin/status.sh --watch </dev/null >/dev/null 2>&1 & ;;
@@ -584,15 +584,15 @@ fi
 
 # 설치가 아직 진행 중이면 끝난 뒤에 한 번 더 돌도록 뒤에 남긴다(한 번에 하나만, 이번 부팅의 것만)
 if [ $WAITED = 0 ] && $BB grep -q '^state=run$' $PROG 2>/dev/null; then
-  # 1.7.3(K-7): wait.pid도 "<pid> <boot_id>"로 쓰고 st_alive로 본다(지난 부팅의 같은 pid를 살아 있는 것으로 보지 않게)
+  # wait.pid도 "<pid> <boot_id>"로 쓰고 st_alive로 본다(지난 부팅의 같은 pid를 살아 있는 것으로 보지 않게)
   if ! st_alive $W/wait.pid --wait; then
     BB=$BB $BB setsid sh $APP/bin/status.sh --wait </dev/null >/dev/null 2>&1 &
     echo "$! ${BID:-$(cat ${BOOT_ID:-/proc/sys/kernel/random/boot_id} 2>/dev/null)}" > $W/wait.pid
   fi
 fi
-# 상태와 저장 진행은 이어서 열리는 화면(StatusActivity)이 보여 준다. 토스트는 쓰지 않는다(1.7.0 소유자 결정).
+# 상태와 저장 진행은 이어서 열리는 화면(StatusActivity)이 보여 준다. 토스트는 쓰지 않는다.
 # 표준출력에는 한 줄 요약을 남긴다(launch 서비스 기록·테스트용).
-# 상태 파일을 쓸 때 구한 값(kp_collect)을 다시 쓴다
+# 상태 파일을 쓸 때 구한 값(st_collect)을 다시 쓴다
 c=$K_CP
 # 순정 Wi-Fi 차는 판정 문구와 같은 뜻으로
 if [ "$K_APMODE" = stock ]; then m="NX4 KOR: 무선 카플레이·안드로이드 오토 준비됨, 카플레이 연결 $c개"

@@ -9,7 +9,7 @@ import java.util.Map;
  * 상태 파일(bin/status.sh가 root로 쓰는 key=value 줄)을 읽어 화면에 보일 줄을 만든다.
  * 안드로이드 클래스를 쓰지 않아 PC에서 시험할 수 있다(tests/ReportTest.java).
  * 상태 파일에는 SSID, 비밀번호, 휴대폰 이름, MAC, IP가 없다. 이 클래스도 그런 값을 만들지 않는다.
- * 판정(verdict·verdict_lv·verdict_msg·verdict_end)과 요약(s1~s3)은 status.sh(kp_verdict) 한 곳에서 정하고, 앱은 그대로 보인다.
+ * 판정(verdict·verdict_lv·verdict_msg·verdict_end)과 요약(s1~s3)은 status.sh(st_verdict) 한 곳에서 정하고, 앱은 그대로 보인다.
  */
 final class Report {
     final Map<String, String> v = new LinkedHashMap<String, String>();
@@ -401,7 +401,7 @@ final class Report {
             out.add(new String[] { "1", "안드로이드 폰의 블루투스를 껐다 켜 주세요(또는 내비 블루투스 화면에서 폰을 다시 연결).", "" });
         if ("cpwait".equals(aa) && aaNow)
             out.add(new String[] { "1", "카플레이가 연결되어 있어 안드로이드 오토는 기다립니다.", "" });
-        // 무선 안드로이드 오토 준비됨·연결됨은 따로 줄을 두지 않는다. 판정 줄(status.sh kp_verdict)이 카플레이와 함께 한 줄로 말한다
+        // 무선 안드로이드 오토 준비됨·연결됨은 따로 줄을 두지 않는다. 판정 줄(status.sh st_verdict)이 카플레이와 함께 한 줄로 말한다
         return out;
     }
 

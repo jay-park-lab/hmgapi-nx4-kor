@@ -141,14 +141,13 @@ javac --release 8 -d out/engine-host core/runtime/java/hmgapi/engine/*.java
 java -cp out/engine-host hmgapi.engine.Signing keygen ~/.local/share/hmgapi-nx4-kor/keys/mod.key
 
 # 3. 묶음(결과: out/hmgapi-nx4-kor-버전.zip, out/hmgapi-nx4-kor-버전-usb.zip)
-HMGAPI_SRC=<HMG-API 소스> KP_MOD_KEY=~/.local/share/hmgapi-nx4-kor/keys/mod.key \
-  KP_PKG_ZIP=<Korea Projection 릴리스의 패키지 zip, busybox와 그 라이선스 안내용> HMGAPI_USB_ZIP=<hmgapi-버전-usb.zip, 선택> \
+HMGAPI_SRC=<HMG-API 소스> NX4_MOD_KEY=~/.local/share/hmgapi-nx4-kor/keys/mod.key \
+  NX4_PKG_ZIP=<Korea Projection 릴리스의 패키지 zip, busybox와 그 라이선스 안내용> HMGAPI_USB_ZIP=<hmgapi-버전-usb.zip, 선택> \
   sh scripts/build.sh
 ```
 
 **PC 시험**
-- `sh tests/mod-test.sh`: `mod.json`(합친 무선 부분 포함), 서비스 래퍼, 자동 설정(map 만들기·확인·적용), 설치 뒤·삭제 전 정리, 무선 권한 파일 되돌리기, 상태 판정, [지금 재부팅] 요청, USB 설치기, 지우기(HMG-API를 먼저 지운 경우 포함). `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치, 차종 제한(NX4.KOR 260902만)까지 봅니다.
-- `sh tests/stub-test.sh`: 핫스팟 서비스 시험(softap.conf 해석, hostapd·dnsmasq, Wi-Fi 잠금, 순정 카플레이 AP, Wi-Fi 칩 깨우기, 안드로이드 오토 신호, 기록 크기 제한)과 상태 화면 앱의 `ReportTest`. Korea Projection의 시험에서 이 모드에 남은 기능만 남겼습니다.
+- `sh tests/mod-test.sh`: `mod.json`(합친 무선 부분 포함), 서비스 래퍼, 자동 설정(map 만들기·확인·적용), 설치 뒤·삭제 전 정리, 무선 권한 파일 되돌리기, 상태 판정, [지금 재부팅] 요청, USB 설치기, 지우기(HMG-API를 먼저 지운 경우 포함), 상태 화면 앱의 `ReportTest`, 정적 검사. `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치, 차종 제한(NX4.KOR 260902만)까지 봅니다.
 
 ## 라이선스
 

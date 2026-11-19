@@ -1,20 +1,20 @@
 #!/system/bin/sh
 # 지우기 전 정리(bin/uninstall.sh가 서비스 ap를 멈춘 뒤 부른다):
-#   1. 우리 hostapd·dnsmasq와 상태 화면 감시자를 멈추고 작업 파일을 지운다. KP_UPDATE=1(새 판으로 바꾸기 전)이면 여기서 끝난다.
+#   1. 우리 hostapd·dnsmasq와 상태 화면 감시자를 멈추고 작업 파일을 지운다. NX4_UPDATE=1(새 판으로 바꾸기 전)이면 여기서 끝난다.
 #   2. HMG-API에서 이 모드를 빼고 적용한다(무선 훅·기능 파일·네이티브 패치를 원래대로). 계획이 이 모드의 되돌리기뿐일 때만
 #      적용하고, 아니면 HMG-API 앱에서 적용하라고 안내한다. HMG-API를 먼저 지웠으면 HMG-API 삭제가 이미 되돌렸다.
 #   3. 이 모드가 직접 바꾼 것을 되돌린다: 무선 권한 파일(perms_revert), Wi-Fi 잠금, 순정 AP 저장값. 그리고 기록($BK)을 지운다.
 # hotspot.sh 함수는 2번 전에 읽어 둔다(engine remove가 모드 폴더를 지운다).
-# Wi-Fi는 껐다 켜지 않는다: Korea Projection 때 니로에서 Wi-Fi를 껐다 켜면 USB가 다시 붙고(Wi-Fi/블루투스 모듈이
+# Wi-Fi는 껐다 켜지 않는다: 니로에서 Wi-Fi를 껐다 켜면 USB가 다시 붙고(Wi-Fi/블루투스 모듈이
 # 같은 USB 버스에 있는 것으로 보임) 블루투스 카플레이가 재부팅 전까지 되지 않았다. 일반 Wi-Fi는 차를 껐다
 # 켜면 돌아온다(wifi_on이 켜져 있으므로). 설치 전에 Wi-Fi가 꺼져 있던 차만 다시 끈다.
 export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 umask 077
 # busybox는 아래 hotspot.sh가 고른다(내비의 것, 없으면 모드에 함께 넣은 것)
 BB=
-# bin/uninstall.sh가 BK·KP_APP를 넘긴다
+# bin/uninstall.sh가 BK·NX4_APP를 넘긴다
 BK=${BK:-/data/nx4-kor/backup}
-APP=${KP_APP:-/data/hmgapi/mods/nx4-kor}
+APP=${NX4_APP:-/data/hmgapi/mods/nx4-kor}
 HOTSPOT_LIB=1 . $APP/svc/hotspot.sh
 # 쓸 수 있는 busybox가 없는 내비는 우리 hostapd를 켠 적이 없다: 오류 줄만 나오므로 건너뛴다
 has_bb && stop_all
@@ -37,7 +37,7 @@ rm -f $HINT $HINT.tmp
 # 순정 hostapd가 돌고 있으면(순정 카플레이 AP 등) 그 주소는 순정 것이라 지우지 않는다(지우면 순정 카플레이가 끊김)
 if ! { has_bb && stock_ap_on; }; then $BB ifconfig $WIF 0.0.0.0 2>/dev/null; fi
 # 새 판으로 바꾸기 전(bin/uninstall.sh --update): Wi-Fi 설정과 기록은 그대로 두고 끝낸다. 모드는 HMG-API가 새 판으로 바꾼다
-if [ "$KP_UPDATE" = 1 ]; then
+if [ "$NX4_UPDATE" = 1 ]; then
   echo "NX4 KOR 업데이트: 이전 판 정리"
   exit 0
 fi

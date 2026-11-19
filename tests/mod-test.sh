@@ -17,7 +17,7 @@ bad() { echo "FAIL $1"; fails=$((fails+1)); }
 check() { if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 V=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' $PKG/mod.json | head -1)
 
-# --- 구문 검사: 차의 셸은 mksh. 있는 ksh 계열과 dash로 본다(stub-test.sh와 같은 이유) ---
+# --- 구문 검사: 차의 셸은 mksh. 있는 ksh 계열과 dash로 본다(PC sh만으로는 ksh 계열에서만 틀리는 구문을 못 잡는다) ---
 KSHS=$(for s in mksh ksh dash; do command -v $s; done)
 [ -n "$KSHS" ] || bad "구문 검사: mksh/ksh/dash 없음"
 for f in $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/usb/troubleShooter $B/scripts/build.sh $B/scripts/build-app.sh; do
@@ -60,12 +60,29 @@ keys = [x["key"] for x in s["settings"]]
 assert keys == ["tbt", "tbt_fit", "bridge", "audio", "now_playing", "menu", "usb_drives", "aa_ready_resend", "aa_name_hold", "star_popup_skip"], keys
 assert not os.path.exists(os.path.join(d, "patches")) and not os.path.exists(os.path.join(d, "stubs"))
 PY'
-check "hotspot.sh: 모드 id·HMG-API 최소 판이 mod.json과 같음, env.sh의 KP_MOD_ID도 같음" \
-  'grep -q "^MOD_ID=\${KP_MOD_ID:-nx4-kor}$" $PKG/svc/hotspot.sh && grep -q "^HMG_MIN=1.1.0-rc.4$" $PKG/svc/hotspot.sh && grep -q "^KP_MOD_ID=nx4-kor$" $PKG/svc/env.sh'
+check "hotspot.sh: 모드 id·HMG-API 최소 판이 mod.json과 같음, env.sh의 NX4_MOD_ID도 같음" \
+  'grep -q "^MOD_ID=\${NX4_MOD_ID:-nx4-kor}$" $PKG/svc/hotspot.sh && grep -q "^HMG_MIN=1.1.0-rc.4$" $PKG/svc/hotspot.sh && grep -q "^NX4_MOD_ID=nx4-kor$" $PKG/svc/env.sh'
 check "launch 서비스 이름 = 앱이 부르는 이름" 'grep -q "\"service-start\", \"launch\"" $B/app/java/io/github/jayparklab/nx4kor/StatusActivity.java'
 # HMG-API USB 묶음 안의 파일 이름 NEMESIS.data(빌드가 빼는 파일)는 그대로 둔다
 check "NEMESIS·다른 차·제보 흔적 없음(모드·USB·빌드 스크립트)" \
-  '! grep -rnE "NEMESIS|nemesis|KP_NEMESIS|korea\.projection|korea-projection|KoreaProjection|CARS_OK|CARS_TRY|CARS_SEEN|req_tick|report\.req|carreport|wireless\.projection|제보|QR" $PKG $B/usb $B/scripts --include=*.sh --include=troubleShooter --include=*.json --include=*.txt | grep -v "NEMESIS\.data"'
+  '! grep -rnE "NEMESIS|nemesis|KP_[A-Z]|korea\.projection|korea-projection|KoreaProjection|CARS_OK|CARS_TRY|CARS_SEEN|req_tick|report\.req|carreport|wireless\.projection|제보|QR" $PKG $B/usb $B/scripts --include=*.sh --include=troubleShooter --include=*.json --include=*.txt | grep -v "NEMESIS\.data"'
+
+# 정적 검사: 맨 위(함수 밖) 기본값 대입이 아래에서 정해지는 변수를 먼저 쓰지 않음, "> 파일 2>/dev/null" 순서가 없음
+python3 $B/tests/tools/defuse-check.py $PKG > $T/defuse.out 2>&1; DEFRC=$?
+check "정적 검사: 정의 전에 쓰는 변수·'> 파일 2>/dev/null' 순서가 모드 스크립트에 없음(tests/tools/defuse-check.py)" '[ $DEFRC = 0 ] && [ ! -s $T/defuse.out ]'
+# 상태 화면 앱: Report(상태 파일 읽기·판정 문구·상태표·재부팅 요청). android.* 없이 PC JVM으로 돈다
+if command -v javac >/dev/null 2>&1; then
+  J=$T/java; mkdir -p $J
+  if javac -nowarn -encoding UTF-8 -d $J $B/app/java/io/github/jayparklab/nx4kor/Report.java $B/tests/ReportTest.java 2>$T/javac.err; then
+    java -cp $J io.github.jayparklab.nx4kor.ReportTest > $T/java.out 2>&1; jr=$?
+    grep -E "^FAIL" $T/java.out | sed 's/^/  [Java] /'
+    check "상태 화면 앱 ReportTest 전부($(grep -c "^ok" $T/java.out)개)" '[ $jr -eq 0 ]'
+  else
+    cat $T/javac.err; check "상태 화면 앱 Report 컴파일" 'false'
+  fi
+else
+  echo "skip ReportTest(javac 없음)"
+fi
 
 # --- 가짜 도구 ---
 mkdir -p $T/bin
@@ -131,7 +148,7 @@ cat > $T/bin/svc <<E
 #!/bin/sh
 echo "svc \$*" >> $T/calls
 E
-# busybox 대신: 받은 명령을 그대로 실행(stub-test.sh의 bb와 같은 뜻)
+# busybox 대신: 받은 명령을 그대로 실행
 printf '#!/bin/sh\ncommand -v "$1" >/dev/null 2>&1 || exit 127\nexec "$@"\n' > $T/bin/bb
 chmod +x $T/bin/*
 P0=$T/bin:/usr/bin:/bin:/usr/sbin:/sbin
@@ -143,40 +160,40 @@ echo "100.00 50.00" > $T/uptime
 mkfix() {
   rm -rf $1; mkdir -p $1; cp -R $PKG/. $1/
   for s in scripts/post.sh svc/hotspot.sh bin/status.sh; do
-    printf '#!/bin/sh\necho "%s KP_APP=$KP_APP APP=$APP BK=$BK APLOG=$APLOG KP_UPDATE=$KP_UPDATE KP_APLOG=$KP_APLOG" >> %s/stublog\necho "out of %s"\n' $s $T $s > $1/$s
+    printf '#!/bin/sh\necho "%s NX4_APP=$NX4_APP APP=$APP BK=$BK APLOG=$APLOG NX4_UPDATE=$NX4_UPDATE NX4_APLOG=$NX4_APLOG" >> %s/stublog\necho "out of %s"\n' $s $T $s > $1/$s
   done
-  printf '#!/bin/sh\necho "scripts/preun.sh KP_APP=$KP_APP APP=$APP BK=$BK APLOG=$APLOG KP_UPDATE=$KP_UPDATE KP_APLOG=$KP_APLOG" >> %s/stublog\n[ "$KP_UPDATE" = 1 ] || { command -v hmgapid >/dev/null 2>&1 && hmgapid engine remove nx4-kor >/dev/null; }\nexit 0\n' $T > $1/scripts/preun.sh
+  printf '#!/bin/sh\necho "scripts/preun.sh NX4_APP=$NX4_APP APP=$APP BK=$BK APLOG=$APLOG NX4_UPDATE=$NX4_UPDATE NX4_APLOG=$NX4_APLOG" >> %s/stublog\n[ "$NX4_UPDATE" = 1 ] || { command -v hmgapid >/dev/null 2>&1 && hmgapid engine remove nx4-kor >/dev/null; }\nexit 0\n' $T > $1/scripts/preun.sh
   mkdir -p $1/app; echo apk > $1/app/NX4KOR.apk
 }
 
 # --- ap.sh ---
 F=$T/mod; mkfix $F
-apr() { (env -u KP_APP PATH=$P0 HMGAPI_MOD_DIR=$F KP_ROOT=$T/kp sh $F/svc/ap.sh) > $T/ap.out 2>&1; }
+apr() { (env -u NX4_APP PATH=$P0 HMGAPI_MOD_DIR=$F NX4_ROOT=$T/kp sh $F/svc/ap.sh) > $T/ap.out 2>&1; }
 rm -f $T/stublog; apr
 check "ap.sh: 처음에 post.sh를 한 번 돌리고 표시(post.done)를 남김" 'grep -q "^scripts/post.sh" $T/stublog && [ -f $T/kp/backup/post.done ]'
 check "ap.sh: hotspot.sh에 위치를 넘김(APP=모드 폴더, BK·APLOG는 /data/nx4-kor 아래)" \
-  'grep -q "^svc/hotspot.sh KP_APP=$F APP=$F BK=$T/kp/backup APLOG=$T/kp/logs/ap.log KP_UPDATE= KP_APLOG=$T/kp/logs/ap.log" $T/stublog'
+  'grep -q "^svc/hotspot.sh NX4_APP=$F APP=$F BK=$T/kp/backup APLOG=$T/kp/logs/ap.log NX4_UPDATE= NX4_APLOG=$T/kp/logs/ap.log" $T/stublog'
 check "ap.sh: hotspot.sh 출력은 APLOG로(덧붙이기), 래퍼의 줄은 hmgapid 기록으로" 'grep -q "out of svc/hotspot.sh" $T/kp/logs/ap.log && ! grep -q "out of svc/hotspot.sh" $T/ap.out && grep -q "hotspot.sh 시작" $T/ap.out'
 rm -f $T/stublog; apr
 check "ap.sh: 두 번째 시작에는 post.sh를 다시 돌리지 않음" '! grep -q "^scripts/post.sh" $T/stublog && grep -q "^svc/hotspot.sh" $T/stublog'
 
 # --- launch.sh ---
 rm -f $T/stublog
-(env -u KP_APP PATH=$P0 HMGAPI_MOD_DIR=$F KP_ROOT=$T/kp sh $F/svc/launch.sh) > $T/l.out 2>&1
-check "launch.sh: bin/status.sh를 모드 위치로 돌림(KP_APLOG로 ap.log 위치를 넘김)" 'grep -q "^bin/status.sh KP_APP=$F APP=$F BK=$T/kp/backup APLOG=$T/kp/logs/ap.log KP_UPDATE= KP_APLOG=$T/kp/logs/ap.log" $T/stublog'
+(env -u NX4_APP PATH=$P0 HMGAPI_MOD_DIR=$F NX4_ROOT=$T/kp sh $F/svc/launch.sh) > $T/l.out 2>&1
+check "launch.sh: bin/status.sh를 모드 위치로 돌림(NX4_APLOG로 ap.log 위치를 넘김)" 'grep -q "^bin/status.sh NX4_APP=$F APP=$F BK=$T/kp/backup APLOG=$T/kp/logs/ap.log NX4_UPDATE= NX4_APLOG=$T/kp/logs/ap.log" $T/stublog'
 
 # --- uninstall.sh ---
-ur() { (env -u KP_APP PATH=$P0 HMGDATA=$HD KP_ROOT=$T/kp sh $1/bin/uninstall.sh $2) > $T/u.out 2>&1; echo $? > $T/u.rc; }
+ur() { (env -u NX4_APP PATH=$P0 HMGDATA=$HD NX4_ROOT=$T/kp sh $1/bin/uninstall.sh $2) > $T/u.out 2>&1; echo $? > $T/u.rc; }
 mkdir -p $HD/mods; rm -rf $HD/mods/nx4-kor; cp -R $F $HD/mods/nx4-kor; I=$HD/mods/nx4-kor
 mkdir -p $T/kp/backup; : > $T/kp/backup/post.done; : > $T/ap-running; : > $T/calls; rm -f $T/stublog
 ur $I --update
 check "uninstall.sh --update: 서비스 ap를 멈추고 멈출 때까지 기다림" 'grep -qx "hmgapid service-stop nx4-kor ap" $T/calls && grep -q "hmgapid services nx4-kor" $T/calls'
-check "uninstall.sh --update: preun.sh를 KP_UPDATE=1로(업데이트 갈래), 모드는 지우지 않음, post.done을 지워 새 판이 post.sh를 다시 돌리게" \
-  'grep -q "^scripts/preun.sh KP_APP=$I .*KP_UPDATE=1" $T/stublog && ! grep -q "engine remove" $T/calls && [ -d $I ] && [ ! -f $T/kp/backup/post.done ] && [ "$(cat $T/u.rc)" = 0 ]'
+check "uninstall.sh --update: preun.sh를 NX4_UPDATE=1로(업데이트 갈래), 모드는 지우지 않음, post.done을 지워 새 판이 post.sh를 다시 돌리게" \
+  'grep -q "^scripts/preun.sh NX4_APP=$I .*NX4_UPDATE=1" $T/stublog && ! grep -q "engine remove" $T/calls && [ -d $I ] && [ ! -f $T/kp/backup/post.done ] && [ "$(cat $T/u.rc)" = 0 ]'
 : > $T/calls; rm -f $T/stublog
 ur $I
 check "uninstall.sh: preun.sh(삭제 갈래, HMG-API에서 모드를 뺌) → /data/nx4-kor 지움" \
-  'grep -q "^scripts/preun.sh KP_APP=$I .*KP_UPDATE= " $T/stublog && grep -qx "hmgapid engine remove nx4-kor" $T/calls && [ ! -d $I ] && [ ! -d $T/kp ] && [ "$(cat $T/u.rc)" = 0 ]'
+  'grep -q "^scripts/preun.sh NX4_APP=$I .*NX4_UPDATE= " $T/stublog && grep -qx "hmgapid engine remove nx4-kor" $T/calls && [ ! -d $I ] && [ ! -d $T/kp ] && [ "$(cat $T/u.rc)" = 0 ]'
 # preun.sh가 모드를 빼지 못했으면(HMG-API 앱에서 지워야 함) 실패로 끝내고 알림
 cp -R $F $I; printf '#!/bin/sh\nexit 0\n' > $I/scripts/preun.sh; mkdir -p $T/kp; : > $T/calls
 ur $I
@@ -184,16 +201,16 @@ check "uninstall.sh: 모드가 HMG-API에 남았으면 실패(1)로 끝내고 HM
 rm -rf $I
 # HMG-API를 먼저 지운 경우(hmgapid 명령·installed.txt 없음): preun.sh는 그대로 돌리고, 남은 모드 폴더를 직접 지우고, 앱은 pm으로 지움
 cp -R $F $I; mkdir -p $T/kp; : > $T/calls; rm -f $T/stublog
-(env -u KP_APP PATH=$P0 HMGAPID=$T/nohmgapid HMGDATA=$HD KP_ROOT=$T/kp sh $I/bin/uninstall.sh) > $T/u.out 2>&1; echo $? > $T/u.rc
+(env -u NX4_APP PATH=$P0 HMGAPID=$T/nohmgapid HMGDATA=$HD NX4_ROOT=$T/kp sh $I/bin/uninstall.sh) > $T/u.out 2>&1; echo $? > $T/u.rc
 check "uninstall.sh: HMG-API를 먼저 지웠으면 preun.sh로 되돌리고, 남은 모드 폴더·앱(pm)을 직접 지움" \
-  '[ "$(cat $T/u.rc)" = 0 ] && grep -q "^scripts/preun.sh KP_APP=$I .*KP_UPDATE= " $T/stublog && grep -qx "pm uninstall io.github.jayparklab.nx4kor" $T/calls && [ ! -d $I ] && [ ! -d $T/kp ] && grep -q "HMG-API가 먼저 지워져" $T/u.out'
+  '[ "$(cat $T/u.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$I .*NX4_UPDATE= " $T/stublog && grep -qx "pm uninstall io.github.jayparklab.nx4kor" $T/calls && [ ! -d $I ] && [ ! -d $T/kp ] && grep -q "HMG-API가 먼저 지워져" $T/u.out'
 
 # --- troubleShooter(USB 설치기) ---
 R=$T/root; U=$T/usb0; K=$U/NX4
 mkdir -p $R/data/local/tmp $K/install/payload
 cp -R $F/. $K/install/payload/
 (cd $K/install/payload && zip -q -r $K/install/hmgapi-nx4-kor.zip .)
-ts() { : > $T/calls; (env -u KP_APP PATH=$P0 ROOT=$R HMGAPID=$T/bin/hmgapid KP_USB_DIRS="$1" KP_APP_WAIT=4 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
+ts() { : > $T/calls; (env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/bin/hmgapid NX4_USB_DIRS="$1" NX4_APP_WAIT=4 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
 rm -rf $HD/mods/nx4-kor $R/data/nx4-kor
 ts $T/nostick
 check "USB 설치기: NX4 폴더가 없으면 아무것도 하지 않음" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "NX4 폴더가 없습니다" $T/ts.out && [ ! -s $T/calls ]'
@@ -212,7 +229,7 @@ check "USB 설치기: 같은 판이 있으면 다시 설치하지 않고 상태 
 : > $K/REINSTALL; : > $T/ap-running; rm -f $T/stublog
 ts $U
 check "USB 설치기: REINSTALL이면 예전 판 정리(uninstall.sh --update) → engine install → 서비스 ap 다시 시작" \
-  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "KP_UPDATE=1" $T/stublog && grep -q "^hmgapid engine install" $T/calls && grep -qx "hmgapid service-start nx4-kor ap" $T/calls'
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "NX4_UPDATE=1" $T/stublog && grep -q "^hmgapid engine install" $T/calls && grep -qx "hmgapid service-start nx4-kor ap" $T/calls'
 rm -f $K/REINSTALL
 # 따로 설치된 무선 모드: 지우고, 계획이 그 모드의 되돌리기뿐이면 적용한 뒤 설치
 mkdir -p $HD/mods/wireless-carplay-aa; echo '{"id": "wireless-carplay-aa"}' > $HD/mods/wireless-carplay-aa/mod.json
@@ -236,42 +253,42 @@ rm -f $T/install-fail
 : > $K/UNINSTALL; : > $T/ap-running; rm -f $T/stublog; mkdir -p $R/data/nx4-kor/backup
 ts $U
 check "USB 설치기: UNINSTALL이면 설치된 모드의 uninstall.sh로 되돌리고 모드를 지움" \
-  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh KP_APP=$HD/mods/nx4-kor " $T/stublog && grep -qx "hmgapid engine remove nx4-kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && grep -q "지웠습니다" $T/ts.out'
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$HD/mods/nx4-kor " $T/stublog && grep -qx "hmgapid engine remove nx4-kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && grep -q "지웠습니다" $T/ts.out'
 ts $U
 check "USB 설치기: 지울 것이 없으면 아무것도 하지 않음" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "설치되어 있지 않습니다" $T/ts.out && ! grep -q "engine remove" $T/calls'
 # 모드는 HMG-API 앱에서 먼저 지웠고 되돌릴 기록만 남은 경우: 스틱의 사본(/data로 복사)으로 되돌림
 mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog
 ts $U
 check "USB 설치기: 모드가 이미 지워졌어도 기록이 남았으면 스틱의 사본으로 되돌림" \
-  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh KP_APP=$R/data/local/tmp/nx4-kor-usb/payload " $T/stublog && [ ! -d $R/data/nx4-kor ] && [ ! -d $R/data/local/tmp/nx4-kor-usb ]'
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$R/data/local/tmp/nx4-kor-usb/payload " $T/stublog && [ ! -d $R/data/nx4-kor ] && [ ! -d $R/data/local/tmp/nx4-kor-usb ]'
 # HMG-API를 먼저 지운 뒤(hmgapid 없음): 일반 삭제는 모드 폴더를 남긴다 → 그 폴더의 uninstall.sh로, purge는 /data/hmgapi째 없다 → 스틱 사본으로
-ts0() { : > $T/calls; (env -u KP_APP PATH=$P0 ROOT=$R HMGAPID=$T/nohmgapid KP_USB_DIRS=$U KP_APP_WAIT=4 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
+ts0() { : > $T/calls; (env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/nohmgapid NX4_USB_DIRS=$U NX4_APP_WAIT=4 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
 mkdir -p $HD/mods $R/data/nx4-kor/backup; cp -R $F $HD/mods/nx4-kor; rm -f $HD/installed.txt $T/stublog
 ts0
 check "USB 설치기: HMG-API를 먼저 지운 뒤(일반 삭제)에도 UNINSTALL이 됨: 남은 모드 폴더의 uninstall.sh로 되돌리고 모드 폴더·앱을 지움" \
-  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh KP_APP=$HD/mods/nx4-kor " $T/stublog && grep -qx "pm uninstall io.github.jayparklab.nx4kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && [ ! -d $R/data/nx4-kor ] && grep -q "지웠습니다" $T/ts.out && grep -q "HMG-API가 없음" $K/install.log'
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$HD/mods/nx4-kor " $T/stublog && grep -qx "pm uninstall io.github.jayparklab.nx4kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && [ ! -d $R/data/nx4-kor ] && grep -q "지웠습니다" $T/ts.out && grep -q "HMG-API가 없음" $K/install.log'
 mv $HD $T/hd.purged; mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog
 ts0
 check "USB 설치기: HMG-API를 먼저 완전 삭제(--purge)한 뒤에도 기록이 남았으면 스틱의 사본으로 되돌림" \
-  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh KP_APP=$R/data/local/tmp/nx4-kor-usb/payload " $T/stublog && [ ! -d $R/data/nx4-kor ]'
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$R/data/local/tmp/nx4-kor-usb/payload " $T/stublog && [ ! -d $R/data/nx4-kor ]'
 mv $T/hd.purged $HD
 rm -f $K/UNINSTALL
 
 # --- 진짜 스크립트: post.sh·preun.sh·hotspot.sh(setup_hmgapi) ---
-# 차의 PATH로 바꾸는 맨 윗줄만 시험용 PATH로 바꾼 사본으로 돌린다(stub-test.sh와 같은 방법). 나머지는 그대로
+# 차의 PATH로 바꾸는 맨 윗줄만 시험용 PATH로 바꾼 사본으로 돌린다. 나머지는 그대로
 TP=$T/pkg; rm -rf $TP; cp -R $PKG $TP
 for f in svc/hotspot.sh scripts/post.sh scripts/preun.sh bin/status.sh; do
   sed "s#^export PATH=.*#export PATH=$P0#" $PKG/$f > $TP/$f
 done
 # post.sh: 설치 전 Wi-Fi 상태 기록, 앱은 설치하지 않음(HMG-API가 설치)
 : > $T/calls; rm -rf $T/pbk
-(env PATH=$P0 BB_SYS=$T/bin/bb KP_APP=$TP BK=$T/pbk W=$T/pw NOTICE=$T/pnotice BOOT_ID=$T/bootid sh $TP/scripts/post.sh) > $T/p.out 2>&1
+(env PATH=$P0 BB_SYS=$T/bin/bb NX4_APP=$TP BK=$T/pbk W=$T/pw NOTICE=$T/pnotice BOOT_ID=$T/bootid sh $TP/scripts/post.sh) > $T/p.out 2>&1
 check "post.sh: BK에 설치 전 Wi-Fi 상태를 적고 앱은 설치하지 않음(pm install 없음)" '[ "$(cat $T/pbk/wifi_on 2>/dev/null)" = 1 ] && grep -qx "settings get global wifi_on" $T/calls && ! grep -q "^pm" $T/calls' || cat $T/p.out
 # preun.sh: 업데이트 갈래
-prun() { (env PATH=${PP:-$P0} BB_SYS=$T/bin/bb KP_APP=$TP BK=$T/ubk W=$T/uw CONF=$T/uconf HINT=$T/uhint PROG=$T/uprog NOTICE=$T/unotice HMGDATA=$T/uh BOOT_ID=$T/bootid MOUNTS=$T/mounts "$@" sh $TP/scripts/preun.sh) > $T/pu.out 2>&1; echo $? > $T/pu.rc; }
+prun() { (env PATH=${PP:-$P0} BB_SYS=$T/bin/bb NX4_APP=$TP BK=$T/ubk W=$T/uw CONF=$T/uconf HINT=$T/uhint PROG=$T/uprog NOTICE=$T/unotice HMGDATA=$T/uh BOOT_ID=$T/bootid MOUNTS=$T/mounts "$@" sh $TP/scripts/preun.sh) > $T/pu.out 2>&1; echo $? > $T/pu.rc; }
 pureset() { rm -rf $T/ubk $T/uh; mkdir -p $T/ubk $T/uh/mods/nx4-kor; : > $T/ubk/keep; echo '{"id": "nx4-kor"}' > $T/uh/mods/nx4-kor/mod.json; : > $T/uh/installed.txt; : > $T/calls; }
-pureset; prun KP_UPDATE=1
-check "preun.sh: KP_UPDATE=1이면 업데이트 갈래로 끝나고 BK를 남김, 모드를 지우지 않음" '[ "$(cat $T/pu.rc)" = 0 ] && grep -q "NX4 KOR 업데이트: 이전 판 정리" $T/pu.out && [ -f $T/ubk/keep ] && ! grep -q "engine remove" $T/calls'
+pureset; prun NX4_UPDATE=1
+check "preun.sh: NX4_UPDATE=1이면 업데이트 갈래로 끝나고 BK를 남김, 모드를 지우지 않음" '[ "$(cat $T/pu.rc)" = 0 ] && grep -q "NX4 KOR 업데이트: 이전 판 정리" $T/pu.out && [ -f $T/ubk/keep ] && ! grep -q "engine remove" $T/calls'
 # preun.sh: 삭제 → HMG-API에서 이 모드를 빼고, 계획이 되돌리기뿐이면 적용
 pureset; printf 'restore  /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml [nx4-kor]\nsetting  persist.sys.iap2.wifi back to stock\nhook plan: 0 mods\n' > $T/plan.out
 prun
@@ -290,7 +307,7 @@ P2=$T/bin2:/usr/bin:/bin:/usr/sbin:/sbin
 sed "s#^export PATH=.*#export PATH=$P2#" $PKG/scripts/preun.sh > $TP/scripts/preun.sh
 sed "s#^export PATH=.*#export PATH=$P2#" $PKG/svc/hotspot.sh > $TP/svc/hotspot.sh
 pureset; rm -f $T/uh/installed.txt
-(env PATH=$P2 BB_SYS=$T/bin2/bb KP_APP=$TP BK=$T/ubk W=$T/uw CONF=$T/uconf HINT=$T/uhint PROG=$T/uprog NOTICE=$T/unotice HMGDATA=$T/uh BOOT_ID=$T/bootid sh $TP/scripts/preun.sh) > $T/pu.out 2>&1
+(env PATH=$P2 BB_SYS=$T/bin2/bb NX4_APP=$TP BK=$T/ubk W=$T/uw CONF=$T/uconf HINT=$T/uhint PROG=$T/uprog NOTICE=$T/unotice HMGDATA=$T/uh BOOT_ID=$T/bootid sh $TP/scripts/preun.sh) > $T/pu.out 2>&1
 check "preun.sh: HMG-API를 먼저 지웠으면 HMG-API를 부르지 않고 되돌리기를 끝까지 함, BK 지움" \
   '! grep -q "^hmgapid" $T/calls && grep -q "HMG-API가 먼저 지워져 있음" $T/pu.out && ! grep -q "되돌리기 건너뜀" $T/pu.out && [ ! -d $T/ubk ]' || cat $T/pu.out
 sed "s#^export PATH=.*#export PATH=$P0#" $PKG/scripts/preun.sh > $TP/scripts/preun.sh
@@ -368,7 +385,7 @@ check "setup_hmgapi: NX4가 아니면 아무것도 하지 않음(지원하지 �
 stsh() {
   (env PATH=$P0 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog NOTICE=$T/snotice BOOT_ID=$T/bootid UPTIME=$T/uptime \
      WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio STATUS=$T/status.txt HINT=$T/shint SRC=$T/nosoftap HMGINST=$T/sinst HMGLOG=$T/shlog \
-     HOOKSTARTS=$T/sstarts KP_DMESG=$T/sdmesg RPT_SYNC=1 "$@" sh $TP/bin/status.sh) > $T/st.out 2>&1
+     HOOKSTARTS=$T/sstarts NX4_DMESG=$T/sdmesg RPT_SYNC=1 "$@" sh $TP/bin/status.sh) > $T/st.out 2>&1
 }
 sv() { sed -n "s/^$1=//p" $T/status.txt; }
 : > $T/sdmesg; printf 'version 1.1.0-rc.4\nbuild x\n' > $T/sinst
@@ -387,8 +404,8 @@ RW=$T/rw; rm -rf $RW; mkdir -p $RW/w $RW/bk $RW/proc
 printf '#!/bin/sh\necho reboot >> %s/rbcalls\nexit 1\n' $RW > $T/bin/fakereboot; chmod +x $T/bin/fakereboot
 echo "100.00 50.00" > $RW/uptime; echo 200 > $RW/w/watch.until
 (env PATH=$P0 BB=$T/bin/bb APP=$TP W=$RW/w BK=$RW/bk PROG=$RW/prog NOTICE=$RW/notice BOOT_ID=$T/bootid UPTIME=$RW/uptime PROC=$RW/proc \
-   KP_RBREQ=$RW/reboot.req RBRES=$RW/rbres WATCHF=$RW/watchf KP_REBOOT=$T/bin/fakereboot KP_SYNC=true KP_RB_WAIT=1 KP_APLOG=$RW/ap.log \
-   HOOKSTARTS=$RW/nostarts HMGINST=$RW/noinst KP_DMESG=$T/sdmesg sh $TP/bin/status.sh --watch) > $RW/watch.out 2>&1 &
+   NX4_RBREQ=$RW/reboot.req RBRES=$RW/rbres WATCHF=$RW/watchf NX4_REBOOT=$T/bin/fakereboot NX4_SYNC=true NX4_RB_WAIT=1 NX4_APLOG=$RW/ap.log \
+   HOOKSTARTS=$RW/nostarts HMGINST=$RW/noinst NX4_DMESG=$T/sdmesg sh $TP/bin/status.sh --watch) > $RW/watch.out 2>&1 &
 RWP=$!
 # 감시자가 결과 파일에 이 요청 id와 code를 쓸 때까지 기다린다(최대 약 10초)
 rbwait() { _k=0; until grep -qx "id=$1" $RW/rbres 2>/dev/null || [ $_k -ge 100 ]; do /bin/sleep 0.1; _k=$((_k+1)); done; }
@@ -418,12 +435,12 @@ if [ -n "$HMGAPI_SRC" ]; then
   python3 -c 'import tarfile,sys; t=tarfile.open(sys.argv[1],"w"); t.add(sys.argv[2],"troubleShooter"); t.close()' $T/hu/ota_package.tar $T/hu/troubleShooter
   printf '[nemesis]\n' > $T/hu/NEMESIS.data; echo hmgapi > $T/hu/README.txt; rm $T/hu/troubleShooter
   (cd $T/hu && zip -q -r $T/hmgapi-usb.zip .)
-  bld() { (HMGAPI_SRC=$HS KP_MOD_KEY=$T/test-mod.key KP_APK=$T/test.apk HMGAPI_USB_ZIP=$T/hmgapi-usb.zip "$@" sh $B/scripts/build.sh) > $T/build.out 2>&1; echo $? > $T/build.rc; }
+  bld() { (HMGAPI_SRC=$HS NX4_MOD_KEY=$T/test-mod.key NX4_APK=$T/test.apk HMGAPI_USB_ZIP=$T/hmgapi-usb.zip "$@" sh $B/scripts/build.sh) > $T/build.out 2>&1; echo $? > $T/build.rc; }
   # busybox(GPL-2.0)를 넣는데 그 라이선스 안내가 없으면 만들지 않는다
-  bld env KP_BUSYBOX=$T/test-bb OUT=$T/out-nolic
+  bld env NX4_BUSYBOX=$T/test-bb OUT=$T/out-nolic
   check "빌드: busybox를 넣는데 라이선스 안내가 없으면 만들지 않음" '[ "$(cat $T/build.rc)" != 0 ] && grep -q "라이선스 안내" $T/build.out && [ ! -f $T/out-nolic/hmgapi-nx4-kor-$V-usb.zip ]'
   echo "BusyBox GPL-2.0 test notice" > $T/test-bb-LICENSE.txt
-  bld env KP_BUSYBOX=$T/test-bb OUT=$T/out
+  bld env NX4_BUSYBOX=$T/test-bb OUT=$T/out
   check "빌드: 모드 zip과 USB 묶음을 만듦" '[ "$(cat $T/build.rc)" = 0 ] && [ -f $T/out/hmgapi-nx4-kor-$V.zip ] && [ -f $T/out/hmgapi-nx4-kor-$V-usb.zip ]' || cat $T/build.out
   rm -rf $T/ux; mkdir -p $T/ux; (cd $T/ux && unzip -q $T/out/hmgapi-nx4-kor-$V-usb.zip)
   check "USB 묶음: ota_package.tar = 우리 troubleShooter(0755, root), HMG-API 설치기는 NX4/hmgapi로, NEMESIS.data 뺌, README 판 채움" \
@@ -436,7 +453,7 @@ if [ -n "$HMGAPI_SRC" ]; then
   check "라이선스: HMG-API를 함께 넣으면 HMGAPI-SOURCE.txt에 판과 대응 소스(태그), README.txt에 이 묶음의 소스 커밋" \
     'grep -q "^HMG-API 1.1.0:" $T/ux/HMGAPI-SOURCE.txt && grep -q "https://github.com/Open-HMG/HMG-API/tree/v1.1.0" $T/ux/HMGAPI-SOURCE.txt && grep -q "AGPL-3.0" $T/ux/HMGAPI-SOURCE.txt && grep -q "https://github.com/jay-park-lab/hmgapi-nx4-kor (이 묶음: [0-9a-f]\{7,\}" $T/ux/README.txt && ! grep -q "@SOURCE_REV@" $T/ux/README.txt'
   # busybox 없이 만들면 그 안내도 없다(HMG-API도 함께 넣지 않으면 HMGAPI-SOURCE.txt도 없다)
-  (HMGAPI_SRC=$HS KP_MOD_KEY=$T/test-mod.key KP_APK=$T/test.apk KP_BUSYBOX=$T/nobb OUT=$T/out-nobb sh $B/scripts/build.sh) > $T/build.out 2>&1; echo $? > $T/build.rc
+  (HMGAPI_SRC=$HS NX4_MOD_KEY=$T/test-mod.key NX4_APK=$T/test.apk NX4_BUSYBOX=$T/nobb OUT=$T/out-nobb sh $B/scripts/build.sh) > $T/build.out 2>&1; echo $? > $T/build.rc
   rm -rf $T/ux2; mkdir -p $T/ux2; (cd $T/ux2 && unzip -q $T/out-nobb/hmgapi-nx4-kor-$V-usb.zip 2>/dev/null)
   check "라이선스: busybox·HMG-API 없이 만들면 BUSYBOX-LICENSE.txt·HMGAPI-SOURCE.txt 없음, LICENSE·NOTICE.md는 있음" \
     '[ "$(cat $T/build.rc)" = 0 ] && [ ! -f $T/ux2/BUSYBOX-LICENSE.txt ] && [ ! -f $T/ux2/NX4/install/payload/bin/busybox-LICENSE.txt ] && [ ! -f $T/ux2/HMGAPI-SOURCE.txt ] && [ -f $T/ux2/LICENSE ] && [ -f $T/ux2/NOTICE.md ]' || cat $T/build.out
