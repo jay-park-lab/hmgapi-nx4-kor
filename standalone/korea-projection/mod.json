@@ -1,0 +1,26 @@
+{
+  "id": "korea-projection",
+  "name": "Korea Projection: Wireless for Korean Cars (without NEMESIS)",
+  "version": "1.7.4",
+  "hmgapi": ">=1.0.2",
+  "authors": ["StopDragon"],
+  "license": "AGPL-3.0",
+  "description": "Korea Projection's NEMESIS package run as an HMG-API mod, for a head unit without NEMESIS: hmgapid runs the hotspot service (svc/hotspot.sh) as root, installs the status app, and starts the status script when the app opens. Tucson NX4 (Korea, 260902) only.",
+  "system": {
+    "model": ["NX4", "NX4HEV"],
+    "region": ["KOR"],
+    "firmware": ["260902"]
+  },
+  "apps": [
+    { "apk": "app/KoreaProjection.apk", "package": "korea.projection.app" }
+  ],
+  "services": [
+    { "name": "ap", "script": "standalone/ap.sh", "user": "root", "start": "android", "restart": true },
+    { "name": "launch", "script": "standalone/launch.sh", "user": "root", "start": "manual", "restart": false }
+  ],
+  "provides": {
+    "launcher": [
+      { "package": "korea.projection.app", "class": ".StatusActivity" }
+    ]
+  }
+}

@@ -53,6 +53,8 @@ RDIR=${RDIR:-KoreaProjection-report}
 PDIR=${PDIR:-KoreaProjection-private}
 # NEMESIS가 정한 위치(hotspot.sh에도 같은 기본값이 있다). 여기서는 그대로 다시 정한다(PC 테스트가 이 줄의 경로를 바꾼다)
 APLOG=/data/nemesis/logs/korea.projection/ap.log
+# standalone/(NEMESIS 없이 HMG-API 모드로 설치): 서비스 래퍼(standalone/env.sh)가 정한 위치
+[ -n "$KP_APLOG" ] && APLOG=$KP_APLOG
 # busybox가 없는 내비(K3 BDPE·K8 GL3HEV, tcc803x, #15·#19): 보통 리포트는 못 만든다. 셸 기본 명령(grep, mkdir, ls)만으로
 # USB에 짧은 리포트를 남긴다(제품, 플랫폼, 이 내비에 있는 명령 목록: busybox 없이 다시 만들 때 참고). 개인정보는 없다.
 # 1.5.5: 상태 화면 앱도 쓴다. 앱이 없으면 다시 설치하고(설치 때 실패했을 수 있음), 앱이 읽을 짧은 상태 파일
@@ -68,7 +70,6 @@ if ! has_bb; then
       echo "- 펌웨어: $(getprop ro.build.product)"
       echo "- 플랫폼: $(getprop ro.board.platform)"
       echo "- 이 패키지: $(grep '^package-version=' $APP/NEMESIS.data 2>/dev/null)"
-      echo "- NEMESIS: $(nemesis version 2>/dev/null)"
       echo; echo "## /system/bin"; ls /system/bin
       echo; echo "## /system/xbin"; ls /system/xbin
     } 2>/dev/null > "$u/$RDIR/1-report.md"
@@ -830,7 +831,6 @@ report() {
   elif car_in "$prod" "$CARS_AUTO"; then echo "- 확인된 차: 자동 설정 (HMG-API가 차에서 지도를 만들어 설정, 결과를 알려 주세요)"
     for _f in automap.bad automap.checked automap.foreign; do [ -f $BK/$_f ] && echo "  - 기록: $_f"; done
   else echo "- 확인된 차: 아니요 (서비스가 대기만 함, 지원 차: $CARS)"; fi
-  echo "- NEMESIS: $(nemesis version 2>/dev/null)"
   # 따옴표 없이: 두 줄이 한 줄로 합쳐진다
   echo "- HMG-API:" $($BB grep -E '^(version|build) ' ${HMGINST:-/data/hmgapi/installed.txt} 2>/dev/null)
   echo "- wireless.projection 설치: $(yn [ -d /data/nemesis/apps/wireless.projection ])"
@@ -1033,7 +1033,6 @@ kp_collect() {
   parse_conf $SRC
   K_HMG=$(echo $($BB grep -E '^(version|build) ' ${HMGINST:-/data/hmgapi/installed.txt} 2>/dev/null))
   _kv=${K_HMG#*version }; [ "$_kv" = "$K_HMG" ] && _kv=; K_HMGV=${_kv%% *}
-  K_NEM=$(nemesis version 2>/dev/null)
   K_MOD=$(mod_state); K_MODON=$(mod_on_state); K_BRIDGE=$(bridge_state)
   hmg_hooks_load; K_MH=${_MH%% *}; K_HK=${_HK%% *}; K_HKMAP=${_HK#* }
   K_OURAP=$(yesno running "hostapd $CONF"); K_DHCP=$(yesno our_dhcp_on)
@@ -1169,7 +1168,6 @@ kp_verdict() {
     _vs wifioff 1 "$WIFI_CHECK_MSG (확인 $_nl/3)"
   elif [ "$K_APMODE" != stock ] && { [ "$K_OURAP" = no ] || [ "$K_DHCP" = no ]; } && [ "$_vconn" = no ]; then
     _vs apoff 1 "핫스팟이 꺼져 있습니다. 내비를 3분 후 재부팅(RESET 버튼 또는 NEMESIS 재부팅)한 뒤 다시 확인해 주세요."
-  elif ver_lt "${K_NEM:-0}" 1.16; then _vs oldnemesis 1 "NEMESIS를 1.16 이상으로 업데이트해 주세요."
   elif [ "${K_CP:-0}" != 0 ] || [ "$K_AAOK" = yes ]; then
     # 1.7.3(U-10): 확인 안 된 차(README ✅ 아님)가 연결되면 제보를 부탁한다(QR 요약 맨 앞 result: connected).
     # 리뷰 L-6: 무선 안드로이드 오토 연결도 연결로 본다(CLAUDE.md 2장 ✅ 기준)
@@ -1196,7 +1194,7 @@ kp_verdict() {
   # 리뷰 L-1: 원인이 분명한 판정과 부팅 직후(5분 안)의 핫스팟 꺼짐에는 붙이지 않는다
   _vup=$(up_s); case "$_vup" in ''|*[!0-9]*) _vup=9999 ;; esac
   _g4=
-  case "$V_CODE" in installing|untested|nopart|nochip|nowlanfail|nowlanrepeat|reboot|modwait|wificheck|wifioff|failed|mapfail|nomap|wifigone|ready|connected|newconnected|nohmgapi|oldhmgapi|otherpkg|otherwifi|foreign|modgone|hmgrefuse|oldnemesis|bootguard) ;;
+  case "$V_CODE" in installing|untested|nopart|nochip|nowlanfail|nowlanrepeat|reboot|modwait|wificheck|wifioff|failed|mapfail|nomap|wifigone|ready|connected|newconnected|nohmgapi|oldhmgapi|otherpkg|otherwifi|foreign|modgone|hmgrefuse|bootguard) ;;
     apoff) [ "$_vup" -lt 300 ] || _g4=1 ;;
     *) _g4=1 ;;
   esac
@@ -1219,7 +1217,7 @@ kp_verdict() {
     reboot|modwait|wificheck) V_S1="설치: 재부팅 필요" ;;
     untested) V_S1="설치: 이 차는 대기 중" ;;
     bootguard) V_S1="설치: HMG-API 훅 꺼짐(부팅 보호)" ;;
-    ready|connected|newconnected|stockoff|wifioff|nowlanrepeat|apoff|oldnemesis|hooksoff) V_S1="설치: 끝남" ;;
+    ready|connected|newconnected|stockoff|wifioff|nowlanrepeat|apoff|hooksoff) V_S1="설치: 끝남" ;;
     *) V_S1="설치: 안 됨(위 안내를 보세요)" ;;
   esac
   if [ "$K_OURAP" = yes ]; then V_S2="무선 Wi-Fi: 켜짐"
@@ -1254,7 +1252,6 @@ status_kv() {
   # tested: 서비스가 동작하는 차인가 (앱은 no면 "대기 중"으로 보인다). 시험 지원 차도 yes다.
   car_in "$K_PROD" "$CARS" && echo "tested=yes" || echo "tested=no"
   echo "hmgapi=$K_HMG"
-  echo "nemesis=$K_NEM"
   echo "wp=$(yesno [ -d /data/nemesis/apps/wireless.projection ])"
   echo "mod=$K_MOD"
   echo "modver=$(mod_ver)"

@@ -2848,7 +2848,10 @@ app_fail_n() { _af=; _an=0; [ -f $BK/app.fail ] && read _af _an < $BK/app.fail; 
 # 1.7.4(B-7): 앱 기록을 쓰지 못했을 때 한 줄. 서비스 로그(log)와 제보에 들어가는 $W/app-install.log 둘 다에
 app_note() { log "$1"; echo "$(date '+%m-%d %H:%M:%S') $1" 2>/dev/null >> $W/app-install.log; return 0; }
 # 결과(Success/Failure 전체 출력)를 $W/app-install.log에 남긴다. 성공 0, 실패 1.
+# KP_APP_BY_HMGAPI=1(standalone/: NEMESIS 없이 HMG-API 모드로 설치): 앱은 HMG-API가 mod.json "apps"로 설치·삭제한다.
+# 여기서 다시 설치하지 않는다(서명 우회·sys.boot_completed 조작이 겹치지 않게).
 install_app() {
+  [ "$KP_APP_BY_HMGAPI" = 1 ] && return 0
   [ -f $APK_SRC ] || { log "상태 화면 앱 파일 없음: $APK_SRC"; return 1; }
   bbx cp -f $APK_SRC $APK_COPY && bbx chmod 644 $APK_COPY || { log "상태 화면 앱 복사 실패"; return 1; }
   # 이 헤드유닛은 sys.boot_completed=1일 때 제조사 서명만 받는다: pm 호출 동안만 0으로 둔다
@@ -2889,6 +2892,7 @@ install_app_once() {
   install_app >/dev/null 2>&1
 }
 remove_app() {
+  [ "$KP_APP_BY_HMGAPI" = 1 ] && return 0
   pm uninstall $APP_ID >/dev/null 2>&1
   rm -f $APK_COPY
 }

@@ -7,8 +7,11 @@ export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 umask 077
 # busybox는 아래 hotspot.sh가 고른다(내비의 것, 없으면 패키지에 함께 넣은 것: 1.6.x 알파)
 BB=
-BK=/data/nemesis/backup/korea.projection
-HOTSPOT_LIB=1 . /data/nemesis/apps/korea.projection/svc/hotspot.sh
+# standalone/(NEMESIS 없이 HMG-API 모드로 설치): standalone/uninstall.sh가 BK·KP_APP를 넘긴다. 없으면 NEMESIS 위치
+BK=${BK:-/data/nemesis/backup/korea.projection}
+if [ -n "$KP_APP" ]; then APP=$KP_APP; HOTSPOT_LIB=1 . $KP_APP/svc/hotspot.sh
+else HOTSPOT_LIB=1 . /data/nemesis/apps/korea.projection/svc/hotspot.sh
+fi
 # 쓸 수 있는 busybox가 없는 내비는 우리 hostapd를 켠 적이 없다: 오류 줄만 나오므로 건너뛴다
 has_bb && stop_all
 rm -f $CONF
@@ -37,6 +40,12 @@ if ! { has_bb && stock_ap_on; }; then $BB ifconfig wlan0 0.0.0.0 2>/dev/null; fi
 # 백업은 그대로 두고 조용히 끝낸다. HMG-API의 preuninstall과 같은 판단: 부른 명령이 uninstall이 아니고,
 # staging에 우리 패키지가 있을 때만 (중단된 설치가 남긴 staging 때문에 삭제가 무시되지 않게)
 STAGE=/data/local/tmp/nemesis/stage/korea.projection
+# standalone/: HMG-API 모드를 새 판으로 바꾸기 전(standalone/uninstall.sh --update)도 같은 업데이트 갈래로 끝낸다(NEMESIS staging 없음)
+# (문구는 아래 NEMESIS 갈래와 다르게 둔다: stub-test가 그 문구의 줄 번호로 순서를 본다)
+if [ "$KP_UPDATE" = 1 ]; then
+  echo "korea.projection 업데이트(HMG-API 모드): 이전 판 정리"
+  exit 0
+fi
 case "$(cat /proc/$PPID/cmdline 2>/dev/null)" in
   *uninstall*) ;;
   *)
@@ -62,7 +71,18 @@ rm -f $RBRES $RBRES.tmp
 modmsg=""
 # 1.7.2(P-14, 리뷰 M3): 우리 모드를 지우고 적용까지 끝내지 못했으면 1 (아래 권한 파일 되돌리기를 하지 않는다)
 modhold=0
-if [ -f $BK/mod.ours ] && [ -f $HMGDATA/mods/$MOD_ID/mod.json ] && mod_kor && hmgapid ping >/dev/null 2>&1; then
+# HMG-API를 먼저 지웠는가: hmgapid 명령도, 설치 기록(installed.txt, HMG-API 삭제가 지운다)도 없다.
+# 그때 HMG-API 삭제(engine restore)가 무선 모드의 변경을 이미 원래대로 되돌렸다. 일반 삭제는 모드 폴더를 남기므로
+# (--purge만 지움) 우리가 넣은 것만 지운다: HMG-API를 다시 설치했을 때 되살아나지 않게. 그 뒤 권한 파일 되돌리기도 한다.
+hmg_gone() { ! command -v hmgapid >/dev/null 2>&1 && [ ! -f ${HMGINST:-$HMGDATA/installed.txt} ]; }
+if [ -f $BK/mod.ours ] && [ -f $HMGDATA/mods/$MOD_ID/mod.json ] && mod_kor && hmg_gone; then
+  if rm -rf $HMGDATA/mods/$MOD_ID && [ ! -d $HMGDATA/mods/$MOD_ID ]; then
+    echo "HMG-API가 먼저 지워져 있음: 남은 무선 모드 폴더를 지움"
+    modmsg=" 함께 설치했던 HMG-API 무선 모드도 지웠습니다."
+  else
+    echo "HMG-API가 먼저 지워져 있음: 남은 무선 모드 폴더를 지우지 못함"
+  fi
+elif [ -f $BK/mod.ours ] && [ -f $HMGDATA/mods/$MOD_ID/mod.json ] && mod_kor && hmgapid ping >/dev/null 2>&1; then
   if hmgapid engine remove $MOD_ID > $BK/mod-remove.txt 2>&1; then
     bad=0
     hmgapid engine plan > $BK/plan.txt 2>&1 || bad=1

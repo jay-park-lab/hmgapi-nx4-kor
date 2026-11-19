@@ -52,7 +52,6 @@ final class Report {
 
     /** README "필요한 것"과 같은 최소 버전 (바꾸면 README와 설치 가이드도 함께 고친다) */
     static final String MIN_HMGAPI = "1.0.2";
-    static final String MIN_NEMESIS = "1.16";
 
     /**
      * 1.6.2: 순정이 카플레이 AP를 직접 띄운 차(K3 BDPE 등, 상태 파일 ap_mode=stock). 이때 우리 핫스팟·DHCP가 꺼져 있는
@@ -92,8 +91,6 @@ final class Report {
         if (!stockAp() && yes("nowlan") && !yes("our_ap"))
             return "Wi-Fi 장치가 켜지지 않아 핫스팟을 켜지 못했습니다. 내비를 재부팅해 보시고, 그래도 같으면 USB를 꽂고 [제보 파일 만들기]로 리포트를 보내 주세요.";
         if (!stockAp() && (!yes("our_ap") || !yes("our_dhcp"))) return "핫스팟이 꺼져 있습니다. 내비를 3분 후 재부팅(RESET 버튼 또는 NEMESIS 재부팅)한 뒤 다시 확인해 주세요.";
-        if (older(get("nemesis"), MIN_NEMESIS) != 0)
-            return "NEMESIS를 " + MIN_NEMESIS + " 이상으로 업데이트해 주세요.";
         if (!"0".equals(get("cp_conn")) && !get("cp_conn").isEmpty()) return "무선 카플레이 연결됨";
         // 1.7.3(U-4): 안드로이드도 쓰는 법을 알린다. 무선 AA가 꺼진 차(aa=no)·옛 상태 파일·순정 AP 차는 아이폰 문장만
         // 1.7.4(L-9): 새 상태 파일에는 aa 키가 없고 판정(verdict)이 있어 여기 오지 않는다. 판정이 없는 옛(1.7.2 이하) 파일만 aa를 본다
@@ -147,7 +144,6 @@ final class Report {
         // 훅 기록은 지난 부팅 것일 수 있어 노랑
         if ("off".equals(get("hooks"))) return 1;
         if (!stockAp() && (!yes("our_ap") || !yes("our_dhcp"))) return 1;
-        if (older(get("nemesis"), MIN_NEMESIS) != 0) return 1;
         return 0;
     }
 
@@ -666,7 +662,6 @@ final class Report {
         if (!pin.isEmpty()) out.add(new String[] { "무선 모드 고정", "old".equals(pin) ? "고정됨(판 모름)" : pin });
         String h = get("hooks");
         out.add(new String[] { "HMG-API 훅", "on".equals(h) ? "켜짐" : "off".equals(h) ? "꺼짐 (" + (get("hookmap").isEmpty() ? "?" : get("hookmap")) + ", 마지막 부팅 기록)" : "-" });
-        out.add(new String[] { "NEMESIS", ver(get("nemesis"), MIN_NEMESIS) });
         out.add(new String[] { "무선 카플레이 기능", yn("feat_carplay") });
         // 1.7.4(L-9): USB 파일로 무선 AA를 끄는 기능을 없애 켜짐·꺼짐 표시를 뺐다(늘 켜짐). 줄 수는 그대로 둔다
         out.add(new String[] { "무선 안드로이드 오토 기능", yn("feat_aa") });
@@ -698,7 +693,7 @@ final class Report {
         // 중요한 것부터: 링크가 길면 뒤에서부터 뺀다 (product는 제목·항목에 따로 들어간다)
         String[] keys = { "support", "state", "platform", "targetdir", "pkgver", "tested", "feat_carplay", "ap_mode", "our_ap", "our_dhcp", "other_ap", "stock_ssid", "stock_seen",
             "cp_conn", "nowlan", "wlan0", "softap_strings", "ssid_len", "pass_len", "wp", "mod", "mod_on", "bridge", "hooks", "hookmap", "feat_aa", "feat_wifi",
-            "wpa", "hmgapi", "nemesis", "made", "modver" };
+            "wpa", "hmgapi", "made", "modver" };
         List<String> lines = new ArrayList<String>();
         lines.add("(QR summary)");
         for (String k : keys) if (v.containsKey(k)) lines.add(k + ": " + v.get(k));

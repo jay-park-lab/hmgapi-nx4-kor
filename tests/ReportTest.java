@@ -15,7 +15,7 @@ public class ReportTest {
     static final String GOOD =
         "product=DEPEHEV.KOR.0000.V039.001.260902\n" +
         "targetdir=/system/onebin/depehev_kr\n" +
-        "pkgver=1.4\ntested=yes\nhmgapi=version 1.0.2 build 180185d 2026-11-04\nnemesis=1.16.7\n" +
+        "pkgver=1.4\ntested=yes\nhmgapi=version 1.0.2 build 180185d 2026-11-04\n" +
         "wp=no\nmod=yes\nmod_on=yes\nbridge=on\nhooks=on\nfeat_carplay=yes\nfeat_aa=yes\nfeat_wifi=no\nwlan0=yes\n" +
         "softap_strings=4\nssid_len=8\npass_len=12\nour_ap=yes\nour_dhcp=yes\nother_ap=no\nwpa=no\n" +
         "cp_conn=0\nmade=2026-11-06 06:00\n";
@@ -35,8 +35,8 @@ public class ReportTest {
         check("무선 기능 꺼짐 → 빨강", Report.parse(GOOD.replace("feat_carplay=yes", "feat_carplay=no")).level() == 2);
         check("핫스팟 꺼짐 → 안내", Report.parse(GOOD.replace("our_ap=yes", "our_ap=no")).verdict().startsWith("핫스팟이 꺼져"));
         check("파일 없음 → 다시 눌러 달라는 안내", Report.parse(null).verdict().startsWith("상태를 읽지 못했습니다") && Report.parse(null).level() == 2);
-        check("표는 15줄, 예/아니요로 표시", r.rows().size() == 15 && "예".equals(r.rows().get(1)[1]));
-        check("정상이면 버전 칸은 버전만 (HMG-API 1.0.2, NEMESIS 1.16.7)", "1.0.2".equals(row(r, "HMG-API")) && "1.16.7".equals(row(r, "NEMESIS")));
+        check("표는 14줄(NEMESIS 칸 없음), 예/아니요로 표시", r.rows().size() == 14 && "예".equals(r.rows().get(1)[1]) && row(r, "NEMESIS") == null);
+        check("정상이면 버전 칸은 버전만 (HMG-API 1.0.2)", "1.0.2".equals(row(r, "HMG-API")));
 
         // 필요 조건: README "필요한 것"과 같은 최소 버전
         Report old = Report.parse(GOOD.replace("version 1.0.2 build", "version 1.0.1 build"));
@@ -76,8 +76,10 @@ public class ReportTest {
         check("확인 안 된 차는 HMG-API가 없어도 노랑(문구와 색이 맞음)", Report.parse(GOOD.replace("tested=yes", "tested=no").replace("hmgapi=version 1.0.2 build 180185d 2026-11-04\n", "")).level() == 1);
         Report hunk = Report.parse(GOOD.replace("hooks=on\n", "hooks=\n"));
         check("훅 기록 없음 → 판정에 쓰지 않고 '-'", hunk.level() == 0 && "-".equals(row(hunk, "HMG-API 훅")));
-        Report nold = Report.parse(GOOD.replace("nemesis=1.16.7", "nemesis=1.15.2"));
-        check("NEMESIS 1.15 → 업데이트 안내, 노랑", nold.verdict().startsWith("NEMESIS를 1.16 이상") && nold.level() == 1 && row(nold, "NEMESIS").contains("1.16 이상 필요"));
+        // NEMESIS 버전은 보지 않는다(NEMESIS 없이 HMG-API 모드로도 돈다): 옛 상태 파일에 nemesis= 값이 있어도 판정·색·표·QR에 쓰지 않음
+        Report nold = Report.parse(GOOD + "nemesis=1.15.2\n");
+        check("NEMESIS 버전은 판정·색·표·QR에 쓰지 않음(옛 상태 파일의 nemesis=1.15.2도)", nold.verdict().startsWith("무선 카플레이 준비됨") && nold.level() == 0
+            && row(nold, "NEMESIS") == null && !nold.issueUrl().contains("nemesis"));
         check("wireless.projection 칸에 '필요 없음'", "아니요 (필요 없음)".equals(row(r, "wireless.projection")));
 
         String url = r.issueUrl();
@@ -135,7 +137,7 @@ public class ReportTest {
         check("  USB가 없으면 Launch를 다시 누르라고, 쓰지 못했으면 다른 USB", row(Report.parse(NB.replace("usb=saved", "usb=none")), "제보 파일").startsWith("USB를 꽂고")
             && row(Report.parse(NB.replace("usb=saved", "usb=fail")), "제보 파일").startsWith("USB에 쓰지 못함"));
         check("  QR 링크에 support·platform이 들어감", nb.issueUrl().contains("support%3A%20nobb") && nb.issueUrl().contains("platform%3A%20tcc803x"));
-        check("  보통 상태 파일은 busybox 없는 내비가 아님(표 15줄 그대로)", !r.nobb() && r.rows().size() == 15);
+        check("  보통 상태 파일은 busybox 없는 내비가 아님(표 14줄 그대로, NEMESIS 칸 뺌)", !r.nobb() && r.rows().size() == 14);
 
         // 1.6.2: 순정 카플레이 AP(K3 #15: our_ap=no, our_dhcp는 오판이 고쳐져 no, other_ap=yes)
         String STOCK = GOOD.replace("our_ap=yes", "our_ap=no").replace("our_dhcp=yes", "our_dhcp=no").replace("other_ap=no", "other_ap=yes")
@@ -153,7 +155,7 @@ public class ReportTest {
         check("  순정 일반 핫스팟(ap_mode=none)은 예전처럼 '핫스팟이 꺼져' 안내, 노랑", hs.verdict().startsWith("핫스팟이 꺼져") && hs.level() == 1 &&
             "없음".equals(row(hs, "무선 카플레이 Wi-Fi")));
         check("  ap_mode=ours는 예전과 같은 '준비됨'(1.7.3 U-4 문구)", Report.parse(GOOD + "stock_ssid=none\nap_mode=ours\n").verdict().equals("무선 카플레이 준비됨."));
-        check("  예전 상태 파일(ap_mode 없음)은 표 15줄 그대로", r.rows().size() == 15 && row(r, "무선 카플레이 Wi-Fi") == null);
+        check("  예전 상태 파일(ap_mode 없음)은 표 14줄 그대로", r.rows().size() == 14 && row(r, "무선 카플레이 Wi-Fi") == null);
         String sd = java.net.URLDecoder.decode(st.issueUrl(), "UTF-8");
         check("  QR 요약에 ap_mode·stock_ssid", sd.contains("ap_mode: stock") && sd.contains("stock_ssid: carplay"));
         Report off = Report.parse(GOOD.replace("our_ap=yes", "our_ap=no").replace("our_dhcp=yes", "our_dhcp=no") + "stock_ssid=none\nap_mode=none\nstock_seen=yes\n");
@@ -165,7 +167,7 @@ public class ReportTest {
         check("  nowlan=no면 예전 '핫스팟이 꺼져' 안내", Report.parse(GOOD.replace("our_ap=yes", "our_ap=no") + "nowlan=no\n").verdict().startsWith("핫스팟이 꺼져"));
         // 1.7.4(L-9): 끄기 파일을 없애 무선 AA 칸에 켜짐·꺼짐(kp-aa-off)을 붙이지 않는다. 옛 상태 파일(aa=no)이어도 같다
         check("  1.7.4 L-9: 무선 AA 칸은 feat_aa만(켜짐·꺼짐·kp-aa-off 없음), 표 줄 수는 그대로", row(Report.parse(GOOD + "aa=yes\n"), "무선 안드로이드 오토 기능").equals("예")
-            && row(Report.parse(GOOD + "aa=no\n"), "무선 안드로이드 오토 기능").equals("예") && Report.parse(GOOD).rows().size() == 15);
+            && row(Report.parse(GOOD + "aa=no\n"), "무선 안드로이드 오토 기능").equals("예") && Report.parse(GOOD).rows().size() == 14);
         String nq = java.net.URLDecoder.decode(Report.parse(GOOD + "state=reboot\naa=yes\nnowlan=yes\n").issueUrl(), "UTF-8");
         check("  QR 요약에 state·nowlan, 1.7.4 L-9: aa는 넣지 않음", nq.contains("state: reboot") && !nq.contains("aa: ") && nq.contains("nowlan: yes"));
         // 1.7.1: 알림 기록(토스트 대신), 모드 업데이트 대기

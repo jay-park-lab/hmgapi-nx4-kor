@@ -101,7 +101,68 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         start();
     }
 
+    /**
+     * standalone/(NEMESIS 없이 HMG-API 모드로 설치): NEMESIS의 Launch가 없으므로 화면을 열 때 root의 bin/status.sh를
+     * HMG-API 서비스 "launch"(mod.json, start=manual)로 돌린다. hmgapid는 이 앱을 모드의 앱(state/apps.txt)으로 알 때만
+     * 받는다(종료 코드 0). NEMESIS판에서는 모드 앱이 아니어서 거절되고(13), Launch가 이미 status.sh를 돌렸으므로 아무것도 하지 않는다.
+     * 받았으면 상태 파일이 새로 쓰일 때까지(최대 KICK_WAIT초) 1초마다 보고, 바뀌면 화면을 다시 그린다.
+     */
+    static final String HMGAPID = "/system/bin/hmgapid";
+    static final int KICK_WAIT = 40;
+    /** 서비스를 부른 때(부팅 뒤 밀리초, 0이면 아직)와 그때 상태 파일의 수정 시각 */
+    long kickEl, kickMtime;
+
+    final Runnable kickWatch = new Runnable() {
+        @Override
+        public void run() {
+            if (isFinishing()) return;
+            if (new File(STATUS).lastModified() != kickMtime) {
+                handler.removeCallbacks(StatusActivity.this);
+                render();
+                return;
+            }
+            if (android.os.SystemClock.elapsedRealtime() - kickEl < KICK_WAIT * 1000L) handler.postDelayed(this, 1000);
+        }
+    };
+
+    void kickLaunch() {
+        long el = android.os.SystemClock.elapsedRealtime();
+        // Launch를 빠르게 여러 번 누르면 한 번만(돌고 있는 status.sh를 service-start가 멈추고 다시 띄우지 않게)
+        if (kickEl > 0 && el - kickEl < 10000) return;
+        if (!new File(HMGAPID).exists()) return;
+        kickEl = el;
+        kickMtime = new File(STATUS).lastModified();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int rc;
+                try {
+                    Process pr = new ProcessBuilder(HMGAPID, "service-start", "launch").redirectErrorStream(true).start();
+                    InputStream in = pr.getInputStream();
+                    byte[] buf = new byte[256];
+                    while (in.read(buf) >= 0) { }
+                    rc = pr.waitFor();
+                } catch (Exception e) {
+                    rc = -1;
+                }
+                if (rc != 0) return;
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        handler.removeCallbacks(kickWatch);
+                        handler.postDelayed(kickWatch, 1000);
+                    }
+                });
+            }
+        }).start();
+    }
+
     void start() {
+        kickLaunch();
+        render();
+    }
+
+    void render() {
         String bid = read(BOOT_ID);
         boot = bid == null ? null : bid.trim();
         finishedAt = 0;
@@ -137,6 +198,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         watching = false;
         saving = false;
         handler.removeCallbacks(this);
+        handler.removeCallbacks(kickWatch);
         super.onDestroy();
     }
 
