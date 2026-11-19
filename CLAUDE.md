@@ -10,6 +10,7 @@
 | `docs/design.md` | 설계(모드 구성, 자동 설정, 상태 화면, 재부팅 요청)와 차에서 확인할 것 |
 | `docs/emulator-test.md` | 에뮬레이터에서 상태 화면 앱 시험(SDK·AVD 준비, 시나리오, [지금 재부팅] 흐름, 이 시험이 보지 않는 것) |
 | `docs/git-flow.md` | 브랜치 전략(Git Flow) 규칙, 흐름, 강제 장치 |
+| `docs/release.md` | 태그로 도는 배포 워크플로(`.github/workflows/release.yml`), 배포 키 secret, `production` 환경, 키 백업, 유출 위험 |
 | `wireless/README.md` | 합친 무선 모드(한국 차 빌드 2.4.5)의 출처, 공식 판과의 비교 |
 | `usb/README.txt` | USB 설치기 안내 |
 | `NOTICE.md` | 바탕 프로젝트와 라이선스 고지 |

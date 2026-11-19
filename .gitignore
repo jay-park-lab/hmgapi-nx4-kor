@@ -1,6 +1,10 @@
 # PC의 저장소 밖 경로(형식은 .env.example)
 /.env.local
 
+# 서명 키는 저장소 밖에 둔다(docs/release.md). 잘못 들어온 키도 git에 넣지 않는다
+*.keystore
+*.key
+
 # 빌드 결과(scripts/build.sh, scripts/build-app.sh)
 /out/
 /mod/app/

@@ -1,0 +1,355 @@
+# 배포 묶음: v<판> / v<판>-beta.<n> 태그를 올리면 서명한 모드 zip과 USB 묶음을 만들어 GitHub 릴리스에 올린다.
+# 설정(secret, production 환경, 태그 규칙)과 위험은 docs/release.md.
+#   check    키 없음, 승인 전. 태그·판 번호·이미 낸 릴리스 확인과 PC 시험. 키를 쓰는 job과 다른 러너에서 돈다
+#   build    production 환경(승인 필요). 배포 키는 이 job에서만, 러너 임시 폴더의 파일로만 쓴다. 저장소 쓰기 권한 없음
+#   publish  키 없이 build의 결과만 받아 릴리스를 만든다(저장소 쓰기 권한은 이 job에만)
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-beta.*'
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # CI에는 .env.local이 없다. 스크립트는 step의 환경 변수만 읽는다
+  NX4_ENV_FILE: ''
+  # HMG-API v1.1.0-rc.4 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도)
+  HMGAPI_COMMIT: 31d781b412681ba9e53cbe2627dcee274cb75119
+
+jobs:
+  check:
+    name: 태그 확인과 PC 시험
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash # 명시해야 -o pipefail이 켜진다
+        working-directory: nx4
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      prerelease: ${{ steps.ver.outputs.prerelease }}
+    steps:
+      - name: 저장소
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: nx4
+          fetch-depth: 0 # 정식 태그가 main에 있는지 본다
+          persist-credentials: false
+
+      - name: 태그와 판 번호 확인
+        id: ver
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          fail() { echo "::error::$1"; exit 1; }
+          TV=${TAG#v}
+          if printf '%s\n' "$TV" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+'; then
+            V=${TV%-beta.*}
+            PRE=true
+          elif printf '%s\n' "$TV" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+'; then
+            V=$TV
+            PRE=false
+          else
+            fail "태그가 v<X.Y.Z> 또는 v<X.Y.Z>-beta.<n> 꼴이 아닙니다: $TAG"
+          fi
+          MV=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' mod/mod.json | head -1)
+          [ "$V" = "$MV" ] || fail "태그의 판($V)과 mod/mod.json version($MV)이 다릅니다"
+          AV=$(sed -n 's/.*android:versionName="\([^"]*\)".*/\1/p' app/AndroidManifest.xml | head -1)
+          [ "$V" = "$AV" ] || fail "태그의 판($V)과 app/AndroidManifest.xml versionName($AV)이 다릅니다"
+          # Git Flow(docs/git-flow.md 규칙 6): 정식 태그는 main의 커밋, 베타 태그는 release/ 브랜치(또는 이미 합친 main)의 커밋
+          C=$(git rev-parse HEAD)
+          if [ "$PRE" = false ]; then
+            git merge-base --is-ancestor "$C" origin/main || fail "정식 태그 $TAG의 커밋이 main에 없습니다"
+          else
+            [ -n "$(git branch -r --contains "$C" --list 'origin/release/*' 'origin/main')" ] \
+              || fail "베타 태그 $TAG의 커밋이 release/ 브랜치에도 main에도 없습니다"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRE" >> "$GITHUB_OUTPUT"
+          echo "판 $V (베타: $PRE), 커밋 $C"
+
+      # 묶음은 만들 때마다 서명(ECDSA)이 달라 SHA-256이 바뀐다. 같은 태그로 다시 만들어 이미 낸 파일을 바꾸지 않는다
+      - name: 이미 낸 릴리스인지 확인
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::릴리스 $TAG가 이미 있습니다. 고쳐야 하면 다음 번호의 태그를 답니다(docs/release.md)"
+            exit 1
+          fi
+
+      - name: JDK 21
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: HMG-API 소스 (v1.1.0-rc.4)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Open-HMG/HMG-API
+          ref: ${{ env.HMGAPI_COMMIT }}
+          path: hmgapi
+          persist-credentials: false
+
+      # 차의 셸은 mksh. 러너의 dash와 함께 구문 검사에 쓴다(tests/mod-test.sh)
+      - name: mksh
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mksh
+
+      # 시험의 빌드는 임시 키로 한다. 이 job에는 배포 키가 없다
+      - name: PC 시험 (빌드·HMG-API 엔진 시험 포함)
+        env:
+          HMGAPI_SRC: ${{ github.workspace }}/hmgapi
+        run: sh tests/mod-test.sh
+
+  build:
+    name: 서명한 묶음 만들기
+    needs: check
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash # 명시해야 -o pipefail이 켜진다
+        working-directory: nx4
+    env:
+      V: ${{ needs.check.outputs.version }}
+    outputs:
+      uuid: ${{ steps.verify.outputs.uuid }}
+      app_cert: ${{ steps.cert.outputs.app_cert }}
+      busybox: ${{ steps.bb.outcome == 'success' }}
+    steps:
+      - name: 저장소
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: nx4
+          persist-credentials: false
+
+      - name: JDK 21
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 러너(ubuntu-24.04)에는 build-tools 34~37이 있지만 android-19가 없다. build-app.sh는 가장 높은 build-tools와
+      # 이름순 첫 플랫폼을 쓰므로, 빈 SDK 폴더에 정한 둘만 받아 러너 이미지가 바뀌어도 같은 도구로 만든다.
+      # JDK 21에는 build-tools 37 이상이 필요하다(34의 d8은 이 앱의 안쪽 클래스에서 멈춘다)
+      - name: Android SDK (build-tools 37.0.0, android-19)
+        run: |
+          set -eu
+          SDK=$RUNNER_TEMP/android-sdk
+          SM=$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager
+          [ -x "$SM" ] || { echo "::error::러너에 sdkmanager가 없습니다: $SM"; exit 1; }
+          mkdir -p "$SDK"
+          # 러너 이미지가 이미 받아들인 SDK 라이선스를 그대로 쓴다
+          cp -R "$ANDROID_HOME/licenses" "$SDK/"
+          if ! "$SM" --sdk_root="$SDK" --install 'build-tools;37.0.0' 'platforms;android-19' > "$RUNNER_TEMP/sdkmanager.log" 2>&1; then
+            cat "$RUNNER_TEMP/sdkmanager.log"
+            exit 1
+          fi
+          for f in build-tools/37.0.0/d8 build-tools/37.0.0/apksigner platforms/android-19/android.jar; do
+            [ -f "$SDK/$f" ] || { echo "::error::SDK에 $f가 없습니다"; exit 1; }
+          done
+          ls "$SDK/build-tools" "$SDK/platforms"
+
+      - name: HMG-API 소스 (v1.1.0-rc.4)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Open-HMG/HMG-API
+          ref: ${{ env.HMGAPI_COMMIT }}
+          path: hmgapi
+          persist-credentials: false
+
+      # 선택: 저장소(또는 production 환경) 변수 NX4_PKG_ZIP_URL에 Korea Projection 릴리스 패키지 zip 주소를 두면
+      # 그 안의 busybox와 라이선스 안내를 넣는다. busybox는 NOTICE.md에 적은 SHA-256과 같아야 한다
+      - name: busybox (선택)
+        id: bb
+        if: vars.NX4_PKG_ZIP_URL != ''
+        env:
+          URL: ${{ vars.NX4_PKG_ZIP_URL }}
+        run: |
+          set -eu
+          Z=$RUNNER_TEMP/pkg.zip
+          curl -fsSL --proto '=https' --tlsv1.2 -o "$Z" "$URL"
+          EXP=$(sed -n 's/.*SHA-256 `\([0-9a-f]\{64\}\)`.*/\1/p' NOTICE.md | head -1)
+          GOT=$(unzip -p "$Z" bin/busybox | sha256sum | cut -d' ' -f1)
+          [ -n "$EXP" ] || { echo "::error::NOTICE.md에서 busybox SHA-256을 읽지 못했습니다"; exit 1; }
+          [ "$GOT" = "$EXP" ] || { echo "::error::busybox SHA-256($GOT)이 NOTICE.md($EXP)와 다릅니다"; exit 1; }
+          echo "NX4_PKG_ZIP=$Z" >> "$GITHUB_ENV"
+
+      # secret은 화면에 내지 않는다(set -x 금지). 파일은 umask 077, 러너 임시 폴더, 마지막 step에서 지운다
+      - name: 배포 키를 파일로
+        env:
+          NX4_APP_KEYSTORE_B64: ${{ secrets.NX4_APP_KEYSTORE_B64 }}
+          NX4_APP_KEY_PASS: ${{ secrets.NX4_APP_KEY_PASS }}
+          NX4_MOD_KEY: ${{ secrets.NX4_MOD_KEY }}
+        run: |
+          set -eu
+          umask 077
+          # 비었으면 멈춘다. build-app.sh는 키가 없으면 새 키를 만들어 버리므로, 다른 키로 서명한 앱이 나가지 않게 한다
+          for n in NX4_APP_KEYSTORE_B64 NX4_APP_KEY_PASS NX4_MOD_KEY; do
+            eval "x=\${$n:-}"
+            [ -n "$x" ] || { echo "::error::secret $n 값이 없습니다(production 환경 secret, docs/release.md)"; exit 1; }
+          done
+          K=$RUNNER_TEMP/keys
+          mkdir -p "$K/app"
+          printf '%s' "$NX4_APP_KEYSTORE_B64" | base64 -d > "$K/app/release.keystore"
+          printf '%s\n' "$NX4_APP_KEY_PASS" | head -n 1 > "$K/app/pass"
+          printf '%s\n' "$NX4_MOD_KEY" > "$K/mod.key"
+          # 공개 키는 커밋한 것을 쓴다(모드 UUID를 정한다). 비밀 키와 짝이 아니면 서명 확인에서 멈춘다
+          cp .github/release/mod.key.pub "$K/mod.key.pub"
+          [ -s "$K/app/release.keystore" ] || { echo "::error::NX4_APP_KEYSTORE_B64를 풀지 못했습니다"; exit 1; }
+
+      - name: 상태 화면 앱
+        env:
+          ANDROID_HOME: ${{ runner.temp }}/android-sdk
+          NX4_APP_KEYS: ${{ runner.temp }}/keys/app
+        run: sh scripts/build-app.sh
+
+      - name: 앱 서명 인증서 확인
+        id: cert
+        env:
+          ANDROID_HOME: ${{ runner.temp }}/android-sdk
+        run: |
+          set -eu
+          # 고정값은 콜론 없는 소문자 64자. keytool 꼴(85:06:FF:...)로 적어도 같게 본다
+          EXP=$(tr -d ' :\r\n' < .github/release/app-cert.sha256 | tr 'A-F' 'a-f')
+          GOT=$("$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs mod/app/NX4KOR.apk \
+            | sed -n 's/.*certificate SHA-256 digest: *//p' | sort -u)
+          [ "$GOT" = "$EXP" ] || { echo "::error::앱 서명 인증서($GOT)가 .github/release/app-cert.sha256($EXP)과 다릅니다. 차가 앱 업데이트를 받지 않습니다"; exit 1; }
+          echo "app_cert=$GOT" >> "$GITHUB_OUTPUT"
+
+      - name: 모드 zip과 USB 묶음
+        env:
+          HMGAPI_SRC: ${{ github.workspace }}/hmgapi
+          NX4_MOD_KEY: ${{ runner.temp }}/keys/mod.key
+        run: |
+          set -eu
+          # 커밋한 그대로 만든다(docs/git-flow.md 규칙 7)
+          [ -z "$(git status --porcelain)" ] || { git status --short; echo "::error::커밋하지 않은 수정이 있습니다"; exit 1; }
+          sh scripts/build.sh
+
+      - name: 모드 서명 확인 (커밋한 공개 키의 UUID)
+        id: verify
+        env:
+          APP_CERT: ${{ steps.cert.outputs.app_cert }}
+          # build.sh(HMG-API tools/mkmodpkg.sh)가 컴파일해 둔 HMG-API 엔진
+          EH: ${{ github.workspace }}/hmgapi/out/engine-host
+        run: |
+          set -eu
+          UUID=$(java -cp "$EH" hmgapi.engine.Signing uuid .github/release/mod.key.pub)
+          D=$(mktemp -d)
+          unzip -q "out/hmgapi-nx4-kor-$V.zip" -d "$D"
+          java -cp "$EH" hmgapi.engine.Signing verify "$D" "$UUID"
+          rm -rf "$D"
+          [ -f "out/hmgapi-nx4-kor-$V-usb.zip" ] || { echo "::error::USB 묶음이 없습니다"; exit 1; }
+          echo "uuid=$UUID" >> "$GITHUB_OUTPUT"
+          if [ -n "${NX4_PKG_ZIP:-}" ]; then BB="넣음"; else BB="넣지 않음"; fi
+          {
+            echo "### NX4 KOR $V"
+            echo "- 모드 UUID: \`$UUID\`"
+            echo "- 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
+            echo "- busybox: $BB"
+            echo '```'
+            (cd out && sha256sum "hmgapi-nx4-kor-$V.zip" "hmgapi-nx4-kor-$V-usb.zip")
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 배포 키 파일 지우기
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"
+
+      - name: 묶음 넘기기
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            nx4/out/hmgapi-nx4-kor-${{ needs.check.outputs.version }}.zip
+            nx4/out/hmgapi-nx4-kor-${{ needs.check.outputs.version }}-usb.zip
+          if-no-files-found: error
+          retention-days: 3
+
+  publish:
+    name: GitHub 릴리스
+    needs: [check, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: 묶음 받기
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: out
+
+      - name: 릴리스 만들기
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          V: ${{ needs.check.outputs.version }}
+          PRE: ${{ needs.check.outputs.prerelease }}
+          UUID: ${{ needs.build.outputs.uuid }}
+          APP_CERT: ${{ needs.build.outputs.app_cert }}
+          BUSYBOX: ${{ needs.build.outputs.busybox }}
+          SRC: ${{ github.sha }}
+        run: |
+          set -eu
+          F1=out/hmgapi-nx4-kor-$V.zip
+          F2=out/hmgapi-nx4-kor-$V-usb.zip
+          for f in "$F1" "$F2"; do
+            [ -f "$f" ] || { echo "::error::$f가 없습니다"; exit 1; }
+          done
+          # check 뒤에 생긴 경우(승인을 기다리는 동안 다른 실행이 올림)도 이미 낸 파일을 바꾸지 않는다
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::릴리스 $TAG가 이미 있습니다. 고쳐야 하면 다음 번호의 태그를 답니다(docs/release.md)"
+            exit 1
+          fi
+          case $TAG in
+            *-beta.*) TITLE="NX4 KOR $V beta ${TAG##*-beta.}" ;;
+            *) TITLE="NX4 KOR $V" ;;
+          esac
+          if [ "$BUSYBOX" = true ]; then BB="넣음"; else BB="넣지 않음(내비의 /system/bin/busybox를 씀)"; fi
+          N=$RUNNER_TEMP/notes.md
+          {
+            echo "| 파일 | 설치 |"
+            echo "|---|---|"
+            echo "| \`hmgapi-nx4-kor-$V.zip\` | HMG-API 모드(작성자 키로 서명). HMG-API 앱·adb·USB |"
+            echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음. Engineering Mode > DSP > Update OTA |"
+            echo
+            echo "- 모드 UUID: \`$UUID\`"
+            echo "- 상태 화면 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
+            echo "- busybox: $BB"
+            echo "- 소스 커밋: $SRC"
+            echo
+            echo '```'
+            (cd out && sha256sum "hmgapi-nx4-kor-$V.zip" "hmgapi-nx4-kor-$V-usb.zip")
+            echo '```'
+            echo
+          } > "$N"
+          if [ "$PRE" = true ]; then
+            gh release create "$TAG" "$F1" "$F2" --verify-tag --title "$TITLE" --notes-file "$N" --generate-notes --prerelease
+          else
+            gh release create "$TAG" "$F1" "$F2" --verify-tag --title "$TITLE" --notes-file "$N" --generate-notes
+          fi

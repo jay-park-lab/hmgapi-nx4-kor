@@ -129,6 +129,7 @@ HMG-API 앱에서 NX4 KOR를 누르면 무선 기능 설정이 나옵니다. 모
 | `docs/design.md` | 설계와 차에서 확인할 것 |
 | `docs/emulator-test.md` | 에뮬레이터에서 상태 화면 앱 시험 |
 | `docs/git-flow.md` | 브랜치 전략(Git Flow) |
+| `docs/release.md` | 태그로 도는 배포(GitHub Actions)와 배포 키 |
 | `tests/` | PC 시험(`mod-test.sh`), 에뮬레이터 시험 스크립트(`emu/`) |
 
 **만들기**
