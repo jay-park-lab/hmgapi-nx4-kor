@@ -3,3 +3,6 @@
 /mod/app/
 /mod/bin/busybox
 /mod/bin/busybox-LICENSE.txt
+
+# Claude Code 작업 공간(세션마다 만드는 git worktree)
+/.claude/worktrees/
