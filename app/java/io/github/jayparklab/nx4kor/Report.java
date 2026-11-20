@@ -46,7 +46,7 @@ final class Report {
     /** 상태 파일에 판정 문구가 없을 때(status.sh가 아직 쓰는 중이거나 판정을 쓰지 못함) */
     static final String NO_VERDICT = "상태를 읽는 중입니다. 잠시 뒤 화면을 다시 열어 주세요.";
 
-    /** 맨 위 한 줄: status.sh가 정한 판정 문구를 그대로 */
+    /** 판정 한 줄(결과 화면 오른쪽 칸): status.sh가 정한 판정 문구를 그대로 */
     String verdict() {
         if (empty()) return NO_STATUS;
         if (nobb()) return NOBB_MSG;
@@ -139,7 +139,7 @@ final class Report {
     }
 
     /**
-     * 설치가 끝난 결과가 맨 위 판정을 대신할 때의 문구. 재부팅 필요·실패만(이번 부팅 기록일 때). 아니면 null.
+     * 설치가 끝난 결과가 판정을 대신할 때의 문구. 재부팅 필요·실패만(이번 부팅 기록일 때). 아니면 null.
      * 상태 파일에 판정 문구가 없을 때만 쓰인다.
      */
     String progVerdict(String boot) {
