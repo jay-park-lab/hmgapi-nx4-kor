@@ -128,6 +128,7 @@ gh variable set NX4_PKG_ZIP_URL --body https://github.com/StopDragon/korea-proje
   - 고치려면 그때 있는 판으로 `HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`을 함께 옮깁니다. 바꿀 곳 목록은 [`open-issue.md`](open-issue.md) OI-2에 있습니다.
   - 그 소스로 `tests/mod-test.sh`를 통과시킨 뒤 다음 번호의 태그를 답니다. 같은 태그는 다시 쓸 수 없습니다. 태그 push로 도는 워크플로는 그 태그 커밋의 `release.yml`을 쓰기 때문입니다.
   - 받을 수 있는지는 태그를 달기 전에 `curl -sSI -o /dev/null -w '%{http_code}\n' <HMGAPI_USB_URL>`로 봅니다. 200이나 302면 됩니다.
+  - 정식판 직전에 지워지면 차에서 확인하지 않은 판으로 옮겨야 합니다. 그래서 고정한 파일을 이 저장소에 사본으로 둘지는 [`open-issue.md`](open-issue.md) OI-10에서 정합니다.
 
 ## production 환경 (처음 한 번, 저장소 관리자)
 

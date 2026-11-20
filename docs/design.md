@@ -86,7 +86,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 | HMG-API에 다른 모드의 적용 전 변경이 남아 있음 | `engine plan`에 이 모드 것이 아닌 변경이 섞입니다 | 자동으로 적용하지 않고 HMG-API 앱에서 적용하라고 안내합니다(상태 `otherplan`). 지울 때도 같습니다 |
 | 핫스팟을 띄우는 다른 패키지(USB 동글 패키지 등) | wlan0을 다툽니다 | 그 hostapd가 도는 동안 우리 핫스팟을 멈추고 비켜 줍니다. 처음 설정 전이면 자동 설정(무선 기능 적용)도 이번 부팅은 건너뛰고 다음 부팅에 다시 봅니다. 순정(netd)이 띄운 것이 아니고 연결도 없으면 상태 `otherwifi` |
 | 일반 Wi-Fi 접속(클라이언트)이 필요한 모드·앱 | Wi-Fi 잠금으로 wpa_supplicant가 뜨지 않아 접속할 수 없습니다 | 잠금은 이 모드를 지울 때 되돌립니다 |
-| HMG-API의 "집 Wi-Fi"(HMG-API 1.1.0-rc.5부터, HMG-API 앱 설정 > Home Wi-Fi, 기본 꺼짐) | 켜면 주차했을 때 HMG-API가 프로젝션 핫스팟을 끄고 차의 Wi-Fi 클라이언트를 켜 집 Wi-Fi에 붙습니다. 이때 Android Wi-Fi 설정(`wpa_supplicant.conf`)을 `wifi:wifi` 소유로 다시 씁니다(HMG-API `engine/HomeWifi.java`). 이 모드는 그 파일을 root로 잠그고 자체 hostapd로 핫스팟을 띄우므로, 잠금이 풀리거나 핫스팟과 클라이언트가 wlan0을 다툴 수 있습니다 | 막지 못하고, 시험하지 않았습니다. **켜지 않습니다**(README "알아 두실 점") |
+| HMG-API의 "집 Wi-Fi"(HMG-API 1.1.0-rc.5부터, HMG-API 앱 설정 > Home Wi-Fi, 기본 꺼짐) | 켜면 두 가지가 일어납니다(HMG-API rc.7 `engine/HomeWifi.java`). 이 모드는 그 파일을 root로 잠그고 자체 hostapd로 핫스팟을 띄우므로, 잠금이 풀리거나 핫스팟과 클라이언트가 wlan0을 다툴 수 있습니다.<br>• HMG-API 앱에서 집 Wi-Fi 네트워크를 저장하거나 지울 때(`join`·`forget`), Android Wi-Fi 설정(`wpa_supplicant.conf`)을 `wifi:wifi` 소유로 다시 씁니다.<br>• 차를 끈 지 30초 뒤나 주차하면(car events) 프로젝션 핫스팟을 끄고 차의 Wi-Fi 클라이언트를 켜 집 Wi-Fi에 붙습니다. | 막지 못하고, 시험하지 않았습니다. **켜지 않습니다**(README "알아 두실 점"). 상태 화면에서 알릴지는 [`open-issue.md`](open-issue.md) OI-7 |
 
 ## 차에서 확인할 것
 
@@ -101,6 +101,15 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - 순정 무선 카플레이가 있는 트림에서 순정 카플레이 AP 경로(`stock_ap_mode`)가 그대로 도는지.
   - HMG-API 1.1.0-rc.5부터는 한국 260902 현대·기아 빌드에서, 무선 프로젝션 AP(apMode 2)를 폰에 알린 이름·비밀번호로 띄우게 고칩니다(HMG-API `hook/ProjectionAp.java`).
   - 이 고침은 관련 훅 지점 5개가 NX4 map에 모두 있을 때만 돕니다(`framework.network_management_service.start_access_point`, `framework.wifi_configuration.*` 4개).
-  - 그 트림에서 폰이 순정 AP에 붙는지, AP 이름이 순정과 같은지 봅니다.
+  - 이 모드는 순정 AP(netd가 띄운 hostapd) 설정의 `ssid=`로 판정합니다(`hotspot.sh` `stock_ssid`). 카플레이 SSID(softap.conf의 S2)면 `carplay`, 핫스팟 이름(S1)이면 `hotspot`입니다.
+  - 기대값:
+    - HMG-API rc.5 이상, map이 적용된 뒤(훅 켜짐): 순정 AP 이름이 카플레이 SSID(S2)이고, `ap.log`에 "순정 카플레이 AP 사용"이 남아야 합니다. 폰이 그 AP에 붙는지 봅니다.
+    - HMG-API rc.4, 또는 map이 생기기 전(훅 꺼짐): 이 빌드에 그 분기가 없으면 순정 AP가 핫스팟 이름(S1)으로 떠, `ap.log`에 "순정 카플레이 AP를 기다림 … 지금 판정 hotspot"이 남을 수 있습니다. 그때 폰이 붙는지도 적어 둡니다.
+  - 둘이 부딪히면 어떻게 할지는 [`open-issue.md`](open-issue.md) OI-8에서 정합니다.
+- **HMG-API rc.5 이상에서 이 모드의 서비스가 그대로 도는지.** rc.5부터 `hmgapid`는 모드 서비스를 실효 그룹 2950(`MOD_GID`, root 서비스는 보조 그룹도 비움)과 `ANDROID_DNS_MODE=local`로 돌립니다. 또 HMG-API 방화벽이 그룹 2950·2951의 `rmnet+` 송신을 막습니다(rc.7 `core/hmgapid/hmgapid.c`, `engine/Network.java`).
+  - 이 모드의 `ap` 서비스(root)와 그 자식 hostapd·dnsmasq도 이 환경에서 돕니다.
+  - `tests/mod-test.sh`의 엔진 시험은 서비스를 띄우지 않아 이 부분을 덮지 않습니다.
+  - 우리 스크립트는 모바일 데이터와 이름 조회를 쓰지 않아 영향이 없을 것으로 봅니다.
+  - HMG-API rc.7인 차에서 다음 셋이 되면 이것도 확인한 것으로 봅니다: 우리 핫스팟이 뜨고, 폰이 붙고, 상태 화면이 상태를 읽음.
 
 정하지 않은 것은 [`open-issue.md`](open-issue.md)에서 관리합니다.

@@ -28,7 +28,7 @@
 - 지금: `mod/mod.json`의 `hmgapi`는 `>=1.1.0-rc.4` 그대로입니다. 시험·빌드에 쓰는 HMG-API는 rc.7입니다.
   - 2026-11-20: HMG-API가 rc.4·rc.5 릴리스를 지웠습니다. 남은 것은 rc.7과 1.0.2입니다. 그래서 `v2.0.0-beta.2`가 릴리스 USB 묶음에 넣을 rc.4 파일을 받지 못하고 멈췄습니다([`release.md`](release.md) "HMG-API가 릴리스를 지우면").
   - 그래서 배포 워크플로의 시험·빌드와 함께 넣는 HMG-API를 rc.7로 옮겼습니다(아래 첫 갈래).
-  - rc.7 소스로도 `tests/mod-test.sh`가 모두 통과했습니다. 빌드와 HMG-API 엔진 시험까지 돌았습니다. rc.5·rc.6은 시험하지 않았습니다.
+  - rc.7 소스로도 `tests/mod-test.sh`가 모두 통과했습니다. 빌드와 HMG-API 엔진 시험까지 돌았습니다. rc.5·rc.6은 시험하지 않았습니다. 이 시험은 rc.5부터 바뀐 모드 서비스 실행 환경(그룹 2950, 모바일 데이터 차단)을 덮지 않습니다. 이 환경은 [`design.md`](design.md) "차에서 확인할 것"에서 확인합니다.
   - HMG-API USB 설치기(`install/usb/troubleShooter`)와 스틱을 만드는 `tools/mkinstallers.sh`는 rc.4와 rc.7이 같습니다.
 - 할 일: 최소 판을 어떻게 할지 정합니다. 시판 판(1.1.0)이 나오면 그 판으로 다시 시험합니다.
 - 정할 것: 최소 판을 rc.7로 올릴지, rc.4로 둘지. 차에서 rc.7을 확인한 뒤 정하는 것이 좋습니다.
@@ -116,6 +116,16 @@
 - 지금: 쓰지 않습니다. HMG-API 1.1.0-rc.5부터 모드가 `mod.json`에 `"car_events"`로 원하는 이벤트를 적으면, HMG-API가 `hmgapi.intent.action.CAR_EVENT` 방송(보낸이는 `DEVICE_POWER` 권한이 있는 HMG-API)으로 알려 줍니다: `parked`(주차하고 운전자가 떠남), `unparked`, `shutdown`(몇 초 뒤 꺼짐), `wake`(QuickBoot에서 깨어남). 모드의 훅 코드뿐 아니라 모드의 앱도 이 방송을 받으므로(HMG-API rc.7 `hook/CarEvents.java`), `hooks.jar`를 다시 빌드하지 않고 상태 화면 앱만으로도 받을 수 있습니다.
 - 쓸 곳 후보: `shutdown` 때 핫스팟·DHCP를 정리하고 기록을 마무리, `parked` 때 핫스팟을 꺼 폰이 차를 떠난 뒤 붙어 있지 않게, `wake` 때 핫스팟을 다시 확인. 앱이 받아 root 서비스에 알리는 길(지금 `reboot.req` 같은 파일)이 필요합니다.
 - 정할 것: 쓸지, 쓴다면 어느 이벤트에 무엇을 할지. 최소 판을 rc.5 이상으로 올려야 하므로 OI-2와 묶이고, 앱을 바꾸므로 `release/`에서 할 일입니다. 무선 모드를 rc.8로 옮기면(OI-3 선택지 3) 그쪽의 `park` 기능과 겹치는지도 봅니다.
+
+### OI-10. 릴리스 USB 묶음에 넣는 HMG-API를 이 저장소에 사본으로 둘지
+
+- 기록: 2026-11-20
+- 지금: 배포 워크플로는 HMG-API 릴리스의 `hmgapi-<판>-usb.zip`을 그 주소(`HMGAPI_USB_URL`)에서 받고, SHA-256(`HMGAPI_USB_SHA256`)으로 확인합니다. 2026-11-20에 HMG-API가 rc.4 릴리스를 지워 `v2.0.0-beta.2`가 그 다운로드(404)에서 멈췄습니다([`release.md`](release.md) "HMG-API가 릴리스를 지우면"). 그때 사용자 결정으로 사본 없이 rc.7의 HMG-API 주소로 옮겼습니다(#11).
+- 위험: beta.3을 차에서 rc.7로 확인한 뒤 HMG-API가 rc.7 릴리스도 지우면, `v2.0.0` 정식 태그 실행이 같은 404로 멈춥니다. 그러면 차에서 확인하지 않은 판으로 옮겨야 정식판을 낼 수 있습니다. 깨지는 것은 USB 묶음 파일 하나입니다. `HMGAPI_COMMIT` 소스 checkout은 릴리스가 지워져도 됩니다(beta.2의 `check` job은 rc.4 커밋으로 통과).
+- 안:
+  1. 고정한 zip을 이 저장소의 별도 시험판 릴리스(`v*`가 아닌 태그)에 한 번 올려 두고, `HMGAPI_USB_URL`이 그것을 가리키게 합니다. SHA-256 고정은 그대로라 받는 곳이 바뀌어도 무결성은 같습니다. 대응 소스 안내(AGPL-3.0)는 USB의 `HMGAPI-SOURCE.txt`와 릴리스 글의 `HMGAPI_COMMIT` 링크가 이미 하고, 올린 릴리스에도 적습니다.
+  2. 지금처럼 HMG-API 주소를 쓰고, 지워지면 그때 있는 판으로 옮깁니다.
+- 정할 것: 정식판(`v2.0.0`) 태그 전에 어느 안으로 할지. 1이면 GitHub에 HMG-API 파일을 공개로 올리게 됩니다.
 
 ## 닫힌 것
 
