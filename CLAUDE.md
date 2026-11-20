@@ -37,7 +37,7 @@
   - `git fetch origin`, `git worktree add --no-track -b feature/<주제> .claude/worktrees/<주제> origin/develop` 순서로 워크트리를 만듭니다. 그다음 `EnterWorktree`의 `path`로 들어가 그 안에서 고칩니다. `EnterWorktree`의 `name`으로 만들지 않습니다(`main`에서 규칙에 맞지 않는 브랜치를 만듦).
   - 메인 체크아웃은 `develop`에 두고 고치지 않습니다. 읽기만 하는 일은 메인 체크아웃에서 해도 됩니다.
   - 메인 체크아웃에 내가 하지 않은 커밋하지 않은 변경이 있으면 다른 작업의 것이니 건드리지 않습니다.
-  - 이미 있는 브랜치(열린 PR의 리뷰 반영 등)를 고칠 때도 메인 체크아웃에서 `git switch` 하지 않고 그 브랜치의 워크트리에서 고칩니다. 없으면 만듭니다(`docs/git-flow.md` "워크트리").
+  - 이미 있는 브랜치(열린 PR의 리뷰 반영 등)를 고칠 때도 메인 체크아웃에서 `git switch` 하지 않고 그 브랜치의 워크트리에서 고칩니다. 없으면 만듭니다. 그 워크트리가 내가 만들었거나 지금 쓰던 것이 아니면 다른 세션이 쓰고 있을 수 있으니 들어가기 전에 사용자에게 묻습니다(`docs/git-flow.md` "워크트리").
   - 데스크톱 앱이 처음부터 워크트리로 연 세션이면 그 안에서 `git fetch origin`, `git switch --no-track -c feature/<주제> origin/develop` 순서로 작업 브랜치를 만듭니다.
 - `main`·`develop`에 직접 커밋·푸시하지 않습니다. PR의 `--base`는 `feature/` → `develop`, `release/`·`hotfix/` → `main`과 `develop`입니다.
 - 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는 `release/`·`hotfix/`에서만 바꿉니다.
