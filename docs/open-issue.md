@@ -29,8 +29,8 @@
 - 할 일: rc.5 소스를 `HMGAPI_SRC`로 주고 `tests/mod-test.sh`를 돌립니다.
 - 정할 것: rc.5를 지원 판으로 적을지, 최소 판을 올릴지, 그대로 둘지.
 - 정하면 함께 바꿀 곳:
-  - **시험·빌드에 쓰는 HMG-API를 rc.5로 옮기면:** 배포 워크플로도 HMG-API rc.4를 커밋으로 고정해 시험·빌드합니다. `.github/workflows/release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 그 주석, 단계 이름 두 곳("HMG-API 소스 (v1.1.0-rc.4)"), `docs/release.md`의 판·커밋 표기를 바꿉니다.
-  - **최소 판을 올리면:** 위 갈래를 먼저 하거나 함께 합니다. HMG-API 엔진은 설치할 때 `mod.json` `hmgapi`를 자기 판과 비교해, 더 높은 판을 요구하는 모드는 거절합니다(HMG-API `Packages.java`). 그래서 시험·빌드에 쓰는 HMG-API가 rc.4인 채로 최소 판만 올리면 `tests/mod-test.sh`의 엔진 설치 시험과 배포 워크플로의 PC 시험이 실패합니다. 바꿀 곳은 `git grep -n '1\.1\.0-rc\.4'`로 찾은 것 중 **최소 판을 뜻하는 곳**입니다.
+  - **시험·빌드에 쓰는 HMG-API를 rc.5로 옮기면:** 배포 워크플로도 HMG-API rc.4를 커밋으로 고정해 시험·빌드합니다. `.github/workflows/release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 그 주석, 단계 이름 두 곳("HMG-API 소스 (v1.1.0-rc.4)"), `docs/release.md`의 판·커밋 표기를 바꿉니다. 릴리스 USB 묶음에 함께 넣는 HMG-API도 같은 판으로 바꿉니다: `HMGAPI_USB_URL`·`HMGAPI_USB_SHA256`(같은 판의 `hmgapi-<판>-usb.zip`. 판이 `HMGAPI_COMMIT`과 다르면 `build` job이 멈춥니다)과 `README.md` "필요한 것"의 함께 든 HMG-API 판.
+  - **최소 판을 올리면:** 위 갈래를 먼저 하거나 함께 합니다. 릴리스 USB 묶음의 HMG-API가 새 최소 판을 채우지 못하면 `build` job이 멈춥니다(USB 설치기가 낮은 HMG-API를 그것으로 올리기 때문입니다). HMG-API 엔진은 설치할 때 `mod.json` `hmgapi`를 자기 판과 비교해, 더 높은 판을 요구하는 모드는 거절합니다(HMG-API `Packages.java`). 그래서 시험·빌드에 쓰는 HMG-API가 rc.4인 채로 최소 판만 올리면 `tests/mod-test.sh`의 엔진 설치 시험과 배포 워크플로의 PC 시험이 실패합니다. 바꿀 곳은 `git grep -n '1\.1\.0-rc\.4'`로 찾은 것 중 **최소 판을 뜻하는 곳**입니다.
     - 모드: `mod/mod.json` `hmgapi`, `mod/svc/hotspot.sh` `HMG_MIN`
     - 상태 화면 앱: `app/java/io/github/jayparklab/nx4kor/Report.java` `MIN_HMGAPI`(차주에게 "… 이상 필요"를 보이는 값). 앱을 바꾸므로 `app/AndroidManifest.xml`의 판 번호도 올려야 하고, 그래서 `release/`에서 할 일입니다(`docs/git-flow.md` 규칙 4).
     - 시험: `tests/mod-test.sh`는 `mod.json`과 `HMG_MIN`을 서로 비교하지 않고 각각을 `1.1.0-rc.4` 글자 그대로와 비교합니다. 그 두 곳과 `oldhmgapi` 판정 시험, `tests/ReportTest.java`에서 최소 판을 기대하는 값을 함께 고칩니다.

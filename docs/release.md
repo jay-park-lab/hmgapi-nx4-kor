@@ -12,14 +12,19 @@
    - JDK 21(Temurin), HMG-API `v1.1.0-rc.4`(커밋 `31d781b`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
 3. Actions의 release 실행이 `production` 승인을 기다립니다. 실행 화면의 **Review deployments**에서 아래 "승인하기 전에"를 확인하고 승인합니다.
 4. `build` job(배포 키 있음, 저장소 읽기만)이 돕니다.
-   - JDK 21, Android SDK(`build-tools;37.0.0`, `platforms;android-19`), HMG-API를 준비합니다.
+   - JDK 21, Android SDK(`build-tools;37.0.0`, `platforms;android-19`), HMG-API 소스를 준비합니다.
+   - 키를 꺼내기 전에 HMG-API USB 묶음을 받아 확인합니다(아래 "HMG-API를 USB 묶음에 함께").
    - 배포 키를 러너 임시 폴더의 파일로 꺼내고(umask 077), `scripts/build-app.sh`, `scripts/build.sh`를 돌립니다.
-   - 앱 서명 인증서가 `.github/release/app-cert.sha256`과 같은지, 모드가 `.github/release/mod.key.pub`의 UUID로 서명됐는지 봅니다. 하나라도 다르면 멈춥니다.
+   - 다음을 봅니다. 하나라도 다르면 멈춥니다.
+     - 앱 서명 인증서가 `.github/release/app-cert.sha256`과 같은지
+     - 모드가 `.github/release/mod.key.pub`의 UUID로 서명됐는지
+     - USB 묶음의 맨 위 설치기가 `usb/troubleShooter`이고, HMG-API 설치기(`NX4/hmgapi/troubleShooter`)와 같은 판의 payload가 함께 들었으며, `HMGAPI/updates`는 없는지
    - 키 파일을 지우고, 두 zip만 다음 job에 넘깁니다.
 5. `publish` job(배포 키 없음, 저장소 쓰기)이 릴리스를 만들어 두 파일을 올립니다. 릴리스 글에는 다음이 들어갑니다.
    - 파일 설명
    - 모드 UUID, 앱 서명 인증서 SHA-256
    - busybox를 넣었는지
+   - 필요한 HMG-API 최소 판, 함께 넣은 HMG-API 판과 그 대응 소스(커밋)
    - 소스 커밋
    - 두 파일의 SHA-256
    - 자동 변경 목록
@@ -101,7 +106,24 @@ gh variable set NX4_PKG_ZIP_URL --body https://github.com/StopDragon/korea-proje
 
 - 워크플로는 그 zip의 `bin/busybox`가 [`NOTICE.md`](../NOTICE.md#busybox-gpl-20)에 적은 SHA-256과 같을 때만 씁니다. 라이선스 안내(`bin/busybox-LICENSE.txt`)가 없으면 `build.sh`가 멈춥니다.
 - 위 주소의 zip 안을 이 문서를 쓰며 열어 보지는 않았습니다. 처음에는 베타 태그로 확인합니다.
-- HMG-API USB 묶음(`HMGAPI_USB_ZIP`)은 CI에서 넣지 않습니다. 그래서 USB 묶음에는 NX4 KOR만 들어갑니다. HMG-API가 없는 차에는 HMG-API를 먼저 설치해야 합니다.
+
+### HMG-API를 USB 묶음에 함께
+
+릴리스의 USB 묶음에는 HMG-API USB 묶음이 함께 들어갑니다. 그래서 HMG-API가 없는 차도 USB 하나로 설치합니다.
+
+- **차에서:** NX4 KOR 설치기(`usb/troubleShooter`)가 HMG-API를 먼저 봅니다([`design.md`](design.md) "설치·업데이트·지우기").
+  - HMG-API가 없거나 모드의 최소 판(`mod/mod.json` `hmgapi`)보다 낮으면, 첫 Update OTA에서 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)를 대신 돌립니다. HMG-API가 설치(또는 업데이트)되고 재부팅되면 같은 USB로 한 번 더 누릅니다.
+  - 낮은 판일 때는 따로 설치된 무선 모드를 지우기 전에 넘기므로, 설치가 거절되어 무선 모드만 사라지는 일이 없습니다.
+  - 최소 판 이상이면 한 번에 NX4 KOR를 설치합니다.
+- **HMG-API 앱으로 모드를 넣는 길을 쓰지 않는 까닭:** HMG-API 문서의 방법(USB `HMGAPI/updates/`에 모드 zip, 앱의 "Check USB updates")은 HMG-API 앱을 열어야 합니다. 그런데 HMG-API에 NX4 map이 없어 처음에는 앱 타일이 생기지 않습니다(NEMESIS나 adb가 있어야 엽니다).
+- **어떻게 넣나:** 워크플로 맨 위 `HMGAPI_USB_URL`(HMG-API 릴리스의 `hmgapi-<판>-usb.zip`)을 받습니다. 다음 둘이 맞을 때만 `HMGAPI_USB_ZIP`으로 `scripts/build.sh`에 넘깁니다.
+  - 파일의 SHA-256이 `HMGAPI_USB_SHA256`과 같은지
+  - 그 안의 `HMGAPI/install/payload/VERSION`이 `HMGAPI_COMMIT` 소스의 판(`Engine.java`의 `HMGAPI_VERSION`)과 같은지
+  - 그 판이 모드의 최소 판을 채우는지(비교는 `usb/troubleShooter`의 `vlt`·`hmg_meets`를 그대로 씁니다). 못 채우면 설치기가 낮은 HMG-API를 올릴 수 없습니다
+- **싣지 않는 것:** HMG-API 스틱의 `HMGAPI/updates/`(HMG-API 앱용 업데이트와 공식 모드 묶음: `wireless-carplay-aa`, `adb`, `nemesis-shortcut`)와 `NEMESIS.data`는 `build.sh`가 뺍니다. HMG-API 설치기는 `HMGAPI/install`만 씁니다. `wireless-carplay-aa`는 이 모드와 함께 둘 수 없습니다. 서명 확인 step이 `HMGAPI/updates`가 없는지도 봅니다.
+- **배포 키를 가진 job이 받는 까닭:** `build.sh`가 USB 묶음을 만들 때 넣어야 해서 `build` job에서 받습니다. 키를 꺼내기 전에 받고, 그 안의 것은 실행하지 않습니다. 풀어서 USB 묶음에 옮겨 담기만 합니다.
+- **라이선스:** HMG-API(AGPL-3.0)에서 설치에 쓰는 것만 고치지 않고 함께 배포합니다. `build.sh`가 USB 맨 위 `HMGAPI-SOURCE.txt`에 판, 대응 소스(태그), 뺀 것을 적습니다. 릴리스 글에는 대응 소스를 `HMGAPI_COMMIT`(커밋)으로 적습니다. 태그는 옮겨질 수 있기 때문입니다.
+- **PC 빌드:** `.env.local`의 `HMGAPI_USB_ZIP`이 없으면 NX4 KOR만 넣습니다.
 
 ## production 환경 (처음 한 번, 저장소 관리자)
 
@@ -181,7 +203,7 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
 | 모드 폴더의 `build.sh`: HMG-API `mkmodpkg.sh`가 서명 키를 받은 채로 실행하고, 패키지에서는 빼서 결과물에 남지 않음 | 이 모드는 그 파일을 쓰지 않습니다. `scripts/build.sh`가 `mod/build.sh`를 보면 만들지 않고 멈춥니다(`check`의 시험 빌드에서도 멈춥니다). 이 확인을 없애는 변경은 `scripts/`에 있으므로 아래 diff에 보입니다 |
 | 시험 코드(`tests/`)가 키를 읽음 | 시험은 키가 없는 `check` job에서, 다른 러너로 돕니다. `build` job은 시험을 돌리지 않습니다 |
 | 포크의 PR | 포크 PR에는 secret이 가지 않습니다. 이 저장소는 `pull_request_target`을 쓰지 않습니다 |
-| job이 받아 돌리는 남의 코드(액션, HMG-API) | 액션과 HMG-API를 커밋 SHA로 고정합니다. busybox zip은 돌리지 않고, 파일의 SHA-256을 확인합니다 |
+| job이 받아 돌리는 남의 코드(액션, HMG-API) | 액션과 HMG-API 소스를 커밋 SHA로 고정합니다. busybox zip과 HMG-API USB 묶음은 돌리지 않고, 파일의 SHA-256을 확인합니다. HMG-API USB 묶음은 키를 꺼내기 전에 받습니다 |
 | 키를 가진 job의 토큰으로 저장소를 바꿈 | `build`의 토큰은 읽기만 합니다. 쓰기 토큰은 키가 없는 `publish`에만 둡니다 |
 
 ### 승인하기 전에
@@ -190,7 +212,7 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
 
 - `check` job이 통과했는지 봅니다. 승인 요청은 `check`가 통과한 태그에만 뜹니다.
 - 태그가 기대한 커밋인지 봅니다. 정식 태그는 `main`의 merge commit, 베타 태그는 `release/<판>`의 끝입니다.
-- 지난 릴리스 태그 이후 `build` job에서 도는 코드가 바뀌었으면, 그 변경이 리뷰를 거쳐 합친 것인지 봅니다. 대상은 `.github/`, `scripts/`, `mod/build.sh`(있으면 안 됨), HMG-API 고정 커밋(`HMGAPI_COMMIT`)입니다.
+- 지난 릴리스 태그 이후 `build` job에서 도는 코드가 바뀌었으면, 그 변경이 리뷰를 거쳐 합친 것인지 봅니다. 대상은 `.github/`, `scripts/`, `mod/build.sh`(있으면 안 됨), HMG-API 고정값(`HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`)입니다.
 
   ```sh
   git diff --stat <지난 태그> <이번 태그> -- .github scripts mod/build.sh
@@ -207,7 +229,13 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
 
 - HMG-API 판을 올리면 다음을 함께 바꿉니다.
   - `release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 주석
+  - `release.yml`의 `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`(같은 판의 `hmgapi-<판>-usb.zip`)
   - 이 문서
   - `mod/mod.json` `hmgapi`
+- `HMGAPI_USB_SHA256`은 HMG-API 릴리스의 `SHA256SUMS`나 GitHub이 기록한 파일 digest에서 읽습니다. 받은 파일로 `shasum -a 256`을 돌려 같은지도 봅니다.
+
+  ```sh
+  gh release view v<판> --repo Open-HMG/HMG-API --json assets --jq '.assets[] | select(.name | endswith("-usb.zip")) | .digest | ltrimstr("sha256:")'
+  ```
 - 액션을 올릴 때도 태그가 아니라 커밋 SHA로 적고, 뒤에 판을 주석으로 남깁니다.
 - 러너는 `ubuntu-24.04`로 고정했습니다. Android SDK는 빈 폴더에 정한 판만 받으므로 러너 이미지가 바뀌어도 같은 도구로 만듭니다.

@@ -4,7 +4,7 @@
 - **투싼 NX4 전용입니다.** 다른 차의 map·패치 세트·차 목록을 뺐습니다.
 - **HMG-API 1.1.0-rc.4 이상에 맞췄습니다.** 이 차의 map은 HMG-API가 차에서 만들어 `state/local-map.json`에 둡니다.
 - **제보 기능을 뺐습니다.** 제보 파일, QR, 이슈 자동 분류가 없습니다.
-- **차에서 아직 확인하지 않았습니다**(PC 시험만). 릴리스 묶음은 없어 직접 만듭니다([만들기와 시험](#만들기와-시험)).
+- **차에서 아직 확인하지 않았습니다**(PC 시험만). 시험판 묶음은 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에 있고, 직접 만들 수도 있습니다([만들기와 시험](#만들기와-시험)).
 
 > ⚠️ 차량 소프트웨어를 바꾸는 일입니다. 모든 책임은 설치하신 차주 본인에게 있습니다.
 
@@ -39,23 +39,29 @@
 
 ## 필요한 것
 
-- **HMG-API** 1.1.0-rc.4 이상. USB로 설치합니다.
-- **이 저장소로 만든 USB 묶음** `hmgapi-nx4-kor-버전-usb.zip`([만들기와 시험](#만들기와-시험)).
+- **USB 묶음** `hmgapi-nx4-kor-버전-usb.zip`: 이 저장소의 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에서 받습니다. `v2.0.0-beta.2`부터 **HMG-API**(1.1.0-rc.4)가 함께 들어 있어, HMG-API가 없는 차도 이 USB 하나로 설치합니다. 직접 만들려면 [만들기와 시험](#만들기와-시험).
+  - `v2.0.0-beta.1`에는 HMG-API가 없습니다. 그 묶음을 쓰면 HMG-API [릴리스](https://github.com/Open-HMG/HMG-API/releases)의 `hmgapi-버전-usb.zip`으로 HMG-API를 먼저 설치합니다.
+- **HMG-API는 1.1.0-rc.4 이상**이어야 합니다. 이미 있는 HMG-API가 이보다 낮으면 USB 묶음의 HMG-API로 먼저 올립니다(아래 "설치" 2).
 - FAT32로 포맷한 USB(32GB 이하 권장).
 
 ## 설치
 
-1. **HMG-API 설치:** HMG-API [릴리스](https://github.com/Open-HMG/HMG-API/releases)의 `hmgapi-버전-usb.zip`을 USB 맨 위에 풀고 Engineering Mode → USB Copy → DSP → Update OTA를 누릅니다. 재부팅될 때까지 기다립니다.
-   - USB의 `HMGAPI/install.log`에 `isn't a known stock build`가 있으면 HMG-API 설치기가 이 차의 `app_process`를 모르는 것입니다. 그때는 `HMGAPI/FORCE` 빈 파일을 만들고 다시 합니다(자기 책임).
-2. **NX4 KOR 설치:** `hmgapi-nx4-kor-버전-usb.zip`을 USB 맨 위에 풀고 다시 Update OTA를 누릅니다.
+1. `hmgapi-nx4-kor-버전-usb.zip`을 빈 USB 맨 위에 풉니다.
    ```
    USB
-   ├─ ota_package.tar
-   ├─ README.txt
+   ├─ ota_package.tar          NX4 KOR 설치기
+   ├─ README.txt, LICENSE, NOTICE.md, HMGAPI-README.txt, HMGAPI-SOURCE.txt
+   ├─ HMGAPI                   HMG-API(설치 payload)
    └─ NX4
-       └─ install (hmgapi-nx4-kor.zip, payload)
+       ├─ install              NX4 KOR(hmgapi-nx4-kor.zip, payload)
+       └─ hmgapi               HMG-API 설치기
    ```
-   - 묶음을 HMG-API USB 묶음과 함께 만들었으면(`HMGAPI_USB_ZIP`) 같은 USB로 두 번 하면 됩니다. 첫 번째에 HMG-API를 설치하고 재부팅, 두 번째에 NX4 KOR를 설치합니다.
+2. 시동을 건 채 차를 세우고 USB를 꽂은 뒤 Engineering Mode → USB Copy → DSP → Update OTA를 누릅니다.
+   - **HMG-API가 없는 차:** "NX4 KOR: HMG-API를 먼저 설치합니다"가 나오고 HMG-API가 설치된 뒤 재부팅됩니다. 부팅이 끝나고 1~2분 뒤 **같은 USB로 Update OTA를 한 번 더** 누릅니다.
+   - **HMG-API가 1.1.0-rc.4보다 낮은 차:** "NX4 KOR: HMG-API를 …에서 …(으)로 먼저 올립니다"가 나오고 HMG-API가 업데이트된 뒤 재부팅됩니다. 위와 같이 한 번 더 누릅니다. 이때는 따로 설치한 무선 모드도 아직 지우지 않습니다. USB에 HMG-API가 없으면 아무것도 바꾸지 않고 멈춥니다.
+   - **HMG-API 1.1.0-rc.4 이상인 차:** 바로 NX4 KOR를 설치합니다.
+   - USB의 `HMGAPI/install.log`에 `isn't a known stock build`가 있으면 HMG-API 설치기가 이 차의 `app_process`를 모르는 것입니다. 그때는 `HMGAPI/FORCE` 빈 파일을 만들고 다시 합니다(자기 책임).
+   - HMG-API 앱의 "Check USB updates"로 모드를 넣는 HMG-API 문서의 방법은 처음에는 쓸 수 없습니다. HMG-API에 NX4 map이 없어 HMG-API 앱 타일이 생기지 않기 때문입니다.
 3. 상태 화면이 열리고 설정 진행이 보입니다. OTA 화면의 오류 684는 정상입니다. map을 만들고 확인하는 동안 **3~5분 동안 끄지 마세요.**
 4. "무선 카플레이 설정을 마쳤습니다"가 나오면 **[지금 재부팅]**을 누릅니다(또는 RESET 버튼). 시동만 끄면 내비가 꺼지지 않을 수 있습니다.
 5. 폰에서 무선 카플레이(또는 무선 안드로이드 오토)를 연결합니다.
