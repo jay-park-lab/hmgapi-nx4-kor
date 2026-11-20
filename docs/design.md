@@ -119,4 +119,6 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - 우리 스크립트는 모바일 데이터와 이름 조회를 쓰지 않아 영향이 없을 것으로 봅니다.
   - HMG-API rc.7인 차에서 다음 셋이 되면 이것도 확인한 것으로 봅니다: 우리 핫스팟이 뜨고, 폰이 붙고, 상태 화면이 상태를 읽음.
 
+확인하다 설치가 막히거나 상태 화면이 빨강·노랑이면 [`troubleshooting.md`](troubleshooting.md)를 봅니다.
+
 정하지 않은 것은 [GitHub 이슈](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues?q=is%3Aissue+label%3A%22%EA%B2%B0%EC%A0%95+%ED%95%84%EC%9A%94%22)(라벨 `결정 필요`)에서 관리합니다. 차에서 확인한 결과는 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적습니다.
