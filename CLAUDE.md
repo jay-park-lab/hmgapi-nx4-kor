@@ -10,7 +10,7 @@
 | `docs/design.md` | 설계(모드 구성, 자동 설정, 상태 화면, 재부팅 요청)와 차에서 확인할 것 |
 | `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때(설치기·상태 화면 문구별 할 일, 부팅 보호, 되돌리기, 남길 기록) |
 | `docs/emulator-test.md` | 에뮬레이터에서 상태 화면 앱 시험(SDK·AVD 준비, 시나리오, [지금 재부팅] 흐름, 이 시험이 보지 않는 것) |
-| `docs/git-flow.md` | 브랜치 전략(Git Flow) 규칙, 흐름(워크트리에서 할 때 포함), 강제 장치 |
+| `docs/git-flow.md` | 브랜치 전략(Git Flow) 규칙, 흐름(작업마다 워크트리), 강제 장치 |
 | GitHub 이슈(`gh issue list`) | 정하지 않은 것(라벨 `결정 필요`), 차에서 확인할 일(`차 확인`), 릴리스 일(`릴리스`). 결정을 기다리는 일과 이후 할 일은 모두 여기 |
 | `docs/release.md` | 태그로 도는 배포 워크플로(`.github/workflows/release.yml`), 배포 키 secret, `production` 환경, 키 백업, 유출 위험 |
 | `wireless/README.md` | 합친 무선 모드(한국 차 빌드 2.4.5)의 출처, 공식 판과의 비교 |
@@ -32,11 +32,16 @@
 
 [`docs/git-flow.md`](docs/git-flow.md)의 규칙을 따릅니다. 특히:
 
-- 파일을 고치기 전에 현재 브랜치를 확인합니다. `main`이나 `develop`이면 고치지 말고 먼저 알맞은 작업 브랜치(보통 `develop`에서 만든 `feature/<주제>`)로 옮깁니다. `develop`이 아직 없으면 사용자에게 알리고 어떻게 할지 묻습니다.
+- **작업은 워크트리를 따로 만들어 시작합니다**([`docs/git-flow.md`](docs/git-flow.md) 규칙 11, "워크트리").
+  - 파일을 고치는 일을 시작할 때 메인 체크아웃에서 브랜치를 바꾸지 않습니다.
+  - `git fetch origin`, `git worktree add --no-track -b feature/<주제> .claude/worktrees/<주제> origin/develop` 순서로 워크트리를 만듭니다. 그다음 `EnterWorktree`의 `path`로 들어가 그 안에서 고칩니다. `EnterWorktree`의 `name`으로 만들지 않습니다(`main`에서 규칙에 맞지 않는 브랜치를 만듦).
+  - 메인 체크아웃은 `develop`에 두고 고치지 않습니다. 읽기만 하는 일은 메인 체크아웃에서 해도 됩니다.
+  - 메인 체크아웃에 내가 하지 않은 커밋하지 않은 변경이 있으면 다른 작업의 것이니 건드리지 않습니다.
+  - 데스크톱 앱이 처음부터 워크트리로 연 세션이면 그 안에서 `git switch --no-track -c feature/<주제> origin/develop`으로 작업 브랜치를 만듭니다.
 - `main`·`develop`에 직접 커밋·푸시하지 않습니다. PR의 `--base`는 `feature/` → `develop`, `release/`·`hotfix/` → `main`과 `develop`입니다.
 - 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는 `release/`·`hotfix/`에서만 바꿉니다.
 - 커밋·푸시·PR·태그는 사용자가 시킬 때만 합니다.
-- 워크트리(`.claude/worktrees/*` 등 메인 체크아웃이 아닌 작업 트리)에서 돌면 [`docs/git-flow.md`](docs/git-flow.md) "워크트리에서 할 때"를 따릅니다. 작업 브랜치는 `origin/develop`에서 만들고, 로컬 `develop`·`main`·`release/*`를 `git fetch origin <브랜치>:<브랜치>`로 옮기지 않습니다(다른 트리에 열린 브랜치면 그 트리가 어긋남).
+- 로컬 `develop`·`main`·`release/*`를 `git fetch origin <브랜치>:<브랜치>`로 옮기지 않습니다(다른 트리에 열린 브랜치면 그 트리가 어긋남). 메인 체크아웃의 `develop`은 메인 체크아웃에서 `git pull --ff-only`로 맞춥니다.
 
 ## 저장소 밖 경로
 

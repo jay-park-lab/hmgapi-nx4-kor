@@ -34,10 +34,15 @@
    - 상태 화면 앱을 바꾼 PR: [`docs/emulator-test.md`](emulator-test.md)의 시나리오와 [지금 재부팅] 흐름
 9. **강제 푸시(`--force`)는 `main`·`develop`에 하지 않습니다.** 작업 브랜치도 PR을 연 뒤에는 하지 않습니다.
 10. **합친 작업 브랜치는 지웁니다.** `release/`·`hotfix/`는 `main`과 `develop` 양쪽에 합친 뒤에 지웁니다.
+11. **작업은 작업 브랜치마다 워크트리를 따로 만들어 시작합니다.** 만들고 지우는 법은 아래 "워크트리"에 있습니다.
+    - 메인 체크아웃(저장소를 받은 폴더)은 `develop`에 둡니다. 브랜치를 바꾸지 않고, 파일도 고치지 않습니다.
+    - 읽기만 하는 일(조사, 질문에 답하기, PR 보기)은 메인 체크아웃에서 해도 됩니다.
+    - 까닭: 한 체크아웃에서 브랜치를 바꿔 가며 일하면 여러 세션(사람·Claude)이 같은 파일과 HEAD를 함께 씁니다. 그러면 한쪽의 커밋하지 않은 변경이 다른 쪽의 브랜치로 따라갑니다(2026-11-20: 한 세션이 메인 체크아웃을 `feature/` 브랜치로 바꿔 둔 사이, 다른 작업이 같은 체크아웃에서 `docs/release.md`를 고침).
+    - 메인 체크아웃에 내가 하지 않은 커밋하지 않은 변경이 있으면 다른 작업의 것입니다. 건드리지 않습니다.
 
 ## 흐름
 
-명령은 한 줄씩 차례로 칩니다. PR은 `gh`로 만들며 `--base`를 늘 적습니다(GitHub 기본 브랜치는 사용자가 보는 `main`이므로 빠뜨리면 `main`으로 갑니다).
+명령은 한 줄씩 차례로 칩니다. 메인 체크아웃의 맨 위 폴더에서 시작합니다. PR은 `gh`로 만들며 `--base`를 늘 적습니다(GitHub 기본 브랜치는 사용자가 보는 `main`이므로 빠뜨리면 `main`으로 갑니다).
 
 Claude로 PR을 올리고 리뷰·합치기까지 할 때는 `pr-review-cycle` 스킬(`.claude/skills/pr-review-cycle/`)이 이 규칙대로 진행합니다.
 
@@ -46,33 +51,35 @@ Claude로 PR을 올리고 리뷰·합치기까지 할 때는 `pr-review-cycle` �
 ### 기능 (`feature/`)
 
 ```sh
-git switch develop
-git pull --ff-only
-git switch -c feature/<주제>
+git fetch origin
+git worktree add --no-track -b feature/<주제> .claude/worktrees/<주제> origin/develop
+cd .claude/worktrees/<주제>
 # 고치고 커밋
 git push -u origin feature/<주제>
 gh pr create --base develop --head feature/<주제>
 ```
 
-합친 뒤:
+`--no-track`을 주면 새 브랜치가 `origin/develop`을 따라가지 않습니다. 첫 `git push -u` 뒤에는 자기 원격 브랜치를 따라갑니다.
+
+합친 뒤, 메인 체크아웃에서:
 
 ```sh
-git switch develop
 git pull --ff-only
+git worktree remove .claude/worktrees/<주제>
 git branch -d feature/<주제>
 ```
 
 ### 릴리스 (`release/`)
 
 ```sh
-git switch develop
-git pull --ff-only
-git switch -c release/<판>
+git fetch origin
+git worktree add --no-track -b release/<판> .claude/worktrees/release-<판> origin/develop
+cd .claude/worktrees/release-<판>
 # mod/mod.json version, app/AndroidManifest.xml versionName·versionCode를 올리고 커밋
 git push -u origin release/<판>
 ```
 
-차에서 확인할 묶음이 필요하면:
+차에서 확인할 묶음이 필요하면 그 워크트리에서:
 
 ```sh
 git tag -a v<판>-beta.<n> -m "NX4 KOR <판> beta <n>"
@@ -80,52 +87,66 @@ git push origin v<판>-beta.<n>
 # Actions의 release 실행을 승인하면 시험판 릴리스에 묶음이 올라갑니다(release.md)
 ```
 
-확인이 끝나면 `main`에 합치고 태그를 답니다.
+확인이 끝나면 `main`에 합치고 태그를 답니다. 로컬 `main`으로 바꾸지 않고, 합친 merge commit에 바로 답니다.
 
 ```sh
 gh pr create --base main --head release/<판>
-# 합친 뒤
-git switch main
-git pull --ff-only
-git tag -a v<판> -m "NX4 KOR <판>"
+# 합친 뒤. <merge commit>은 gh pr view <PR> --json mergeCommit -q .mergeCommit.oid
+git fetch origin
+git tag -a v<판> -m "NX4 KOR <판>" <merge commit>
 git push origin v<판>
 # Actions의 release 실행을 승인하면 릴리스에 묶음이 올라갑니다(release.md)
 gh pr create --base develop --head release/<판>
 ```
 
-`develop`에도 합친 뒤 `release/<판>`을 지웁니다.
+`develop`에도 합친 뒤, 메인 체크아웃에서 `git pull --ff-only`, `git worktree remove .claude/worktrees/release-<판>`, `git branch -d release/<판>` 순서로 지웁니다.
 
 ### 핫픽스 (`hotfix/`)
 
 ```sh
-git switch main
-git pull --ff-only
-git switch -c hotfix/<판>
+git fetch origin
+git worktree add --no-track -b hotfix/<판> .claude/worktrees/hotfix-<판> origin/main
+cd .claude/worktrees/hotfix-<판>
 # 고치고, 판 번호(셋째 자리)를 올리고 커밋
 git push -u origin hotfix/<판>
 gh pr create --base main --head hotfix/<판>
-# 합친 뒤 main에 v<판> 태그(릴리스와 같음)
+# 합친 뒤 merge commit에 v<판> 태그(릴리스와 같음)
 gh pr create --base develop --head hotfix/<판>
 ```
 
-### 워크트리에서 할 때
+지우는 법은 릴리스와 같습니다.
 
-Claude 세션이 메인 체크아웃이 아닌 작업 트리(`.claude/worktrees/*` 등)에서 돌 때입니다. 한 저장소의 브랜치는 한 트리에서만 열 수 있어서, `develop`·`main`이 메인 체크아웃에 열려 있으면 위의 `git switch develop`을 쓸 수 없습니다. 어느 트리에 무엇이 열려 있는지는 `git worktree list`로 봅니다.
+### 워크트리
 
-```sh
-git fetch origin
-git switch -c feature/<주제> origin/develop
-# 고치고 커밋, 푸시, PR은 위와 같음
-```
+규칙 11대로 작업마다 워크트리를 따로 만듭니다. 한 저장소의 브랜치는 한 트리에서만 열 수 있습니다. 메인 체크아웃에는 `develop`이 열려 있으므로 다른 트리에서는 `git switch develop`을 쓸 수 없습니다. 어느 트리에 무엇이 열려 있는지는 `git worktree list`로 봅니다(첫 줄이 메인 체크아웃).
 
-합친 뒤:
+- **폴더:** `.claude/worktrees/<이름>`에 만듭니다(git이 무시하는 폴더). 이름은 `feature/<주제>`면 `<주제>`, `release/<판>`·`hotfix/<판>`이면 `release-<판>`·`hotfix-<판>`입니다.
+- **다른 브랜치에서 시작하는 일:** 사용자가 정한 예외로 `release/<판>`에 넣는 `feature/` 브랜치 등이 그렇습니다. 같은 방법으로 만들고 시작점만 `origin/<그 브랜치>`로 바꿉니다.
+- **Claude 세션:**
+  - 메인 체크아웃에서 시작한 세션은 위 `git worktree add`로 만든 뒤 `EnterWorktree`의 `path`로 그 워크트리에 들어가 작업합니다.
+  - `EnterWorktree`의 `name`으로 새로 만들지 않습니다. 그 길은 GitHub 기본 브랜치(`main`)에서 규칙 2에 맞지 않는 이름의 브랜치를 만듭니다.
+  - 지울 때는 `ExitWorktree`(`keep`)로 메인 체크아웃에 돌아온 뒤 위의 `git worktree remove`를 합니다. `path`로 들어간 워크트리는 `ExitWorktree`가 지우지 않습니다.
+- **데스크톱 앱이 워크트리로 연 세션:** 앱이 처음부터 `.claude/worktrees/<이름>`(브랜치 `claude/<이름>`)에서 연 세션은 이미 따로 떨어져 있습니다. 그 안에서 작업 브랜치를 만듭니다. 워크트리 폴더는 앱이 정리합니다.
 
-```sh
-git fetch origin
-git switch --detach origin/develop
-git branch -d feature/<주제>
-```
+  ```sh
+  git fetch origin
+  git switch --no-track -c feature/<주제> origin/develop
+  # 고치고 커밋, 푸시, PR은 위와 같음
+  ```
 
+  합친 뒤:
+
+  ```sh
+  git fetch origin
+  git switch --detach origin/develop
+  git branch -d feature/<주제>
+  ```
+
+- **지울 때:**
+  - 워크트리에 커밋하지 않은 변경이나 git이 모르는 파일이 있으면 `git worktree remove`가 멈춥니다. `--force`로 지우지 말고 무엇이 남았는지 봅니다.
+  - git이 무시하는 빌드 결과(`out/`, `mod/app/`)는 워크트리와 함께 지워집니다.
+  - 다른 세션의 워크트리(`git worktree list`의 다른 줄)는 건드리지 않습니다.
+- **stash:** stash 목록은 모든 트리가 함께 씁니다. 맨 `git stash`·`git stash pop`은 다른 트리가 넣은 것을 꺼낼 수 있습니다. 커밋하지 않은 변경을 다른 트리로 옮길 때는 `git stash push -u -m <고유한 이름>`으로 넣고, 옮길 트리에서 그 항목의 SHA로 `git stash apply <SHA>` 합니다. 옮긴 것을 확인한 뒤 그 항목만 지웁니다.
 - **로컬 `develop`·`main`·`release/*`를 `git fetch origin <브랜치>:<브랜치>`나 `git update-ref`로 옮기지 않습니다.**
   - 이 PC의 git 2.33은 다른 트리에 열린 브랜치도 막지 않고 옮깁니다. 그러면 그 트리는 HEAD만 새 커밋으로 가고 파일과 인덱스는 예전 그대로 남습니다.
   - 그 트리의 `git status`에는 방금 합친 PR을 되돌리는 스테이징 변경으로 보이고, 그대로 브랜치를 만들어 커밋하면 PR이 되돌려집니다(2026-11-20, #11·#29를 합친 뒤 두 번 일어남, [#25](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/25)).
@@ -140,7 +161,7 @@ git branch -d feature/<주제>
 
 | 장치 | 막는 것 | 상태 |
 |---|---|---|
-| `CLAUDE.md`의 브랜치 규칙 | Claude가 `main`·`develop`에서 작업, 이름이 틀린 브랜치, `feature/`에서 판 번호 바꾸기 | 적용됨 |
+| `CLAUDE.md`의 브랜치 규칙 | Claude가 `main`·`develop`에서 작업, 메인 체크아웃에서 브랜치를 바꿔 작업(규칙 11), 이름이 틀린 브랜치, `feature/`에서 판 번호 바꾸기 | 적용됨 |
 | GitHub 브랜치 보호(`main`, `develop`) | 직접 푸시, PR 없이 합치기, 강제 푸시, 브랜치 삭제(관리자 포함) | 아직 걸려 있지 않음(2026-11-20 확인). 클래식 브랜치 보호는 없습니다. 브랜치 ruleset `main-protetion`(`main`: 삭제·강제 푸시 금지)과 `develop`(삭제·강제 푸시 금지·PR 필수)은 만들어져 있지만 꺼져 있고, 둘 다 사용자 예외가 있습니다. 무엇으로 걸지는 [#16](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/16), 클래식 보호는 아래 "처음 한 번" 3 |
 | GitHub 저장소 설정 | squash·rebase 합치기, 합친 브랜치 남기기 | 합친 브랜치 자동 삭제는 켜짐. squash·rebase 합치기는 아직 허용됨(2026-11-20 확인). 아래 "처음 한 번" 2 |
 | release 워크플로의 확인([`release.md`](release.md)) | 태그와 판 번호가 다른 묶음, `main`에 없는 정식 태그, 이미 낸 릴리스 다시 만들기, 커밋하지 않은 수정, `mod-test.sh` 실패, 다른 키로 서명한 앱·모드 | `develop`에 있음(#4, 2026-11-20). `v2.0.0-beta.1`(`release/2.0.0`의 `407ab2f`)에서 처음 돌았고, 태그 확인·PC 시험, 서명한 묶음 만들기(`production` 승인 뒤), GitHub 릴리스가 모두 성공했습니다(실행 `44652653040`, 2026-11-20 확인) |
