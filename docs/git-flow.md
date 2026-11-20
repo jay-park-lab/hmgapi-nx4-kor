@@ -115,7 +115,7 @@ gh pr create --base develop --head hotfix/<판>
 | `CLAUDE.md`의 브랜치 규칙 | Claude가 `main`·`develop`에서 작업, 이름이 틀린 브랜치, `feature/`에서 판 번호 바꾸기 | 적용됨 |
 | GitHub 브랜치 보호(`main`, `develop`) | 직접 푸시, PR 없이 합치기, 강제 푸시, 브랜치 삭제(관리자 포함) | 아직 걸려 있지 않음(2026-11-20 확인). 클래식 브랜치 보호는 없습니다. 브랜치 ruleset `main-protetion`(`main`: 삭제·강제 푸시 금지)과 `develop`(삭제·강제 푸시 금지·PR 필수)은 만들어져 있지만 꺼져 있고, 둘 다 사용자 예외가 있습니다. 무엇으로 걸지는 [`open-issue.md`](open-issue.md) OI-4, 클래식 보호는 아래 "처음 한 번" 3 |
 | GitHub 저장소 설정 | squash·rebase 합치기, 합친 브랜치 남기기 | 합친 브랜치 자동 삭제는 켜짐. squash·rebase 합치기는 아직 허용됨(2026-11-20 확인). 아래 "처음 한 번" 2 |
-| release 워크플로의 확인([`release.md`](release.md)) | 태그와 판 번호가 다른 묶음, `main`에 없는 정식 태그, 이미 낸 릴리스 다시 만들기, 커밋하지 않은 수정, `mod-test.sh` 실패, 다른 키로 서명한 앱·모드 | `develop`에 있음(#4, 2026-11-20). `v*` 태그를 아직 달지 않아 GitHub에서 한 번도 돌지 않았습니다 |
+| release 워크플로의 확인([`release.md`](release.md)) | 태그와 판 번호가 다른 묶음, `main`에 없는 정식 태그, 이미 낸 릴리스 다시 만들기, 커밋하지 않은 수정, `mod-test.sh` 실패, 다른 키로 서명한 앱·모드 | `develop`에 있음(#4, 2026-11-20). `v2.0.0-beta.1`(`release/2.0.0`의 `407ab2f`)에서 처음 돌았고, 태그 확인·PC 시험, 서명한 묶음 만들기(`production` 승인 뒤), GitHub 릴리스가 모두 성공했습니다(실행 `44652653040`, 2026-11-20 확인) |
 | GitHub `production` 환경(필수 리뷰어, 배포 ref `v*` 태그) | 승인 없이, 또는 `v*` 태그가 아닌 곳에서 배포 키를 쓰는 job | 적용됨(2026-11-20 확인): 필수 리뷰어 parkjoos(자기 승인 허용), 배포 ref는 `v*` 태그만, secret 세 개 있음. 관리자는 이 보호를 건너뛸 수 있습니다(`can_admins_bypass` 기본값). [`release.md`](release.md) "production 환경" |
 | GitHub 태그 ruleset 두 개(`refs/tags/v*`) | 관리자가 아닌 사람의 `v*` 태그 만들기, 관리자를 포함한 누구든 태그 옮기기·지우기 | 적용됨(2026-11-20 확인): `release tags: create`(만들기 막음, 관리자 예외), `release tags: immutable`(옮기기·지우기 막음, 예외 없음). [`release.md`](release.md) "`v*` 태그 보호" |
 

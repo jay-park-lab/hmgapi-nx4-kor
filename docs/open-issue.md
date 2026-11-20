@@ -28,7 +28,13 @@
 - 지금: HMG-API 1.1.0-rc.4에서만 확인했습니다(`tests/mod-test.sh`의 빌드·HMG-API 엔진 시험). `mod/mod.json`의 `hmgapi`가 `>=1.1.0-rc.4`라 rc.5에도 설치됩니다. rc.5 태그가 나온 것만 확인했고 시험은 하지 않았습니다.
 - 할 일: rc.5 소스를 `HMGAPI_SRC`로 주고 `tests/mod-test.sh`를 돌립니다.
 - 정할 것: rc.5를 지원 판으로 적을지, 최소 판을 올릴지, 그대로 둘지.
-- 정하면 함께 바꿀 곳: 배포 워크플로도 HMG-API rc.4를 커밋으로 고정해 시험·빌드합니다. rc.5로 옮기면 `.github/workflows/release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 그 주석, `docs/release.md`의 판·커밋 표기도 바꿉니다. 최소 판을 올리면 `mod/mod.json` `hmgapi`와 `mod/svc/hotspot.sh` `HMG_MIN`도 바꿉니다(`tests/mod-test.sh`가 둘이 같은지 봄).
+- 정하면 함께 바꿀 곳:
+  - **시험·빌드에 쓰는 HMG-API를 rc.5로 옮기면:** 배포 워크플로도 HMG-API rc.4를 커밋으로 고정해 시험·빌드합니다. `.github/workflows/release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 그 주석, 단계 이름 두 곳("HMG-API 소스 (v1.1.0-rc.4)"), `docs/release.md`의 판·커밋 표기를 바꿉니다.
+  - **최소 판을 올리면:** `1.1.0-rc.4`가 적힌 곳을 모두 바꿉니다(`git grep -n '1\.1\.0-rc\.4'`).
+    - 모드: `mod/mod.json` `hmgapi`, `mod/svc/hotspot.sh` `HMG_MIN`
+    - 상태 화면 앱: `app/java/io/github/jayparklab/nx4kor/Report.java` `MIN_HMGAPI`(차주에게 "… 이상 필요"를 보이는 값). 앱을 바꾸므로 `app/AndroidManifest.xml`의 판 번호도 올려야 하고, 그래서 `release/`에서 할 일입니다(`docs/git-flow.md` 규칙 4).
+    - 시험: `tests/mod-test.sh`는 `mod.json`과 `HMG_MIN`을 서로 비교하지 않고 각각을 `1.1.0-rc.4` 글자 그대로와 비교합니다. 그 두 곳과 `oldhmgapi` 판정 시험, `tests/ReportTest.java`의 기대값을 함께 고칩니다.
+    - 문서: `README.md`(맨 위와 "필요한 것"), `usb/README.txt`, `docs/design.md`(모드 구성 표의 `hmgapi`). `docs/design.md` 맨 위의 "1.1.0-rc.4 엔진에서만 확인"은 시험한 판이므로, 다른 판으로 다시 시험했을 때 고칩니다.
 
 ### OI-3. 무선 모드를 공식 v2.2.0-rc.5 위로 옮길지
 
