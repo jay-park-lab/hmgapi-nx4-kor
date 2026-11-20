@@ -4,6 +4,14 @@
 채워 보낸다. 리뷰어는 이 대화를 모르므로 필요한 것은 지시문과 아래 "리뷰어 규칙" 절에 모두 있어야 한다. 내 판단이나
 예상 문제는 넣지 않는다.
 
+경로 빈칸 두 개는 서로 다른 곳일 수 있다.
+
+- `<로컬 체크아웃>`: 리뷰어를 띄우는 세션의 작업 트리 절대 경로. 리뷰어 셸은 여기서 시작하고, "순서 0" 은 `pwd` 가
+  이 값과 다르면 멈춘다. 메인 체크아웃에서 도는 세션이면 메인 체크아웃, 워크트리 세션(`.claude/worktrees/*`)이면 그
+  워크트리다(2026-11-20 #11 에서 워크트리 세션이 메인 체크아웃을 적어 리뷰어가 멈춘 일이 있었다).
+- `<개인 설정 파일>`: `.env.local` 이 실제로 있는 절대 경로. git 이 무시하는 파일이라 워크트리에는 없으므로, 워크트리
+  세션이면 보통 `<메인 체크아웃>/.env.local` 이다. 메인 체크아웃 세션이면 `<로컬 체크아웃>/.env.local`.
+
 ## 첫 리뷰
 
 ```text
@@ -12,11 +20,11 @@ PR #<PR> 를 리뷰해 PR 에 리뷰를 올리고, 짧은 알림만 돌려주세
 - 저장소: jay-park-lab/hmgapi-nx4-kor (github.com). base <base 브랜치>, head <브랜치> (<head SHA>)
 - 브랜치 종류: <feature | release | hotfix>
 - PR: <PR URL>
-- 로컬 체크아웃: <체크아웃 절대 경로>. 읽기만 하고 파일은 바꾸지 마세요.
-- 개인 설정 파일: <체크아웃 절대 경로>/.env.local. 시험에 쓸 경로(HMGAPI_SRC 등)가 있습니다. 내용을 출력하지 마세요.
+- 로컬 체크아웃: <로컬 체크아웃>. 당신 셸이 시작하는 곳입니다. 읽기만 하고 파일은 바꾸지 마세요.
+- 개인 설정 파일: <개인 설정 파일>. 시험에 쓸 경로(HMGAPI_SRC 등)가 있습니다. 내용을 출력하지 마세요.
 - 저장소 규칙: CLAUDE.md, docs/git-flow.md, docs/design.md
 
-리뷰 방법은 <체크아웃 절대 경로>/.claude/skills/pr-review-cycle/references/reviewer-brief.md 의
+리뷰 방법은 <로컬 체크아웃>/.claude/skills/pr-review-cycle/references/reviewer-brief.md 의
 "리뷰어 규칙" 절을 읽고 그대로 따라 주세요.
 ```
 
@@ -40,7 +48,7 @@ PR 에 리뷰를 올린 뒤 짧은 알림만 돌려주세요.
   4. CI 결과(없으면 없다고)
 - 리뷰어 규칙이 지난번 뒤 바뀐 것: <바뀐 절과 요지, 없으면 "없음">
 
-리뷰 방법은 <체크아웃 절대 경로>/.claude/skills/pr-review-cycle/references/reviewer-brief.md 의
+리뷰 방법은 <로컬 체크아웃>/.claude/skills/pr-review-cycle/references/reviewer-brief.md 의
 "리뷰어 규칙" 절을 이번에도 처음부터 다시 읽고 따라 주세요. 기억에 기대지 마세요.
 ```
 
@@ -90,11 +98,11 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
      이 경로가 `<W>` 다.
    - 워크트리 안의 스크립트는 **절대 경로로** 부른다. 이 저장소의 PC 스크립트는 자기 위치(`dirname "$0"`)로
      저장소 루트를 찾으므로, 절대 경로로 부르면 `cd` 없이도 워크트리 기준으로 돈다. 워크트리에는 `.env.local` 이
-     없으므로 체크아웃의 것을 `NX4_ENV_FILE` 로 가리킨다.
-     - 늘: `NX4_ENV_FILE=<체크아웃>/.env.local sh <W>/tests/mod-test.sh` ("모두 통과"인지, 빌드·HMG-API 엔진 시험이
+     없으므로 지시문의 "개인 설정 파일" 을 `NX4_ENV_FILE` 로 가리킨다.
+     - 늘: `NX4_ENV_FILE=<개인 설정 파일> sh <W>/tests/mod-test.sh` ("모두 통과"인지, 빌드·HMG-API 엔진 시험이
        돌았는지 "skip" 줄로 확인)
      - `app/` 를 바꿨으면: 임시 키 폴더(`mktemp -d`)로
-       `NX4_ENV_FILE=<체크아웃>/.env.local NX4_APP_KEYS=<임시 키 폴더> sh <W>/scripts/build-app.sh`
+       `NX4_ENV_FILE=<개인 설정 파일> NX4_APP_KEYS=<임시 키 폴더> sh <W>/scripts/build-app.sh`
    - PR 본문이나 답글이 주장하는 것(수치, "고쳤다", "실패를 잡는다")은 재현해 확인한다. 시험이 늘 통과하는
      시험이 아닌지, 일부러 깨뜨려 실패하는지도 본다. 깨뜨릴 때는 `<W>/…` 의 파일을 절대 경로로 고치고, 체크아웃의
      파일은 건드리지 않는다.

@@ -10,7 +10,7 @@
 | `docs/design.md` | 설계(모드 구성, 자동 설정, 상태 화면, 재부팅 요청)와 차에서 확인할 것 |
 | `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때(설치기·상태 화면 문구별 할 일, 부팅 보호, 되돌리기, 남길 기록) |
 | `docs/emulator-test.md` | 에뮬레이터에서 상태 화면 앱 시험(SDK·AVD 준비, 시나리오, [지금 재부팅] 흐름, 이 시험이 보지 않는 것) |
-| `docs/git-flow.md` | 브랜치 전략(Git Flow) 규칙, 흐름, 강제 장치 |
+| `docs/git-flow.md` | 브랜치 전략(Git Flow) 규칙, 흐름(워크트리에서 할 때 포함), 강제 장치 |
 | GitHub 이슈(`gh issue list`) | 정하지 않은 것(라벨 `결정 필요`), 차에서 확인할 일(`차 확인`), 릴리스 일(`릴리스`). 결정을 기다리는 일과 이후 할 일은 모두 여기 |
 | `docs/release.md` | 태그로 도는 배포 워크플로(`.github/workflows/release.yml`), 배포 키 secret, `production` 환경, 키 백업, 유출 위험 |
 | `wireless/README.md` | 합친 무선 모드(한국 차 빌드 2.4.5)의 출처, 공식 판과의 비교 |
@@ -36,10 +36,12 @@
 - `main`·`develop`에 직접 커밋·푸시하지 않습니다. PR의 `--base`는 `feature/` → `develop`, `release/`·`hotfix/` → `main`과 `develop`입니다.
 - 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는 `release/`·`hotfix/`에서만 바꿉니다.
 - 커밋·푸시·PR·태그는 사용자가 시킬 때만 합니다.
+- 워크트리(`.claude/worktrees/*` 등 메인 체크아웃이 아닌 작업 트리)에서 돌면 [`docs/git-flow.md`](docs/git-flow.md) "워크트리에서 할 때"를 따릅니다. 작업 브랜치는 `origin/develop`에서 만들고, 로컬 `develop`·`main`·`release/*`를 `git fetch origin <브랜치>:<브랜치>`로 옮기지 않습니다(다른 트리에 열린 브랜치면 그 트리가 어긋남).
 
 ## 저장소 밖 경로
 
 - Android SDK, 서명 키, HMG-API 소스 같은 PC 경로는 코드와 문서에 기본값으로 적지 않습니다.
 - PC 스크립트는 `scripts/local-env.sh`(`nx4_env`, `nx4_need`)로 저장소 맨 위 `.env.local`(git 제외)에서 읽고, 값이 없으면 멈춥니다. 명령 앞에 준 값이 `.env.local`보다 앞섭니다.
 - 새 경로 변수는 `.env.example`에 설명과 함께 더합니다.
+- 워크트리에는 `.env.local`이 없습니다. 메인 체크아웃의 것을 명령 앞에 `NX4_ENV_FILE=<메인 체크아웃>/.env.local`로 가리킵니다. 주지 않으면 빌드 스크립트는 멈추고 `tests/mod-test.sh`는 빌드·HMG-API 엔진 시험을 건너뜁니다.
 - `tests/mod-test.sh`는 `.env.local`에서 `HMGAPI_SRC`만 읽고, 시험이 부르는 스크립트는 `.env.local`을 읽지 않게 합니다(`NX4_ENV_FILE=`).
