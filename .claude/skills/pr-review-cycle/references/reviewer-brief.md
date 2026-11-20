@@ -56,29 +56,39 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
 ### 하지 않는 것
 
 - 코드 수정, 커밋, 푸시, 머지, 태그, 브랜치 전환, stash, reset 을 하지 않는다.
-- 로컬 체크아웃의 파일을 바꾸지 않는다. 실행이 필요하면 아래 임시 워크트리에서만 한다.
+- 로컬 체크아웃의 파일을 바꾸지 않는다. 일시적으로 바꿨다가 되돌리는 것도 안 된다. 실행이나 일부러 깨뜨려 보는
+  시험이 필요하면 아래 임시 워크트리 안에서만 한다.
 - PR 본문 수정, PR 닫기, 리뷰어 지정을 하지 않는다.
 - 리뷰 대상 PR 말고 다른 PR 이나 이슈에 글을 쓰지 않는다.
 - `.env.local`, 서명 키, 그 비밀번호의 내용을 출력하거나 PR 에 쓰지 않는다. 배포용 키로 서명하는 명령
   (`scripts/build.sh`, `NX4_APP_KEYS` 를 바꾸지 않은 `scripts/build-app.sh`)을 돌리지 않는다.
-- 셸 명령을 `&&`·`||`·`;` 로 잇지 않는다. git 에 `-C` 를 쓰지 않고 대상 폴더로 `cd` 한 뒤 실행한다.
+- 셸 명령을 `&&`·`||`·`;` 로 잇지 않는다. git 에 `-C` 를 쓰지 않는다.
+- `cd` 에 기대지 않는다. 서브에이전트의 셸은 호출마다 시작 위치(로컬 체크아웃 루트)로 돌아오고 `cd` 는 다음 호출로
+  이어지지 않는다. 그래서 `cd <워크트리>` 뒤의 명령은 체크아웃에서 돈다(2026-11-20 PR #5 리뷰에서 이 때문에 시험이
+  체크아웃에서 돌고 체크아웃 파일이 바뀐 일이 있었다). 아래 "직접 확인" 처럼 git 은 체크아웃 루트에서, 워크트리 안의
+  스크립트와 파일은 절대 경로로 다룬다.
 
 ### 순서
 
 1. **맥락** — PR 본문과 변경 파일(`gh pr view <PR> --json title,body,files,baseRefName,headRefName,headRefOid`),
    전체 diff(`gh pr diff <PR>`), 관련 코드, `CLAUDE.md`·`docs/git-flow.md`·`docs/design.md` 를 읽는다.
-2. **직접 확인** — 체크아웃 밖 임시 폴더에 워크트리를 만들어 실행한다.
-   - 체크아웃 루트에서 `git fetch origin`
-   - `mktemp -d` 로 임시 폴더를 만들고, `git worktree add --detach <임시 폴더>/review-pr-<PR> <head SHA>`
-   - 그 폴더로 `cd` 해 바뀐 범위에 맞는 검증을 돌린다. 워크트리에는 `.env.local` 이 없으므로 체크아웃의 것을
-     `NX4_ENV_FILE` 로 가리킨다.
-     - 늘: `NX4_ENV_FILE=<체크아웃>/.env.local sh tests/mod-test.sh` ("모두 통과"인지, 빌드·HMG-API 엔진 시험이
+2. **직접 확인** — 체크아웃 밖 임시 폴더에 워크트리를 만들어 실행한다. 아래에서 `<W>` 는 그 워크트리의 절대 경로다.
+   - 체크아웃 루트(셸의 시작 위치)에서 `git fetch origin`
+   - `mktemp -d` 로 임시 폴더를 만들고, 체크아웃 루트에서 `git worktree add --detach <임시 폴더>/review-pr-<PR> <head SHA>`.
+     이 경로가 `<W>` 다.
+   - 워크트리 안의 스크립트는 **절대 경로로** 부른다. 이 저장소의 PC 스크립트는 자기 위치(`dirname "$0"`)로
+     저장소 루트를 찾으므로, 절대 경로로 부르면 `cd` 없이도 워크트리 기준으로 돈다. 워크트리에는 `.env.local` 이
+     없으므로 체크아웃의 것을 `NX4_ENV_FILE` 로 가리킨다.
+     - 늘: `NX4_ENV_FILE=<체크아웃>/.env.local sh <W>/tests/mod-test.sh` ("모두 통과"인지, 빌드·HMG-API 엔진 시험이
        돌았는지 "skip" 줄로 확인)
      - `app/` 를 바꿨으면: 임시 키 폴더(`mktemp -d`)로
-       `NX4_ENV_FILE=<체크아웃>/.env.local NX4_APP_KEYS=<임시 키 폴더> sh scripts/build-app.sh`
+       `NX4_ENV_FILE=<체크아웃>/.env.local NX4_APP_KEYS=<임시 키 폴더> sh <W>/scripts/build-app.sh`
    - PR 본문이나 답글이 주장하는 것(수치, "고쳤다", "실패를 잡는다")은 재현해 확인한다. 시험이 늘 통과하는
-     시험이 아닌지, 일부러 깨뜨려 실패하는지도 본다(워크트리 안에서만).
-   - 끝나면 체크아웃 루트로 돌아와 `git worktree remove --force <임시 폴더>/review-pr-<PR>` 로 지우고, 임시 폴더도 지운다.
+     시험이 아닌지, 일부러 깨뜨려 실패하는지도 본다. 깨뜨릴 때는 `<W>/…` 의 파일을 절대 경로로 고치고, 체크아웃의
+     파일은 건드리지 않는다.
+   - 끝나면 체크아웃 루트에서 `git worktree remove --force <W>` 로 지우고, 임시 폴더도 지운다.
+   - 돌려주기 전에 체크아웃 루트에서 `git status --short` 가 리뷰를 시작할 때와 같은지 본다. 다르면 고치려 하지 말고
+     알림에 그대로 적는다.
 3. **판단** — 다음을 본다.
    - 정확성: 버그, 경계 조건, 오류 처리, 회귀
    - 차에서 도는 스크립트(`mod/svc`, `mod/bin`, `mod/scripts`, `usb/troubleShooter`): 차의 셸은 mksh 다. bash 전용
