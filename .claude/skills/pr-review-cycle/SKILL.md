@@ -46,12 +46,13 @@ argument-hint: "[PR 번호 | PR URL]"
   비밀번호를 화면·PR·로그에 남기지 않는다. `git add -f` 를 쓰지 않는다.
 - 셸 명령은 `&&`·`||`·`;` 로 잇지 않고 하나씩 실행한다. git 은 `-C` 없이, 대상 트리로 `cd` 한 뒤 실행한다.
 - 이번 작업과 무관한 커밋하지 않은 변경은 건드리지 않는다.
-- **워크트리 세션**(`.claude/worktrees/*` 처럼 메인 체크아웃이 아닌 작업 트리에서 도는 세션)이면
-  [`docs/git-flow.md`](../../../docs/git-flow.md) "워크트리에서 할 때" 를 따른다. `develop`·`main` 이 다른 트리에 열려
-  있어 `git switch` 할 수 없을 수 있고, `.env.local` 이 없다. 아래 각 단계의 "워크트리 세션이면" 이 그 경우다.
-  특히 로컬 `develop`·`main`·`release/*` 를 `git fetch origin <브랜치>:<브랜치>` 나 `git update-ref` 로 옮기지 않는다
-  (다른 트리에 열린 브랜치면 그 트리의 HEAD 만 옮겨져 어긋난다. "예외" 참고). 어느 트리에 무엇이 열려 있는지는
-  `git worktree list` 로 본다.
+- **작업은 워크트리에서 한다**([`docs/git-flow.md`](../../../docs/git-flow.md) 규칙 11, "워크트리"). 메인 체크아웃은
+  `develop` 에 두고 고치지도, 브랜치를 바꾸지도 않는다.
+  - 그래서 `develop`·`main` 은 메인 체크아웃에 열려 있어 다른 트리에서 `git switch` 할 수 없다.
+  - 워크트리에는 `.env.local` 이 없다. 메인 체크아웃의 것을 `NX4_ENV_FILE` 로 가리킨다.
+  - 로컬 `develop`·`main`·`release/*` 를 `git fetch origin <브랜치>:<브랜치>` 나 `git update-ref` 로 옮기지 않는다
+    (다른 트리에 열린 브랜치면 그 트리의 HEAD 만 옮겨져 어긋난다. "예외" 참고).
+  - 어느 트리에 무엇이 열려 있는지는 `git worktree list` 로 본다. 첫 줄이 메인 체크아웃이다.
 
 진행하면서 PR 번호, base 브랜치, 리뷰어 이름, 리뷰 라운드, 지적 번호와 처리 상태(반영 / 미룸 / 해소),
 리뷰어가 마지막으로 본 커밋을 계속 기억해 둔다. 세션이 끊겨도 이 정보는 PR 에 올린 리뷰와 답글에서
@@ -90,16 +91,30 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
      새 리뷰어를 띄우고 지난 리뷰 링크와 "지적 번호는 <가장 큰 번호 + 1> 부터" 를 함께 준다.
    - 커밋이 없고 판단할 지적이 남았으면 4 단계로 간다.
    - 판단할 지적이 없으면 6 단계로 간다.
+4. 4·5 단계(수정)로 가면 고치기 전에 1 단계 2 의 "이미 있는 브랜치를 고칠 때" 대로 그 PR 브랜치의 워크트리에 들어간다.
+   메인 체크아웃에서 고치지 않는다.
 
 ## 1. 커밋·푸시
 
 1. `git branch --show-current` 와 `git status --short` 로 브랜치와 남은 변경을 본다.
-2. 브랜치를 맞춘다(`docs/git-flow.md` 규칙 1–3).
-   - `main` 이나 `develop` 이면 커밋하지 않는다. 커밋하지 않은 변경은 `git switch -c feature/<주제>` 로
-     그대로 데려간다. 새로 시작하는 작업이면 `git switch develop`, `git pull --ff-only`,
-     `git switch -c feature/<주제>` 순서로 만든다.
-   - 워크트리 세션이면 `git fetch origin`, `git switch -c feature/<주제> origin/develop` 으로 만든다(로컬 `develop` 은
-     쓰지도 옮기지도 않는다). 세션이 처음 받은 브랜치(예: `claude/<이름>`)에 커밋이 있으면 그 커밋을 데려갈지 사용자에게 묻는다.
+2. 브랜치와 트리를 맞춘다(`docs/git-flow.md` 규칙 1–3, 11).
+   - 이 세션이 메인 체크아웃에서 돌면 여기서 브랜치를 만들거나 커밋하지 않는다. 메인 체크아웃인지는
+     `git worktree list` 첫 줄의 경로와 `git rev-parse --show-toplevel` 이 같은지로 본다.
+     - `git fetch origin`, `git worktree add --no-track -b feature/<주제> .claude/worktrees/<주제> origin/develop` 로
+       워크트리를 만든다.
+     - `EnterWorktree` 의 `path` 로 그 워크트리에 들어간다. `name` 으로 만들지 않는다(`main` 에서 규칙에 맞지 않는
+       브랜치를 만든다).
+     - 메인 체크아웃에 이번 작업의 커밋하지 않은 변경이 있으면 데려갈지 사용자에게 묻는다. 데려가는 방법은
+       `docs/git-flow.md` "워크트리" 의 stash 줄을 따른다. `git stash push` 에는 내 파일만 경로로 준다(경로가 없으면
+       다른 작업의 변경까지 옮겨진다). 내가 하지 않은 변경은 다른 작업의 것이니 건드리지 않는다.
+   - 데스크톱 앱이 처음부터 워크트리로 연 세션이면 그 안에서 `git fetch origin`,
+     `git switch --no-track -c feature/<주제> origin/develop` 으로 만든다(로컬 `develop` 은 쓰지도 옮기지도 않는다).
+     세션이 처음 받은 브랜치(예: `claude/<이름>`)에 커밋이 있으면 그 커밋을 데려갈지 사용자에게 묻는다.
+   - 이미 작업 브랜치의 워크트리에 있으면 그대로 쓴다.
+   - 이미 있는 브랜치(이어받은 PR 등)를 고칠 때는 메인 체크아웃에서 `git switch` 하지 않는다.
+     `docs/git-flow.md` "워크트리" 의 "이미 있는 브랜치를 이어서 고칠 때" 대로 그 브랜치의 워크트리를 찾거나 만들고,
+     `EnterWorktree` 의 `path` 로 들어간다. 찾은 워크트리가 이 세션이 만들었거나 쓰던 것이 아니면 다른 세션이 쓰고
+     있을 수 있으므로, 들어가기 전에 `AskUserQuestion` 으로 묻는다.
    - 이름은 `feature/`·`release/`·`hotfix/` 로 시작하고 뒤는 영어 소문자·숫자·하이픈만 쓴다.
    - `feature/` 에 판 번호 변경이 섞여 있으면 커밋하지 말고 사용자에게 알린다.
 3. 5 단계 1 의 검증을 한 번 돌린다. 실패하면 커밋하지 않고 고친다.
@@ -135,8 +150,8 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
    그다음 리뷰어 서브에이전트를 띄운다. `Agent` 도구, `subagent_type: "general-purpose"`,
    `name: "pr-<PR 번호>-reviewer"`, `run_in_background: true`. 재리뷰 때 같은 이름으로 `SendMessage` 해 이어서 보낸다.
 2. 지시문은 [references/reviewer-brief.md](references/reviewer-brief.md) 의 "첫 리뷰" 를 채워서 보낸다. 내 판단이나
-   예상 문제는 넣지 않는다. `<로컬 체크아웃>` 은 이 세션의 작업 트리(`git rev-parse --show-toplevel`, 워크트리 세션이면
-   그 워크트리)이고, `<개인 설정 파일>` 은 `.env.local` 이 실제로 있는 곳(워크트리 세션이면 보통 메인 체크아웃의 것)이다.
+   예상 문제는 넣지 않는다. `<로컬 체크아웃>` 은 이 세션의 작업 트리(`git rev-parse --show-toplevel`, 곧 이 작업의
+   워크트리)이고, `<개인 설정 파일>` 은 `.env.local` 이 실제로 있는 곳(보통 메인 체크아웃의 것)이다.
    두 값을 같은 경로로 묶어 적지 않는다.
 3. 리뷰어가 끝날 때까지 PR 대상 파일을 고치지 않고 기다린다. 완료 알림이 오기 전에는 결과를 짐작해 말하지 않는다.
 4. 리뷰어의 알림을 그대로 믿지 않는다. "PR 코멘트 조회 규칙" 대로 실제로 올라간 리뷰와 인라인 코멘트를 읽는다.
@@ -189,8 +204,8 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 1. **수정** — 바뀐 범위에 맞춰 검증한다.
    - 늘: `sh tests/mod-test.sh` 가 "모두 통과". `.env.local` 에 `HMGAPI_SRC` 가 있으면 빌드와 HMG-API 엔진
      시험까지 돈다. "skip 빌드·HMG-API 엔진 시험" 이 나오면 PR 본문의 확인 절에 그렇게 적는다.
-     워크트리 세션이면 `NX4_ENV_FILE=<메인 체크아웃>/.env.local sh tests/mod-test.sh` 처럼 메인 체크아웃의
-     `.env.local` 을 가리킨다(`scripts/build-app.sh` 도 같다). 주지 않으면 빌드·엔진 시험이 "skip" 된다.
+     워크트리에는 `.env.local` 이 없으므로 `NX4_ENV_FILE=<메인 체크아웃>/.env.local sh tests/mod-test.sh` 처럼 메인
+     체크아웃의 것을 가리킨다(`scripts/build-app.sh` 도 같다). 주지 않으면 빌드·엔진 시험이 "skip" 된다.
    - `app/` 를 바꿨으면: `sh scripts/build-app.sh` 가 끝까지 되는지(`ReportTest` 는 `mod-test.sh` 가 돌린다).
      화면이 바뀌었으면 에뮬레이터를 쓸 수 있을 때 [`docs/emulator-test.md`](../../../docs/emulator-test.md)의
      해당 시나리오를 돌린다.
@@ -220,6 +235,9 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
      시험까지 통과해야 하고, `docs/design.md` "차에서 확인할 것" 중 해당 항목의 확인 여부를 함께 적는다.
 2. `AskUserQuestion` — "PR #<번호> 를 merge commit 으로 합칠까요?" 선택지는 **합치기 (권장)** / **아직**.
    미룬 지적이 있거나, 엔진 시험을 건너뛰었거나, 차에서 확인하지 않았으면 질문에 그 사실을 함께 적는다.
+   합치기 선택지 설명에 "합친 뒤 7 단계대로 워크트리에서 나와(`ExitWorktree`) 워크트리와 브랜치를 지웁니다" 를 적는다.
+   1 단계 2 에서 물어서 들어간 다른 세션의 워크트리면 "합친 뒤 워크트리에서 나오고, 그 워크트리와 로컬 브랜치는
+   남깁니다" 로 적는다. `ExitWorktree` 는 사용자가 요청할 때만 부르는 도구라, 이 답이 그 요청이 된다.
    `release/`·`hotfix/` 면 `v<판>` 태그와 `develop` 으로 되돌려 합치기까지 함께 묻는다.
 3. **base 가 앞서 충돌이 있을 때** — PR 을 연 뒤라 rebase·강제 푸시하지 않는다.
    - `git fetch origin`
@@ -227,9 +245,8 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 4. **합치기** — `gh pr merge <PR> --merge`. `--squash`·`--rebase` 를 쓰지 않는다. 브랜치 삭제는 7 단계에서 한다.
 5. `gh pr view <PR> --json state,mergeCommit` 로 합쳐졌는지 확인한다.
 6. **`release/`·`hotfix/` 만**
-   - 태그: `git switch main`, `git pull --ff-only`, `git tag -a v<판> -m "NX4 KOR <판>" <merge commit>`,
-     `git push origin v<판>`. 태그는 지우거나 옮기지 않는다. 워크트리 세션이면 `git switch main`·`git pull` 대신
-     `git fetch origin` 만 하고 같은 `git tag -a … <merge commit>` 을 단다(로컬 `main` 을 옮기지 않는다).
+   - 태그: `git fetch origin`, `git tag -a v<판> -m "NX4 KOR <판>" <merge commit>`, `git push origin v<판>`.
+     로컬 `main` 으로 바꾸거나 옮기지 않는다. 태그는 지우거나 옮기지 않는다.
    - `develop` 으로 되돌려 합치기: `gh pr create --base develop --head <브랜치>`. 내용이 이미 리뷰된 것이라
      리뷰어는 띄우지 않고, 충돌이 있으면 3 처럼 푼다. 합치기는 위와 같이 `--merge`.
    - `hotfix/` 인데 진행 중인 `release/` 가 있으면 거기에도 같은 방법으로 합친다.
@@ -245,11 +262,21 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 
 1. 원격 브랜치: `git ls-remote origin refs/heads/<브랜치>` 가 합쳐진 PR 의 head SHA 와 같을 때만
    `git push origin --delete <브랜치>` 한다. 저장소 설정으로 이미 지워졌으면 건너뛴다.
-2. 로컬: `git switch <base>`, `git pull --ff-only`, `git branch -d <브랜치>`. `-D` 로 강제 삭제하지 않는다.
-   - 워크트리 세션이면 `<base>` 가 메인 체크아웃 등 다른 트리에 열려 있을 수 있다. `git fetch origin`,
-     `git switch --detach origin/<base>`, `git branch -d <브랜치>` 로 정리한다. 로컬 `<base>` 는
-     `git fetch origin <base>:<base>` 로 옮기지 않는다(2026-11-20 #11·#29 뒤 두 번 이렇게 옮겨 메인 체크아웃이 어긋났다).
-     메인 체크아웃의 로컬 `<base>` 는 그 트리에서 `git pull --ff-only` 로 맞추면 된다고 보고에 적는다.
+2. 로컬: `-D` 로 강제 삭제하지 않는다. 로컬 `<base>` 는 `git fetch origin <base>:<base>` 로 옮기지 않는다
+   (2026-11-20 #11·#29 뒤 두 번 이렇게 옮겨 메인 체크아웃이 어긋났다).
+   - 1 단계에서 `git worktree add` 로 만든 워크트리면:
+     - `ExitWorktree`(`keep`)로 메인 체크아웃에 돌아온다. 6 단계 2 에서 사용자가 합치기(정리 포함)를 골랐을 때만 부른다.
+     - 메인 체크아웃에서 `git pull --ff-only` 로 `develop` 을 맞춘다. 커밋하지 않은 변경과 겹쳐 멈추면 손대지 말고
+       보고에 적는다.
+     - `git worktree remove .claude/worktrees/<이름>`, `git branch -d <브랜치>` 로 지운다. `git worktree remove` 가
+       남은 변경 때문에 멈추면 `--force` 로 지우지 말고 무엇이 남았는지 사용자에게 알린다.
+   - 데스크톱 앱이 처음부터 워크트리로 연 세션이면 `git fetch origin`, `git switch --detach origin/<base>`,
+     `git branch -d <브랜치>` 로 정리한다. 워크트리 폴더는 앱이 정리한다. 메인 체크아웃의 로컬 `<base>` 는 그 트리에서
+     `git pull --ff-only` 로 맞추면 된다고 보고에 적는다.
+   - 1 단계 2 에서 물어서 들어간 다른 세션의 워크트리면 `ExitWorktree`(`keep`)로 나오기만 한다. 그 워크트리와 로컬
+     브랜치는 지우지 않는다(`docs/git-flow.md` "워크트리": 다른 세션의 워크트리는 지우지 않음. 워크트리가 브랜치를 열고
+     있어 `git branch -d` 도 막힌다). 원격 브랜치는 1 대로 정리하고, 워크트리와 로컬 브랜치가 남았다고 8 단계 보고에
+     적는다. 지우려면 사용자에게 묻는다.
 3. 쌓인 PR 이 있었으면 base PR 도 같은 절차로 정리한다.
 
 ## 8. 마무리 보고
@@ -266,7 +293,7 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 - **사용자가 중간에 다른 지시를 함** — 그 지시를 따르고, 사이클을 이어 갈지 묻는다.
 - **체크아웃의 HEAD 만 옮겨짐** — `git status` 에 내가 하지 않은 스테이징 변경이 있고, 그것이 방금 합친 PR 을
   되돌리는 내용이면, 다른 트리에서 이 트리에 열린 브랜치를 `git fetch origin <브랜치>:<브랜치>` 로 옮긴 경우다.
-  [`docs/git-flow.md`](../../../docs/git-flow.md) "워크트리에서 할 때" 의 알아보는 법대로 확인하고, 남은 흔적뿐이면
+  [`docs/git-flow.md`](../../../docs/git-flow.md) "워크트리" 의 알아보는 법대로 확인하고, 남은 흔적뿐이면
   사용자에게 물은 뒤 맞춘다. 그 상태로 브랜치를 만들거나 커밋하지 않는다(PR 이 되돌려진다).
 - **잘못 올린 코멘트** — `gh api -X PATCH repos/<R>/pulls/comments/<id>` (인라인) 또는
   `gh api -X PATCH repos/<R>/issues/comments/<id>` (PR 코멘트)로 고친다. 지우기는 사용자에게 묻고 한다.
