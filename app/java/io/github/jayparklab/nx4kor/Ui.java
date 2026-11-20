@@ -24,7 +24,9 @@ import android.widget.TextView;
  * 상태 화면의 모양: 투싼 NX4 순정 내비(표준형 5세대 와이드)의 타입1(어두운 화면)에 맞춘다(#28).
  * 색·글자 크기·여백은 이 파일 한 곳에 둔다. 문구와 판정은 여기 없다(Report).
  *
- * 값은 현대 국내형 Gen5W 웹 매뉴얼의 화면 그림(945x354)을 1920x720으로 환산해 잰 근사값이다(2026-11-20, #28 댓글).
+ * 값은 현대 국내형 Gen5W 웹 매뉴얼의 화면 그림(945x354)을 1920x720으로 환산해 잰 근사값이다(2026-11-20, #28 댓글의
+ * 그림 10장: 홈, 설정, 디스플레이·내비게이션·일반·차량 설정, 기기 연결, 장소 검색, 블루링크 첫 화면, 후석 취침 모드).
+ * #28 본문의 "색(근사)" 표는 그 전에 다른 그림으로 잰 첫 조사라 몇 값이 다르다. 이 파일의 값이 다시 잰 것이다.
  * 차에서 캡처하면 여기만 고친다.
  *
  * 크기는 1920x720 화면의 px로 적고 실제 화면 폭에 맞춰 늘이거나 줄인다(px). 차의 화면 밀도와 관계없이
@@ -50,7 +52,10 @@ final class Ui {
     static final int LINE_HEAD = 0xFF111111;
     /** 오른쪽 칸(분할 화면) 앞 세로선 */
     static final int LINE_PANEL = 0xFF121316;
-    /** 목록 줄 사이 선의 가운데 색(양끝은 바탕으로 흐려짐) */
+    /**
+     * 목록 줄 사이 선의 가운데 색(양끝은 바탕으로 흐려짐). 그림의 목록 구분선은 거의 보이지 않는 회색(#0D0E12~#101010)이라
+     * 조금 밝게 잡았다. #28 본문의 청록 선(#146C8C 쯤)은 왼쪽 분류 목록에서 고른 줄 아래 선(#062D41)으로 보인다
+     */
     static final int LINE_ROW = 0xFF1C2229;
     /** 보통 버튼 블록(위→아래), 누를 때 */
     static final int BTN_TOP = 0xFF0B151B, BTN_BOTTOM = 0xFF060D13, BTN_PRESSED = 0xFF16242F;
@@ -89,6 +94,8 @@ final class Ui {
     static final int FOOT_H = 56, FOOT_TEXT = 22;
     /** 띠·상자 모서리 */
     static final int RADIUS = 4;
+    /** 스크롤 끝을 흐리는 길이 */
+    static final int FADE = 48;
     /** 설치 진행 화면: 좌우 여백, 제목, 단계, 막대 높이, %, 경과 시간 */
     static final int PROG_PAD_X = 200, PROG_TITLE = 40, PROG_STAGE = 30, BAR_H = 12, PROG_PCT = 30, PROG_TIME = 26;
 
@@ -139,10 +146,15 @@ final class Ui {
         return root;
     }
 
-    /** 순정처럼 끝에서 당겨도 파란 빛이 번지지 않는 스크롤 */
+    /**
+     * 순정처럼 끝에서 당겨도 파란 빛이 번지지 않는 스크롤. 위나 아래에 더 있으면 그쪽 끝을 바탕으로 흐려서 보인다
+     * (넘친 줄이 칼로 자른 듯 잘려 다음 띠와 붙어 보이지 않게, PR #34 리뷰 1)
+     */
     ScrollView scroll(View content) {
         ScrollView sv = new ScrollView(c);
         sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        sv.setVerticalFadingEdgeEnabled(true);
+        sv.setFadingEdgeLength(px(FADE));
         sv.setFillViewport(true);
         sv.addView(content);
         return sv;

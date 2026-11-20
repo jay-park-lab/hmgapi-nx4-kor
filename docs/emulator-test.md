@@ -128,7 +128,7 @@ done
 | `oldmod` | `verdict=oldmod`, `oldmod=yes` | 빨간 띠 "따로 설치된 무선 모드(wireless-carplay-aa)가 있어 …" 다섯 줄 |
 | `nocar` | 다른 차 `product`, `verdict_end=yes` | 빨간 띠 "지원하지 않는 차입니다 …"와 그 아래 회색 지우는 방법 안내 |
 | `nobb` | 짧은 상태 파일(`support=nobb`) | 노란 띠 "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함) …", 왼쪽 칸은 요약 없이 짧은 표, **[지금 재부팅] 없음** |
-| `hint` | `ready`와 같고 힌트(`iph=wifi`, `aa=cpwait`)·알림 | 시안 판정 아래 주황 띠 두 개(아이폰 Wi-Fi 다시 연결, 안드로이드 오토는 카플레이 연결 중이라 대기), 연노랑 띠 "알림 HH:MM …", 맨 아래 [지금 재부팅] |
+| `hint` | `ready`와 같고 힌트(`iph=wifi`, `aa=cpwait`)·알림 | 시안 판정 아래 노란 띠 두 개(아이폰 Wi-Fi 다시 연결, 안드로이드 오토는 카플레이 연결 중이라 대기), 연노랑 띠 "알림 HH:MM …", 맨 아래 [지금 재부팅] |
 
 각 파일의 키는 `mod/bin/status.sh`(`status_kv`, `st_verdict`)와 `app/java/.../Report.java`를 따릅니다. 판정 코드를 더하거나 문구를 바꾸면 `scen.sh`에도 같은 경우를 넣습니다.
 
@@ -185,6 +185,14 @@ $ADB shell input tap 60 85; sleep 1; shot closed
 ```
 
 `watch.sh answer`는 앱이 쓴 `reboot.req`의 id를 그대로 씁니다. [재부팅]을 누르기 전에 부르면 요청이 없다고 멈춥니다.
+
+오른쪽 칸이 넘칠 때도 봅니다. `hint` 시나리오에서 감시자를 끄고 [지금 재부팅]을 누르면, 버튼 안내 띠가 알림 띠와 틈을 두고 따로 보이고, 넘친 목록의 아래 끝이 흐려져야 합니다(PR #34 리뷰 1).
+
+```sh
+sh tests/emu/shot.sh hint
+sh tests/emu/watch.sh off
+$ADB shell input tap 1600 672; shot rb-hint
+```
 
 ## 끝난 뒤
 
