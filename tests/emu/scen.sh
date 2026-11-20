@@ -68,17 +68,17 @@ case $S in
   mapfail)
     M="이 차의 map을 확인하지 못해 무선 기능을 적용하지 않았습니다. NX4 KOR를 지우고 다시 설치해도 같으면 기록(/data/nx4-kor/logs/ap.log)을 확인해 주세요."
     { base | sed -e 's/^applied=yes/applied=no/' -e 's/^our_ap=yes/our_ap=no/' -e 's/^our_dhcp=yes/our_dhcp=no/' -e 's/^ap_mode=ours/ap_mode=none/' -e 's/^hooks=on/hooks=off/' -e 's/^hookmap=verified/hookmap=mismatch/'; echo "cp_conn=0"; echo "state=fail"
-      verdict mapfail 2 "$M" no "설치: 안 됨(위 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+      verdict mapfail 2 "$M" no "설치: 안 됨(오른쪽 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 fail "$M" "" > $D/prog ;;
   oldmod)
     M="따로 설치된 무선 모드(wireless-carplay-aa)가 있어 무선 기능을 적용하지 않았습니다. HMG-API 앱에서 그 모드를 지우고 변경 사항을 적용한 뒤 내비를 재부팅해 주세요."
     { base | sed -e 's/^applied=yes/applied=no/' -e 's/^oldmod=no/oldmod=yes/' -e 's/^our_ap=yes/our_ap=no/' -e 's/^our_dhcp=yes/our_dhcp=no/' -e 's/^ap_mode=ours/ap_mode=none/'; echo "cp_conn=0"; echo "state=fail"
-      verdict oldmod 2 "$M" no "설치: 안 됨(위 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+      verdict oldmod 2 "$M" no "설치: 안 됨(오른쪽 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 fail "$M" "" > $D/prog ;;
   nocar)
     M="지원하지 않는 차입니다(투싼 NX4 한국 내수 260902 전용). 아무것도 바꾸지 않았습니다."
     { base | sed -e 's/^product=.*/product=DEPEHEV.KOR.0000.V039.001.260902/' -e 's/^tested=yes/tested=no/' -e 's/^applied=yes/applied=no/' -e 's/^our_ap=yes/our_ap=no/' -e 's/^our_dhcp=yes/our_dhcp=no/' -e 's/^ap_mode=ours/ap_mode=none/'; echo "cp_conn=0"; echo "state=fail"
-      verdict nocar 2 "$M" yes "설치: 안 됨(위 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+      verdict nocar 2 "$M" yes "설치: 안 됨(오른쪽 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 fail "$M" "" > $D/prog ;;
   nobb)
     printf 'support=nobb\nproduct=NX4.KOR.0000.V039.001.260902\nplatform=tcc803x\npkgver=2.0.0\nmade=%s\n' "$(date '+%m-%d %H:%M')" > $D/status

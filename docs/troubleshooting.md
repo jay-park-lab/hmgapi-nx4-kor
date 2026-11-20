@@ -65,7 +65,7 @@ HMG-API 설치 중 `HMGAPI/install.log`에 `isn't a known stock build`가 있으
 | 다른 Wi-Fi 패키지가 핫스팟을 쓰고 있어… | NEMESIS의 Korea Projection이나 다른 무선·핫스팟 패키지를 지우고 재부팅합니다([`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때") |
 | 이 차는 Wi-Fi 칩이 켜지지 않아… / Wi-Fi 부품이 없어… | 이 차에서는 무선 카플레이를 쓸 수 없습니다 |
 | 지원하지 않는 HMG-API 버전입니다 | HMG-API가 든 릴리스 USB로 다시 누릅니다 |
-| 연결됨·준비됨(초록)인데 폰이 붙지 않음 | 화면의 노란 알림 줄을 봅니다. USB를 뺐는지도 봅니다 |
+| 연결됨·준비됨(시안 글자)인데 폰이 붙지 않음 | 오른쪽 칸 판정 아래의 노란 띠를 봅니다. USB를 뺐는지도 봅니다 |
 
 ### HMG-API 앱을 열 수 없을 때
 

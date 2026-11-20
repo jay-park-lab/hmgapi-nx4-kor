@@ -110,17 +110,25 @@ done
 
 `shot.sh`는 `scen.sh <시나리오>`로 파일을 넣고, 앱을 끈 뒤 다시 열고, 2초 기다렸다가 `out/emu/<시나리오>.png`를 찍습니다(`OUT=<폴더>`로 바꿀 수 있음). 바로 찍으면 앱이 그리기 전이라 런처가 찍힙니다.
 
+결과 화면은 순정 설정 상세 화면 모양입니다([`design.md`](design.md) "상태 화면").
+
+- 위 제목 줄: 가운데 "NX4 KOR 2.0.0", 왼쪽 위 `<`([닫기])
+- 왼쪽 칸: 요약 3줄(흰 제목, 회색 값)과 "자세히" 표, 맨 아래 확인 시각·앱 판·화면 크기 줄
+- 오른쪽 칸: 판정과 안내, 맨 아래 [지금 재부팅] 블록(시안 글자)
+
+아래 "볼 것"은 오른쪽 칸 기준입니다.
+
 | 시나리오 | 넣는 것 | 볼 것 |
 |---|---|---|
-| `ready` | `verdict=ready`, 진행 100% | 초록 "무선 카플레이·안드로이드 오토 준비됨.", [지금 재부팅], 요약 3줄(설치·무선 Wi-Fi·폰 연결), "자세히" 표, 아래 [닫기]와 확인 시각·앱 판·화면 크기 |
-| `connected` | `cp_conn=1`, `verdict=connected` | 초록 "무선 카플레이 연결됨, 안드로이드 오토 준비됨", "폰 연결: 카플레이 1대 연결됨" |
-| `installing` | 진행 `pct=55`, `step=3/5`, `state=run` | 상태 화면 대신 설치 진행 화면: "NX4 KOR 2.0.0 설치 중", "단계 3/5 · map을 확인하는 중입니다", 막대 55%, "경과 2분 02초", "보통 5분 안에 끝납니다 …", [닫기] |
-| `reboot` | `verdict=reboot` | 노란 "내비를 3분 후 재부팅해 주세요." |
-| `mapfail` | `verdict=mapfail`, `hookmap=mismatch` | 빨간 안내(긴 문구가 두 줄로 줄바꿈), "설치: 안 됨(위 안내를 보세요)" |
-| `oldmod` | `verdict=oldmod`, `oldmod=yes` | 빨간 "따로 설치된 무선 모드(wireless-carplay-aa)가 있어 …" 두 줄 |
-| `nocar` | 다른 차 `product`, `verdict_end=yes` | 빨간 "지원하지 않는 차입니다 …"와 지우는 방법 안내 |
-| `nobb` | 짧은 상태 파일(`support=nobb`) | 노란 "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함) …", 짧은 표, **[지금 재부팅] 없음** |
-| `hint` | `ready`와 같고 힌트(`iph=wifi`, `aa=cpwait`)·알림 | 주황 두 줄(아이폰 Wi-Fi 다시 연결, 안드로이드 오토는 카플레이 연결 중이라 대기), 연한 노란 "알림 HH:MM …", 그 아래 [지금 재부팅] |
+| `ready` | `verdict=ready`, 진행 100% | 시안 세로 표시와 시안 글자 "무선 카플레이·안드로이드 오토 준비됨."(띠 없음), [지금 재부팅]. 왼쪽 칸에 설치 "끝남", 무선 Wi-Fi "켜짐", 폰 연결 "지금 연결된 폰 없음", "자세히" 표 |
+| `connected` | `cp_conn=1`, `verdict=connected` | 시안 표시와 시안 "무선 카플레이 연결됨, 안드로이드 오토 준비됨", 왼쪽 칸 폰 연결 "카플레이 1대 연결됨" |
+| `installing` | 진행 `pct=55`, `step=3/5`, `state=run` | 상태 화면 대신 설치 진행 화면(가운데 정렬): "NX4 KOR 2.0.0 설치 중", "단계 3/5 · map을 확인하는 중입니다", 시안 막대 55%, 시안 "55%"와 회색 "경과 2분 02초", 회색 "보통 5분 안에 끝납니다 …", 맨 아래 [닫기] 블록 |
+| `reboot` | `verdict=reboot` | 노란 띠 "내비를 3분 후 재부팅해 주세요." |
+| `mapfail` | `verdict=mapfail`, `hookmap=mismatch` | 빨간 띠(긴 문구가 네 줄로 줄바꿈), 왼쪽 칸 설치 "안 됨(오른쪽 안내를 보세요)" |
+| `oldmod` | `verdict=oldmod`, `oldmod=yes` | 빨간 띠 "따로 설치된 무선 모드(wireless-carplay-aa)가 있어 …" 다섯 줄 |
+| `nocar` | 다른 차 `product`, `verdict_end=yes` | 빨간 띠 "지원하지 않는 차입니다 …"와 그 아래 회색 지우는 방법 안내 |
+| `nobb` | 짧은 상태 파일(`support=nobb`) | 노란 띠 "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함) …", 왼쪽 칸은 요약 없이 짧은 표, **[지금 재부팅] 없음** |
+| `hint` | `ready`와 같고 힌트(`iph=wifi`, `aa=cpwait`)·알림 | 시안 판정 아래 주황 띠 두 개(아이폰 Wi-Fi 다시 연결, 안드로이드 오토는 카플레이 연결 중이라 대기), 연노랑 띠 "알림 HH:MM …", 맨 아래 [지금 재부팅] |
 
 각 파일의 키는 `mod/bin/status.sh`(`status_kv`, `st_verdict`)와 `app/java/.../Report.java`를 따릅니다. 판정 코드를 더하거나 문구를 바꾸면 `scen.sh`에도 같은 경우를 넣습니다.
 
@@ -143,29 +151,37 @@ done
 
 ### 순서
 
-좌표는 1920x720 화면 픽셀이고, `ready` 화면(힌트 줄 없음) 기준입니다. 힌트·알림 줄이 있으면 버튼이 아래로 내려가므로 화면을 찍어 보고 좌표를 고칩니다.
+좌표는 1920x720 화면 픽셀입니다.
+
+- [지금 재부팅]은 오른쪽 칸 맨 아래에 붙어 있어 힌트·알림 줄과 관계없이 (1600, 672)입니다.
+- 확인 창의 [재부팅]은 (1200, 471)입니다.
+- 왼쪽 위 `<`([닫기])는 (60, 85)입니다.
+- 버튼 안내(보냄·거절·실패)는 버튼 바로 위에 나옵니다.
 
 ```sh
 ADB=$ANDROID_HOME/platform-tools/adb
 shot() { $ADB exec-out screencap -p > out/emu/$1.png; }
 
-# 1. 감시자 없음 → 확인 창 없이 노란 "상태 화면을 닫았다가 다시 연 뒤 눌러 주세요."
+# 1. 감시자 없음 → 확인 창 없이 노란 띠 "상태 화면을 닫았다가 다시 연 뒤 눌러 주세요."
 sh tests/emu/shot.sh ready
 sh tests/emu/watch.sh off
-$ADB shell input tap 110 222;  shot rb-nowatch
+$ADB shell input tap 1600 672; shot rb-nowatch
 
-# 2. 감시자 있음 → 확인 창 → [재부팅] → "재부팅합니다…", 버튼 꺼짐
+# 2. 감시자 있음 → 확인 창 → [재부팅] → 어두운 상자 "재부팅합니다…", 버튼 글자 회색(꺼짐)
 sh tests/emu/watch.sh on
-$ADB shell input tap 110 222;  sleep 1; shot rb-confirm
-$ADB shell input tap 1211 476; sleep 1; shot rb-sent
+$ADB shell input tap 1600 672; sleep 1; shot rb-confirm
+$ADB shell input tap 1200 471; sleep 1; shot rb-sent
 
-# 3. root가 부팅 보호로 거절 → 노란 RB_GUARD, 버튼 다시 켜짐
+# 3. root가 부팅 보호로 거절 → 노란 띠 RB_GUARD, 버튼 다시 켜짐(시안 글자)
 sh tests/emu/watch.sh answer guard; sleep 2; shot rb-guard
 
-# 4. 재부팅 명령이 돌아옴 → 빨간 RESET 안내
-$ADB shell input tap 110 222;  sleep 1
-$ADB shell input tap 1211 476; sleep 1
+# 4. 재부팅 명령이 돌아옴 → 빨간 띠 RESET 안내
+$ADB shell input tap 1600 672; sleep 1
+$ADB shell input tap 1200 471; sleep 1
 sh tests/emu/watch.sh answer cmd; sleep 2; shot rb-failed
+
+# 5. 왼쪽 위 < → 화면이 닫히고 런처로 돌아감
+$ADB shell input tap 60 85; sleep 1; shot closed
 ```
 
 `watch.sh answer`는 앱이 쓴 `reboot.req`의 id를 그대로 씁니다. [재부팅]을 누르기 전에 부르면 요청이 없다고 멈춥니다.
@@ -183,13 +199,16 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
 
 - root 쪽 스크립트(`svc/hotspot.sh`, `bin/status.sh --watch`), HMG-API 엔진, 실제 Wi-Fi·카플레이·안드로이드 오토. 판정 코드가 맞게 나오는지는 `tests/mod-test.sh`가 봅니다.
 - 차의 Android와의 차이(에뮬레이터는 Android 7.0): 글꼴, 화면 밀도, 위젯 모양, SELinux와 파일 권한(차에서 앱이 `/data/local/tmp` 파일을 읽을 수 있는지).
+  - 화면 크기는 밀도가 아니라 화면 폭에 맞춰 늘이거나 줄이므로(`Ui.px`) 밀도가 달라도 배치는 같습니다.
+  - 에뮬레이터 맨 위의 Android 상태 줄(시각·배터리)이 차에서 어떻게 보일지는 이 시험이 보지 않습니다.
+- 순정 화면과 얼마나 같은지. 색·크기는 매뉴얼 그림에서 잰 근사값입니다([#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)).
 - 차의 실제 재부팅. 이 시험의 `watch.sh`는 감시자의 답만 흉내 냅니다.
 
 ## 마지막 결과
 
-2026-11-19, 앱 2.0.0(versionCode 38), 에뮬레이터 37.2.13, Android 7.0 arm64 이미지.
+2026-11-20, 앱 2.0.0(versionCode 38, 순정 5W 모양 #28), 에뮬레이터 37.2.13, Android 7.0 arm64 이미지.
 
-- 시나리오 9개 모두 위 표대로 나옴.
-- [지금 재부팅] 4단계(감시자 없음, 확인 창, 요청 보냄, `guard`·`cmd` 답) 모두 위 표대로 나옴. `reboot.req`는 `<id> <boot_id> <초>` 형식.
-- `logcat` 크래시 없음.
+- 시나리오 9개 모두 위 표대로 나옴. 바꾸기 전(2026-11-19 모양)과 나란히 찍어 비교함.
+- [지금 재부팅] 4단계(감시자 없음, 확인 창, 요청 보냄, `guard`·`cmd` 답)와 `<` 닫기 모두 위대로 나옴. `reboot.req`는 `<id> <boot_id> <초>` 형식.
+- `logcat`에 이 앱의 크래시 없음. 에뮬레이터가 켜질 때 시스템의 `BatteryService`가 남긴 크래시 한 건은 앱과 관계없음.
 - 사소한 점: 확인 창이 떠 있는 동안 그 뒤에 직전 안내(예: 감시자 없음)가 남아 보임. [재부팅]을 누르면 바로 바뀜.
