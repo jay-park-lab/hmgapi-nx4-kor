@@ -13,3 +13,6 @@
 
 # Claude Code 작업 공간(세션마다 만드는 git worktree)
 /.claude/worktrees/
+
+# 브라우저 도구(Playwright MCP)가 실행한 폴더에 남기는 기록
+/.playwright-mcp/

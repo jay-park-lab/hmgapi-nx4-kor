@@ -108,6 +108,34 @@ gh pr create --base main --head hotfix/<판>
 gh pr create --base develop --head hotfix/<판>
 ```
 
+### 워크트리에서 할 때
+
+Claude 세션이 메인 체크아웃이 아닌 작업 트리(`.claude/worktrees/*` 등)에서 돌 때입니다. 한 저장소의 브랜치는 한 트리에서만 열 수 있어서, `develop`·`main`이 메인 체크아웃에 열려 있으면 위의 `git switch develop`을 쓸 수 없습니다. 어느 트리에 무엇이 열려 있는지는 `git worktree list`로 봅니다.
+
+```sh
+git fetch origin
+git switch -c feature/<주제> origin/develop
+# 고치고 커밋, 푸시, PR은 위와 같음
+```
+
+합친 뒤:
+
+```sh
+git fetch origin
+git switch --detach origin/develop
+git branch -d feature/<주제>
+```
+
+- **로컬 `develop`·`main`·`release/*`를 `git fetch origin <브랜치>:<브랜치>`나 `git update-ref`로 옮기지 않습니다.**
+  - 이 PC의 git 2.33은 다른 트리에 열린 브랜치도 막지 않고 옮깁니다. 그러면 그 트리는 HEAD만 새 커밋으로 가고 파일과 인덱스는 예전 그대로 남습니다.
+  - 그 트리의 `git status`에는 방금 합친 PR을 되돌리는 스테이징 변경으로 보이고, 그대로 브랜치를 만들어 커밋하면 PR이 되돌려집니다(2026-11-20, #11·#29를 합친 뒤 두 번 일어남, [#25](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/25)).
+  - 메인 체크아웃의 로컬 `develop`은 메인 체크아웃에서 `git pull --ff-only`로 맞춥니다.
+- **알아보는 법:** `git status`에 하지 않은 스테이징 변경이 있고 `git reflog <브랜치>` 맨 위가 `fetch origin <브랜치>:<브랜치>`이면 이 경우입니다.
+- **맞추는 법:**
+  - `git diff --cached --stat <reflog에서 바로 앞 커밋>`이 비어 있으면 남은 흔적뿐입니다. 사용자에게 확인한 뒤 `git restore --source=HEAD --staged --worktree -- <파일>`로 맞춥니다.
+  - 비어 있지 않으면 그 트리에서 하던 작업이 섞여 있으니 손대지 말고 사용자에게 묻습니다.
+- **`.env.local`:** git이 무시하는 파일이라 워크트리에는 없습니다. 시험과 빌드에는 메인 체크아웃의 것을 가리킵니다(`NX4_ENV_FILE=<메인 체크아웃>/.env.local sh tests/mod-test.sh`). 주지 않으면 `mod-test.sh`는 빌드·HMG-API 엔진 시험을 건너뛰고, `scripts/build-app.sh`·`build.sh`는 값이 없다며 멈춥니다.
+
 ## 강제 장치
 
 | 장치 | 막는 것 | 상태 |
