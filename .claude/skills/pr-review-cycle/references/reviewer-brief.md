@@ -74,9 +74,13 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
 0. **시작 기록** — 다른 일을 하기 전에, 끝에서 비교할 체크아웃 상태를 적어 둔다(기록은 체크아웃 밖, 예: `mktemp -d` 로 만든
    임시 폴더의 파일).
    - `pwd` 가 지시문의 "로컬 체크아웃" 경로와 같은지 본다. 다르면 아무것도 하지 말고 그 사실만 알린다.
-   - 체크아웃 루트에서 `git status --short`, `git rev-parse HEAD`, `git worktree list`
+   - 체크아웃 루트에서 `git status --short`, `git rev-parse HEAD`
+   - 추적 파일 내용: `git diff HEAD --binary | shasum`. 이미 수정돼 있던 파일을 더 고친 것은 `git status --short` 줄이
+     그대로라 이것으로만 보인다.
    - git 이 무시하는 빌드 결과: `shasum mod/app/NX4KOR.apk out/*.zip`. `git status` 에는 나오지 않지만
      `scripts/build-app.sh`·`scripts/build.sh` 가 체크아웃에서 돌면 여기가 바뀐다. 파일이 없으면 없다고 적는다.
+   - `git worktree list` 에서는 체크아웃 자신의 줄(경로·HEAD·브랜치)만 적는다. 다른 줄은 다른 세션·다른 PR 리뷰어의
+     것이라 리뷰와 상관없이 바뀐다.
    - 재리뷰 때도 매번 새로 적는다(그사이 메인 쪽이 체크아웃을 바꿨을 수 있다).
 1. **맥락** — PR 본문과 변경 파일(`gh pr view <PR> --json title,body,files,baseRefName,headRefName,headRefOid`),
    전체 diff(`gh pr diff <PR>`), 관련 코드, `CLAUDE.md`·`docs/git-flow.md`·`docs/design.md` 를 읽는다.
@@ -97,8 +101,10 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
    - 끝나면 체크아웃 루트에서 `git worktree remove --force <W>` 로 지우고, 임시 폴더도 지운다. 지우는 것은 내가 만든
      `<W>` 하나뿐이다. `git worktree list` 에 보이는 다른 워크트리(다른 PR 의 리뷰어, 다른 세션)는 건드리지 않는다.
    - 돌려주기 전에 체크아웃 루트에서 0 의 기록과 비교한다: `git status --short`, `git rev-parse HEAD`,
-     `git worktree list`(`<W>` 가 빠진 것 말고 같은지), 무시된 빌드 결과의 `shasum`. 다르면 고치려 하지 말고 무엇이
-     어떻게 다른지 알림에 그대로 적는다.
+     `git diff HEAD --binary | shasum`, 무시된 빌드 결과의 `shasum`, `git worktree list` 의 체크아웃 줄이 같고 내 `<W>` 가
+     없어졌는지. 다르면 고치려 하지 말고 무엇이 어떻게 다른지 알림에 그대로 적는다. 다른 워크트리 줄이 바뀐 것은 "체크아웃과
+     무관" 으로 따로 적는다.
+   - 비교를 마치면 0 의 기록 폴더도 지운다.
 3. **판단** — 다음을 본다.
    - 정확성: 버그, 경계 조건, 오류 처리, 회귀
    - 차에서 도는 스크립트(`mod/svc`, `mod/bin`, `mod/scripts`, `usb/troubleShooter`): 차의 셸은 mksh 다. bash 전용
