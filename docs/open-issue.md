@@ -73,6 +73,42 @@
 - 안: 계획의 `conflict:` 이유를 따로 가려 "다른 모드(<id>)와 같은 훅을 씁니다. HMG-API 앱에서 한쪽을 꺼 주세요" 같은 판정과 문구를 둡니다. 다른 모드만 꺼지는 경우에는 이 모드의 자동 설정을 막지 않을지도 함께 정합니다.
 - 정할 것: 고칠지, 고친다면 위 두 경우를 어떻게 다룰지. 바꾸면 `tests/mod-test.sh`의 자동 설정·상태 판정 시험도 더합니다.
 
+### OI-6. HMG-API rc.6부터 바뀐 부팅 보호에 상태 판정과 [지금 재부팅] 거절을 맞출지
+
+- 기록: 2026-11-20
+- 지금: `mod/bin/status.sh`는 HMG-API 1.1.0-rc.4의 부팅 보호 규칙을 전제로 합니다.
+  - rc.4: zygote가 120초를 못 버틴 시작이 재부팅을 넘어 3번 이어지면(`/data/hmgapi/hook/starts` ≥ 3) 그 시작의 훅을 끕니다.
+  - rc.6부터(HMG-API 커밋 `6247107` "Boot guard: quick restarts aren't crashes", `core/zygote/zygote.c`): 한 커널 부팅 안에서 3번(훅이 시스템을 죽여 같은 부팅에서 zygote가 다시 뜨는 경우), 또는 재부팅을 넘어 6번 이어질 때만 끕니다. 부팅마다의 횟수는 새 파일 `hook/boot`(`<boot_id> <횟수>`)에 둡니다. 커널 로그 줄은 `hooks off (boot guard, starts=N, this boot M)`, `hooks on, start N (this boot M)`으로 바뀌었습니다.
+  - 그래서 HMG-API가 rc.6 이상인 차에서는 우리 쪽이 지나치거나 틀립니다.
+    - [지금 재부팅] 거절(`status.sh` `rb_result guard`): `starts`가 2·3이면 거절하고, 앱은 "3분 안에 재부팅을 반복하면 HMG-API가 무선 기능을 끕니다"(`Report.RB_GUARD`)를 보입니다. rc.6 이상에서는 6번까지 괜찮으므로 필요 없는 거절이고 문구도 맞지 않습니다.
+    - `bootguard` 판정의 대비 갈래: 이번 부팅 커널 로그에 zygote 줄이 없을 때 `starts` ≥ 4면 부팅 보호로 봅니다. rc.6 이상에서는 `starts`가 4·5여도 훅이 켜져 있을 수 있습니다. 커널 로그 줄로 보는 기본 갈래(`hooks off (boot guard` 글자)는 rc.6 이후에도 맞습니다.
+  - 배포 워크플로가 릴리스 USB에 함께 넣는 HMG-API를 rc.7로 옮기면(OI-2, #11) 새로 설치하는 차는 rc.7이 됩니다.
+- 안:
+  1. 설치된 HMG-API 판(`installed.txt`)을 보고 규칙을 고릅니다(rc.6 미만은 지금처럼, 이상은 새 규칙).
+  2. `hook/boot`가 있으면 rc.6 이후로 보고 그 파일의 이번 부팅 횟수와 `starts`(6 기준)로 판단합니다.
+  3. 지금처럼 둡니다(거절이 지나칠 뿐 위험하지는 않음).
+- 정할 것: 어느 안으로 할지. 바꾸면 `mod/bin/status.sh`(거절과 `bootguard` 판정), 앱 `Report.RB_GUARD` 문구(앱 판 번호 → `release/`), `tests/mod-test.sh`의 부팅 보호 시험, `tests/ReportTest.java`를 함께 고칩니다. OI-2(최소 판)와 함께 정하는 것이 좋습니다.
+
+### OI-7. HMG-API "집 Wi-Fi"가 켜져 있으면 상태 화면에서 알릴지
+
+- 기록: 2026-11-20
+- 지금: HMG-API 1.1.0-rc.5부터 있는 "집 Wi-Fi"는 켜면 주차했을 때 프로젝션 핫스팟을 끄고 차의 Wi-Fi 클라이언트를 켜며, Android Wi-Fi 설정(`wpa_supplicant.conf`)을 다시 씁니다. 이 모드의 핫스팟과 Wi-Fi 잠금과 부딪힐 것으로 봅니다(시험하지 않음). 문서로만 "켜지 않습니다"라고 안내합니다([`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때", README "알아 두실 점", #11). 상태 화면은 이것을 모릅니다.
+- 안: `mod/bin/status.sh`가 집 Wi-Fi 스위치를 읽어(HMG-API rc.7 `engine/HomeWifi.java`: `/data/hmgapi/settings/allow/home_wifi` 파일, 또는 `hmgapi.json`의 `"home_wifi": true`) 켜져 있으면 판정(예: `homewifi`)과 "HMG-API 앱에서 집 Wi-Fi를 꺼 주세요" 안내를 냅니다.
+- 정할 것: 안내만 할지(다른 판정 아래), 앞쪽 판정으로 둘지, 그대로 문서로만 둘지. 바꾸면 `tests/mod-test.sh`의 판정 시험과 앱 문구(앱 판 번호 → `release/`)도 함께 고칩니다.
+
+### OI-8. HMG-API의 프로젝션 AP 보정이 순정 AP 경로와 부딪히면 어떻게 할지
+
+- 기록: 2026-11-20
+- 지금: HMG-API 1.1.0-rc.5부터 한국 260902 현대·기아 빌드에서 무선 프로젝션 AP(apMode 2)를 폰에 알린 이름·비밀번호로 띄우게 고칩니다(HMG-API `hook/ProjectionAp.java`). 관련 훅 지점 5개가 NX4 map에 모두 있을 때만 돕니다. 이 모드는 순정 무선 카플레이가 있는 트림에서 순정 AP를 그대로 쓰는 경로(`stock_ap_mode`)가 있어, 둘이 함께 돌 때 어떻게 되는지 모릅니다. 확인할 일은 [`design.md`](design.md) "차에서 확인할 것"에 있습니다(#11).
+- 정할 것: 차에서 부딪히는 것이 보이면 무엇을 할지. 예: 그 트림에서는 HMG-API 보정에 맡기고 `stock_ap_mode`를 보정에 맞춤, 또는 보정을 끄는 방법을 찾아 안내. 부딪히지 않으면 확인 결과를 적고 닫습니다.
+
+### OI-9. HMG-API 차 이벤트(주차·시동 끔·깨어남)를 쓸지
+
+- 기록: 2026-11-20
+- 지금: 쓰지 않습니다. HMG-API 1.1.0-rc.5부터 모드가 `mod.json`에 `"car_events"`로 원하는 이벤트를 적으면, HMG-API가 `hmgapi.intent.action.CAR_EVENT` 방송(보낸이는 `DEVICE_POWER` 권한이 있는 HMG-API)으로 알려 줍니다: `parked`(주차하고 운전자가 떠남), `unparked`, `shutdown`(몇 초 뒤 꺼짐), `wake`(QuickBoot에서 깨어남). 모드의 훅 코드뿐 아니라 모드의 앱도 이 방송을 받으므로(HMG-API rc.7 `hook/CarEvents.java`), `hooks.jar`를 다시 빌드하지 않고 상태 화면 앱만으로도 받을 수 있습니다.
+- 쓸 곳 후보: `shutdown` 때 핫스팟·DHCP를 정리하고 기록을 마무리, `parked` 때 핫스팟을 꺼 폰이 차를 떠난 뒤 붙어 있지 않게, `wake` 때 핫스팟을 다시 확인. 앱이 받아 root 서비스에 알리는 길(지금 `reboot.req` 같은 파일)이 필요합니다.
+- 정할 것: 쓸지, 쓴다면 어느 이벤트에 무엇을 할지. 최소 판을 rc.5 이상으로 올려야 하므로 OI-2와 묶이고, 앱을 바꾸므로 `release/`에서 할 일입니다. 무선 모드를 rc.8로 옮기면(OI-3 선택지 3) 그쪽의 `park` 기능과 겹치는지도 봅니다.
+
 ## 닫힌 것
 
 아직 없습니다.
