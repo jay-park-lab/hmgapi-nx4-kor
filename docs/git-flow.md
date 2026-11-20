@@ -122,10 +122,16 @@ gh pr create --base develop --head hotfix/<판>
 
 - **폴더:** `.claude/worktrees/<이름>`에 만듭니다(git이 무시하는 폴더). 이름은 `feature/<주제>`면 `<주제>`, `release/<판>`·`hotfix/<판>`이면 `release-<판>`·`hotfix-<판>`입니다.
 - **다른 브랜치에서 시작하는 일:** 사용자가 정한 예외로 `release/<판>`에 넣는 `feature/` 브랜치 등이 그렇습니다. 같은 방법으로 만들고 시작점만 `origin/<그 브랜치>`로 바꿉니다.
+- **이미 있는 브랜치를 이어서 고칠 때**(열린 PR의 리뷰 반영 등): 메인 체크아웃에서 `git switch`로 그 브랜치를 열지 않습니다.
+  - 그 브랜치가 열린 워크트리가 `git worktree list`에 있으면 그 워크트리에서 고칩니다.
+  - 없으면 `git fetch origin` 뒤 만듭니다.
+    - 로컬 브랜치가 있으면 `git worktree add .claude/worktrees/<주제> feature/<주제>`. 원격보다 뒤처졌으면 그 워크트리에서 `git pull --ff-only` 합니다.
+    - 로컬 브랜치가 없으면 `git worktree add -b feature/<주제> .claude/worktrees/<주제> origin/feature/<주제>`. 이때는 원격 브랜치를 따라가야 하므로 `--no-track`을 주지 않습니다.
 - **Claude 세션:**
-  - 메인 체크아웃에서 시작한 세션은 위 `git worktree add`로 만든 뒤 `EnterWorktree`의 `path`로 그 워크트리에 들어가 작업합니다.
+  - 메인 체크아웃에서 시작한 세션은 위 `git worktree add`로 만든 뒤 `EnterWorktree`의 `path`로 그 워크트리에 들어가 작업합니다. 이미 있는 워크트리도 같습니다.
   - `EnterWorktree`의 `name`으로 새로 만들지 않습니다. 그 길은 GitHub 기본 브랜치(`main`)에서 규칙 2에 맞지 않는 이름의 브랜치를 만듭니다.
   - 지울 때는 `ExitWorktree`(`keep`)로 메인 체크아웃에 돌아온 뒤 위의 `git worktree remove`를 합니다. `path`로 들어간 워크트리는 `ExitWorktree`가 지우지 않습니다.
+  - `ExitWorktree`는 사용자가 요청할 때만 부르는 도구입니다. 그래서 합칠지 물을 때 "합친 뒤 워크트리에서 나와 워크트리와 브랜치를 지운다"를 함께 묻고, 사용자가 고르면 부릅니다.
 - **데스크톱 앱이 워크트리로 연 세션:** 앱이 처음부터 `.claude/worktrees/<이름>`(브랜치 `claude/<이름>`)에서 연 세션은 이미 따로 떨어져 있습니다. 그 안에서 작업 브랜치를 만듭니다. 워크트리 폴더는 앱이 정리합니다.
 
   ```sh
@@ -146,7 +152,14 @@ gh pr create --base develop --head hotfix/<판>
   - 워크트리에 커밋하지 않은 변경이나 git이 모르는 파일이 있으면 `git worktree remove`가 멈춥니다. `--force`로 지우지 말고 무엇이 남았는지 봅니다.
   - git이 무시하는 빌드 결과(`out/`, `mod/app/`)는 워크트리와 함께 지워집니다.
   - 다른 세션의 워크트리(`git worktree list`의 다른 줄)는 건드리지 않습니다.
-- **stash:** stash 목록은 모든 트리가 함께 씁니다. 맨 `git stash`·`git stash pop`은 다른 트리가 넣은 것을 꺼낼 수 있습니다. 커밋하지 않은 변경을 다른 트리로 옮길 때는 `git stash push -u -m <고유한 이름>`으로 넣고, 옮길 트리에서 그 항목의 SHA로 `git stash apply <SHA>` 합니다. 옮긴 것을 확인한 뒤 그 항목만 지웁니다.
+- **stash:** stash 목록은 모든 트리가 함께 씁니다. 맨 `git stash`·`git stash pop`은 다른 트리가 넣은 것을 꺼낼 수 있습니다.
+  - 커밋하지 않은 변경을 다른 트리로 옮길 때는 내 파일만 경로로 넣습니다.
+  - 경로를 주지 않으면 그 트리에 있던 다른 작업의 변경(`-u`라 미추적 파일 포함)까지 함께 옮겨집니다. 그러면 규칙 11이 막으려는 일이 그대로 일어납니다(2026-11-20, PR #33 리뷰에서 확인).
+  - 순서:
+    1. `git stash push -u -m <고유한 이름> -- <내 파일>…`
+    2. 옮길 트리에서 `git stash list --format='%H %gd %gs'`로 그 이름의 SHA를 찾아 `git stash apply <SHA>` 합니다.
+    3. 옮긴 것을 확인한 뒤, 같은 목록에서 이름으로 지금의 `stash@{n}`을 다시 찾아 `git stash drop stash@{n}` 합니다.
+  - `git stash drop`은 SHA를 받지 않습니다(`is not a stash reference`). 그사이 다른 트리가 넣으면 `n`이 바뀌므로 지우기 직전에 다시 찾습니다.
 - **로컬 `develop`·`main`·`release/*`를 `git fetch origin <브랜치>:<브랜치>`나 `git update-ref`로 옮기지 않습니다.**
   - 이 PC의 git 2.33은 다른 트리에 열린 브랜치도 막지 않고 옮깁니다. 그러면 그 트리는 HEAD만 새 커밋으로 가고 파일과 인덱스는 예전 그대로 남습니다.
   - 그 트리의 `git status`에는 방금 합친 PR을 되돌리는 스테이징 변경으로 보이고, 그대로 브랜치를 만들어 커밋하면 PR이 되돌려집니다(2026-11-20, #11·#29를 합친 뒤 두 번 일어남, [#25](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/25)).
