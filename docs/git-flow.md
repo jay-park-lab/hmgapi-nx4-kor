@@ -133,6 +133,7 @@ gh pr create --base develop --head hotfix/<판>
   - 메인 체크아웃에서 시작한 세션은 위 `git worktree add`로 만든 뒤 `EnterWorktree`의 `path`로 그 워크트리에 들어가 작업합니다. 이미 있는 워크트리도 같습니다.
   - `EnterWorktree`의 `name`으로 새로 만들지 않습니다. 그 길은 GitHub 기본 브랜치(`main`)에서 규칙 2에 맞지 않는 이름의 브랜치를 만듭니다.
   - 지울 때는 `ExitWorktree`(`keep`)로 메인 체크아웃에 돌아온 뒤 위의 `git worktree remove`를 합니다. `path`로 들어간 워크트리는 `ExitWorktree`가 지우지 않습니다.
+  - 사용자에게 물어서 빌려 쓴 다른 세션의 워크트리는 `ExitWorktree`(`keep`)로 나오기만 하고, 워크트리와 로컬 브랜치는 지우지 않습니다. 워크트리가 브랜치를 열고 있어 `git branch -d`도 막힙니다. 남았다고 알리고, 지우려면 사용자에게 묻습니다.
   - `ExitWorktree`는 사용자가 요청할 때만 부르는 도구입니다. 그래서 합칠지 물을 때 "합친 뒤 워크트리에서 나와 워크트리와 브랜치를 지운다"를 함께 묻고, 사용자가 고르면 부릅니다.
 - **데스크톱 앱이 워크트리로 연 세션:** 앱이 처음부터 `.claude/worktrees/<이름>`(브랜치 `claude/<이름>`)에서 연 세션은 이미 따로 떨어져 있습니다. 그 안에서 작업 브랜치를 만듭니다. 워크트리 폴더는 앱이 정리합니다.
 
