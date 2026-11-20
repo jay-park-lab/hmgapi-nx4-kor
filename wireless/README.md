@@ -14,6 +14,7 @@ NX4 KOR 모드(`mod/`)의 무선 부분은 Korea Projection(StopDragon)이 HMG-A
 - 컴파일용 Android·벤더 클래스 시그니처: [`stubs/`](stubs/README.md)(빌드 때만 씁니다, 모드에는 넣지 않음)
 - 모드 id가 `nx4-kor`로 바뀌어 차주 설정 파일은 `/data/hmgapi/settings/nx4-kor.json`입니다(예전 `wireless-carplay-aa.json`은 넘어오지 않음).
 - `hooks.jar`가 쓰는 HMG-API 런타임 API(메서드 30개, 필드 15개, 재정의 4개)와 훅 지점은 HMG-API 1.1.0-rc.4에 모두 같은 꼴로 있습니다(2026-11-19 확인). 다시 빌드하지 않았습니다.
+- 1.1.0-rc.7에서도 이 모드의 훅 지점 36개 정의는 rc.4와 한 글자도 다르지 않습니다(카탈로그 `core/hookpoints/*.json`). 런타임 API(`hmgapi.hook`, `hmgapi.vehicle`)에서 바뀐 공개 멤버는 더해진 것(`ModContext.onCarEvent` 등)뿐이고, 빠지거나 꼴이 바뀐 것은 없습니다(2026-11-20, rc.4·rc.7 소스 비교).
 
 ## 바탕이 된 것
 
@@ -33,24 +34,67 @@ NX4 KOR 모드(`mod/`)의 무선 부분은 Korea Projection(StopDragon)이 HMG-A
 
 - 1.7.1의 차로 조합 그림 표는 seogaemo(커밋 `26eeb97`, AGPL-3.0)에서 옮겼습니다. 출처는 소스 파일 머리말에 적었습니다.
 
-## 공식 무선 모드 v2.2.0-rc.5와 비교 (2026-11-19)
+## 공식 무선 모드 v2.2.0-rc.8과 비교 (2026-11-20)
 
-[v2.2.0-rc.5](https://github.com/Open-HMG/hmgapi-wireless-cp-aa/releases/tag/v2.2.0-rc.5)(2026-11-18, `hmgapi >=1.1.0-rc.3`)와 비교했습니다.
+[v2.2.0-rc.8](https://github.com/Open-HMG/hmgapi-wireless-cp-aa/releases/tag/v2.2.0-rc.8)과 비교했습니다.
+- 발행일 2026-11-20, 태그 커밋 `c47c0bb`, `hmgapi >=1.1.0-rc.6`. HMG-API 1.1.0-rc.7과 함께 나왔습니다.
+- 소스(`wireless-carplay-aa/`의 `mod.json`, `patches.json`, `settings.json`, 레시피, `libleafiaaac.so`)와 릴리스 설명을 봤습니다.
+- 지난 비교는 v2.2.0-rc.5(2026-11-19)였습니다. 그 릴리스는 지금 없습니다.
 
-| 항목 | 2.4.5(한국 포크, 이 모드) | v2.2.0-rc.5 |
+| 항목 | 2.4.5(한국 포크, 이 모드) | v2.2.0-rc.8 |
 |---|---|---|
-| 지원 차 | 한국 차(이 모드는 NX4만) | 미국·캐나다 7항목. **한국 차·NX4 없음** |
+| 지원 차 | 한국 차(이 모드는 NX4만) | `system` 18항목. 미국·캐나다, 한국 260902는 기아만입니다. **NX4와 한국 현대 차는 없습니다.** 차별 패치 세트 17개에도 `NX4`가 없습니다 |
+| HMG-API 최소 판 | `>=1.1.0-rc.4` | `>=1.1.0-rc.6` |
 | 순정 핫스팟 메뉴 | `patches.json`의 featurexml 줄 주석 | `"wifi": {"hotspot": true}`(HMG-API가 같은 줄을 처리) |
-| 훅 지점 | 36개 | 36개에 4개 더함(`btsettings.projection_helper.open_wireless_page`, `iap2.init_info.use_vehicle_information`·`use_vehicle_status`, `dipo.carplay.disable_bluetooth`) |
-| 네이티브 레시피 | 5개 | 3개 더함(한국 260902 빌드 `libCarPlayCore` 프레임 레시피 `carplay-core-frames-ef49c09b`, 캐나다 AA, 260507 identity) |
-| 한국 포크에만 | AA 핫스팟 신호(`sys.kp.aa_ap`), AA 준비 다시 보내기, 별표 키 팝업 건너뜀, `tbt_fit` 보정, SPP 재시도, 한국어 UTF-8 수정 AA 레시피 | — |
-| rc.5에만 | — | 1분쯤 뒤 무선 카플레이 끊김 수정(BT 유지), 길안내 재연결, Wi-Fi 끊김 10초 버티기, `libleafiaaac` 경쟁 수정, 방화벽·공유 identity 설정 |
+| 훅 지점 | 36개 | 49개. 우리 36개는 같은 이름·같은 방식(replace/change/observe)으로 다 있고, 13개가 더 있습니다(아래) |
+| 네이티브 레시피 | 5개 | 8개. 아래 "네이티브 레시피" 참고 |
+| `libleafiaaac.so` | md5 `a63e6492f38d541518b9606a978f5da3` | md5 `8b8e33a2a1669325e0d54bc355034ed6`. 소스에 코덱 로딩 경쟁 수정과 0비트 PCM 허용이 있습니다 |
+| 설정 | 한국 포크에만: `tbt_fit`, `aa_ready_resend`, `aa_name_hold`, `star_popup_skip` | rc.8에만: `park`, `shared_identity`(둘 다 기본 켬), `tbt_standard`, `aa_firewall`, `cp_firewall`, `carplay_log`(모두 기본 끔). 같이 있는 6개(`tbt`, `bridge`, `audio`, `now_playing`, `menu`, `usb_drives`)는 기본값이 같습니다 |
+| 한국 포크에만 | AA 핫스팟 신호(`sys.kp.aa_ap`), AA 준비 다시 보내기, 별표 키 팝업 건너뜀, `tbt_fit`·`aa_name_hold` 보정, 블루투스 SPP 재시도, 한국어 UTF-8 수정 AA 레시피 | — |
+| rc.8에만 | — | 아래 "rc.8에만 있는 동작" 참고 |
 
-- **rc.5를 그대로 쓸 수는 없습니다.** 한국 차를 받지 않고, 위 한국 포크 기능이 없습니다.
-- 그래서 지금은 2.4.5를 유지합니다. 차에서 시험해 볼 만한 것(코드 수정 없이):
-  - rc.5의 `carplay-core-frames-ef49c09b.recipe`를 `libCarPlayCore.so` 레시피 목록 맨 앞에 더하기. 이 레시피의 원본 md5는 한국 260902 빌드의 것과 같습니다. NX4 라이브러리와 맞는지는 차에서 확인해야 합니다.
-  - rc.5의 `libleafiaaac.so`로 바꾸기.
-- 길게 보면 한국 포크의 변경을 rc.5 위로 옮겨(BT 유지·재연결·`wifi.hotspot`을 받기) 다시 빌드하는 것이 좋습니다. 어느 쪽으로 갈지는 [#15](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/15)에서 정합니다.
+**rc.8에 더해진 훅 지점 13개**
+- rc.5 때도 있던 4개: `btsettings.projection_helper.open_wireless_page`, `iap2.init_info.use_vehicle_information`·`use_vehicle_status`, `dipo.carplay.disable_bluetooth`
+- 그 뒤 새로 생긴 9개: `gpm.receiver_service.on_create`·`disconnected`, `framework.pp_service.*` 6개, `framework.activity.start_activity_for_result`
+
+**네이티브 레시피**
+- 우리 5개와 같은 이름의 레시피
+  - AA 2개(`aa-tbt-48ee793a`, `aa-tbt-a0bea1c4`): 우리 것만 한국어 UTF-8 수정(32바이트)이 들어 있습니다.
+  - `carplay-core-wifi`: rc.8이 260507용 프레임 대기 패치를 더했습니다.
+  - `carplay-audio-formats`, `carplay-utils-converter`: 바이트까지 같습니다.
+- rc.8에만 있는 레시피
+  - `carplay-core-frames-ef49c09b`: 프레임 대기를 200ms에서 10s로 늘립니다.
+  - `aa-tbt-dbfe7bd2`: 캐나다·미국 빌드용입니다.
+  - `carplay-identification-fc7`: 260507용이고, `libcarplayidentity.so`와 rc.8 코드가 있어야 합니다.
+
+**rc.8에만 있는 동작**
+- rc.5까지 들어온 것
+  - 1분쯤 뒤 무선 카플레이가 끊기던 문제 수정(BT 유지)
+  - 길안내 재연결
+  - Wi-Fi가 끊겨도 10초 버티기
+  - 방화벽·공유 identity 설정
+- rc.6~rc.8에 들어온 것
+  - 주차하고 떠나면 무선을 끊고 다시 시동을 걸면 다시 연결(`park`, HMG-API car events)
+  - 두 폰이 다투지 않게 함
+  - "connect a phone" 팝업 수정(미국·캐나다)
+  - `carplay_log`
+  - 차종 추가(미국·캐나다 현대·기아, 한국 260902 기아 등)
+
+**rc.8을 그대로 쓸 수 없는 까닭**
+- **NX4가 지원 차와 패치 세트에 없습니다.** HMG-API rc.6부터는 "그래도 설치"를 고르면 패치 세트가 없다는 것이 경고로 바뀝니다. 다만 세트의 순정 파일을 기준으로 한 변경은 여전히 거절됩니다.
+- **위 한국 포크 기능이 없습니다.**
+- **더해진 훅 지점 13개 중 하나라도 NX4 map에 없으면** HMG-API가 이 모드의 훅을 통째로 끕니다.
+
+그래서 지금은 2.4.5를 유지합니다. 코드를 고치지 않고 차에서 시험해 볼 만한 것은 다음 셋입니다. NX4 라이브러리의 실제 md5는 아직 기록이 없어, 맞는지는 차에서 확인해야 합니다.
+- **rc.8의 `carplay-core-frames-ef49c09b.recipe`를 `libCarPlayCore.so` 레시피 목록 맨 앞에 더하기.**
+  - 원본 md5 `ef49c09b…`는 우리 `carplay-core-wifi`의 한국 빌드 표시(`kr-v039`) 줄과 같습니다.
+  - 검사 영역이 맞지 않으면 아무것도 쓰지 않습니다.
+- **rc.8의 `libleafiaaac.so`로 바꾸기.**
+  - 내보내는 함수와 가져오는 함수가 같고, 이 라이브러리를 부르는 utils 레시피도 바이트까지 같습니다.
+  - NX4 `libCarPlayUtils.so`가 변환기를 내장한 판(`e85385d7…`)이면 쓰이지 않습니다.
+- **NX4 AA 라이브러리가 `dbfe7bd2…`이면 `aa-tbt-dbfe7bd2.recipe` 더하기.** 우리 AA 레시피와 같은 한국어 UTF-8 수정을 넣어야 합니다.
+
+길게 보면 한국 포크의 변경을 rc.8 위로 옮겨 다시 빌드하는 것이 좋습니다. 그러면 BT 유지, 재연결, `park`, 두 폰 처리, `wifi.hotspot`을 얻습니다. 어느 쪽으로 갈지는 [#15](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/15)에서 정합니다.
 
 ## 직접 다시 만들기
 

@@ -39,8 +39,8 @@
 
 ## 필요한 것
 
-- **USB 묶음** `hmgapi-nx4-kor-버전-usb.zip`: 이 저장소의 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에서 받습니다. `v2.0.0-beta.2`부터 **HMG-API**(1.1.0-rc.4)가 함께 들어 있어, HMG-API가 없는 차도 이 USB 하나로 설치합니다. 직접 만들려면 [만들기와 시험](#만들기와-시험).
-  - `v2.0.0-beta.1`에는 HMG-API가 없습니다. 그 묶음을 쓰면 HMG-API [릴리스](https://github.com/Open-HMG/HMG-API/releases)의 `hmgapi-버전-usb.zip`으로 HMG-API를 먼저 설치합니다.
+- **USB 묶음** `hmgapi-nx4-kor-버전-usb.zip`: 이 저장소의 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에서 받습니다. `v2.0.0-beta.3`부터 **HMG-API**(1.1.0-rc.7)가 함께 들어 있어, HMG-API가 없는 차도 이 USB 하나로 설치합니다. 직접 만들려면 [만들기와 시험](#만들기와-시험).
+  - `v2.0.0-beta.1`에는 HMG-API가 없습니다. 그 묶음을 쓰면 HMG-API [릴리스](https://github.com/Open-HMG/HMG-API/releases)의 `hmgapi-버전-usb.zip`으로 HMG-API를 먼저 설치합니다. `v2.0.0-beta.2`는 빌드가 멈춰 릴리스가 없습니다.
 - **HMG-API는 1.1.0-rc.4 이상**이어야 합니다. 이미 있는 HMG-API가 이보다 낮으면 USB 묶음의 HMG-API로 먼저 올립니다(아래 "설치" 2).
 - FAT32로 포맷한 USB(32GB 이하 권장).
 
@@ -106,6 +106,9 @@ HMG-API 앱에서 NX4 KOR를 누르면 무선 기능 설정이 나옵니다. 모
 - **NEMESIS로 Korea Projection이나 다른 무선·핫스팟 패키지를 설치해 두었다면 먼저 지우세요.** 함께 두면 핫스팟을 다투고 무선 기능이 적용되지 않습니다. 같은 훅을 `replace`로 거는 다른 HMG-API 모드와도 함께 켤 수 없습니다. 자세한 것은 [`docs/design.md`](docs/design.md) "다른 패키지·모드와 함께 쓸 때".
 - 핫스팟이 켜져 있는 동안에는 내비가 휴대폰 핫스팟(일반 Wi-Fi)에 붙을 수 없습니다. Wi-Fi 칩 하나가 핫스팟 역할을 하기 때문입니다.
 - 내비의 일반 Wi-Fi 접속 기능을 잠급니다. Wi-Fi 설정 파일(`/data/misc/wifi/wpa_supplicant.conf`)의 소유자를 root로 바꿉니다. 그러지 않으면 내비의 Wi-Fi 서비스가 30초마다 Wi-Fi를 다시 시작해 핫스팟이 끊깁니다. 한국 내비에는 일반 Wi-Fi 메뉴가 없어 보통은 영향이 없고, 지우면 원래대로 되돌립니다.
+- **HMG-API 앱의 "집 Wi-Fi"(Settings > Home Wi-Fi, HMG-API 1.1.0-rc.5부터, 기본 꺼짐)는 켜지 마세요.** 켜면 두 가지가 일어납니다. 이 모드의 잠금·핫스팟과 부딪힐 수 있고, 함께 시험하지 않았습니다.
+  - 집 Wi-Fi 네트워크를 저장하거나 지울 때 위 Wi-Fi 설정 파일을 다시 써 잠금이 풀립니다.
+  - 차를 끈 지 30초 뒤나 주차하면 핫스팟을 끄고 내비를 집 Wi-Fi에 붙입니다.
 - 차 설정에서 ADB TCP가 켜져 있으면 HMG-API가 경고를 띄웁니다. 이 모드는 `192.168.43.x` 대역을 써서 영향이 없었습니다.
 - **계기판·HUD 길안내의 한계:** 폰의 지도 앱이 보내 주는 정보(다음 회전의 종류·방향·남은 거리·도로 이름)까지만 나와서 순정 내비와 똑같지 않습니다. 지하차도·고가차도 구분, 일부 갈림길·회전교차로 모양, 방면 표시는 다르거나 나오지 않을 수 있고, 지도 앱마다 보내는 정보가 다릅니다.
 - **map이 생기기 전(훅이 꺼진 동안)에는 HMG-API가 순정 OTA 업데이트를 막지 못합니다.** 펌웨어가 업데이트되면 HMG-API의 시스템 파일이 지워지니, 그때는 HMG-API부터 다시 설치합니다.
