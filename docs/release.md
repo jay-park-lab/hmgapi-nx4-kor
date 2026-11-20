@@ -124,11 +124,16 @@ gh variable set NX4_PKG_ZIP_URL --body https://github.com/StopDragon/korea-proje
 - **배포 키를 가진 job이 받는 까닭:** `build.sh`가 USB 묶음을 만들 때 넣어야 해서 `build` job에서 받습니다. 키를 꺼내기 전에 받고, 그 안의 것은 실행하지 않습니다. 풀어서 USB 묶음에 옮겨 담기만 합니다.
 - **라이선스:** HMG-API(AGPL-3.0)에서 설치에 쓰는 것만 고치지 않고 함께 배포합니다. `build.sh`가 USB 맨 위 `HMGAPI-SOURCE.txt`에 판, 대응 소스(태그), 뺀 것을 적습니다. 릴리스 글에는 대응 소스를 `HMGAPI_COMMIT`(커밋)으로 적습니다. 태그는 옮겨질 수 있기 때문입니다.
 - **PC 빌드:** `.env.local`의 `HMGAPI_USB_ZIP`이 없으면 NX4 KOR만 넣습니다.
+- **어느 HMG-API 판을 쓰나(2026-11-20 결정, [#22](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/22)):** 시험·빌드(`HMGAPI_COMMIT`)와 USB 묶음(`HMGAPI_USB_URL`·`HMGAPI_USB_SHA256`)에 쓰는 HMG-API 판의 규칙입니다.
+  - HMG-API 1.1.0 정식판이 나오기 전까지는 그때 나와 있는 가장 새 시험판(`1.1.0-rc.N`)을 따라갑니다.
+  - 1.1.0 정식판이 나온 뒤에는 정식 릴리스(GitHub에서 Pre-release가 아닌 판, 판 번호에 `-rc`·`-beta` 같은 꼬리가 없는 판)만 씁니다.
+  - HMG-API 파일의 사본을 이 저장소에 두지 않습니다. 늘 HMG-API 릴리스 주소에서 받고 SHA-256으로 확인합니다.
+  - 그래서 1.1.0 전에 쓰던 시험판이 지워지면 아래 "HMG-API가 릴리스를 지우면"대로 그때 가장 새 시험판으로 옮깁니다. 지금까지 HMG-API가 지운 것은 시험판(rc.4, rc.5)뿐이고, 정식판 1.0.2는 남아 있습니다.
 - **HMG-API가 릴리스를 지우면:** HMG-API는 새 시험판을 내면서 예전 시험판 릴리스를 지웁니다. 2026-11-20에 rc.4 릴리스가 지워져, `v2.0.0-beta.2` 실행이 "HMG-API USB 묶음" step의 다운로드(404)에서 멈췄습니다. 키를 꺼내기 전이라 키는 쓰이지 않았고, 릴리스도 만들지 않았습니다.
   - 고치려면 그때 있는 판으로 `HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`을 함께 옮깁니다. 바꿀 곳 목록은 [#14](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/14)에 있습니다.
   - 그 소스로 `tests/mod-test.sh`를 통과시킨 뒤 다음 번호의 태그를 답니다. 같은 태그는 다시 쓸 수 없습니다. 태그 push로 도는 워크플로는 그 태그 커밋의 `release.yml`을 쓰기 때문입니다.
   - 받을 수 있는지는 태그를 달기 전에 `curl -sSI -o /dev/null -w '%{http_code}\n' <HMGAPI_USB_URL>`로 봅니다. 200이나 302면 됩니다.
-  - 정식판 직전에 지워지면 차에서 확인하지 않은 판으로 옮겨야 합니다. 그래서 고정한 파일을 이 저장소에 사본으로 둘지는 [#22](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/22)에서 정합니다.
+  - 정식판 직전에 지워지면 차에서 확인하지 않은 판으로 옮겨야 합니다. 그래도 사본은 두지 않기로 했습니다(위 "어느 HMG-API 판을 쓰나").
 
 ## production 환경 (처음 한 번, 저장소 관리자)
 
@@ -232,7 +237,7 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
 
 ## 바꿀 때
 
-- HMG-API 판을 올리면 다음을 함께 바꿉니다.
+- HMG-API 판을 올리면 다음을 함께 바꿉니다. 어느 판으로 올릴지는 "HMG-API를 USB 묶음에 함께"의 "어느 HMG-API 판을 쓰나"를 따릅니다(1.1.0 정식판 뒤에는 정식 릴리스만).
   - `release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 주석
   - `release.yml`의 `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`(같은 판의 `hmgapi-<판>-usb.zip`)
   - 이 문서
