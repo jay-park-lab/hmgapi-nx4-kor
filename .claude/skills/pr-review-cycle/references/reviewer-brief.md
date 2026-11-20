@@ -38,9 +38,10 @@ PR 에 리뷰를 올린 뒤 짧은 알림만 돌려주세요.
   2. 고친 내용이 실제로 동작하는지(직접 재현)
   3. 새로 생긴 문제
   4. CI 결과(없으면 없다고)
+- 리뷰어 규칙이 지난번 뒤 바뀐 것: <바뀐 절과 요지, 없으면 "없음">
 
 리뷰 방법은 <체크아웃 절대 경로>/.claude/skills/pr-review-cycle/references/reviewer-brief.md 의
-"리뷰어 규칙" 절을 따라 주세요(지난번과 같습니다).
+"리뷰어 규칙" 절을 이번에도 처음부터 다시 읽고 따라 주세요. 기억에 기대지 마세요.
 ```
 
 ## 리뷰어 규칙
@@ -70,6 +71,13 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
 
 ### 순서
 
+0. **시작 기록** — 다른 일을 하기 전에, 끝에서 비교할 체크아웃 상태를 적어 둔다(기록은 체크아웃 밖, 예: `mktemp -d` 로 만든
+   임시 폴더의 파일).
+   - `pwd` 가 지시문의 "로컬 체크아웃" 경로와 같은지 본다. 다르면 아무것도 하지 말고 그 사실만 알린다.
+   - 체크아웃 루트에서 `git status --short`, `git rev-parse HEAD`, `git worktree list`
+   - git 이 무시하는 빌드 결과: `shasum mod/app/NX4KOR.apk out/*.zip`. `git status` 에는 나오지 않지만
+     `scripts/build-app.sh`·`scripts/build.sh` 가 체크아웃에서 돌면 여기가 바뀐다. 파일이 없으면 없다고 적는다.
+   - 재리뷰 때도 매번 새로 적는다(그사이 메인 쪽이 체크아웃을 바꿨을 수 있다).
 1. **맥락** — PR 본문과 변경 파일(`gh pr view <PR> --json title,body,files,baseRefName,headRefName,headRefOid`),
    전체 diff(`gh pr diff <PR>`), 관련 코드, `CLAUDE.md`·`docs/git-flow.md`·`docs/design.md` 를 읽는다.
 2. **직접 확인** — 체크아웃 밖 임시 폴더에 워크트리를 만들어 실행한다. 아래에서 `<W>` 는 그 워크트리의 절대 경로다.
@@ -86,9 +94,11 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
    - PR 본문이나 답글이 주장하는 것(수치, "고쳤다", "실패를 잡는다")은 재현해 확인한다. 시험이 늘 통과하는
      시험이 아닌지, 일부러 깨뜨려 실패하는지도 본다. 깨뜨릴 때는 `<W>/…` 의 파일을 절대 경로로 고치고, 체크아웃의
      파일은 건드리지 않는다.
-   - 끝나면 체크아웃 루트에서 `git worktree remove --force <W>` 로 지우고, 임시 폴더도 지운다.
-   - 돌려주기 전에 체크아웃 루트에서 `git status --short` 가 리뷰를 시작할 때와 같은지 본다. 다르면 고치려 하지 말고
-     알림에 그대로 적는다.
+   - 끝나면 체크아웃 루트에서 `git worktree remove --force <W>` 로 지우고, 임시 폴더도 지운다. 지우는 것은 내가 만든
+     `<W>` 하나뿐이다. `git worktree list` 에 보이는 다른 워크트리(다른 PR 의 리뷰어, 다른 세션)는 건드리지 않는다.
+   - 돌려주기 전에 체크아웃 루트에서 0 의 기록과 비교한다: `git status --short`, `git rev-parse HEAD`,
+     `git worktree list`(`<W>` 가 빠진 것 말고 같은지), 무시된 빌드 결과의 `shasum`. 다르면 고치려 하지 말고 무엇이
+     어떻게 다른지 알림에 그대로 적는다.
 3. **판단** — 다음을 본다.
    - 정확성: 버그, 경계 조건, 오류 처리, 회귀
    - 차에서 도는 스크립트(`mod/svc`, `mod/bin`, `mod/scripts`, `usb/troubleShooter`): 차의 셸은 mksh 다. bash 전용
@@ -157,4 +167,5 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
 - 등급별 지적 수 (예: 인라인 4건 — 반드시 1, 권장 2, 사소함 1)
 - 재리뷰면 지난 지적 판정 수 (해소 / 일부 / 미해소)
 - 직접 실행한 확인 한 줄(예: mod-test 102개 통과, 빌드·엔진 시험 포함)
+- 체크아웃 비교 결과: 시작 기록과 같음, 또는 무엇이 다른지
 - 이번에 본 head SHA
