@@ -86,6 +86,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 | HMG-API에 다른 모드의 적용 전 변경이 남아 있음 | `engine plan`에 이 모드 것이 아닌 변경이 섞입니다 | 자동으로 적용하지 않고 HMG-API 앱에서 적용하라고 안내합니다(상태 `otherplan`). 지울 때도 같습니다 |
 | 핫스팟을 띄우는 다른 패키지(USB 동글 패키지 등) | wlan0을 다툽니다 | 그 hostapd가 도는 동안 우리 핫스팟을 멈추고 비켜 줍니다. 처음 설정 전이면 자동 설정(무선 기능 적용)도 이번 부팅은 건너뛰고 다음 부팅에 다시 봅니다. 순정(netd)이 띄운 것이 아니고 연결도 없으면 상태 `otherwifi` |
 | 일반 Wi-Fi 접속(클라이언트)이 필요한 모드·앱 | Wi-Fi 잠금으로 wpa_supplicant가 뜨지 않아 접속할 수 없습니다 | 잠금은 이 모드를 지울 때 되돌립니다 |
+| HMG-API의 "집 Wi-Fi"(HMG-API 1.1.0-rc.5부터, HMG-API 앱 설정 > Home Wi-Fi, 기본 꺼짐) | 켜면 주차했을 때 HMG-API가 프로젝션 핫스팟을 끄고 차의 Wi-Fi 클라이언트를 켜 집 Wi-Fi에 붙습니다. 이때 Android Wi-Fi 설정(`wpa_supplicant.conf`)을 `wifi:wifi` 소유로 다시 씁니다(HMG-API `engine/HomeWifi.java`). 이 모드는 그 파일을 root로 잠그고 자체 hostapd로 핫스팟을 띄우므로, 잠금이 풀리거나 핫스팟과 클라이언트가 wlan0을 다툴 수 있습니다 | 막지 못하고, 시험하지 않았습니다. **켜지 않습니다**(README "알아 두실 점") |
 
 ## 차에서 확인할 것
 
@@ -98,5 +99,8 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - **HMG-API가 없는 차에서 릴리스 USB 하나로 설치되는지.** 첫 Update OTA에서 NX4 KOR 설치기가 스틱의 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)로 넘겨 HMG-API가 설치되고 재부팅되는지, 두 번째 Update OTA에서 NX4 KOR가 설치되는지(USB의 `HMGAPI/install.log`, `NX4/install.log`).
 - **HMG-API가 1.1.0-rc.4보다 낮은 차에서 HMG-API를 먼저 올리는지.** 첫 Update OTA가 따로 설치한 무선 모드(`wireless-carplay-aa`)를 지우지 않고 HMG-API 설치기의 업데이트 갈래로 HMG-API를 올린 뒤 재부팅하는지, 두 번째에 NX4 KOR가 설치되는지. HMG-API 설치기를 `/storage/upgrade`가 아니라 스틱의 `NX4/hmgapi`에서 `exec`로 돌리는 길은 차에서 처음 돕니다. NEMESIS로 설치한 HMG-API라면 NEMESIS 목록의 판도 함께 봅니다.
 - 순정 무선 카플레이가 있는 트림에서 순정 카플레이 AP 경로(`stock_ap_mode`)가 그대로 도는지.
+  - HMG-API 1.1.0-rc.5부터는 한국 260902 현대·기아 빌드에서, 무선 프로젝션 AP(apMode 2)를 폰에 알린 이름·비밀번호로 띄우게 고칩니다(HMG-API `hook/ProjectionAp.java`).
+  - 이 고침은 관련 훅 지점 5개가 NX4 map에 모두 있을 때만 돕니다(`framework.network_management_service.start_access_point`, `framework.wifi_configuration.*` 4개).
+  - 그 트림에서 폰이 순정 AP에 붙는지, AP 이름이 순정과 같은지 봅니다.
 
 정하지 않은 것은 [`open-issue.md`](open-issue.md)에서 관리합니다.

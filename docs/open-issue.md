@@ -39,18 +39,22 @@
     - 상태 화면 앱: `app/java/io/github/jayparklab/nx4kor/Report.java` `MIN_HMGAPI`(차주에게 "… 이상 필요"를 보이는 값). 앱을 바꾸므로 `app/AndroidManifest.xml`의 판 번호도 올려야 하고, 그래서 `release/`에서 할 일입니다(`docs/git-flow.md` 규칙 4).
     - 시험: `tests/mod-test.sh`는 `mod.json`과 `HMG_MIN`을 서로 비교하지 않고 각각을 `1.1.0-rc.4` 글자 그대로와 비교합니다. 그 두 곳과 `oldhmgapi` 판정 시험, `tests/ReportTest.java`에서 최소 판을 기대하는 값을 함께 고칩니다.
     - 문서: `README.md`(맨 위와 "필요한 것"), `usb/README.txt`, `docs/design.md`(모드 구성 표의 `hmgapi`)
-  - **바꾸지 않는 곳**(최소 판이 아니라 시험한 판이나 시험 입력값): `wireless/README.md`의 "HMG-API 1.1.0-rc.4에 … 있습니다(2026-11-19 확인)"는 다른 판으로 다시 시험했을 때 고칩니다. `tests/ReportTest.java`의 `Report.older` 비교 입력값과 `tests/emu/scen.sh`의 HMG-API 판은 그대로 둡니다.
+  - **바꾸지 않는 곳**(최소 판이 아니라 시험한 판이나 시험 입력값): `wireless/README.md`의 런타임 API·훅 지점 확인 문장(rc.4, rc.7까지 확인)은 다른 판으로 다시 확인했을 때 더합니다. `tests/ReportTest.java`의 `Report.older` 비교 입력값과 `tests/emu/scen.sh`의 HMG-API 판은 그대로 둡니다.
   - **알아 둘 점:** rc.4 → rc.5처럼 `-rc.N`만 올리면 상태 화면은 낮은 판을 막지 못합니다. `hotspot.sh` `ver_lt`와 앱 `Report.older`는 major.minor.patch 숫자만 비교하고 `-태그`는 무시합니다(`ReportTest`: `older("1.1.0-rc.3", "1.1.0-rc.4") == 0`). 그래서 rc.4를 쓰는 차도 `oldhmgapi`로 나오지 않고, 막는 것은 HMG-API 엔진의 설치 거절뿐입니다.
 
-### OI-3. 무선 모드를 공식 v2.2.0-rc.5 위로 옮길지
+### OI-3. 무선 모드를 공식 v2.2.0-rc.8 위로 옮길지
 
-- 기록: 2026-11-19
-- 지금: 한국 포크 `wireless-carplay-aa` 2.4.5를 이 모드에 그대로 합쳐 씁니다. 공식 rc.5는 한국 차를 받지 않고 한국 포크 기능이 없어 그대로 쓸 수 없습니다.
+- 기록: 2026-11-19 (2026-11-20 rc.5에서 rc.8 기준으로 고침. rc.5 릴리스는 지금 없습니다)
+- 지금: 한국 포크 `wireless-carplay-aa` 2.4.5를 이 모드에 그대로 합쳐 씁니다. 공식 rc.8은 그대로 쓸 수 없습니다.
+  - 지원 차와 패치 세트에 NX4가 없습니다(한국 260902는 기아만).
+  - 한국 포크 기능이 없습니다.
+  - 훅 지점이 13개 더 있어, NX4 map에 하나라도 없으면 훅이 통째로 꺼집니다.
+  - HMG-API `>=1.1.0-rc.6`이 필요합니다. 릴리스 USB 묶음의 HMG-API는 rc.7이라 이것은 채웁니다.
 - 선택지:
   1. 2.4.5를 유지합니다.
-  2. 코드를 고치지 않고 rc.5의 `carplay-core-frames-ef49c09b.recipe`와 `libleafiaaac.so`만 차에서 시험합니다.
-  3. 한국 포크의 변경을 rc.5 위로 옮겨 다시 빌드합니다(rc.5의 BT 유지, 재연결 같은 수정을 얻습니다).
-- 근거: [`wireless/README.md`](../wireless/README.md) "공식 무선 모드 v2.2.0-rc.5와 비교".
+  2. 코드를 고치지 않고 rc.8의 `carplay-core-frames-ef49c09b.recipe`, `libleafiaaac.so`만 차에서 시험합니다. NX4 AA 라이브러리가 맞으면 `aa-tbt-dbfe7bd2.recipe`도 한국어 수정을 넣어 시험합니다.
+  3. 한국 포크의 변경을 rc.8 위로 옮겨 다시 빌드합니다. rc.8의 BT 유지, 재연결, `park`(주차 뒤 끊기·다시 연결), 두 폰 처리 같은 수정을 얻습니다.
+- 근거: [`wireless/README.md`](../wireless/README.md) "공식 무선 모드 v2.2.0-rc.8과 비교".
 
 ### OI-4. GitHub 브랜치 보호와 합치기 방법 설정을 적용할지
 
