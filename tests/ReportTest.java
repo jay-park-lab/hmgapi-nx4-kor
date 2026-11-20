@@ -49,10 +49,10 @@ public class ReportTest {
         check("상태 파일 해석", "NX4.KOR.0000.V039.001.260902".equals(r.get("product")) && r.yes("our_ap"));
 
         // --- 판정: status.sh(st_verdict)가 정한 문구·수준을 그대로 ---
-        check("판정 문구·수준은 상태 파일 값 그대로(준비됨 → 초록)", r.verdict().equals("무선 카플레이·안드로이드 오토 준비됨.") && r.level() == 0);
+        check("판정 문구·수준은 상태 파일 값 그대로(준비됨 → 수준 0)", r.verdict().equals("무선 카플레이·안드로이드 오토 준비됨.") && r.level() == 0);
         String V3 = GOOD.replace("verdict=ready", "verdict=nochip").replace("verdict_lv=0", "verdict_lv=2")
             .replace("verdict_msg=무선 카플레이·안드로이드 오토 준비됨.", "verdict_msg=이 차는 Wi-Fi 칩이 켜지지 않아 지원하기 어렵습니다.")
-            .replace("verdict_end=no", "verdict_end=yes").replace("s1=설치: 끝남", "s1=설치: 안 됨(위 안내를 보세요)")
+            .replace("verdict_end=no", "verdict_end=yes").replace("s1=설치: 끝남", "s1=설치: 안 됨(오른쪽 안내를 보세요)")
             .replace("s2=무선 Wi-Fi: 켜짐", "s2=무선 Wi-Fi: 칩이 켜지지 않음");
         Report v3 = Report.parse(V3);
         check("  nochip → 그 문구, 빨강", v3.verdict().startsWith("이 차는 Wi-Fi 칩이 켜지지 않아") && v3.level() == 2);
@@ -144,7 +144,7 @@ public class ReportTest {
         check("  지난 부팅의 기록이면 진행 막대를 보이지 않음", !pr.progRunning("other") && !pr.progRunning(null));
         check("  15분 넘게 새로 쓰이지 않은 기록은 멈춘 것으로 봄, 한참 미래 시각도", pr.progRunning("abc-123", 1100 + 900) && !pr.progRunning("abc-123", 1100 + 901)
             && !pr.progRunning("abc-123", 1100 - 901));
-        check("  진행 중이면 맨 위 판정을 바꾸지 않음", pr.progVerdict("abc-123") == null);
+        check("  진행 중이면 판정을 바꾸지 않음", pr.progVerdict("abc-123") == null);
         Report rb = Report.parse(PR.replace("state=run", "state=reboot").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=내비를 3분 후 재부팅해 주세요."));
         check("  재부팅 필요 → 그 문구가 판정, 노랑", "내비를 3분 후 재부팅해 주세요.".equals(rb.progVerdict("abc-123")) && rb.progLevel() == 1);
         Report rf = Report.parse(PR.replace("state=run", "state=fail").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=HMG-API가 없습니다."));

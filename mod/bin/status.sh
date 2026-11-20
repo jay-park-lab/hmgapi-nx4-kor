@@ -257,7 +257,7 @@ st_verdict() {
     reboot|wificheck) V_S1="설치: 재부팅 필요" ;;
     bootguard) V_S1="설치: HMG-API 훅 꺼짐(부팅 보호)" ;;
     ready|connected|stockoff|wifioff|nowlanrepeat|apoff|hooksoff) V_S1="설치: 끝남" ;;
-    *) V_S1="설치: 안 됨(위 안내를 보세요)" ;;
+    *) V_S1="설치: 안 됨(오른쪽 안내를 보세요)" ;;
   esac
   if [ "$K_OURAP" = yes ]; then V_S2="무선 Wi-Fi: 켜짐"
   elif [ "$K_APMODE" = stock ]; then V_S2="무선 Wi-Fi: 켜짐(내비 순정)"
