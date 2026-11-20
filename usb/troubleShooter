@@ -163,7 +163,8 @@ fi
 rm -rf $STAGE
 mkdir -p $STAGE && cp $Z $STAGE/$MOD.zip || { toast "NX4 KOR: USB에서 복사하지 못했습니다. 아무것도 바꾸지 않았습니다."; finish 1; }
 # 따로 설치된 무선 모드: 같은 훅 지점을 두 모드가 바꾸게 되므로 먼저 지운다. 계획이 그 모드의 되돌리기뿐일 때만 적용한다.
-# 못 하면 계속 설치한다(서비스가 상태 화면에 "HMG-API 앱에서 그 모드를 지우고 적용" 안내를 보인다)
+# 못 하면 계속 설치한다. 지우지 못했으면 서비스가 oldmod("HMG-API 앱에서 그 모드를 지우고 적용")를, 지웠지만
+# 적용하지 않았으면(engine remove는 모드 폴더를 바로 지우고 되돌리기가 계획에 남음) otherplan("HMG-API 앱에서 적용")을 보인다
 if [ -f $HMGDATA/mods/$OLD_MOD/mod.json ]; then
   toast "NX4 KOR: 따로 설치된 무선 모드($OLD_MOD)를 지우는 중..."
   if $HMGAPID engine remove $OLD_MOD >> $LOG 2>&1; then

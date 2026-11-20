@@ -26,8 +26,9 @@
 
 - 기록: 2026-11-20
 - 지금: HMG-API 1.1.0-rc.4에서만 확인했습니다(`tests/mod-test.sh`의 빌드·HMG-API 엔진 시험). `mod/mod.json`의 `hmgapi`가 `>=1.1.0-rc.4`라 rc.5에도 설치됩니다. rc.5 태그가 나온 것만 확인했고 시험은 하지 않았습니다.
-- 할 일: rc.5 소스를 `HMGAPI_SRC`로 주고 `tests/mod-test.sh`를 돌립니다. 배포 워크플로가 받는 HMG-API 판(#4)도 함께 봅니다.
+- 할 일: rc.5 소스를 `HMGAPI_SRC`로 주고 `tests/mod-test.sh`를 돌립니다.
 - 정할 것: rc.5를 지원 판으로 적을지, 최소 판을 올릴지, 그대로 둘지.
+- 정하면 함께 바꿀 곳: 배포 워크플로도 HMG-API rc.4를 커밋으로 고정해 시험·빌드합니다. rc.5로 옮기면 `.github/workflows/release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 그 주석, `docs/release.md`의 판·커밋 표기도 바꿉니다. 최소 판을 올리면 `mod/mod.json` `hmgapi`와 `mod/svc/hotspot.sh` `HMG_MIN`도 바꿉니다(`tests/mod-test.sh`가 둘이 같은지 봄).
 
 ### OI-3. 무선 모드를 공식 v2.2.0-rc.5 위로 옮길지
 
@@ -42,8 +43,17 @@
 ### OI-4. GitHub 브랜치 보호와 합치기 방법 설정을 적용할지
 
 - 기록: 2026-11-20
-- 지금: `develop`은 만들었고, 합친 브랜치 자동 삭제는 켜져 있습니다. squash·rebase 합치기는 허용되어 있고, `main`·`develop`에 브랜치 보호가 없습니다.
-- 정할 것: [`git-flow.md`](git-flow.md) "처음 한 번"의 2(합치기 방법)와 3(브랜치 보호)을 적용할지. 보호를 관리자에게도 걸면 관리자도 PR로만 합칠 수 있습니다.
+- 지금(2026-11-20 확인):
+  - `develop`은 만들었고, 합친 브랜치 자동 삭제는 켜져 있습니다. squash·rebase 합치기는 허용되어 있습니다.
+  - `main`·`develop`에 걸린 보호는 없습니다. 클래식 브랜치 보호(`branches/*/protection`)는 없고, 브랜치 ruleset 두 개가 만들어져 있지만 꺼져 있습니다(`enforcement: disabled`, 둘 다 사용자 예외).
+    - `main-protetion`: 대상 기본 브랜치·`main`, 삭제·강제 푸시 금지
+    - `develop`: 대상 `develop`, 삭제·강제 푸시 금지·PR 필수
+  - 태그 쪽은 걸려 있습니다: `production` 환경, 태그 ruleset `release tags: create`·`release tags: immutable`(#4, [`release.md`](release.md)).
+  - [`git-flow.md`](git-flow.md) "강제 장치".
+- 정할 것:
+  - 브랜치 보호를 무엇으로 걸지: 꺼 둔 ruleset 두 개를 켤지(필요하면 `main-protetion`에도 PR 필수를 더함), 클래식 보호(`git-flow.md` "처음 한 번" 3)로 할지. 둘을 함께 두면 규칙이 겹치므로 한쪽으로 정합니다.
+  - 관리자(사용자 예외)도 막을지. 막으면 관리자도 PR로만 합칠 수 있습니다.
+  - 합치기 방법(`git-flow.md` "처음 한 번" 2): squash·rebase를 끌지.
 
 ### OI-5. 다른 모드와 `replace` 훅이 겹칠 때의 판정과 안내를 고칠지
 
