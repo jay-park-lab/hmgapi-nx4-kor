@@ -2,7 +2,7 @@
 
 NX4 KOR는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 내비 260902) 전용 HMG-API 모드 하나입니다. Korea Projection(StopDragon)의 핫스팟 서비스·상태 화면과, Korea Projection이 HMG-API에 따로 넣던 한국 차 빌드 무선 모드(`wireless-carplay-aa` 2.4.5)를 합쳤습니다.
 
-> ⚠️ 차에서 아직 확인하지 않았습니다. PC 시험(`tests/mod-test.sh`)과 HMG-API 1.1.0-rc.4 엔진(PC)에서만 확인했습니다. 아래 "차에서 확인할 것"을 먼저 봐 주세요.
+> ⚠️ 차에서 아직 확인하지 않았습니다. PC 시험(`tests/mod-test.sh`)과 HMG-API 1.1.0-rc.4와 1.1.0-rc.7 엔진(PC)에서만 확인했습니다(배포 워크플로는 rc.7로 시험·빌드). 아래 "차에서 확인할 것"을 먼저 봐 주세요.
 
 ## 모드 구성 (`mod/`)
 

@@ -22,20 +22,24 @@
 - 근거: 이 안은 일부러 뺀 것을 되살리는 결정입니다. 원본의 "NEMESIS판·wireless.projection과의 충돌 확인"은 이 포크에서 뺐고(`NOTICE.md` "뺀 것"), `tests/mod-test.sh`의 "NEMESIS·다른 차·제보 흔적 없음(모드·USB·빌드 스크립트)" 시험은 `usb/troubleShooter`에 `nemesis`·`korea.projection`·`wireless.projection`이 있으면 실패합니다.
 - 정할 것: 거절할지, 안내만 하고 설치할지, 지금처럼 둘지. 바꾸면 위 시험(예외를 둘지), `tests/mod-test.sh`의 USB 설치기 시험, `NOTICE.md`, README의 설치 안내도 함께 고칩니다.
 
-### OI-2. HMG-API 1.1.0-rc.5를 지원할지
+### OI-2. HMG-API rc.5 이후 판을 지원할지(최소 판, 시험·빌드 판)
 
 - 기록: 2026-11-20
-- 지금: HMG-API 1.1.0-rc.4에서만 확인했습니다(`tests/mod-test.sh`의 빌드·HMG-API 엔진 시험). `mod/mod.json`의 `hmgapi`가 `>=1.1.0-rc.4`라 rc.5에도 설치됩니다. rc.5 태그가 나온 것만 확인했고 시험은 하지 않았습니다.
-- 할 일: rc.5 소스를 `HMGAPI_SRC`로 주고 `tests/mod-test.sh`를 돌립니다.
-- 정할 것: rc.5를 지원 판으로 적을지, 최소 판을 올릴지, 그대로 둘지.
+- 지금: `mod/mod.json`의 `hmgapi`는 `>=1.1.0-rc.4` 그대로입니다. 시험·빌드에 쓰는 HMG-API는 rc.7입니다.
+  - 2026-11-20: HMG-API가 rc.4·rc.5 릴리스를 지웠습니다. 남은 것은 rc.7과 1.0.2입니다. 그래서 `v2.0.0-beta.2`가 릴리스 USB 묶음에 넣을 rc.4 파일을 받지 못하고 멈췄습니다([`release.md`](release.md) "HMG-API가 릴리스를 지우면").
+  - 그래서 배포 워크플로의 시험·빌드와 함께 넣는 HMG-API를 rc.7로 옮겼습니다(아래 첫 갈래).
+  - rc.7 소스로도 `tests/mod-test.sh`가 모두 통과했습니다. 빌드와 HMG-API 엔진 시험까지 돌았습니다. rc.5·rc.6은 시험하지 않았습니다.
+  - HMG-API USB 설치기(`install/usb/troubleShooter`)와 스틱을 만드는 `tools/mkinstallers.sh`는 rc.4와 rc.7이 같습니다.
+- 할 일: 최소 판을 어떻게 할지 정합니다. 시판 판(1.1.0)이 나오면 그 판으로 다시 시험합니다.
+- 정할 것: 최소 판을 rc.7로 올릴지, rc.4로 둘지. 차에서 rc.7을 확인한 뒤 정하는 것이 좋습니다.
 - 정하면 함께 바꿀 곳:
-  - **시험·빌드에 쓰는 HMG-API를 rc.5로 옮기면:** 배포 워크플로도 HMG-API rc.4를 커밋으로 고정해 시험·빌드합니다. `.github/workflows/release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 그 주석, 단계 이름 두 곳("HMG-API 소스 (v1.1.0-rc.4)"), `docs/release.md`의 판·커밋 표기를 바꿉니다. 릴리스 USB 묶음에 함께 넣는 HMG-API도 같은 판으로 바꿉니다: `HMGAPI_USB_URL`·`HMGAPI_USB_SHA256`(같은 판의 `hmgapi-<판>-usb.zip`. 판이 `HMGAPI_COMMIT`과 다르면 `build` job이 멈춥니다)과 `README.md` "필요한 것"의 함께 든 HMG-API 판.
+  - **시험·빌드에 쓰는 HMG-API를 다른 판으로 옮기면**(2026-11-20에 rc.4에서 rc.7로 옮김. HMG-API가 그 판의 릴리스를 지웠을 때도 이 갈래입니다): 배포 워크플로는 HMG-API를 커밋으로 고정해 시험·빌드합니다. `.github/workflows/release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 그 주석, 단계 이름 두 곳("HMG-API 소스 (v<판>)"), `docs/release.md`의 판·커밋 표기를 바꿉니다. 릴리스 USB 묶음에 함께 넣는 HMG-API도 같은 판으로 바꿉니다: `HMGAPI_USB_URL`·`HMGAPI_USB_SHA256`(같은 판의 `hmgapi-<판>-usb.zip`. 판이 `HMGAPI_COMMIT`과 다르면 `build` job이 멈춥니다)과 `README.md` "필요한 것"의 함께 든 HMG-API 판과 그 판이 처음 든 릴리스, `docs/design.md` 맨 위의 확인한 엔진 판. 그 판의 소스로 `tests/mod-test.sh`를 먼저 통과시킵니다.
   - **최소 판을 올리면:** 위 갈래를 먼저 하거나 함께 합니다. 릴리스 USB 묶음의 HMG-API가 새 최소 판을 채우지 못하면 `build` job이 멈춥니다(USB 설치기가 낮은 HMG-API를 그것으로 올리기 때문입니다). HMG-API 엔진은 설치할 때 `mod.json` `hmgapi`를 자기 판과 비교해, 더 높은 판을 요구하는 모드는 거절합니다(HMG-API `Packages.java`). 그래서 시험·빌드에 쓰는 HMG-API가 rc.4인 채로 최소 판만 올리면 `tests/mod-test.sh`의 엔진 설치 시험과 배포 워크플로의 PC 시험이 실패합니다. 바꿀 곳은 `git grep -n '1\.1\.0-rc\.4'`로 찾은 것 중 **최소 판을 뜻하는 곳**입니다.
     - 모드: `mod/mod.json` `hmgapi`, `mod/svc/hotspot.sh` `HMG_MIN`
     - 상태 화면 앱: `app/java/io/github/jayparklab/nx4kor/Report.java` `MIN_HMGAPI`(차주에게 "… 이상 필요"를 보이는 값). 앱을 바꾸므로 `app/AndroidManifest.xml`의 판 번호도 올려야 하고, 그래서 `release/`에서 할 일입니다(`docs/git-flow.md` 규칙 4).
     - 시험: `tests/mod-test.sh`는 `mod.json`과 `HMG_MIN`을 서로 비교하지 않고 각각을 `1.1.0-rc.4` 글자 그대로와 비교합니다. 그 두 곳과 `oldhmgapi` 판정 시험, `tests/ReportTest.java`에서 최소 판을 기대하는 값을 함께 고칩니다.
     - 문서: `README.md`(맨 위와 "필요한 것"), `usb/README.txt`, `docs/design.md`(모드 구성 표의 `hmgapi`)
-  - **바꾸지 않는 곳**(최소 판이 아니라 시험한 판이나 시험 입력값): `docs/design.md` 맨 위의 "1.1.0-rc.4 엔진에서만 확인"과 `wireless/README.md`의 "HMG-API 1.1.0-rc.4에 … 있습니다(2026-11-19 확인)"는 다른 판으로 다시 시험했을 때 고칩니다. `tests/ReportTest.java`의 `Report.older` 비교 입력값과 `tests/emu/scen.sh`의 HMG-API 판은 그대로 둡니다.
+  - **바꾸지 않는 곳**(최소 판이 아니라 시험한 판이나 시험 입력값): `wireless/README.md`의 "HMG-API 1.1.0-rc.4에 … 있습니다(2026-11-19 확인)"는 다른 판으로 다시 시험했을 때 고칩니다. `tests/ReportTest.java`의 `Report.older` 비교 입력값과 `tests/emu/scen.sh`의 HMG-API 판은 그대로 둡니다.
   - **알아 둘 점:** rc.4 → rc.5처럼 `-rc.N`만 올리면 상태 화면은 낮은 판을 막지 못합니다. `hotspot.sh` `ver_lt`와 앱 `Report.older`는 major.minor.patch 숫자만 비교하고 `-태그`는 무시합니다(`ReportTest`: `older("1.1.0-rc.3", "1.1.0-rc.4") == 0`). 그래서 rc.4를 쓰는 차도 `oldhmgapi`로 나오지 않고, 막는 것은 HMG-API 엔진의 설치 거절뿐입니다.
 
 ### OI-3. 무선 모드를 공식 v2.2.0-rc.5 위로 옮길지

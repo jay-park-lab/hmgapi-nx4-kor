@@ -39,8 +39,8 @@
 
 ## 필요한 것
 
-- **USB 묶음** `hmgapi-nx4-kor-버전-usb.zip`: 이 저장소의 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에서 받습니다. `v2.0.0-beta.2`부터 **HMG-API**(1.1.0-rc.4)가 함께 들어 있어, HMG-API가 없는 차도 이 USB 하나로 설치합니다. 직접 만들려면 [만들기와 시험](#만들기와-시험).
-  - `v2.0.0-beta.1`에는 HMG-API가 없습니다. 그 묶음을 쓰면 HMG-API [릴리스](https://github.com/Open-HMG/HMG-API/releases)의 `hmgapi-버전-usb.zip`으로 HMG-API를 먼저 설치합니다.
+- **USB 묶음** `hmgapi-nx4-kor-버전-usb.zip`: 이 저장소의 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에서 받습니다. `v2.0.0-beta.3`부터 **HMG-API**(1.1.0-rc.7)가 함께 들어 있어, HMG-API가 없는 차도 이 USB 하나로 설치합니다. 직접 만들려면 [만들기와 시험](#만들기와-시험).
+  - `v2.0.0-beta.1`에는 HMG-API가 없습니다. 그 묶음을 쓰면 HMG-API [릴리스](https://github.com/Open-HMG/HMG-API/releases)의 `hmgapi-버전-usb.zip`으로 HMG-API를 먼저 설치합니다. `v2.0.0-beta.2`는 빌드가 멈춰 릴리스가 없습니다.
 - **HMG-API는 1.1.0-rc.4 이상**이어야 합니다. 이미 있는 HMG-API가 이보다 낮으면 USB 묶음의 HMG-API로 먼저 올립니다(아래 "설치" 2).
 - FAT32로 포맷한 USB(32GB 이하 권장).
 
