@@ -52,7 +52,7 @@ public class ReportTest {
         check("판정 문구·수준은 상태 파일 값 그대로(준비됨 → 초록)", r.verdict().equals("무선 카플레이·안드로이드 오토 준비됨.") && r.level() == 0);
         String V3 = GOOD.replace("verdict=ready", "verdict=nochip").replace("verdict_lv=0", "verdict_lv=2")
             .replace("verdict_msg=무선 카플레이·안드로이드 오토 준비됨.", "verdict_msg=이 차는 Wi-Fi 칩이 켜지지 않아 지원하기 어렵습니다.")
-            .replace("verdict_end=no", "verdict_end=yes").replace("s1=설치: 끝남", "s1=설치: 안 됨(위 안내를 보세요)")
+            .replace("verdict_end=no", "verdict_end=yes").replace("s1=설치: 끝남", "s1=설치: 안 됨(오른쪽 안내를 보세요)")
             .replace("s2=무선 Wi-Fi: 켜짐", "s2=무선 Wi-Fi: 칩이 켜지지 않음");
         Report v3 = Report.parse(V3);
         check("  nochip → 그 문구, 빨강", v3.verdict().startsWith("이 차는 Wi-Fi 칩이 켜지지 않아") && v3.level() == 2);
