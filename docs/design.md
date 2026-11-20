@@ -103,11 +103,14 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - 이 고침은 관련 훅 지점 5개가 NX4 map에 모두 있을 때만 돕니다(`framework.network_management_service.start_access_point`, `framework.wifi_configuration.*` 4개).
   - 이 모드는 순정 AP(netd가 띄운 hostapd) 설정의 `ssid=`로 판정합니다(`hotspot.sh` `stock_ssid`). 카플레이 SSID(softap.conf의 S2)면 `carplay`, 핫스팟 이름(S1)이면 `hotspot`입니다.
   - 판정은 무선 기능이 적용된 뒤에만 합니다(`try_ready`). 그 앞의 두 경우는 판정까지 가지 않습니다.
-    - 적용 전: `ap.log`에 "대기: 무선 기능이 아직 적용되지 않음(적용된 뒤 핫스팟을 켬)"만 남습니다.
+    - 적용 전: 판정 줄은 없고 `ap.log`에 "대기: 무선 기능이 아직 적용되지 않음(적용된 뒤 핫스팟을 켬)"이 남습니다. 뒤에서 도는 설정(`setup_hmgapi`)의 줄도 함께 남습니다.
     - 처음 설정할 때 순정 AP가 떠 있음(`setup_hmgapi`): map 만들기를 포함한 설정을 건너뜁니다. `ap.log`에 "무선 설정 안 함: 다른 hostapd가 돌고 있음(순정 핫스팟 등) (다음 부팅에 다시 봄)"이 남고, 상태 화면은 순정 핫스팟을 끄고 재부팅하라고 안내합니다.
   - 기대값(적용이 끝난 뒤):
     - HMG-API rc.5 이상이고 이번 부팅에 훅이 켜짐: 순정 AP 이름이 카플레이 SSID(S2)이고, `ap.log`에 "순정 카플레이 AP 사용"이 남아야 합니다. 폰이 그 AP에 붙는지 봅니다.
     - HMG-API rc.4이거나 이번 부팅에 훅이 꺼짐(적용 직후 재부팅 전, 부팅 보호 등): 이 빌드에 그 분기가 없으면 순정 AP가 핫스팟 이름(S1)으로 떠 판정이 `hotspot`입니다. `ap.log`에는 처음이면 "대기: 다른 hostapd가 돌고 있음(순정 핫스팟 등, 판정 hotspot)", 앞선 부팅에 `carplay`를 본 기록(`stockap.seen`)이 있으면 "순정 카플레이 AP를 기다림 … 지금 판정 hotspot"이 남습니다. 그때 폰이 붙는지도 적어 둡니다.
+    - 순정 AP가 우리 핫스팟보다 늦게 뜸: 우리 핫스팟을 켠 뒤의 확인(`ap_yield`)이 판정합니다.
+      - S2(`carplay`)면 "우리 핫스팟을 켠 뒤 순정 카플레이 AP가 켜짐: 우리 핫스팟을 멈춤…"이 남고, 이어 "순정 카플레이 AP 사용"이 남습니다.
+      - S1(`hotspot`)이면 "다른 hostapd가 돌고 있음(순정 핫스팟 등): 우리 핫스팟을 멈추고 기다림"이 남습니다.
   - 이 갈래들은 `tests/mod-test.sh`에 시험이 없습니다. 순정 AP가 언제 뜨는지는 차에서만 확인됩니다.
   - 둘이 부딪히면 어떻게 할지, 순정 AP가 늘 떠 있어 설정이 되지 않으면 어떻게 할지는 [`open-issue.md`](open-issue.md) OI-8에서 정합니다.
 - **HMG-API rc.5 이상에서 이 모드의 서비스가 그대로 도는지.** rc.5부터 `hmgapid`는 모드 서비스를 실효 그룹 2950(`MOD_GID`, root 서비스는 보조 그룹도 비움)과 `ANDROID_DNS_MODE=local`로 돌립니다. 또 HMG-API 방화벽이 그룹 2950·2951의 `rmnet+` 송신을 막습니다(rc.7 `core/hmgapid/hmgapid.c`, `engine/Network.java`).
