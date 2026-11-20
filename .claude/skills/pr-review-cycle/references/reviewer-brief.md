@@ -74,7 +74,7 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
 0. **시작 기록** — 다른 일을 하기 전에, 끝에서 비교할 체크아웃 상태를 적어 둔다(기록은 체크아웃 밖, 예: `mktemp -d` 로 만든
    임시 폴더의 파일).
    - `pwd` 가 지시문의 "로컬 체크아웃" 경로와 같은지 본다. 다르면 아무것도 하지 말고 그 사실만 알린다.
-   - 체크아웃 루트에서 `git status --short`, `git rev-parse HEAD`
+   - 체크아웃 루트에서 `git status --short --untracked-files=all`, `git rev-parse HEAD`
    - 추적 파일 내용: `git diff HEAD --binary | shasum`. 이미 수정돼 있던 파일을 더 고친 것은 `git status --short` 줄이
      그대로라 이것으로만 보인다.
    - git 이 무시하는 빌드 결과: `shasum mod/app/NX4KOR.apk out/*.zip`. `git status` 에는 나오지 않지만
@@ -100,7 +100,7 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
      파일은 건드리지 않는다.
    - 끝나면 체크아웃 루트에서 `git worktree remove --force <W>` 로 지우고, 임시 폴더도 지운다. 지우는 것은 내가 만든
      `<W>` 하나뿐이다. `git worktree list` 에 보이는 다른 워크트리(다른 PR 의 리뷰어, 다른 세션)는 건드리지 않는다.
-   - 돌려주기 전에 체크아웃 루트에서 0 의 기록과 비교한다: `git status --short`, `git rev-parse HEAD`,
+   - 돌려주기 전에 체크아웃 루트에서 0 의 기록과 비교한다: `git status --short --untracked-files=all`, `git rev-parse HEAD`,
      `git diff HEAD --binary | shasum`, 무시된 빌드 결과의 `shasum`, `git worktree list` 의 체크아웃 줄이 같고 내 `<W>` 가
      없어졌는지. 다르면 고치려 하지 말고 무엇이 어떻게 다른지 알림에 그대로 적는다. 다른 워크트리 줄이 바뀐 것은 "체크아웃과
      무관" 으로 따로 적는다.

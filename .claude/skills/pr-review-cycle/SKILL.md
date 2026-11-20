@@ -118,7 +118,7 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 
 ## 3. 리뷰
 
-1. 띄우기 전에 체크아웃 기준을 적어 둔다(5 에서 비교한다): `git status --short`, `git rev-parse HEAD`,
+1. 띄우기 전에 체크아웃 기준을 적어 둔다(5 에서 비교한다): `git status --short --untracked-files=all`, `git rev-parse HEAD`,
    추적 파일 내용 `git diff HEAD --binary | shasum`(이미 수정 중인 파일을 더 고친 것은 이것으로만 보임), git 이 무시하는
    빌드 결과 `shasum mod/app/NX4KOR.apk out/*.zip`, `git worktree list` 의 체크아웃 줄. 미커밋 변경이 있으면
    `git diff HEAD --binary` 전체도 체크아웃 밖 임시 파일에 저장해 둔다(해시만으로는 어느 파일이 바뀌었는지 가를 수 없음).
@@ -131,7 +131,7 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 3. 리뷰어가 끝날 때까지 PR 대상 파일을 고치지 않고 기다린다. 완료 알림이 오기 전에는 결과를 짐작해 말하지 않는다.
 4. 리뷰어의 알림을 그대로 믿지 않는다. "PR 코멘트 조회 규칙" 대로 실제로 올라간 리뷰와 인라인 코멘트를 읽는다.
    리뷰어가 사실이라고 적은 것 중 고칠 근거가 되는 것은 직접 확인한다.
-5. 체크아웃이 1 에서 적어 둔 기준과 같은지 본다: `git status --short`, `git rev-parse HEAD`,
+5. 체크아웃이 1 에서 적어 둔 기준과 같은지 본다: `git status --short --untracked-files=all`, `git rev-parse HEAD`,
    `git diff HEAD --binary | shasum`, 무시된 빌드 결과의 `shasum`, `git worktree list` 의 체크아웃 줄, 그리고 이 PR 의
    리뷰용 워크트리(`review-pr-<PR>`)가 남지 않았는지. 리뷰어는 서브에이전트라 `cd` 가 다음 호출로 이어지지 않아, 지시문을
    벗어나면 체크아웃에서 돌거나 체크아웃 파일을 바꿀 수 있다. 리뷰어 알림의 "체크아웃 비교 결과" 도 함께 본다.
@@ -144,7 +144,7 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
      만들었는지 가를 수 없으면 **되돌리지 말고 사용자에게 묻는다**.
 
    리뷰어가 만든 것으로 정해진 경우의 처리:
-   - 파일 변경: 그 파일이 기준 때 이미 있던 변경이면(1 의 `git status --short` 에 있었거나 저장한 diff 에 있으면.
+   - 파일 변경: 그 파일이 기준 때 이미 있던 변경이면(1 의 `git status --short --untracked-files=all` 에 있었거나 저장한 diff 에 있으면.
      아직 `git add` 하지 않은 미추적 파일은 diff 에 나오지 않으므로 status 로 본다) 되돌리면 기존 작업까지 사라지므로
      되돌리지 말고 사용자에게 묻는다. 그렇지 않으면 되돌리기 전에 되살릴 수 있게 체크아웃 밖 임시 폴더에 남겨 둔다. 추적
      파일은 `git diff HEAD --binary -- <파일>`(스테이징 포함. `--binary` 가 없으면 바이너리는 "differ" 한 줄만 남음), 미추적
