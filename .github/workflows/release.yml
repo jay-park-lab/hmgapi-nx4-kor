@@ -22,6 +22,10 @@ env:
   NX4_ENV_FILE: ''
   # HMG-API v1.1.0-rc.4 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도)
   HMGAPI_COMMIT: 31d781b412681ba9e53cbe2627dcee274cb75119
+  # 같은 판의 HMG-API USB 묶음. USB 묶음에 함께 넣어, HMG-API가 없는 차는 그것부터 설치한다(scripts/build.sh).
+  # 릴리스 파일은 바뀔 수 있으므로 SHA-256으로 고정한다. 판은 위 커밋의 판과 같아야 한다(build job이 확인)
+  HMGAPI_USB_URL: https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0-rc.4/hmgapi-1.1.0-rc.4-usb.zip
+  HMGAPI_USB_SHA256: 6b5ad3c4058afefade9a64009be6dc5181637ca9036d1f0f96af4d3c7a8bacf6
 
 jobs:
   check:
@@ -135,6 +139,7 @@ jobs:
       uuid: ${{ steps.verify.outputs.uuid }}
       app_cert: ${{ steps.cert.outputs.app_cert }}
       busybox: ${{ steps.bb.outcome == 'success' }}
+      hmgapi: ${{ steps.hu.outputs.version }}
     steps:
       - name: 저장소
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -176,6 +181,22 @@ jobs:
           ref: ${{ env.HMGAPI_COMMIT }}
           path: hmgapi
           persist-credentials: false
+
+      # USB 묶음에 함께 넣는다. 키를 꺼내기 전에 받고, 고정한 SHA-256과 같고 판이 위 소스와 같을 때만 쓴다.
+      # 이 job은 그 안의 것을 실행하지 않는다(build.sh가 풀어 USB 묶음에 옮겨 담기만 한다)
+      - name: HMG-API USB 묶음
+        id: hu
+        run: |
+          set -eu
+          Z=$RUNNER_TEMP/hmgapi-usb.zip
+          curl -fsSL --proto '=https' --tlsv1.2 -o "$Z" "$HMGAPI_USB_URL"
+          GOT=$(sha256sum "$Z" | cut -d' ' -f1)
+          [ "$GOT" = "$HMGAPI_USB_SHA256" ] || { echo "::error::HMG-API USB 묶음 SHA-256($GOT)이 HMGAPI_USB_SHA256($HMGAPI_USB_SHA256)과 다릅니다"; exit 1; }
+          HV=$(unzip -p "$Z" HMGAPI/install/payload/VERSION | tr -d '\r\n') || HV=
+          SV=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' "$GITHUB_WORKSPACE/hmgapi/core/runtime/java/hmgapi/engine/Engine.java")
+          [ -n "$HV" ] && [ "$HV" = "$SV" ] || { echo "::error::HMG-API USB 묶음의 판($HV)이 HMGAPI_COMMIT의 판($SV)과 다릅니다"; exit 1; }
+          echo "HMGAPI_USB_ZIP=$Z" >> "$GITHUB_ENV"
+          echo "version=$HV" >> "$GITHUB_OUTPUT"
 
       # 선택: 저장소(또는 production 환경) 변수 NX4_PKG_ZIP_URL에 Korea Projection 릴리스 패키지 zip 주소를 두면
       # 그 안의 busybox와 라이선스 안내를 넣는다. busybox는 NOTICE.md에 적은 SHA-256과 같아야 한다
@@ -250,6 +271,7 @@ jobs:
         id: verify
         env:
           APP_CERT: ${{ steps.cert.outputs.app_cert }}
+          HMGAPI_VER: ${{ steps.hu.outputs.version }}
           # build.sh(HMG-API tools/mkmodpkg.sh)가 컴파일해 둔 HMG-API 엔진
           EH: ${{ github.workspace }}/hmgapi/out/engine-host
         run: |
@@ -259,7 +281,17 @@ jobs:
           unzip -q "out/hmgapi-nx4-kor-$V.zip" -d "$D"
           java -cp "$EH" hmgapi.engine.Signing verify "$D" "$UUID"
           rm -rf "$D"
-          [ -f "out/hmgapi-nx4-kor-$V-usb.zip" ] || { echo "::error::USB 묶음이 없습니다"; exit 1; }
+          UZ=out/hmgapi-nx4-kor-$V-usb.zip
+          [ -f "$UZ" ] || { echo "::error::USB 묶음이 없습니다"; exit 1; }
+          # USB 묶음: 맨 위 설치기는 NX4 KOR 것, HMG-API 설치기와 payload는 HMG-API가 없을 때 쓰도록 함께
+          D=$(mktemp -d)
+          unzip -q "$UZ" -d "$D"
+          tar -xOf "$D/ota_package.tar" troubleShooter | cmp -s - usb/troubleShooter \
+            || { echo "::error::USB 묶음의 ota_package.tar가 usb/troubleShooter가 아닙니다"; exit 1; }
+          HV=$(tr -d '\r\n' < "$D/HMGAPI/install/payload/VERSION" 2>/dev/null) || HV=
+          [ -f "$D/NX4/hmgapi/troubleShooter" ] && [ "$HV" = "$HMGAPI_VER" ] \
+            || { echo "::error::USB 묶음에 HMG-API $HMGAPI_VER 설치기가 없습니다(NX4/hmgapi/troubleShooter, HMGAPI/install/payload)"; exit 1; }
+          rm -rf "$D"
           echo "uuid=$UUID" >> "$GITHUB_OUTPUT"
           if [ -n "${NX4_PKG_ZIP:-}" ]; then BB="넣음"; else BB="넣지 않음"; fi
           {
@@ -267,6 +299,7 @@ jobs:
             echo "- 모드 UUID: \`$UUID\`"
             echo "- 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
             echo "- busybox: $BB"
+            echo "- HMG-API: $HMGAPI_VER (USB 묶음에 함께)"
             echo '```'
             (cd out && sha256sum "hmgapi-nx4-kor-$V.zip" "hmgapi-nx4-kor-$V-usb.zip")
             echo '```'
@@ -313,6 +346,7 @@ jobs:
           UUID: ${{ needs.build.outputs.uuid }}
           APP_CERT: ${{ needs.build.outputs.app_cert }}
           BUSYBOX: ${{ needs.build.outputs.busybox }}
+          HMGAPI_VER: ${{ needs.build.outputs.hmgapi }}
           SRC: ${{ github.sha }}
         run: |
           set -eu
@@ -336,11 +370,12 @@ jobs:
             echo "| 파일 | 설치 |"
             echo "|---|---|"
             echo "| \`hmgapi-nx4-kor-$V.zip\` | HMG-API 모드(작성자 키로 서명). HMG-API 앱·adb·USB |"
-            echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음. Engineering Mode > DSP > Update OTA |"
+            echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음(HMG-API $HMGAPI_VER 포함). 빈 USB 맨 위에 풀고 Engineering Mode > USB Copy > DSP > Update OTA. HMG-API가 없는 차는 첫 번째에 HMG-API를 설치하고 재부팅하므로, 같은 USB로 한 번 더 누릅니다 |"
             echo
             echo "- 모드 UUID: \`$UUID\`"
             echo "- 상태 화면 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
             echo "- busybox: $BB"
+            echo "- HMG-API: $HMGAPI_VER (USB 묶음에 그대로 넣음, 대응 소스 https://github.com/Open-HMG/HMG-API/tree/v$HMGAPI_VER)"
             echo "- 소스 커밋: $SRC"
             echo
             echo '```'
