@@ -140,6 +140,7 @@ jobs:
       app_cert: ${{ steps.cert.outputs.app_cert }}
       busybox: ${{ steps.bb.outcome == 'success' }}
       hmgapi: ${{ steps.hu.outputs.version }}
+      hmgapi_need: ${{ steps.hu.outputs.need }}
     steps:
       - name: 저장소
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -195,8 +196,18 @@ jobs:
           HV=$(unzip -p "$Z" HMGAPI/install/payload/VERSION | tr -d '\r\n') || HV=
           SV=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' "$GITHUB_WORKSPACE/hmgapi/core/runtime/java/hmgapi/engine/Engine.java")
           [ -n "$HV" ] && [ "$HV" = "$SV" ] || { echo "::error::HMG-API USB 묶음의 판($HV)이 HMGAPI_COMMIT의 판($SV)과 다릅니다"; exit 1; }
+          # 모드의 최소 판(mod.json "hmgapi")을 채워야 USB 설치기가 낮은 HMG-API를 이것으로 올릴 수 있다. 비교는 설치기의 것을 그대로 쓴다
+          NEED=$(sed -n 's/.*"hmgapi": *">=\([^"]*\)".*/\1/p' mod/mod.json | head -1)
+          [ -n "$NEED" ] || { echo "::error::mod/mod.json에서 hmgapi 최소 판(>=…)을 읽지 못했습니다"; exit 1; }
+          F=$(mktemp)
+          sed -n '/^vlt() {/,/^}/p;/^hmg_meets() {/,/^}/p' usb/troubleShooter > "$F"
+          # shellcheck disable=SC1090
+          . "$F"
+          rm -f "$F"
+          if ! hmg_meets "$HV" "$NEED"; then echo "::error::HMG-API USB 묶음의 판($HV)이 모드의 최소 판($NEED)보다 낮습니다"; exit 1; fi
           echo "HMGAPI_USB_ZIP=$Z" >> "$GITHUB_ENV"
           echo "version=$HV" >> "$GITHUB_OUTPUT"
+          echo "need=$NEED" >> "$GITHUB_OUTPUT"
 
       # 선택: 저장소(또는 production 환경) 변수 NX4_PKG_ZIP_URL에 Korea Projection 릴리스 패키지 zip 주소를 두면
       # 그 안의 busybox와 라이선스 안내를 넣는다. busybox는 NOTICE.md에 적은 SHA-256과 같아야 한다
@@ -291,6 +302,8 @@ jobs:
           HV=$(tr -d '\r\n' < "$D/HMGAPI/install/payload/VERSION" 2>/dev/null) || HV=
           [ -f "$D/NX4/hmgapi/troubleShooter" ] && [ "$HV" = "$HMGAPI_VER" ] \
             || { echo "::error::USB 묶음에 HMG-API $HMGAPI_VER 설치기가 없습니다(NX4/hmgapi/troubleShooter, HMGAPI/install/payload)"; exit 1; }
+          # HMG-API 앱용 업데이트·공식 모드 묶음은 싣지 않는다(scripts/build.sh). wireless-carplay-aa는 이 모드와 함께 둘 수 없다
+          [ ! -e "$D/HMGAPI/updates" ] || { echo "::error::USB 묶음에 HMGAPI/updates가 있습니다"; exit 1; }
           rm -rf "$D"
           echo "uuid=$UUID" >> "$GITHUB_OUTPUT"
           if [ -n "${NX4_PKG_ZIP:-}" ]; then BB="넣음"; else BB="넣지 않음"; fi
@@ -347,6 +360,7 @@ jobs:
           APP_CERT: ${{ needs.build.outputs.app_cert }}
           BUSYBOX: ${{ needs.build.outputs.busybox }}
           HMGAPI_VER: ${{ needs.build.outputs.hmgapi }}
+          NEED: ${{ needs.build.outputs.hmgapi_need }}
           SRC: ${{ github.sha }}
         run: |
           set -eu
@@ -370,12 +384,12 @@ jobs:
             echo "| 파일 | 설치 |"
             echo "|---|---|"
             echo "| \`hmgapi-nx4-kor-$V.zip\` | HMG-API 모드(작성자 키로 서명). HMG-API 앱·adb·USB |"
-            echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음(HMG-API $HMGAPI_VER 포함). 빈 USB 맨 위에 풀고 Engineering Mode > USB Copy > DSP > Update OTA. HMG-API가 없는 차는 첫 번째에 HMG-API를 설치하고 재부팅하므로, 같은 USB로 한 번 더 누릅니다 |"
+            echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음(HMG-API $HMGAPI_VER 포함). 빈 USB 맨 위에 풀고 Engineering Mode > USB Copy > DSP > Update OTA. HMG-API가 없거나 $NEED보다 낮은 차는 첫 번째에 HMG-API를 설치하고 재부팅하므로, 같은 USB로 한 번 더 누릅니다 |"
             echo
             echo "- 모드 UUID: \`$UUID\`"
             echo "- 상태 화면 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
             echo "- busybox: $BB"
-            echo "- HMG-API: $HMGAPI_VER (USB 묶음에 그대로 넣음, 대응 소스 https://github.com/Open-HMG/HMG-API/tree/v$HMGAPI_VER)"
+            echo "- HMG-API: $NEED 이상 필요. USB 묶음에 $HMGAPI_VER를 함께 넣음(대응 소스 https://github.com/Open-HMG/HMG-API/tree/$HMGAPI_COMMIT, 태그 v$HMGAPI_VER)"
             echo "- 소스 커밋: $SRC"
             echo
             echo '```'

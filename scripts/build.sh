@@ -104,14 +104,17 @@ with tarfile.open(sys.argv[1]) as t:
     open(sys.argv[2], "wb").write(t.extractfile("troubleShooter").read())
 PY
   [ -f "$S/README.txt" ] && mv "$S/README.txt" "$S/HMGAPI-README.txt"
-  # HMG-API 묶음의 다른 USB 설치 길(NEMESIS.data)은 쓰지 않으므로 뺀다
+  # HMG-API 묶음의 다른 USB 설치 길(NEMESIS.data)과 HMG-API 앱이 읽는 업데이트·모드 묶음(HMGAPI/updates: 공식 모드들,
+  # 그중 wireless-carplay-aa는 이 모드와 함께 둘 수 없다)은 쓰지 않으므로 뺀다. HMG-API 설치기는 HMGAPI/install만 쓴다
   rm -f "$S/NEMESIS.data"
+  rm -rf "$S/HMGAPI/updates"
   # HMG-API(AGPL-3.0)를 그대로 함께 배포하므로 그 판과 대응 소스 위치를 적는다
   HV=$(tr -d '\r\n' < "$S/HMGAPI/install/payload/VERSION" 2>/dev/null) || HV=
   if [ -n "$HV" ]; then HSRC=https://github.com/Open-HMG/HMG-API/tree/v$HV; else HSRC=https://github.com/Open-HMG/HMG-API/releases; fi
   cat > "$S/HMGAPI-SOURCE.txt" <<EOF
 HMG-API ${HV:-(판 모름)}: 이 USB의 HMGAPI 폴더, HMGAPI-README.txt, NX4/hmgapi/troubleShooter
-- HMG-API 릴리스의 USB 묶음(hmgapi-${HV:-버전}-usb.zip)을 고치지 않고 넣었습니다(설치기 위치만 옮기고 NEMESIS.data는 뺐습니다).
+- HMG-API 릴리스의 USB 묶음(hmgapi-${HV:-버전}-usb.zip)에서 HMG-API 설치에 쓰는 것만 고치지 않고 넣었습니다.
+  설치기 위치만 옮겼고, NEMESIS.data와 HMGAPI/updates(HMG-API 앱용 업데이트와 공식 모드 묶음)는 뺐습니다.
 - 라이선스: GNU AGPL-3.0 (이 USB의 LICENSE와 같은 라이선스)
 - 대응 소스: $HSRC
 EOF

@@ -48,6 +48,10 @@ NX4 KOR는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 내비 2
 Engineering Mode → USB Copy → DSP → Update OTA가 `ota_package.tar`의 `troubleShooter`를 root로 돌립니다(HMG-API USB 설치기와 같은 길).
 
 - HMG-API가 없으면 같은 스틱의 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)로 넘기거나 멈춥니다.
+- HMG-API가 있지만 이 모드의 최소 판(`mod.json` `hmgapi`의 `>=…`)보다 낮으면(`installed.txt`의 `version`) 엔진이 설치를 거절합니다. 그래서 아래 무선 모드 지우기 **전에** 봅니다.
+  - 같은 스틱의 HMG-API 설치기가 그 판 이상(`HMGAPI/install/payload/VERSION`)이면 그것으로 넘깁니다. HMG-API 설치기는 설치된 HMG-API도 업데이트하고 재부팅하며, 그 뒤 Update OTA를 한 번 더 누릅니다.
+  - 아니면 아무것도 바꾸지 않고 "HMG-API <최소 판> 이상으로 먼저 올려 주세요"로 멈춥니다.
+  - 판 비교는 HMG-API `Version`과 같은 규칙(semver, `-rc.N`까지)입니다. 최소 판에 꼬리가 없으면 그 판의 rc도 채웁니다(`meetsHmgapi`). 판을 읽지 못하거나 비교할 수 없는 꼬리면 기록만 하고 지나갑니다(엔진이 설치할 때 다시 봄).
 - 설치·업데이트: 따로 설치된 `wireless-carplay-aa`를 지우고 적용 → (업데이트면) `bin/uninstall.sh --update` → `hmgapid engine install` → 상태 화면 열기. 재부팅하지 않습니다(첫 설정 3~5분을 끊지 않게).
 - 같은 판이면 상태 화면만 엽니다. `NX4/REINSTALL`이면 다시 설치합니다.
 - `NX4/UNINSTALL`: `bin/uninstall.sh` → `scripts/preun.sh`(핫스팟 멈춤 → HMG-API에서 이 모드를 빼고 적용 → 무선 권한 파일·Wi-Fi 잠금·순정 AP 저장값 되돌리기 → `$BK` 지우기) → 재부팅. HMG-API를 먼저 지웠어도 남은 모드 폴더나 스틱의 사본으로 되돌립니다. 이때 `/system`은 DSP OTA 프로세스에서 순정 `mount`로 엽니다.
