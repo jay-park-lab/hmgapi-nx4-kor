@@ -49,7 +49,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
     Ui ui;
     String boot;
     boolean watching;
-    /** [지금 재부팅] 아래 안내 한 줄(보냄·거절 이유·실패) */
+    /** [지금 재부팅] 바로 위 안내 한 줄(보냄·거절 이유·실패) */
     TextView msgText;
     /** [지금 재부팅] 버튼과 요청을 보낸 때(부팅 뒤 밀리초, 0이면 없음) */
     TextView rebootBtn;
@@ -372,11 +372,12 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         }
         right.addView(ui.scroll(info), new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        // 버튼을 누른 뒤의 안내(보냄·거절 이유·실패). 버튼 바로 위에 둔다
+        // 버튼을 누른 뒤의 안내(보냄·거절 이유·실패). 버튼 바로 위에 둔다. 위 목록이 넘쳐도 맨 아래 띠와 붙어 한 덩어리로
+        // 보이지 않게 위에도 틈을 둔다(목록의 아래 여백은 스크롤 안에 있어 넘치면 밀려난다, PR #34 리뷰 1)
         msgText = ui.band("", Ui.INFO_TEXT, Ui.MSG_BG, Color.WHITE);
         msgText.setVisibility(View.GONE);
         LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-1, -2);
-        mp.setMargins(ui.px(Ui.PANEL_PAD), 0, ui.px(Ui.PANEL_PAD), ui.px(Ui.GAP));
+        mp.setMargins(ui.px(Ui.PANEL_PAD), ui.px(Ui.GAP), ui.px(Ui.PANEL_PAD), ui.px(Ui.GAP));
         right.addView(msgText, mp);
 
         // [지금 재부팅]은 늘 둔다(오른쪽 칸 아래 주 버튼 블록). 누르면 확인 창을 띄우고(운행 중에도 막지 않음), root가 설치 중·마무리 중이면 거절한다.

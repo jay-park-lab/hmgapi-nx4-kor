@@ -25,7 +25,7 @@ USB로 설치하다 멈추거나, 설치 뒤 상태 화면이 빨강·노랑일 
 |---|---|---|
 | USB `NX4/install.log` | NX4 KOR 설치기가 한 일 | 아니오 |
 | USB `HMGAPI/install.log` | HMG-API 설치기가 한 일 | 아니오 |
-| 상태 화면 | 맨 위 판정 한 줄과 상태표. 사진으로 남겨 두면 좋습니다. 앱 메뉴의 NX4 KOR 타일로 엽니다. 타일이 없으면 같은 USB로 Update OTA를 다시 누릅니다(다시 설치하지 않고 상태 화면만 엶) | 아니오 |
+| 상태 화면 | 오른쪽 칸의 판정·안내와 왼쪽 칸의 요약·상태표. 사진으로 남겨 두면 좋습니다. 앱 메뉴의 NX4 KOR 타일로 엽니다. 타일이 없으면 같은 USB로 Update OTA를 다시 누릅니다(다시 설치하지 않고 상태 화면만 엶) | 아니오 |
 | `/data/nx4-kor/logs/ap.log` | 이 모드 서비스의 기록 | 예 |
 | `/data/local/tmp/nx4-kor/` | map 만들기·확인·적용 출력(`map-car.txt`, `verify-map.txt`, `plan.txt`, `mod-apply.txt`) | 예 |
 | HMG-API 앱의 Logs 탭, "Record a problem"(HMG-API rc.6부터) | HMG-API 쪽 기록 | 아니오. 다만 앱을 열 수 있어야 합니다(아래 "HMG-API 앱을 열 수 없을 때") |
