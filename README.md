@@ -69,6 +69,7 @@
 - **업데이트:** 새 판 USB로 같은 방법으로 합니다. 같은 판을 다시 설치하려면 `NX4/REINSTALL` 빈 파일을 만듭니다. 훅 코드만 바뀐 판이면 상태 화면이 재부팅을 안내합니다.
 - **따로 설치한 무선 모드:** Korea Projection이나 HMG-API 공식판의 `wireless-carplay-aa`가 있으면 설치기가 먼저 지우고 적용합니다. NX4 KOR에 같은 훅이 들어 있어 둘을 함께 둘 수 없습니다(`mod.json`의 `conflicts`).
 - USB를 꽂아 둔 채로 두면 유선 안드로이드 오토가 시작되어 무선이 붙지 않을 수 있습니다. 끝나면 빼 주세요.
+- **문제가 생기면:** 설치기와 상태 화면의 문구별 할 일, 부팅 보호, 되돌리는 길은 [`docs/troubleshooting.md`](docs/troubleshooting.md)에 있습니다.
 
 ## 상태 확인
 
@@ -137,6 +138,7 @@ HMG-API 앱에서 NX4 KOR를 누르면 무선 기능 설정이 나옵니다. 모
 | `wireless/` | 합친 무선 모드(한국 차 빌드 2.4.5)의 출처·대응 소스 안내, 원래 `mod.json`, 컴파일용 stubs |
 | `scripts/` | `build-app.sh`(상태 화면 앱), `build.sh`(서명한 모드 zip과 USB 묶음) |
 | `docs/design.md` | 설계와 차에서 확인할 것 |
+| `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때 |
 | `docs/emulator-test.md` | 에뮬레이터에서 상태 화면 앱 시험 |
 | `docs/git-flow.md` | 브랜치 전략(Git Flow) |
 | [GitHub 이슈](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues) | 정하지 않은 것(라벨 `결정 필요`), 차에서 확인할 일(`차 확인`), 릴리스 일(`릴리스`) |
