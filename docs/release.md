@@ -9,7 +9,7 @@
    - 태그의 판이 `mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`과 같은지 봅니다(`-beta.<n>`은 빼고 비교).
    - 정식 태그의 커밋이 `main`에 있는지, 베타 태그의 커밋이 `release/` 브랜치나 `main`에 있는지 봅니다.
    - 같은 태그의 릴리스가 이미 있는지 봅니다(아래 "같은 태그로 다시 만들지 않습니다").
-   - JDK 21(Temurin), HMG-API `v1.1.0-rc.4`(커밋 `31d781b`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
+   - JDK 21(Temurin), HMG-API `v1.1.0-rc.7`(커밋 `5732e26`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
 3. Actions의 release 실행이 `production` 승인을 기다립니다. 실행 화면의 **Review deployments**에서 아래 "승인하기 전에"를 확인하고 승인합니다.
 4. `build` job(배포 키 있음, 저장소 읽기만)이 돕니다.
    - JDK 21, Android SDK(`build-tools;37.0.0`, `platforms;android-19`), HMG-API 소스를 준비합니다.
@@ -124,6 +124,11 @@ gh variable set NX4_PKG_ZIP_URL --body https://github.com/StopDragon/korea-proje
 - **배포 키를 가진 job이 받는 까닭:** `build.sh`가 USB 묶음을 만들 때 넣어야 해서 `build` job에서 받습니다. 키를 꺼내기 전에 받고, 그 안의 것은 실행하지 않습니다. 풀어서 USB 묶음에 옮겨 담기만 합니다.
 - **라이선스:** HMG-API(AGPL-3.0)에서 설치에 쓰는 것만 고치지 않고 함께 배포합니다. `build.sh`가 USB 맨 위 `HMGAPI-SOURCE.txt`에 판, 대응 소스(태그), 뺀 것을 적습니다. 릴리스 글에는 대응 소스를 `HMGAPI_COMMIT`(커밋)으로 적습니다. 태그는 옮겨질 수 있기 때문입니다.
 - **PC 빌드:** `.env.local`의 `HMGAPI_USB_ZIP`이 없으면 NX4 KOR만 넣습니다.
+- **HMG-API가 릴리스를 지우면:** HMG-API는 새 시험판을 내면서 예전 시험판 릴리스를 지웁니다. 2026-11-20에 rc.4 릴리스가 지워져, `v2.0.0-beta.2` 실행이 "HMG-API USB 묶음" step의 다운로드(404)에서 멈췄습니다. 키를 꺼내기 전이라 키는 쓰이지 않았고, 릴리스도 만들지 않았습니다.
+  - 고치려면 그때 있는 판으로 `HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`을 함께 옮깁니다. 바꿀 곳 목록은 [`open-issue.md`](open-issue.md) OI-2에 있습니다.
+  - 그 소스로 `tests/mod-test.sh`를 통과시킨 뒤 다음 번호의 태그를 답니다. 같은 태그는 다시 쓸 수 없습니다. 태그 push로 도는 워크플로는 그 태그 커밋의 `release.yml`을 쓰기 때문입니다.
+  - 받을 수 있는지는 태그를 달기 전에 `curl -sSI -o /dev/null -w '%{http_code}\n' <HMGAPI_USB_URL>`로 봅니다. 200이나 302면 됩니다.
+  - 정식판 직전에 지워지면 차에서 확인하지 않은 판으로 옮겨야 합니다. 그래서 고정한 파일을 이 저장소에 사본으로 둘지는 [`open-issue.md`](open-issue.md) OI-10에서 정합니다.
 
 ## production 환경 (처음 한 번, 저장소 관리자)
 

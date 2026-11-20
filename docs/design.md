@@ -2,7 +2,7 @@
 
 NX4 KOR는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 내비 260902) 전용 HMG-API 모드 하나입니다. Korea Projection(StopDragon)의 핫스팟 서비스·상태 화면과, Korea Projection이 HMG-API에 따로 넣던 한국 차 빌드 무선 모드(`wireless-carplay-aa` 2.4.5)를 합쳤습니다.
 
-> ⚠️ 차에서 아직 확인하지 않았습니다. PC 시험(`tests/mod-test.sh`)과 HMG-API 1.1.0-rc.4 엔진(PC)에서만 확인했습니다. 아래 "차에서 확인할 것"을 먼저 봐 주세요.
+> ⚠️ 차에서 아직 확인하지 않았습니다. PC 시험(`tests/mod-test.sh`)과 HMG-API 1.1.0-rc.4와 1.1.0-rc.7 엔진(PC)에서만 확인했습니다(배포 워크플로는 rc.7로 시험·빌드). 아래 "차에서 확인할 것"을 먼저 봐 주세요.
 
 ## 모드 구성 (`mod/`)
 
@@ -86,6 +86,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 | HMG-API에 다른 모드의 적용 전 변경이 남아 있음 | `engine plan`에 이 모드 것이 아닌 변경이 섞입니다 | 자동으로 적용하지 않고 HMG-API 앱에서 적용하라고 안내합니다(상태 `otherplan`). 지울 때도 같습니다 |
 | 핫스팟을 띄우는 다른 패키지(USB 동글 패키지 등) | wlan0을 다툽니다 | 그 hostapd가 도는 동안 우리 핫스팟을 멈추고 비켜 줍니다. 처음 설정 전이면 자동 설정(무선 기능 적용)도 이번 부팅은 건너뛰고 다음 부팅에 다시 봅니다. 순정(netd)이 띄운 것이 아니고 연결도 없으면 상태 `otherwifi` |
 | 일반 Wi-Fi 접속(클라이언트)이 필요한 모드·앱 | Wi-Fi 잠금으로 wpa_supplicant가 뜨지 않아 접속할 수 없습니다 | 잠금은 이 모드를 지울 때 되돌립니다 |
+| HMG-API의 "집 Wi-Fi"(HMG-API 1.1.0-rc.5부터, HMG-API 앱 설정 > Home Wi-Fi, 기본 꺼짐) | 켜면 두 가지가 일어납니다(HMG-API rc.7 `engine/HomeWifi.java`). 이 모드는 그 파일을 root로 잠그고 자체 hostapd로 핫스팟을 띄우므로, 잠금이 풀리거나 핫스팟과 클라이언트가 wlan0을 다툴 수 있습니다.<br>• HMG-API 앱에서 집 Wi-Fi 네트워크를 저장하거나 지울 때(`join`·`forget`), Android Wi-Fi 설정(`wpa_supplicant.conf`)을 `wifi:wifi` 소유로 다시 씁니다.<br>• 차를 끈 지 30초 뒤나 주차하면(car events) 프로젝션 핫스팟을 끄고 차의 Wi-Fi 클라이언트를 켜 집 Wi-Fi에 붙습니다. | 막지 못하고, 시험하지 않았습니다. **켜지 않습니다**(README "알아 두실 점"). 상태 화면에서 알릴지는 [`open-issue.md`](open-issue.md) OI-7 |
 
 ## 차에서 확인할 것
 
@@ -98,5 +99,24 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - **HMG-API가 없는 차에서 릴리스 USB 하나로 설치되는지.** 첫 Update OTA에서 NX4 KOR 설치기가 스틱의 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)로 넘겨 HMG-API가 설치되고 재부팅되는지, 두 번째 Update OTA에서 NX4 KOR가 설치되는지(USB의 `HMGAPI/install.log`, `NX4/install.log`).
 - **HMG-API가 1.1.0-rc.4보다 낮은 차에서 HMG-API를 먼저 올리는지.** 첫 Update OTA가 따로 설치한 무선 모드(`wireless-carplay-aa`)를 지우지 않고 HMG-API 설치기의 업데이트 갈래로 HMG-API를 올린 뒤 재부팅하는지, 두 번째에 NX4 KOR가 설치되는지. HMG-API 설치기를 `/storage/upgrade`가 아니라 스틱의 `NX4/hmgapi`에서 `exec`로 돌리는 길은 차에서 처음 돕니다. NEMESIS로 설치한 HMG-API라면 NEMESIS 목록의 판도 함께 봅니다.
 - 순정 무선 카플레이가 있는 트림에서 순정 카플레이 AP 경로(`stock_ap_mode`)가 그대로 도는지.
+  - HMG-API 1.1.0-rc.5부터는 한국 260902 현대·기아 빌드에서, 무선 프로젝션 AP(apMode 2)를 폰에 알린 이름·비밀번호로 띄우게 고칩니다(HMG-API `hook/ProjectionAp.java`).
+  - 이 고침은 관련 훅 지점 5개가 NX4 map에 모두 있을 때만 돕니다(`framework.network_management_service.start_access_point`, `framework.wifi_configuration.*` 4개).
+  - 이 모드는 순정 AP(netd가 띄운 hostapd) 설정의 `ssid=`로 판정합니다(`hotspot.sh` `stock_ssid`). 카플레이 SSID(softap.conf의 S2)면 `carplay`, 핫스팟 이름(S1)이면 `hotspot`입니다.
+  - 판정은 무선 기능이 적용된 뒤에만 합니다(`try_ready`). 그 앞의 두 경우는 판정까지 가지 않습니다.
+    - 적용 전: 판정 줄은 없고 `ap.log`에 "대기: 무선 기능이 아직 적용되지 않음(적용된 뒤 핫스팟을 켬)"이 남습니다. 뒤에서 도는 설정(`setup_hmgapi`)의 줄도 함께 남습니다.
+    - 처음 설정할 때 순정 AP가 떠 있음(`setup_hmgapi`): map 만들기를 포함한 설정을 건너뜁니다. `ap.log`에 "무선 설정 안 함: 다른 hostapd가 돌고 있음(순정 핫스팟 등) (다음 부팅에 다시 봄)"이 남고, 상태 화면은 순정 핫스팟을 끄고 재부팅하라고 안내합니다.
+  - 기대값(적용이 끝난 뒤):
+    - HMG-API rc.5 이상이고 이번 부팅에 훅이 켜짐: 순정 AP 이름이 카플레이 SSID(S2)이고, `ap.log`에 "순정 카플레이 AP 사용"이 남아야 합니다. 폰이 그 AP에 붙는지 봅니다.
+    - HMG-API rc.4이거나 이번 부팅에 훅이 꺼짐(적용 직후 재부팅 전, 부팅 보호 등): 이 빌드에 그 분기가 없으면 순정 AP가 핫스팟 이름(S1)으로 떠 판정이 `hotspot`입니다. `ap.log`에는 처음이면 "대기: 다른 hostapd가 돌고 있음(순정 핫스팟 등, 판정 hotspot)", 앞선 부팅에 `carplay`를 본 기록(`stockap.seen`)이 있으면 "순정 카플레이 AP를 기다림 … 지금 판정 hotspot"이 남습니다. 그때 폰이 붙는지도 적어 둡니다.
+    - 순정 AP가 우리 핫스팟보다 늦게 뜸: 우리 핫스팟을 켠 뒤의 확인(`ap_yield`)이 판정합니다.
+      - S2(`carplay`)면 "우리 핫스팟을 켠 뒤 순정 카플레이 AP가 켜짐: 우리 핫스팟을 멈춤…"이 남고, 이어 "순정 카플레이 AP 사용"이 남습니다.
+      - S1(`hotspot`)이면 "다른 hostapd가 돌고 있음(순정 핫스팟 등): 우리 핫스팟을 멈추고 기다림"이 남습니다.
+  - 이 갈래들은 `tests/mod-test.sh`에 시험이 없습니다. 순정 AP가 언제 뜨는지는 차에서만 확인됩니다.
+  - 둘이 부딪히면 어떻게 할지, 순정 AP가 늘 떠 있어 설정이 되지 않으면 어떻게 할지는 [`open-issue.md`](open-issue.md) OI-8에서 정합니다.
+- **HMG-API rc.5 이상에서 이 모드의 서비스가 그대로 도는지.** rc.5부터 `hmgapid`는 모드 서비스를 실효 그룹 2950(`MOD_GID`, root 서비스는 보조 그룹도 비움)과 `ANDROID_DNS_MODE=local`로 돌립니다. 또 HMG-API 방화벽이 그룹 2950·2951의 `rmnet+` 송신을 막습니다(rc.7 `core/hmgapid/hmgapid.c`, `engine/Network.java`).
+  - 이 모드의 `ap` 서비스(root)와 그 자식 hostapd·dnsmasq도 이 환경에서 돕니다.
+  - `tests/mod-test.sh`의 엔진 시험은 서비스를 띄우지 않아 이 부분을 덮지 않습니다.
+  - 우리 스크립트는 모바일 데이터와 이름 조회를 쓰지 않아 영향이 없을 것으로 봅니다.
+  - HMG-API rc.7인 차에서 다음 셋이 되면 이것도 확인한 것으로 봅니다: 우리 핫스팟이 뜨고, 폰이 붙고, 상태 화면이 상태를 읽음.
 
 정하지 않은 것은 [`open-issue.md`](open-issue.md)에서 관리합니다.

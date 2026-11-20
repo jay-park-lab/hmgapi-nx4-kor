@@ -20,12 +20,14 @@ concurrency:
 env:
   # CI에는 .env.local이 없다. 스크립트는 step의 환경 변수만 읽는다
   NX4_ENV_FILE: ''
-  # HMG-API v1.1.0-rc.4 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도)
-  HMGAPI_COMMIT: 31d781b412681ba9e53cbe2627dcee274cb75119
+  # HMG-API v1.1.0-rc.7 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도)
+  HMGAPI_COMMIT: 5732e261f544ef780bc0e4a5f7400ccc1b98edaa
   # 같은 판의 HMG-API USB 묶음. USB 묶음에 함께 넣어, HMG-API가 없는 차는 그것부터 설치한다(scripts/build.sh).
-  # 릴리스 파일은 바뀔 수 있으므로 SHA-256으로 고정한다. 판은 위 커밋의 판과 같아야 한다(build job이 확인)
-  HMGAPI_USB_URL: https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0-rc.4/hmgapi-1.1.0-rc.4-usb.zip
-  HMGAPI_USB_SHA256: 6b5ad3c4058afefade9a64009be6dc5181637ca9036d1f0f96af4d3c7a8bacf6
+  # 릴리스 파일은 바뀔 수 있으므로 SHA-256으로 고정한다. 판은 위 커밋의 판과 같아야 한다(build job이 확인).
+  # HMG-API는 예전 시험판 릴리스를 지운다(rc.4가 지워져 v2.0.0-beta.2가 여기서 멈춤). 받지 못하면 그때 있는 판으로
+  # 이 셋을 함께 옮긴다(docs/release.md "HMG-API를 USB 묶음에 함께", docs/open-issue.md OI-2)
+  HMGAPI_USB_URL: https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0-rc.7/hmgapi-1.1.0-rc.7-usb.zip
+  HMGAPI_USB_SHA256: 10818e60932e8d0e45992c69deaafecbf8835ffb21cf197e7b4dbfcbae36e964
 
 jobs:
   check:
@@ -101,7 +103,7 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: HMG-API 소스 (v1.1.0-rc.4)
+      - name: HMG-API 소스 (v1.1.0-rc.7)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Open-HMG/HMG-API
@@ -175,7 +177,7 @@ jobs:
           done
           ls "$SDK/build-tools" "$SDK/platforms"
 
-      - name: HMG-API 소스 (v1.1.0-rc.4)
+      - name: HMG-API 소스 (v1.1.0-rc.7)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Open-HMG/HMG-API
