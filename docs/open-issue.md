@@ -30,11 +30,13 @@
 - 정할 것: rc.5를 지원 판으로 적을지, 최소 판을 올릴지, 그대로 둘지.
 - 정하면 함께 바꿀 곳:
   - **시험·빌드에 쓰는 HMG-API를 rc.5로 옮기면:** 배포 워크플로도 HMG-API rc.4를 커밋으로 고정해 시험·빌드합니다. `.github/workflows/release.yml`의 `HMGAPI_COMMIT`(태그가 가리키는 커밋 SHA)과 그 주석, 단계 이름 두 곳("HMG-API 소스 (v1.1.0-rc.4)"), `docs/release.md`의 판·커밋 표기를 바꿉니다.
-  - **최소 판을 올리면:** `1.1.0-rc.4`가 적힌 곳을 모두 바꿉니다(`git grep -n '1\.1\.0-rc\.4'`).
+  - **최소 판을 올리면:** 위 갈래를 먼저 하거나 함께 합니다. HMG-API 엔진은 설치할 때 `mod.json` `hmgapi`를 자기 판과 비교해, 더 높은 판을 요구하는 모드는 거절합니다(HMG-API `Packages.java`). 그래서 시험·빌드에 쓰는 HMG-API가 rc.4인 채로 최소 판만 올리면 `tests/mod-test.sh`의 엔진 설치 시험과 배포 워크플로의 PC 시험이 실패합니다. 바꿀 곳은 `git grep -n '1\.1\.0-rc\.4'`로 찾은 것 중 **최소 판을 뜻하는 곳**입니다.
     - 모드: `mod/mod.json` `hmgapi`, `mod/svc/hotspot.sh` `HMG_MIN`
     - 상태 화면 앱: `app/java/io/github/jayparklab/nx4kor/Report.java` `MIN_HMGAPI`(차주에게 "… 이상 필요"를 보이는 값). 앱을 바꾸므로 `app/AndroidManifest.xml`의 판 번호도 올려야 하고, 그래서 `release/`에서 할 일입니다(`docs/git-flow.md` 규칙 4).
-    - 시험: `tests/mod-test.sh`는 `mod.json`과 `HMG_MIN`을 서로 비교하지 않고 각각을 `1.1.0-rc.4` 글자 그대로와 비교합니다. 그 두 곳과 `oldhmgapi` 판정 시험, `tests/ReportTest.java`의 기대값을 함께 고칩니다.
-    - 문서: `README.md`(맨 위와 "필요한 것"), `usb/README.txt`, `docs/design.md`(모드 구성 표의 `hmgapi`). `docs/design.md` 맨 위의 "1.1.0-rc.4 엔진에서만 확인"은 시험한 판이므로, 다른 판으로 다시 시험했을 때 고칩니다.
+    - 시험: `tests/mod-test.sh`는 `mod.json`과 `HMG_MIN`을 서로 비교하지 않고 각각을 `1.1.0-rc.4` 글자 그대로와 비교합니다. 그 두 곳과 `oldhmgapi` 판정 시험, `tests/ReportTest.java`에서 최소 판을 기대하는 값을 함께 고칩니다.
+    - 문서: `README.md`(맨 위와 "필요한 것"), `usb/README.txt`, `docs/design.md`(모드 구성 표의 `hmgapi`)
+  - **바꾸지 않는 곳**(최소 판이 아니라 시험한 판이나 시험 입력값): `docs/design.md` 맨 위의 "1.1.0-rc.4 엔진에서만 확인"과 `wireless/README.md`의 "HMG-API 1.1.0-rc.4에 … 있습니다(2026-11-19 확인)"는 다른 판으로 다시 시험했을 때 고칩니다. `tests/ReportTest.java`의 `Report.older` 비교 입력값과 `tests/emu/scen.sh`의 HMG-API 판은 그대로 둡니다.
+  - **알아 둘 점:** rc.4 → rc.5처럼 `-rc.N`만 올리면 상태 화면은 낮은 판을 막지 못합니다. `hotspot.sh` `ver_lt`와 앱 `Report.older`는 major.minor.patch 숫자만 비교하고 `-태그`는 무시합니다(`ReportTest`: `older("1.1.0-rc.3", "1.1.0-rc.4") == 0`). 그래서 rc.4를 쓰는 차도 `oldhmgapi`로 나오지 않고, 막는 것은 HMG-API 엔진의 설치 거절뿐입니다.
 
 ### OI-3. 무선 모드를 공식 v2.2.0-rc.5 위로 옮길지
 
