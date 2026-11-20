@@ -94,7 +94,7 @@ NX4 KOR 모드(`mod/`)의 무선 부분은 Korea Projection(StopDragon)이 HMG-A
   - NX4 `libCarPlayUtils.so`가 변환기를 내장한 판(`e85385d7…`)이면 쓰이지 않습니다.
 - **NX4 AA 라이브러리가 `dbfe7bd2…`이면 `aa-tbt-dbfe7bd2.recipe` 더하기.** 우리 AA 레시피와 같은 한국어 UTF-8 수정을 넣어야 합니다.
 
-길게 보면 한국 포크의 변경을 rc.8 위로 옮겨 다시 빌드하는 것이 좋습니다. 그러면 BT 유지, 재연결, `park`, 두 폰 처리, `wifi.hotspot`을 얻습니다. 어느 쪽으로 갈지는 [`docs/open-issue.md`](../docs/open-issue.md) OI-3에서 관리합니다.
+길게 보면 한국 포크의 변경을 rc.8 위로 옮겨 다시 빌드하는 것이 좋습니다. 그러면 BT 유지, 재연결, `park`, 두 폰 처리, `wifi.hotspot`을 얻습니다. 어느 쪽으로 갈지는 [#15](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/15)에서 정합니다.
 
 ## 직접 다시 만들기
 

@@ -125,10 +125,10 @@ gh variable set NX4_PKG_ZIP_URL --body https://github.com/StopDragon/korea-proje
 - **라이선스:** HMG-API(AGPL-3.0)에서 설치에 쓰는 것만 고치지 않고 함께 배포합니다. `build.sh`가 USB 맨 위 `HMGAPI-SOURCE.txt`에 판, 대응 소스(태그), 뺀 것을 적습니다. 릴리스 글에는 대응 소스를 `HMGAPI_COMMIT`(커밋)으로 적습니다. 태그는 옮겨질 수 있기 때문입니다.
 - **PC 빌드:** `.env.local`의 `HMGAPI_USB_ZIP`이 없으면 NX4 KOR만 넣습니다.
 - **HMG-API가 릴리스를 지우면:** HMG-API는 새 시험판을 내면서 예전 시험판 릴리스를 지웁니다. 2026-11-20에 rc.4 릴리스가 지워져, `v2.0.0-beta.2` 실행이 "HMG-API USB 묶음" step의 다운로드(404)에서 멈췄습니다. 키를 꺼내기 전이라 키는 쓰이지 않았고, 릴리스도 만들지 않았습니다.
-  - 고치려면 그때 있는 판으로 `HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`을 함께 옮깁니다. 바꿀 곳 목록은 [`open-issue.md`](open-issue.md) OI-2에 있습니다.
+  - 고치려면 그때 있는 판으로 `HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`을 함께 옮깁니다. 바꿀 곳 목록은 [#14](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/14)에 있습니다.
   - 그 소스로 `tests/mod-test.sh`를 통과시킨 뒤 다음 번호의 태그를 답니다. 같은 태그는 다시 쓸 수 없습니다. 태그 push로 도는 워크플로는 그 태그 커밋의 `release.yml`을 쓰기 때문입니다.
   - 받을 수 있는지는 태그를 달기 전에 `curl -sSI -o /dev/null -w '%{http_code}\n' <HMGAPI_USB_URL>`로 봅니다. 200이나 302면 됩니다.
-  - 정식판 직전에 지워지면 차에서 확인하지 않은 판으로 옮겨야 합니다. 그래서 고정한 파일을 이 저장소에 사본으로 둘지는 [`open-issue.md`](open-issue.md) OI-10에서 정합니다.
+  - 정식판 직전에 지워지면 차에서 확인하지 않은 판으로 옮겨야 합니다. 그래서 고정한 파일을 이 저장소에 사본으로 둘지는 [#22](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/22)에서 정합니다.
 
 ## production 환경 (처음 한 번, 저장소 관리자)
 
