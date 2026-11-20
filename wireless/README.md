@@ -50,7 +50,7 @@ NX4 KOR 모드(`mod/`)의 무선 부분은 Korea Projection(StopDragon)이 HMG-A
 - 그래서 지금은 2.4.5를 유지합니다. 차에서 시험해 볼 만한 것(코드 수정 없이):
   - rc.5의 `carplay-core-frames-ef49c09b.recipe`를 `libCarPlayCore.so` 레시피 목록 맨 앞에 더하기. 이 레시피의 원본 md5는 한국 260902 빌드의 것과 같습니다. NX4 라이브러리와 맞는지는 차에서 확인해야 합니다.
   - rc.5의 `libleafiaaac.so`로 바꾸기.
-- 길게 보면 한국 포크의 변경을 rc.5 위로 옮겨(BT 유지·재연결·`wifi.hotspot`을 받기) 다시 빌드하는 것이 좋습니다. 어느 쪽으로 갈지는 [`docs/open-issue.md`](../docs/open-issue.md) OI-3에서 관리합니다.
+- 길게 보면 한국 포크의 변경을 rc.5 위로 옮겨(BT 유지·재연결·`wifi.hotspot`을 받기) 다시 빌드하는 것이 좋습니다. 어느 쪽으로 갈지는 [#15](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/15)에서 정합니다.
 
 ## 직접 다시 만들기
 
