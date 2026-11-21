@@ -110,6 +110,10 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - **DSP OTA 화면 위로 상태 화면이 열리는지**(`am start`). 안 열리면 재부팅 뒤 같은 USB로 Update OTA를 다시 누릅니다.
 - HMG-API 설치기가 NX4의 `app_process`를 아는지(모르면 `HMGAPI/FORCE`).
 - **함께 넣은 busybox가 NX4에서 도는지.** NX4 내비에 `/system/bin/busybox`가 없으면 모드의 `bin/busybox`(`/data/hmgapi/mods/nx4-kor/bin/busybox`)만 쓸 수 있습니다. `ap.log`에 "시작 안 함: busybox가 없음"이 없어야 하고, 상태 화면에 "쓸 수 있는 busybox가 없어" 알림이 없어야 합니다. 2.0.0-beta.4까지의 묶음에는 busybox가 없었습니다.
+  - 함께 넣은 busybox를 쓰면 `hotspot.sh`가 K3·K8(tcc803x)용 갈래 두 개를 켭니다. 부팅마다 순정 카플레이 AP를 최대 90초 기다리고(`STOCK_GRACE`), 순정 AP 저장값 `wifi_ap_on`을 0으로 맞추지 않습니다(`apon_off`). NX4에서 처음 켜지는 것이라 함께 봅니다.
+    - 부팅 뒤 `ap.log`의 "순정 카플레이 AP를 최대 90초 기다림(busybox 없는 내비)" 줄과 무선 연결까지 걸린 시간
+    - `settings get global wifi_ap_on` 값, 순정 무선 카플레이가 있는 트림인지
+    - 이 갈래를 NX4에 둘지는 [#37](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/37)에서 정합니다.
 - **HMG-API가 없는 차에서 릴리스 USB 하나로 설치되는지.** 첫 Update OTA에서 NX4 KOR 설치기가 스틱의 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)로 넘겨 HMG-API가 설치되고 재부팅되는지, 두 번째 Update OTA에서 NX4 KOR가 설치되는지(USB의 `HMGAPI/install.log`, `NX4/install.log`).
 - **HMG-API가 1.1.0-rc.4보다 낮은 차에서 HMG-API를 먼저 올리는지.** 첫 Update OTA가 따로 설치한 무선 모드(`wireless-carplay-aa`)를 지우지 않고 HMG-API 설치기의 업데이트 갈래로 HMG-API를 올린 뒤 재부팅하는지, 두 번째에 NX4 KOR가 설치되는지. HMG-API 설치기를 `/storage/upgrade`가 아니라 스틱의 `NX4/hmgapi`에서 `exec`로 돌리는 길은 차에서 처음 돕니다. NEMESIS로 설치한 HMG-API라면 NEMESIS 목록의 판도 함께 봅니다.
 - 순정 무선 카플레이가 있는 트림에서 순정 카플레이 AP 경로(`stock_ap_mode`)가 그대로 도는지.

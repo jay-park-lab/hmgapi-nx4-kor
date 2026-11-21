@@ -23,7 +23,7 @@ USB로 설치하다 멈추거나, 설치 뒤 상태 화면이 빨강·노랑일 
 
 | 어디 | 무엇 | adb 필요 |
 |---|---|---|
-| USB `NX4/install.log` | NX4 KOR 설치기가 한 일. 누를 때마다 아래에 이어 씁니다(앞의 시도도 남음) | 아니오 |
+| USB `NX4/install.log` | NX4 KOR 설치기가 한 일. 누를 때마다 아래에 이어 씁니다(앞의 시도도 남음). 이번 시도는 **맨 아래**, 마지막 "NX4 KOR USB 설치기 시작" 줄부터입니다 | 아니오 |
 | USB `HMGAPI/install.log` | HMG-API 설치기가 한 일 | 아니오 |
 | 상태 화면 | 오른쪽 칸의 판정·안내와 왼쪽 칸의 요약·상태표. 사진으로 남겨 두면 좋습니다. 앱 메뉴의 NX4 KOR 타일로 엽니다. 타일이 없으면 같은 USB로 Update OTA를 다시 누릅니다(다시 설치하지 않고 상태 화면만 엶) | 아니오 |
 | `/data/nx4-kor/logs/ap.log` | 이 모드 서비스의 기록 | 예 |
@@ -43,7 +43,7 @@ USB로 설치하다 멈추거나, 설치 뒤 상태 화면이 빨강·노랑일 
 | HMG-API …에는 설치할 수 없습니다. … 이상으로 먼저 올려 주세요 | HMG-API가 낮은데 USB에 HMG-API가 없음 | HMG-API가 든 릴리스 USB 묶음(`v2.0.0-beta.3`부터)을 씁니다 |
 | HMG-API가 없습니다. HMG-API USB 설치(HMGAPI 폴더)를 먼저 해 주세요 | HMG-API가 없는데 USB에 HMG-API가 없음 | 위와 같습니다 |
 | USB에서 복사하지 못했습니다 / USB에 NX4/install(…)이 없습니다 | USB 읽기 문제나 파일 빠짐 | USB를 다시 포맷하고 zip을 다시 풉니다 |
-| NX4 KOR 설치 실패: USB의 NX4/install.log를 보세요 | HMG-API 엔진이 설치를 거절함 | `install.log`의 `refused:` 줄을 봅니다. 업데이트 중이었다면 예전 판의 서비스는 다시 띄워 둡니다 |
+| NX4 KOR 설치 실패: USB의 NX4/install.log를 보세요 | HMG-API 엔진이 설치를 거절함 | `install.log` 맨 아래(마지막 "NX4 KOR USB 설치기 시작" 줄 뒤)의 `refused:` 줄을 봅니다. 위쪽은 앞의 시도입니다. 업데이트 중이었다면 예전 판의 서비스는 다시 띄워 둡니다 |
 | 이미 설치되어 있습니다 | 같은 판이 있음 | 상태 화면만 엽니다. 같은 판을 다시 설치하려면 `NX4` 폴더에 빈 파일 `REINSTALL`을 만듭니다 |
 
 HMG-API 설치 중 `HMGAPI/install.log`에 `isn't a known stock build`가 있으면, HMG-API 설치기가 이 차의 `app_process`를 모르는 것입니다. USB 맨 위 `HMGAPI` 폴더에 빈 파일 `FORCE`를 만들고 다시 누릅니다(**자기 책임**).

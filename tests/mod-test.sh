@@ -466,9 +466,12 @@ check "  설치가 진행 중(이번 부팅 run, 마지막 기록 5초 전) → 
 kill $RWP 2>/dev/null; wait $RWP 2>/dev/null
 check "  감시자가 끝 시각 파일(boot·until, 앱이 읽음)을 씀" 'grep -qx "boot=test-boot-id" $RW/watchf && grep -qx "until=200" $RW/watchf'
 
-# --- scripts/fetch-busybox.sh: Alpine 패키지에서 busybox만 꺼내 NOTICE.md의 SHA-256과 맞을 때만 둔다 ---
-# 인터넷 없이: 가짜 apk(gzip tar, bin/busybox.static)를 file://로 주고, 그 SHA-256을 적은 가짜 NOTICE.md 옆에 스크립트를 둔다
+# --- scripts/fetch-busybox.sh: Alpine 패키지에서 busybox만 꺼내, 패키지와 busybox가 NOTICE.md의 SHA-256과 맞을 때만 둔다 ---
+# 인터넷 없이: 가짜 apk(gzip tar, bin/busybox.static)를 file://로 주고, 그 SHA-256들을 적은 가짜 NOTICE.md 옆에 스크립트를 둔다
 FB=$T/fb; mkdir -p $FB/scripts; cp $B/scripts/fetch-busybox.sh $FB/scripts/
+sha256() { python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1"; }
+# 가짜 NOTICE.md: $1 = 패키지(apk) 파일, $2 = busybox SHA-256(NOTICE.md BusyBox 절과 같은 꼴)
+fbnotice() { printf '## BusyBox (GPL-2.0)\n  - SHA-256 `%s`\n  - 패키지 파일 `x.apk`(armv7)의 apk SHA-256 `%s`\n' "$2" "$(sha256 $1)" > $FB/NOTICE.md; }
 mkapk() { python3 - "$@" <<'PY'
 import io, sys, tarfile
 out, name = sys.argv[1], sys.argv[2]
@@ -481,23 +484,30 @@ PY
 mkapk $T/fb-pkg.apk bin/busybox.static
 mkapk $T/fb-nobb.apk bin/busybox
 printf '\177ELF fake busybox\n' > $T/fb-bb
-FBSHA=$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' $T/fb-bb)
-printf '## BusyBox (GPL-2.0)\n  - SHA-256 `%s`\n' $FBSHA > $FB/NOTICE.md
+FBSHA=$(sha256 $T/fb-bb)
 fbrun() { (env NX4_BUSYBOX_URL="$1" sh "$2" "$3") > $T/fb.out 2>&1; echo $? > $T/fb.rc; }
+fbnotice $T/fb-pkg.apk $FBSHA
 fbrun file://$T/fb-pkg.apk $FB/scripts/fetch-busybox.sh $T/fb-out
 check "fetch-busybox: 패키지의 bin/busybox.static을 꺼내 busybox(0755)로, SHA-256을 적은 GPL-2.0 안내(대응 소스 위치)와 함께 둠" \
   '[ "$(cat $T/fb.rc)" = 0 ] && cmp -s $T/fb-out/busybox $T/fb-bb && [ -x $T/fb-out/busybox ] && grep -q "$FBSHA" $T/fb-out/busybox-LICENSE.txt && grep -q "GPL" $T/fb-out/busybox-LICENSE.txt && grep -q "busybox-1.36.1.tar.bz2" $T/fb-out/busybox-LICENSE.txt' || cat $T/fb.out
+cp $T/fb-out/busybox-LICENSE.txt $T/fb-notice; echo "old notice" > $T/fb-out/busybox-LICENSE.txt
 fbrun file://$T/none.apk $FB/scripts/fetch-busybox.sh $T/fb-out
-check "fetch-busybox: 같은 SHA-256의 busybox와 안내가 이미 있으면 다시 받지 않음" '[ "$(cat $T/fb.rc)" = 0 ] && grep -q "이미 받아 둠" $T/fb.out' || cat $T/fb.out
+check "fetch-busybox: 같은 SHA-256의 busybox가 이미 있으면 다시 받지 않고, 라이선스 안내는 지금 문구로 다시 씀" \
+  '[ "$(cat $T/fb.rc)" = 0 ] && grep -q "이미 받아 둠" $T/fb.out && cmp -s $T/fb-out/busybox-LICENSE.txt $T/fb-notice' || cat $T/fb.out
 fbrun file://$T/fb-pkg.apk $B/scripts/fetch-busybox.sh $T/fb-bad
-check "fetch-busybox: 꺼낸 busybox가 NOTICE.md의 SHA-256과 다르면 멈추고 아무것도 두지 않음" \
-  '[ "$(cat $T/fb.rc)" != 0 ] && grep -q "다릅니다" $T/fb.out && [ ! -e $T/fb-bad/busybox ] && [ ! -e $T/fb-bad/busybox-LICENSE.txt ]' || cat $T/fb.out
+check "fetch-busybox: 받은 패키지가 NOTICE.md의 apk SHA-256과 다르면 풀기 전에 멈추고 아무것도 두지 않음" \
+  '[ "$(cat $T/fb.rc)" != 0 ] && grep -q "패키지 SHA-256.*다릅니다" $T/fb.out && [ ! -e $T/fb-bad/busybox ] && [ ! -e $T/fb-bad/busybox-LICENSE.txt ]' || cat $T/fb.out
+fbnotice $T/fb-pkg.apk 0000000000000000000000000000000000000000000000000000000000000000
+fbrun file://$T/fb-pkg.apk $FB/scripts/fetch-busybox.sh $T/fb-bad
+check "fetch-busybox: 패키지는 맞아도 꺼낸 busybox가 NOTICE.md의 SHA-256과 다르면 멈추고 아무것도 두지 않음" \
+  '[ "$(cat $T/fb.rc)" != 0 ] && grep -q "^busybox SHA-256.*다릅니다" $T/fb.out && [ ! -e $T/fb-bad/busybox ] && [ ! -e $T/fb-bad/busybox-LICENSE.txt ]' || cat $T/fb.out
+fbnotice $T/fb-nobb.apk $FBSHA
 fbrun file://$T/fb-nobb.apk $FB/scripts/fetch-busybox.sh $T/fb-bad
 check "fetch-busybox: 패키지에 bin/busybox.static이 없으면 멈춤" '[ "$(cat $T/fb.rc)" != 0 ] && grep -q "busybox.static이 없습니다" $T/fb.out && [ ! -e $T/fb-bad/busybox ]' || cat $T/fb.out
 fbrun file://$T/none.apk $FB/scripts/fetch-busybox.sh $T/fb-bad
 check "fetch-busybox: 받지 못하면 멈춤" '[ "$(cat $T/fb.rc)" != 0 ] && grep -q "받지 못했습니다" $T/fb.out && [ ! -e $T/fb-bad/busybox ]' || cat $T/fb.out
-check "fetch-busybox: 기본 주소는 Alpine v3.20 main armv7의 busybox-static-1.36.1-r31(https), NOTICE.md와 같은 판" \
-  'grep -q "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/armv7/busybox-static-1.36.1-r31.apk" $B/scripts/fetch-busybox.sh && grep -q "busybox-static-1.36.1-r31" $B/NOTICE.md'
+check "fetch-busybox: 기본 주소는 Alpine v3.20 main armv7의 busybox-static-1.36.1-r31(https), NOTICE.md에 같은 판과 SHA-256 두 개(busybox, apk)" \
+  'grep -q "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/armv7/busybox-static-1.36.1-r31.apk" $B/scripts/fetch-busybox.sh && grep -q "busybox-static-1.36.1-r31" $B/NOTICE.md && [ "$(grep -c "^ *- SHA-256 \`[0-9a-f]\{64\}\`" $B/NOTICE.md)" = 1 ] && [ "$(grep -c "apk SHA-256 \`[0-9a-f]\{64\}\`" $B/NOTICE.md)" = 1 ]'
 
 # --- 끝까지: 빌드 → HMG-API 엔진에 설치(HMGAPI_SRC가 있을 때만) ---
 if [ -n "$HMGAPI_SRC" ]; then
