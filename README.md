@@ -164,8 +164,8 @@ javac --release 8 -d out/engine-host core/runtime/java/hmgapi/engine/*.java
 java -cp out/engine-host hmgapi.engine.Signing keygen <NX4_MOD_KEY에 적은 경로>
 
 # 3. 묶음(결과: out/hmgapi-nx4-kor-버전.zip, out/hmgapi-nx4-kor-버전-usb.zip)
-#    선택: .env.local에 NX4_PKG_ZIP(Korea Projection 릴리스의 패키지 zip, busybox와 그 라이선스 안내용),
-#          HMGAPI_USB_ZIP(hmgapi-버전-usb.zip)
+#    busybox는 Alpine 저장소에서 받아 넣습니다(scripts/fetch-busybox.sh, 인터넷 필요. NOTICE.md의 SHA-256과 같을 때만)
+#    선택: .env.local에 HMGAPI_USB_ZIP(hmgapi-버전-usb.zip)
 sh scripts/build.sh
 ```
 

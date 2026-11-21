@@ -140,7 +140,6 @@ jobs:
     outputs:
       uuid: ${{ steps.verify.outputs.uuid }}
       app_cert: ${{ steps.cert.outputs.app_cert }}
-      busybox: ${{ steps.bb.outcome == 'success' }}
       hmgapi: ${{ steps.hu.outputs.version }}
       hmgapi_need: ${{ steps.hu.outputs.need }}
     steps:
@@ -211,22 +210,13 @@ jobs:
           echo "version=$HV" >> "$GITHUB_OUTPUT"
           echo "need=$NEED" >> "$GITHUB_OUTPUT"
 
-      # 선택: 저장소(또는 production 환경) 변수 NX4_PKG_ZIP_URL에 Korea Projection 릴리스 패키지 zip 주소를 두면
-      # 그 안의 busybox와 라이선스 안내를 넣는다. busybox는 NOTICE.md에 적은 SHA-256과 같아야 한다
-      - name: busybox (선택)
-        id: bb
-        if: vars.NX4_PKG_ZIP_URL != ''
-        env:
-          URL: ${{ vars.NX4_PKG_ZIP_URL }}
+      # busybox(GPL-2.0)를 Alpine 저장소에서 받아 모드에 넣는다(NX4 내비에는 /system/bin/busybox가 없을 수 있다).
+      # 키를 꺼내기 전에 받고, 꺼낸 busybox가 NOTICE.md에 적은 SHA-256과 같을 때만 쓴다. 이 job은 그것을 실행하지 않는다
+      - name: busybox (Alpine busybox-static 1.36.1-r31)
         run: |
           set -eu
-          Z=$RUNNER_TEMP/pkg.zip
-          curl -fsSL --proto '=https' --tlsv1.2 -o "$Z" "$URL"
-          EXP=$(sed -n 's/.*SHA-256 `\([0-9a-f]\{64\}\)`.*/\1/p' NOTICE.md | head -1)
-          GOT=$(unzip -p "$Z" bin/busybox | sha256sum | cut -d' ' -f1)
-          [ -n "$EXP" ] || { echo "::error::NOTICE.md에서 busybox SHA-256을 읽지 못했습니다"; exit 1; }
-          [ "$GOT" = "$EXP" ] || { echo "::error::busybox SHA-256($GOT)이 NOTICE.md($EXP)와 다릅니다"; exit 1; }
-          echo "NX4_PKG_ZIP=$Z" >> "$GITHUB_ENV"
+          sh scripts/fetch-busybox.sh "$RUNNER_TEMP/busybox"
+          echo "NX4_BUSYBOX=$RUNNER_TEMP/busybox/busybox" >> "$GITHUB_ENV"
 
       # secret은 화면에 내지 않는다(set -x 금지). 파일은 umask 077, 러너 임시 폴더, 마지막 step에서 지운다
       - name: 배포 키를 파일로
@@ -306,9 +296,12 @@ jobs:
             || { echo "::error::USB 묶음에 HMG-API $HMGAPI_VER 설치기가 없습니다(NX4/hmgapi/troubleShooter, HMGAPI/install/payload)"; exit 1; }
           # HMG-API 앱용 업데이트·공식 모드 묶음은 싣지 않는다(scripts/build.sh). wireless-carplay-aa는 이 모드와 함께 둘 수 없다
           [ ! -e "$D/HMGAPI/updates" ] || { echo "::error::USB 묶음에 HMGAPI/updates가 있습니다"; exit 1; }
+          # busybox와 그 라이선스 안내가 모드와 USB 맨 위에 들어갔는지(build.sh는 NX4_BUSYBOX를 받으면 늘 넣는다)
+          [ -f "$D/NX4/install/payload/bin/busybox" ] && [ -f "$D/NX4/install/payload/bin/busybox-LICENSE.txt" ] && [ -f "$D/BUSYBOX-LICENSE.txt" ] \
+            || { echo "::error::USB 묶음에 busybox나 그 라이선스 안내가 없습니다"; exit 1; }
           rm -rf "$D"
           echo "uuid=$UUID" >> "$GITHUB_OUTPUT"
-          if [ -n "${NX4_PKG_ZIP:-}" ]; then BB="넣음"; else BB="넣지 않음"; fi
+          BB="BusyBox 1.36.1(Alpine busybox-static-1.36.1-r31)을 넣음"
           {
             echo "### NX4 KOR $V"
             echo "- 모드 UUID: \`$UUID\`"
@@ -360,7 +353,6 @@ jobs:
           PRE: ${{ needs.check.outputs.prerelease }}
           UUID: ${{ needs.build.outputs.uuid }}
           APP_CERT: ${{ needs.build.outputs.app_cert }}
-          BUSYBOX: ${{ needs.build.outputs.busybox }}
           HMGAPI_VER: ${{ needs.build.outputs.hmgapi }}
           NEED: ${{ needs.build.outputs.hmgapi_need }}
           SRC: ${{ github.sha }}
@@ -380,7 +372,7 @@ jobs:
             *-beta.*) TITLE="NX4 KOR $V beta ${TAG##*-beta.}" ;;
             *) TITLE="NX4 KOR $V" ;;
           esac
-          if [ "$BUSYBOX" = true ]; then BB="넣음"; else BB="넣지 않음(내비의 /system/bin/busybox를 씀)"; fi
+          BB="BusyBox 1.36.1(Alpine busybox-static-1.36.1-r31)을 넣음. GPL-2.0, 대응 소스는 USB 맨 위 BUSYBOX-LICENSE.txt"
           N=$RUNNER_TEMP/notes.md
           {
             echo "| 파일 | 설치 |"

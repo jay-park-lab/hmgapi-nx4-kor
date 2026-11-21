@@ -60,7 +60,8 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
 - BusyBox는 NX4 KOR와 따로 동작하는 프로그램이고, AGPL-3.0이 아니라 **GNU GPL 2.0**으로 배포됩니다. 이 파일은 고치지 않았습니다.
 - 파일: BusyBox v1.36.1, Alpine Linux 3.20 `busybox-static-1.36.1-r31` 패키지의 `/bin/busybox.static`(ARMv7 정적 링크, 877,900바이트)
   - SHA-256 `3d31efecd4d09625a5d04597ad857f3475d35e6d63a3365912a7edd4c60770a5`
-  - Alpine 서명을 확인하는 `apk add busybox-static`(Docker `alpine:3.20`, linux/arm/v7)으로 받았습니다.
+  - 이 저장소의 빌드는 이 파일을 Alpine 저장소에서 직접 받습니다(`scripts/fetch-busybox.sh`: `dl-cdn.alpinelinux.org`의 v3.20 main armv7 패키지에서 이 파일만 꺼냄). SHA-256이 위 값과 같을 때만 넣습니다.
+  - Korea Projection에 들어 있던 것도 Alpine 서명을 확인하는 `apk add busybox-static`(Docker `alpine:3.20`, linux/arm/v7)으로 받은 같은 파일입니다.
 - 대응 소스
   - BusyBox 1.36.1: https://busybox.net/downloads/busybox-1.36.1.tar.bz2
   - Alpine 빌드 설정·패치(`APKBUILD`, 설정 파일, 패치): https://gitlab.alpinelinux.org/alpine/aports/-/tree/3.20-stable/main/busybox
