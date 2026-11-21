@@ -10,7 +10,7 @@
 #   NX4/hmgapi/troubleShooter         HMG-API USB 묶음을 같은 스틱에 함께 풀어 둔 경우의 HMG-API 설치기.
 #                                                 HMG-API가 아직 없거나 이 모드의 최소 판보다 낮으면 이것을 대신 돌린다
 #                                                 (재부팅 뒤 Update OTA를 한 번 더)
-# 한 일은 NX4/install.log에 남는다.
+# 한 일은 NX4/install.log에 남는다. 누를 때마다 그 아래에 이어 쓴다(앞의 시도 기록을 덮지 않음).
 # 설치·업데이트 뒤에는 재부팅하지 않는다: 서비스가 첫 설정(map 만들기·확인, 무선 기능 적용, 3~5분)을 하는 동안 꺼지면
 # 안 된다. 대신 상태 화면을 열어 진행을 보여 주고, 끝나면 그 화면의 [지금 재부팅]을 누르게 한다.
 # 같은 판이 이미 있으면 상태 화면만 연다: HMG-API 훅이 켜지기 전에는 앱 메뉴에 타일이 없으므로 이것이 상태 화면을 여는 길이다.
@@ -171,11 +171,18 @@ open_status() {
   return 1
 }
 
-: > $LOG
-log "NX4 KOR USB 설치기 시작 ($(getprop ro.build.product 2>/dev/null))"
 for d in ${NX4_USB_DIRS:-/storage/usb0 /storage/usb1 /storage/usb2 /mnt/media_rw/usb0 /mnt/media_rw/usb1 /mnt/media_rw/usb2}; do
   if [ -d "$d/NX4" ]; then U=$d; break; fi
 done
+# 기록: 스틱에 앞의 기록(NX4/install.log)이 있으면 먼저 옮겨 두고 그 아래에 이번 기록을 더한다.
+# 스틱에 쓸 때(finish, HMG-API 설치기로 넘길 때)는 이 파일 전체로 바꾸므로, 한 번 누른 기록이 두 번 들어가지 않는다.
+# 기록을 비우려면 스틱에서 NX4/install.log를 지운다
+: > $LOG
+if [ -n "$U" ] && [ -s $U/NX4/install.log ]; then
+  cat $U/NX4/install.log >> $LOG 2>/dev/null
+  echo >> $LOG
+fi
+log "NX4 KOR USB 설치기 시작 ($(getprop ro.build.product 2>/dev/null))"
 if [ -z "$U" ]; then
   toast "NX4 KOR: USB에 NX4 폴더가 없습니다. 아무것도 바꾸지 않았습니다."
   finish 1

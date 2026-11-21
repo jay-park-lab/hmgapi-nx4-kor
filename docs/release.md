@@ -13,17 +13,18 @@
 3. Actions의 release 실행이 `production` 승인을 기다립니다. 실행 화면의 **Review deployments**에서 아래 "승인하기 전에"를 확인하고 승인합니다.
 4. `build` job(배포 키 있음, 저장소 읽기만)이 돕니다.
    - JDK 21, Android SDK(`build-tools;37.0.0`, `platforms;android-19`), HMG-API 소스를 준비합니다.
-   - 키를 꺼내기 전에 HMG-API USB 묶음을 받아 확인합니다(아래 "HMG-API를 USB 묶음에 함께").
+   - 키를 꺼내기 전에 HMG-API USB 묶음(아래 "HMG-API를 USB 묶음에 함께")과 busybox(아래 "busybox")를 받아 확인합니다.
    - 배포 키를 러너 임시 폴더의 파일로 꺼내고(umask 077), `scripts/build-app.sh`, `scripts/build.sh`를 돌립니다.
    - 다음을 봅니다. 하나라도 다르면 멈춥니다.
      - 앱 서명 인증서가 `.github/release/app-cert.sha256`과 같은지
      - 모드가 `.github/release/mod.key.pub`의 UUID로 서명됐는지
      - USB 묶음의 맨 위 설치기가 `usb/troubleShooter`이고, HMG-API 설치기(`NX4/hmgapi/troubleShooter`)와 같은 판의 payload가 함께 들었으며, `HMGAPI/updates`는 없는지
+     - busybox와 그 라이선스 안내가 모드(`bin/`)와 USB 맨 위(`BUSYBOX-LICENSE.txt`)에 들었는지
    - 키 파일을 지우고, 두 zip만 다음 job에 넘깁니다.
 5. `publish` job(배포 키 없음, 저장소 쓰기)이 릴리스를 만들어 두 파일을 올립니다. 릴리스 글에는 다음이 들어갑니다.
    - 파일 설명
    - 모드 UUID, 앱 서명 인증서 SHA-256
-   - busybox를 넣었는지
+   - 넣은 busybox(BusyBox 1.36.1, Alpine `busybox-static-1.36.1-r31`)
    - 필요한 HMG-API 최소 판, 함께 넣은 HMG-API 판과 그 대응 소스(커밋)
    - 소스 커밋
    - 두 파일의 SHA-256
@@ -47,7 +48,7 @@ PC에서 `.env.local`의 키로 `sh scripts/build.sh`를 돌려 만드는 길도
 | `NX4_MOD_KEY` | `production` 환경 secret | HMG-API 모드 작성자 키(비밀 키) | `<NX4_MOD_KEY>` |
 | `.github/release/mod.key.pub` | 커밋한 파일 | 모드 작성자 공개 키 | `<NX4_MOD_KEY>.pub` |
 | `.github/release/app-cert.sha256` | 커밋한 파일 | 앱 서명 인증서 SHA-256 | (키스토어에서 뽑은 값) |
-| `NX4_PKG_ZIP_URL` | 저장소 변수(선택) | busybox를 꺼낼 Korea Projection 패키지 zip 주소 | — |
+| `NX4_BUSYBOX_URL` | 저장소 변수(선택) | busybox 패키지 미러 주소(https, 같은 파일이어야 함. 비우면 Alpine CDN. 아래 "busybox") | `.env.local`의 같은 이름(선택) |
 
 `<NX4_APP_KEYS>`, `<NX4_MOD_KEY>`는 `.env.local`에 적은 경로입니다. 로컬 키는 저장소 밖에 둡니다(아래 "키 백업").
 
@@ -96,16 +97,18 @@ gh secret list --env production
 - `base64 -i`는 macOS 꼴입니다(한 줄로 냅니다). 리눅스에서는 `base64 -w0 <NX4_APP_KEYS>/release.keystore`.
 - secret은 읽어 올 수 없습니다. 제대로 넣었는지는 다음 베타 태그 실행의 "앱 서명 인증서 확인", "모드 서명 확인" step으로 봅니다.
 
-### busybox (선택)
+### busybox
 
-`scripts/build.sh`는 `NX4_PKG_ZIP`이 없으면 busybox를 넣지 않습니다. 그때는 내비의 `/system/bin/busybox`를 씁니다. 지금 PC 빌드도 넣지 않습니다. CI에서 넣으려면 저장소 변수에 Korea Projection 릴리스의 패키지 zip 주소를 둡니다.
+모드의 스크립트는 busybox로 돕니다. NX4 내비에 `/system/bin/busybox`가 없으면 모드에 함께 넣은 것만 쓸 수 있으므로, 묶음에는 늘 busybox를 넣습니다(내비에 있으면 그것을 먼저 씁니다).
 
-```sh
-gh variable set NX4_PKG_ZIP_URL --body https://github.com/StopDragon/korea-projection/releases/download/v1.7.4/korea.projection-1.7.4.zip
-```
-
-- 워크플로는 그 zip의 `bin/busybox`가 [`NOTICE.md`](../NOTICE.md#busybox-gpl-20)에 적은 SHA-256과 같을 때만 씁니다. 라이선스 안내(`bin/busybox-LICENSE.txt`)가 없으면 `build.sh`가 멈춥니다.
-- 위 주소의 zip 안을 이 문서를 쓰며 열어 보지는 않았습니다. 처음에는 베타 태그로 확인합니다.
+- `scripts/fetch-busybox.sh`가 Alpine Linux 저장소에서 `busybox-static-1.36.1-r31`(armv7) 패키지를 받아 `/bin/busybox.static`만 꺼냅니다. 원본 Korea Projection 릴리스를 거치지 않습니다.
+- [`NOTICE.md`](../NOTICE.md#busybox-gpl-20)에 적은 SHA-256 두 개로 확인합니다. 받은 패키지 파일(apk SHA-256)은 풀기 전에, 꺼낸 busybox는 두기 전에 봅니다. 하나라도 다르면 멈춥니다. 받은 것은 실행하지 않습니다.
+- 라이선스 안내(`bin/busybox-LICENSE.txt`, USB 맨 위 `BUSYBOX-LICENSE.txt`)도 이 스크립트가 씁니다. 이미 받아 둔 폴더에서도 안내는 매번 다시 씁니다.
+- 워크플로는 키를 꺼내기 전에 받고, 만든 USB 묶음에 busybox와 안내가 들었는지 확인합니다.
+- PC 빌드(`scripts/build.sh`)는 `NX4_BUSYBOX`를 주지 않으면 먼저 `mod/bin/busybox`(git 제외 파일)를 씁니다. 그 파일은 SHA-256을 확인하지 않으므로, 예전에 둔 것이 있으면 지우고 만듭니다. 없으면 같은 스크립트로 받아 `out/busybox`에 둡니다(curl·인터넷 필요). 인터넷 없이 만들 때는 받아 둔 파일을 `NX4_BUSYBOX`로 가리킵니다. `NX4_BUSYBOX=none`이면 넣지 않습니다(배포용으로 쓰지 않습니다).
+- Alpine 3.20은 지원이 끝난 판이라 이 패키지가 더 바뀌지 않을 것으로 봅니다. 저장소에서 내려가 받지 못하면 빌드가 멈춥니다. 그때는 같은 파일을 둔 미러 주소를 씁니다(SHA-256이 같아야 합니다).
+  - CI: 저장소 변수 `gh variable set NX4_BUSYBOX_URL --body <https 주소>`. 워크플로의 busybox 단계가 읽습니다. 비워 두면 Alpine CDN입니다.
+  - PC: `.env.local`(또는 명령 앞)에 `NX4_BUSYBOX_URL=<https 주소>`.
 
 ### HMG-API를 USB 묶음에 함께
 
@@ -213,7 +216,7 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
 | 모드 폴더의 `build.sh`: HMG-API `mkmodpkg.sh`가 서명 키를 받은 채로 실행하고, 패키지에서는 빼서 결과물에 남지 않음 | 이 모드는 그 파일을 쓰지 않습니다. `scripts/build.sh`가 `mod/build.sh`를 보면 만들지 않고 멈춥니다(`check`의 시험 빌드에서도 멈춥니다). 이 확인을 없애는 변경은 `scripts/`에 있으므로 아래 diff에 보입니다 |
 | 시험 코드(`tests/`)가 키를 읽음 | 시험은 키가 없는 `check` job에서, 다른 러너로 돕니다. `build` job은 시험을 돌리지 않습니다 |
 | 포크의 PR | 포크 PR에는 secret이 가지 않습니다. 이 저장소는 `pull_request_target`을 쓰지 않습니다 |
-| job이 받아 돌리는 남의 코드(액션, HMG-API) | 액션과 HMG-API 소스를 커밋 SHA로 고정합니다. busybox zip과 HMG-API USB 묶음은 돌리지 않고, 파일의 SHA-256을 확인합니다. HMG-API USB 묶음은 키를 꺼내기 전에 받습니다 |
+| job이 받아 돌리는 남의 코드(액션, HMG-API) | 액션과 HMG-API 소스를 커밋 SHA로 고정합니다. busybox 패키지와 HMG-API USB 묶음은 돌리지 않고, 받은 파일의 SHA-256을 먼저 확인한 뒤 풉니다(busybox는 꺼낸 파일도 한 번 더). 둘 다 키를 꺼내기 전에 받습니다 |
 | 키를 가진 job의 토큰으로 저장소를 바꿈 | `build`의 토큰은 읽기만 합니다. 쓰기 토큰은 키가 없는 `publish`에만 둡니다 |
 
 ### 승인하기 전에

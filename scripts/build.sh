@@ -3,7 +3,8 @@
 #   out/hmgapi-nx4-kor-<버전>.zip      HMG-API 모드(작성자 키로 서명): HMG-API 앱·adb·USB로 설치
 #   out/hmgapi-nx4-kor-<버전>-usb.zip  USB 묶음: Engineering Mode > DSP > Update OTA로 설치
 # 모드는 mod/ 폴더(mod.json, 서비스·상태 스크립트, 무선 훅·네이티브 패치)에 상태 화면 앱과 busybox를 더한 것이다.
-# 필요한 것: JDK, python3, zip/unzip, HMG-API 소스(서명 도구 tools/mkmodpkg.sh), 상태 화면 앱 APK.
+# 필요한 것: JDK, python3, zip/unzip, HMG-API 소스(서명 도구 tools/mkmodpkg.sh), 상태 화면 앱 APK,
+#   busybox를 Alpine에서 받을 때는 curl과 인터넷(NX4_BUSYBOX 참고).
 # 환경 변수(명령 앞에 주거나 .env.local에 적는다. .env.example, scripts/local-env.sh):
 #   HMGAPI_SRC      HMG-API 저장소 위치(필수). 서명은 그 tools/mkmodpkg.sh가 한다
 #   NX4_MOD_KEY      모드 작성자 키(필수, 저장소 밖에 둔다). 처음 한 번:
@@ -11,10 +12,11 @@
 #                     java -cp $HMGAPI_SRC/out/engine-host hmgapi.engine.Signing keygen $NX4_MOD_KEY
 #                   HMG-API는 같은 키로 서명한 업데이트만 받는다: 이 키를 잃으면 모드를 지우고 다시 설치해야 한다
 #   NX4_APK          상태 화면 앱(기본 mod/app/NX4KOR.apk, scripts/build-app.sh로 만듦)
-#   NX4_BUSYBOX      함께 넣을 busybox(기본 mod/bin/busybox. 없으면 내비의 /system/bin/busybox만 쓴다)
+#   NX4_BUSYBOX      함께 넣을 busybox. 주지 않으면 mod/bin/busybox(있으면 SHA-256 확인 없이), 그것도 없으면 Alpine
+#                   저장소에서 받는다(scripts/fetch-busybox.sh: BusyBox 1.36.1, NOTICE.md의 SHA-256과 같을 때만.
+#                   <OUT>/busybox에 둠. 미러는 NX4_BUSYBOX_URL).
+#                   none이면 넣지 않는다(내비에 /system/bin/busybox가 없으면 무선 설정을 하지 않는 묶음이 된다)
 #   NX4_BUSYBOX_LICENSE  그 busybox의 라이선스 안내(GPL-2.0, 대응 소스 위치. 기본 <NX4_BUSYBOX>-LICENSE.txt)
-#   NX4_PKG_ZIP      Korea Projection 릴리스의 패키지 zip: 위 둘이 없을 때 그 안의
-#                   bin/busybox와 bin/busybox-LICENSE.txt를 쓴다(같은 BusyBox 1.36.1, NOTICE.md)
 #   HMGAPI_USB_ZIP  HMG-API USB 묶음(hmgapi-<버전>-usb.zip). 주면 같은 USB에 함께 넣는다(HMG-API가 없으면 그것부터 설치)
 #   OUT             결과 폴더(기본 out)
 # 라이선스: 모드와 USB에 LICENSE(AGPL-3.0)·NOTICE.md를 넣는다. busybox(GPL-2.0)를 넣으면 그 안내(bin/busybox-LICENSE.txt,
@@ -49,26 +51,31 @@ APK=${NX4_APK:-$PKG/app/NX4KOR.apk}
 mkdir -p "$M/app"
 [ "$APK" -ef "$M/app/NX4KOR.apk" ] || cp "$APK" "$M/app/NX4KOR.apk"
 
+# busybox: 이 모드의 스크립트는 busybox로 돈다. NX4 내비에 /system/bin/busybox가 없으면 함께 넣은 것만 쓸 수 있으므로
+# 늘 넣는다(내비에 있으면 hotspot.sh가 그것을 먼저 쓴다). 넣지 않으려면 NX4_BUSYBOX=none
 BBX=${NX4_BUSYBOX:-$PKG/bin/busybox}
-if [ -f "$BBX" ]; then
-  [ "$BBX" -ef "$M/bin/busybox" ] || cp "$BBX" "$M/bin/busybox"
-elif [ -n "$NX4_PKG_ZIP" ]; then
-  unzip -p "$NX4_PKG_ZIP" bin/busybox > "$M/bin/busybox" || { echo "NX4_PKG_ZIP에 bin/busybox가 없습니다" >&2; exit 1; }
-else
-  echo "참고: busybox를 넣지 않습니다(내비의 /system/bin/busybox가 있어야 무선 설정을 합니다)"
+if [ "$NX4_BUSYBOX" = none ]; then
+  BBX=
+  rm -f "$M/bin/busybox"
+  echo "참고: busybox를 넣지 않습니다(NX4_BUSYBOX=none). 내비에 /system/bin/busybox가 없으면 무선 설정을 하지 않습니다"
+elif [ -z "$NX4_BUSYBOX" ] && [ ! -f "$BBX" ]; then
+  sh "$B/scripts/fetch-busybox.sh" "$OUT/busybox"
+  BBX=$OUT/busybox/busybox
 fi
-[ -f "$M/bin/busybox" ] && chmod 755 "$M/bin/busybox"
+if [ -n "$BBX" ]; then
+  [ -f "$BBX" ] || { echo "busybox가 없습니다: $BBX (NX4_BUSYBOX를 비우면 Alpine에서 받습니다)" >&2; exit 1; }
+  [ "$BBX" -ef "$M/bin/busybox" ] || cp "$BBX" "$M/bin/busybox"
+  chmod 755 "$M/bin/busybox"
+fi
 # busybox는 GPL-2.0인 별개 프로그램이다: 넣으면 라이선스 안내(대응 소스 위치)도 넣어야 한다. 없으면 만들지 않는다
 BBNOTE=bin/busybox-LICENSE.txt
-BBL=${NX4_BUSYBOX_LICENSE:-$BBX-LICENSE.txt}
-if [ -f "$M/bin/busybox" ]; then
+if [ -n "$BBX" ]; then
+  BBL=${NX4_BUSYBOX_LICENSE:-$BBX-LICENSE.txt}
   if [ -f "$BBL" ]; then
     [ "$BBL" -ef "$M/$BBNOTE" ] || cp "$BBL" "$M/$BBNOTE"
-  elif [ -n "$NX4_PKG_ZIP" ] && unzip -p "$NX4_PKG_ZIP" $BBNOTE > "$M/$BBNOTE" 2>/dev/null && [ -s "$M/$BBNOTE" ]; then
-    :
   else
     rm -f "$M/$BBNOTE"
-    echo "busybox(GPL-2.0)를 넣는데 라이선스 안내($BBNOTE)가 없습니다. NX4_BUSYBOX_LICENSE로 주거나 NX4_PKG_ZIP에 들어 있어야 합니다." >&2
+    echo "busybox(GPL-2.0)를 넣는데 라이선스 안내($BBL)가 없습니다. NX4_BUSYBOX_LICENSE로 주세요." >&2
     exit 1
   fi
 else
