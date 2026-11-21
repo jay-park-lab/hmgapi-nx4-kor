@@ -48,6 +48,7 @@ PC에서 `.env.local`의 키로 `sh scripts/build.sh`를 돌려 만드는 길도
 | `NX4_MOD_KEY` | `production` 환경 secret | HMG-API 모드 작성자 키(비밀 키) | `<NX4_MOD_KEY>` |
 | `.github/release/mod.key.pub` | 커밋한 파일 | 모드 작성자 공개 키 | `<NX4_MOD_KEY>.pub` |
 | `.github/release/app-cert.sha256` | 커밋한 파일 | 앱 서명 인증서 SHA-256 | (키스토어에서 뽑은 값) |
+| `NX4_BUSYBOX_URL` | 저장소 변수(선택) | busybox 패키지 미러 주소(https, 같은 파일이어야 함. 비우면 Alpine CDN. 아래 "busybox") | `.env.local`의 같은 이름(선택) |
 
 `<NX4_APP_KEYS>`, `<NX4_MOD_KEY>`는 `.env.local`에 적은 경로입니다. 로컬 키는 저장소 밖에 둡니다(아래 "키 백업").
 
