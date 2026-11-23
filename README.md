@@ -14,15 +14,17 @@
 |---|---|
 | 무선 카플레이·안드로이드 오토 훅, 계기판·HUD 길안내 | 공식 무선 모드. 한국 계기판 맞춤이 필요하면 공식 모드에 기여합니다(같은 훅 지점을 `replace`하는 모드 둘은 함께 켜지지 않음, [#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)) |
 | 핫스팟(프로젝션 AP), 순정 핫스팟 기능 | HMG-API(공식 모드가 `"wifi": {"projection": true}`로 요청) |
-| HMG-API 설치·업데이트, 공식 모드 설치, NX4 map 만들기·확인, 진단, 되돌리기 | 이 저장소의 USB 설치기 |
+| HMG-API 설치·업데이트, 공식 모드 설치, NX4 map 만들기·확인, 진단, 되돌리기(옛 NX4 KOR 2.0.x 정리 포함. 2.0.x는 공식 모드와 함께 설 수 없음, `conflicts`) | 이 저장소의 USB 설치기 |
 | 설치 진행·판정 화면 | 이 저장소의 상태 화면 앱. 지금 UI를 그대로 두고, 지우기 버튼을 더합니다([#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)) |
 | USB Wi-Fi 동글 | 이 저장소(나중에). Wi-Fi 부품이 없는 차를 위한 길 |
 
 - 빠지는 것: 한국 포크 무선 모드 2.4.5(`hooks.jar`·레시피·`libleafiaaac.so`, [`wireless/`](wireless/README.md)), 순정 칩용 핫스팟 서비스(`svc/hotspot.sh`의 칩 깨우기·Wi-Fi 잠금 등).
-- 판 번호: 2.1.0부터 베타도 판에 꼬리를 붙입니다(`2.1.0-beta.1`, [`docs/git-flow.md`](docs/git-flow.md) 규칙 4).
+- 판 번호: 베타도 판에 꼬리를 붙입니다. `2.0.4-beta.1`부터 그렇게 했고, 2.1.0의 첫 베타는 `2.1.0-beta.1`입니다([`docs/git-flow.md`](docs/git-flow.md) 규칙 4).
+- 2.0.x의 마지막 `release/2.0.4`(`v2.0.4-beta.1`)는 `main`에 합치지 않고 지웁니다. 끝 커밋은 태그가 남깁니다.
 
-**지금까지 차에서 본 것**(2026-11-23, NX4HEV 260902, [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23))
-- USB 설치, HMG-API map 만들기·확인(훅 지점 393/393), 자동 설정, 상태 화면, 진단은 동작했습니다.
+**지금까지 차에서 본 것**(2026-11-23, NX4HEV 260902, [#23 기록](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23#issuecomment-7101713033))
+- USB 설치·업데이트, HMG-API map 만들기·확인(훅 지점 393/393), 자동 설정, 상태 화면과 [지금 재부팅], 진단은 동작했습니다.
+- 자동 설정은 HMG-API rc.7 계획의 새 설명 줄을 변경으로 봐서, 다 적용된 뒤에도 부팅마다 Wi-Fi 깨우기 쪽으로 가는 문제가 있습니다(2.1.0에서 고침, [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)).
 - 이 차는 Wi-Fi 부품이 없는 것으로 봅니다.
   - 순정 핫스팟 기능을 켜도(2.0.4-beta.1) 드라이버가 칩 전원을 넣지 못했습니다(`failed to power up DHD generic adapter`).
   - 그래서 무선은 이 차에서 확인하지 못했고, 동글로 시험할 예정입니다.
