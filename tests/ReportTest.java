@@ -212,6 +212,16 @@ public class ReportTest {
         check("  안내 문구에 SSID·비밀번호 같은 값이 들어갈 자리가 없음(코드만 읽음)",
             Report.hints(hb.replace("aa=\n", "aa=MyNet secret\n"), "boot-A", now).isEmpty());
 
+        // --- 진단 기록 확인 창(DiagActivity) ---
+        check("진단 답 파일은 '<id> <답>' 한 줄(usb/troubleShooter diag_ans가 첫 두 칸을 읽음), id 앞뒤 공백은 뺌",
+            "1700000000123 yes\n".equals(Report.diagLine(" 1700000000123\n", "yes")) && " shown\n".equals(Report.diagLine(null, "shown")));
+        check("  확인 창 문구: 1~2분·USB를 빼지 말 것·건너뛰어도 설치는 이어짐·기다리는 초, 버튼 [모으기]·[건너뛰기]",
+            Report.diagAsk(60).contains("1~2분") && Report.diagAsk(60).contains("USB를 빼지 마세요") && Report.diagAsk(60).contains("설치는 그대로 이어집니다")
+            && Report.diagAsk(45).contains("45초 안에 고르지 않으면 건너뜁니다") && "모으기".equals(Report.DIAG_YES) && "건너뛰기".equals(Report.DIAG_NO));
+        check("  설치기가 창을 기다리는 시각(until)이 지난 뒤 열린 창은 늦음(쓰지 않고 닫음), 그 시각까지·until 없음은 늦지 않음",
+            Report.diagLate(1700000016L, 1700000015L) && !Report.diagLate(1700000015L, 1700000015L)
+            && !Report.diagLate(1700000010L, 1700000015L) && !Report.diagLate(1700000016L, 0L));
+
         // --- [지금 재부팅] ---
         check("재부팅 요청 파일 내용은 '요청 id(부팅 뒤 밀리초) boot_id 부팅 뒤 초' 한 줄뿐(hotspot.sh req_peek과 같은 꼴)",
             "123456789 boot-A 123456\n".equals(Report.rbLine(123456789L, " boot-A\n")));

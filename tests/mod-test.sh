@@ -119,6 +119,9 @@ case "\$1 \$2" in
     esac ;;
   "engine verify-map") exit \$(cat $T/verify.rc 2>/dev/null || echo 0) ;;
   "engine status") cat $T/status.out 2>/dev/null || echo "nothing"; exit 0 ;;
+  "engine report")
+    mkdir -p \$H/public/reports; echo '{"report": "test"}' > \$H/public/reports/car-report-test.json; echo "# test" > \$H/public/reports/car-report-test.md
+    echo "report: car-report-test"; echo "saved: /data/hmgapi/public/reports/car-report-test.json"; exit 0 ;;
   "service-stop "*) rm -f $T/ap-running; echo "stop: asked"; exit 0 ;;
   "service-start "*) echo "start: asked"; exit 0 ;;
   "services "*) [ -f $T/ap-running ] && echo "nx4-kor ap running 123 0"; echo "nx4-kor launch stopped 0 0"; exit 0 ;;
@@ -131,9 +134,26 @@ echo "pm \$*" >> $T/calls
 [ "\$1" = path ] && [ -f $T/app-ready ] && echo "package:/data/app/io.github.jayparklab.nx4kor-1.apk"
 exit 0
 E
+# 진단 기록 확인 창(DiagActivity): $T/diag.reply가 앱의 답. 없으면 확인 창이 없는 예전 판 앱(am이 Error를 냄).
+# yes·no·timeout은 그 답을, silent는 창만 뜨고(shown) 답이 없음, noshow는 창이 뜨지 않음, wrongid는 다른 id의 yes를 쓴다
 cat > $T/bin/am <<E
 #!/bin/sh
 echo "am \$*" >> $T/calls
+case "\$*" in
+  *DiagActivity*)
+    id=; prev=
+    for a in "\$@"; do [ "\$prev" = id ] && id=\$a; prev=\$a; done
+    r=\$(cat $T/diag.reply 2>/dev/null)
+    [ -n "\$r" ] || { echo "Error: Activity class {io.github.jayparklab.nx4kor/io.github.jayparklab.nx4kor.DiagActivity} does not exist."; exit 0; }
+    A=$T/root/data/data/io.github.jayparklab.nx4kor/files
+    mkdir -p \$A
+    case "\$r" in
+      noshow) ;;
+      silent) echo "\$id shown" > \$A/diag.ans ;;
+      wrongid) echo "0\$id yes" > \$A/diag.ans ;;
+      *) echo "\$id \$r" > \$A/diag.ans ;;
+    esac ;;
+esac
 exit 0
 E
 cat > $T/bin/getprop <<E
@@ -218,13 +238,23 @@ mkdir -p $R/data/local/tmp $K/install/payload
 cp -R $F/. $K/install/payload/
 (cd $K/install/payload && zip -q -r $K/install/hmgapi-nx4-kor.zip .)
 # 설치기는 스틱의 NX4/install.log에 이어 쓴다. 시험마다 그 회의 기록만 보도록 지우고 돌린다(KEEPLOG=1이면 남김)
-ts() { : > $T/calls; [ -n "$KEEPLOG" ] || rm -f $K/install.log; (env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/bin/hmgapid NX4_USB_DIRS="$1" NX4_APP_WAIT=4 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
+ts() { : > $T/calls; [ -n "$KEEPLOG" ] || rm -f $K/install.log; (env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/bin/hmgapid NX4_USB_DIRS="$1" NX4_APP_WAIT=4 NX4_DIAG_WAIT=1 NX4_DIAG_SHOWN=1 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
+# 진단 기록 확인 창에는 [모으기]로 답한다(아래 확인 창 시험에서만 바꿈). 앱이 있는지는 $T/app-ready(가짜 pm)
+echo yes > $T/diag.reply
+# 진단 기록(diag)은 읽기만 하는 engine status·report를 부른다. "엔진을 부르지 않음"은 그 둘을 빼고 본다
+engcalls() { grep -v -E "^hmgapid engine (status|report)$" $T/calls | grep -q "engine"; }
+# 진단 기록 폴더(NX4/diag/<시각>) 하나: 시험 전에 rm -rf $K/diag 해 두고 그 회의 것만 본다
+dg() { echo $K/diag/*; }
 rm -rf $HD/mods/nx4-kor $R/data/nx4-kor
 ts $T/nostick
 check "USB 설치기: NX4 폴더가 없으면 아무것도 하지 않음" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "NX4 폴더가 없습니다" $T/ts.out && [ ! -s $T/calls ]'
 mv $HD $T/hd.away
+rm -rf $K/diag; : > $T/app-ready
 ts $U
 check "USB 설치기: HMG-API가 없으면 멈춤(설치 안 함)" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "HMG-API가 없습니다" $T/ts.out && ! grep -q "engine install" $T/calls'
+check "USB 설치기 진단 기록: HMG-API가 없어도 [모으기]면 모으고(info·/system/lib), HMG-API 명령(engine status·report)은 부르지 않음" \
+  '[ -f $(dg)/info.txt ] && [ -f $(dg)/system-lib-md5.txt ] && [ ! -f $(dg)/car-report.txt ] && ! grep -q "engine" $T/calls && grep -q "HMG-API가 응답하지 않아" $K/install.log'
+rm -f $T/app-ready
 mkdir -p $K/hmgapi $U/HMGAPI/install/payload; echo "# hmg-api" > $K/hmgapi/troubleShooter
 ts $U
 check "USB 설치기: HMG-API가 없고 같은 스틱에 HMG-API 설치기가 있으면 그것으로 넘김" '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "HMG-API 설치기로 넘김" $T/ts.out'
@@ -244,15 +274,15 @@ mkdir -p $HD/mods/wireless-carplay-aa; echo '{"id": "wireless-carplay-aa"}' > $H
 printf 'version 1.0.2\nbuild test\n' > $HD/installed.txt
 ts $U
 check "USB 설치기: HMG-API(1.0.2)가 최소 판($NEEDV)보다 낮고 스틱에 HMG-API가 없으면 아무것도 바꾸지 않고 멈춤(무선 모드도 그대로)" \
-  '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "HMG-API $NEEDV 이상으로 먼저 올려" $T/ts.out && ! grep -q "engine" $T/calls && [ -f $HD/mods/wireless-carplay-aa/mod.json ]'
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "HMG-API $NEEDV 이상으로 먼저 올려" $T/ts.out && ! engcalls && [ -f $HD/mods/wireless-carplay-aa/mod.json ]'
 mkdir -p $K/hmgapi $U/HMGAPI/install/payload; echo "# hmg-api" > $K/hmgapi/troubleShooter; echo $NEEDV > $U/HMGAPI/install/payload/VERSION
 ts $U
 check "USB 설치기: ... 스틱에 최소 판 이상의 HMG-API 설치기가 있으면 그것으로 올림(무선 모드는 그대로, 엔진을 부르지 않음)" \
-  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "HMG-API 설치기로 넘김(업데이트)" $T/ts.out && grep -q "1.0.2에서 $NEEDV(으)로" $T/ts.out && ! grep -q "engine" $T/calls && [ -f $HD/mods/wireless-carplay-aa/mod.json ]'
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "HMG-API 설치기로 넘김(업데이트)" $T/ts.out && grep -q "1.0.2에서 $NEEDV(으)로" $T/ts.out && ! engcalls && [ -f $HD/mods/wireless-carplay-aa/mod.json ]'
 printf 'version 1.1.0-rc.3\n' > $HD/installed.txt; echo 1.1.0-rc.3 > $U/HMGAPI/install/payload/VERSION
 ts $U
 check "USB 설치기: ... rc 꼬리까지 비교(1.1.0-rc.3 < $NEEDV), 스틱의 HMG-API도 낮으면 넘기지 않고 멈춤" \
-  '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "이상으로 먼저 올려" $T/ts.out && ! grep -q "engine" $T/calls && [ -f $HD/mods/wireless-carplay-aa/mod.json ]'
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "이상으로 먼저 올려" $T/ts.out && ! engcalls && [ -f $HD/mods/wireless-carplay-aa/mod.json ]'
 rm -rf $K/hmgapi $U/HMGAPI $HD/mods/wireless-carplay-aa
 for hv in $NEEDV 1.1.0-rc.10 1.1.0 1.2.0-beta.1; do
   printf 'version %s\n' $hv > $HD/installed.txt
@@ -261,14 +291,67 @@ for hv in $NEEDV 1.1.0-rc.10 1.1.0 1.2.0-beta.1; do
   rm -rf $HD/mods/nx4-kor
 done
 rm -f $HD/installed.txt
+T0=$(date +%s)
 ts $U
+T1=$(date +%s)
 check "USB 설치기: 새로 설치 → engine install, 앱이 깔리면 상태 화면을 엶, 재부팅하지 않음, 기록을 스틱에" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^hmgapid engine install .*/data/local/tmp/nx4-kor-usb/nx4-kor.zip" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && ! grep -q "service-stop" $T/calls && [ -f $HD/mods/nx4-kor/mod.json ] && grep -q "설치됨: $V" $K/install.log && [ ! -d $R/data/local/tmp/nx4-kor-usb ]'
+DUNTIL=$(sed -n 's/^am start -n .*DiagActivity .* --el until \([0-9][0-9]*\)$/\1/p' $T/calls)
+check "USB 설치기 진단 기록: 확인 창(DiagActivity, id·기다릴 초·창을 기다리는 마지막 시각 until=시작+NX4_DIAG_SHOWN)을 먼저 띄우고 [모으기]면 아무것도 바꾸기 전에 모음(engine report가 engine install보다 먼저), 결과 안내가 마지막" \
+  'grep -q "^am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id [0-9][0-9]* --ei wait 1 --el until [0-9][0-9]*$" $T/calls && [ -n "$DUNTIL" ] && [ "$DUNTIL" -ge $((T0 + 1)) ] && [ "$DUNTIL" -le $((T1 + 1)) ] && [ "$(grep -n "DiagActivity" $T/calls | cut -d: -f1)" -lt "$(grep -n "^hmgapid engine report" $T/calls | cut -d: -f1)" ] && [ "$(grep -n "^hmgapid engine report" $T/calls | cut -d: -f1)" -lt "$(grep -n "^hmgapid engine install" $T/calls | cut -d: -f1)" ] && [ "$(grep -n "진단 기록을 USB에 모으는 중입니다(1~2분)" $T/ts.out | cut -d: -f1)" -lt "$(grep -n "설치하는 중" $T/ts.out | cut -d: -f1)" ] && tail -n 1 $T/ts.out | grep -q "설치됨. 상태 화면에서" && grep -q "\[모으기\]를 고름" $K/install.log'
 cp $K/install.log $T/first.log; FIRSTN=$(($(wc -l < $T/first.log)))
 KEEPLOG=1; ts $U; KEEPLOG=
 check "USB 설치기: 같은 판이 있으면 다시 설치하지 않고 상태 화면만 엶" '[ "$(cat $T/ts.rc)" = 0 ] && ! grep -q "engine install" $T/calls && grep -q "^am start" $T/calls && grep -q "이미 설치되어" $T/ts.out'
 check "USB 설치기: 스틱의 install.log에 이어 씀(앞의 시도 기록이 그대로 맨 앞에 남고, 빈 줄 뒤에 이번 기록, 한 번씩만)" \
   '[ $FIRSTN -gt 0 ] && head -n $FIRSTN $K/install.log | cmp -s - $T/first.log && [ "$(grep -c "USB 설치기 시작" $K/install.log)" = 2 ] && [ "$(grep -c "설치됨: $V" $K/install.log)" = 1 ] && grep -q "같은 판($V)이 이미 설치됨" $K/install.log && [ "$(grep -n "설치됨: $V" $K/install.log | cut -d: -f1)" -lt "$(grep -n "같은 판" $K/install.log | cut -d: -f1)" ] && grep -qx "" $K/install.log' || cat $K/install.log
+# 진단 기록: /system/lib(하위 폴더·링크), 내비의 busybox, 이 모드의 기록. 비밀번호가 든 파일(Wi-Fi 설정, 백업 폴더)은 넣지 않음
+mkdir -p $R/system/lib/hw $R/system/bin $R/data/nx4-kor/logs $R/data/nx4-kor/backup $R/data/local/tmp/nx4-kor $HD/logs/nx4-kor $R/data/misc/wifi
+echo core > $R/system/lib/libCarPlayCore.so; echo hw > $R/system/lib/hw/gralloc.so; ln -s libCarPlayCore.so $R/system/lib/liblink.so
+cp $T/bin/bb $R/system/bin/busybox
+echo aplog > $R/data/nx4-kor/logs/ap.log; echo svclog > $HD/logs/nx4-kor/ap.log; echo hmgapi-install > $HD/install.log
+echo mapcar > $R/data/local/tmp/nx4-kor/map-car.txt; echo status > $R/data/local/tmp/nx4-kor-status.txt
+echo "wpa_passphrase=SECRETPW" > $R/data/misc/wifi/softap.conf; echo SECRETPW > $R/data/nx4-kor/backup/softap.conf
+rm -rf $K/diag
+ts $U
+CORE5=$(md5sum < $R/system/lib/libCarPlayCore.so | cut -d" " -f1)
+check "USB 설치기 진단 기록: NX4/diag/<시각>/에 /system/lib 아래 모든 파일(하위 폴더·링크 포함)의 md5와 경로, ls -lR" \
+  '[ "$(ls $K/diag | wc -l)" -eq 1 ] && grep -q "^$CORE5  .*/system/lib/libCarPlayCore.so$" $(dg)/system-lib-md5.txt && grep -q "^$CORE5  .*/system/lib/liblink.so$" $(dg)/system-lib-md5.txt && grep -q "  .*/system/lib/hw/gralloc.so$" $(dg)/system-lib-md5.txt && [ "$(wc -l < $(dg)/system-lib-md5.txt)" -eq 3 ] && grep -q "liblink.so -> libCarPlayCore.so" $(dg)/system-lib-ls.txt' || cat $(dg)/system-lib-md5.txt
+check "USB 설치기 진단 기록: info.txt(판·getprop·내비 busybox 유무·wifi_ap_on), HMG-API 상태·Car Report 복사, 이 모드와 HMG-API 기록" \
+  'grep -qx "installed_mod: $V" $(dg)/info.txt && grep -qx "usb_mod: $V" $(dg)/info.txt && grep -q "^ro.build.product: NX4.KOR" $(dg)/info.txt && grep -qx "system_busybox: yes" $(dg)/info.txt && grep -qx "md5_busybox: $R/system/bin/busybox" $(dg)/info.txt && grep -qx "wifi_ap_on: 1" $(dg)/info.txt && grep -qx "hmgapid engine status" $T/calls && [ -f $(dg)/hmgapi-status.txt ] && grep -q "^saved: " $(dg)/car-report.txt && [ -f $(dg)/car-report-test.json ] && [ -f $(dg)/car-report-test.md ] && grep -qx aplog $(dg)/logs/ap.log && grep -qx svclog $(dg)/logs/service/ap.log && grep -qx hmgapi-install $(dg)/logs/hmgapi-install.log && grep -qx mapcar $(dg)/logs/map-car.txt && grep -qx status $(dg)/logs/nx4-kor-status.txt && grep -q "진단 기록을 모음: NX4/diag/" $K/install.log' || cat $(dg)/info.txt
+check "USB 설치기 진단 기록: 비밀번호가 든 파일(softap.conf, 백업 폴더)은 넣지 않음" '! grep -rq SECRETPW $K/diag'
+# md5를 셀 busybox: 내비에 없으면 설치된 모드의 것, 그것도 없으면 스틱의 것을 /data로 복사해 쓰고 지움. 모두 없으면 그렇다고 적음
+rm $R/system/bin/busybox; cp $T/bin/bb $HD/mods/nx4-kor/bin/busybox
+ts $U
+check "USB 설치기 진단 기록: 누를 때마다 새 폴더, 내비에 busybox가 없으면 설치된 모드의 busybox로 md5" \
+  '[ "$(ls $K/diag | wc -l)" -eq 2 ] && grep -rqx "md5_busybox: $HD/mods/nx4-kor/bin/busybox" $K/diag && grep -rqx "system_busybox: no" $K/diag'
+rm -rf $K/diag $HD/mods/nx4-kor/bin/busybox; cp $T/bin/bb $K/install/payload/bin/busybox
+ts $U
+check "USB 설치기 진단 기록: 설치된 모드에도 없으면 스틱의 busybox를 /data로 복사해 쓰고 지움" \
+  'grep -qx "md5_busybox: $R/data/local/tmp/nx4-kor-diag-busybox" $(dg)/info.txt && grep -q "^$CORE5  " $(dg)/system-lib-md5.txt && [ ! -f $R/data/local/tmp/nx4-kor-diag-busybox ]'
+rm -rf $K/diag $K/install/payload/bin/busybox
+ts $U
+check "USB 설치기 진단 기록: md5를 셀 busybox가 없으면 그렇다고 적고(이름·크기는 ls -lR) 설치기는 그대로 끝남" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "md5_busybox: none" $(dg)/info.txt && grep -q "busybox가 없음" $(dg)/system-lib-md5.txt && grep -q "libCarPlayCore.so" $(dg)/system-lib-ls.txt && grep -q "busybox가 없어" $K/install.log'
+# 확인 창에서 모으지 않는 경우: 진단 폴더를 만들지 않고 HMG-API 명령도 부르지 않으며, 설치기는 그대로 이어짐(같은 판: 상태 화면)
+dno() { rm -rf $K/diag; ts $U; [ "$(cat $T/ts.rc)" = 0 ] && [ ! -d $K/diag ] && ! grep -q "engine report" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && grep -q "이미 설치되어" $T/ts.out && grep -q "$1" $K/install.log; }
+echo no > $T/diag.reply
+check "USB 설치기 진단 기록: [건너뛰기]·뒤로면 모으지 않고 설치기는 이어짐" 'dno "\[건너뛰기\]를 고름"'
+echo timeout > $T/diag.reply
+check "USB 설치기 진단 기록: 창이 스스로 닫히면(고르지 않음) 모으지 않음" 'dno "고르지 않아 건너뜀"'
+echo silent > $T/diag.reply
+check "USB 설치기 진단 기록: 창은 떴지만 답이 오지 않으면 기다림(NX4_DIAG_WAIT + 2×NX4_DIAG_SHOWN초) 뒤 모으지 않음" 'dno "답이 없어 건너뜀"'
+echo noshow > $T/diag.reply
+check "USB 설치기 진단 기록: 창이 NX4_DIAG_SHOWN초 안에 뜨지 않으면 모으지 않음" 'dno "확인 창이 뜨지 않음"'
+echo wrongid > $T/diag.reply
+check "USB 설치기 진단 기록: 다른 id(지난 시도)의 [모으기]는 믿지 않음" 'dno "확인 창이 뜨지 않음"'
+rm -f $T/diag.reply
+check "USB 설치기 진단 기록: 확인 창이 없는 예전 판 앱이면(am start가 Error) 기다리지 않고 모으지 않음" 'dno "확인 창을 열지 못함"'
+echo yes > $T/diag.reply; rm -f $T/app-ready
+rm -rf $K/diag; ts $U
+check "USB 설치기 진단 기록: 상태 화면 앱이 없으면 묻지 못해 모으지 않음(확인 창을 띄우지 않음)" \
+  '[ ! -d $K/diag ] && ! grep -q "DiagActivity" $T/calls && grep -q "앱이 없어 묻지 못함" $K/install.log'
+: > $T/app-ready
+rm -rf $R/system $R/data/misc $R/data/nx4-kor $R/data/local/tmp/nx4-kor $R/data/local/tmp/nx4-kor-status.txt $HD/logs $HD/install.log $HD/public
 : > $K/REINSTALL; : > $T/ap-running; rm -f $T/stublog
 ts $U
 check "USB 설치기: REINSTALL이면 예전 판 정리(uninstall.sh --update) → engine install → 서비스 ap 다시 시작" \
