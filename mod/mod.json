@@ -76,6 +76,9 @@
     "com.hkmc.software.connectivity.carplay_wireless",
     "com.hkmc.software.connectivity.androidauto_wireless"
   ],
+  "wifi": {
+    "hotspot": true
+  },
   "hooks": {
     "jar": "hooks.jar",
     "entry": "hmgapi.mods.wireless.Wireless",

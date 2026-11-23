@@ -181,6 +181,8 @@ open_status() {
 #   system-lib-md5.txt  /system/lib 아래(하위 폴더 포함) 모든 파일과 링크의 md5와 경로. 공식 모드 레시피가 이 차의
 #                       라이브러리에 맞는지 PC에서 견준다. md5를 셀 busybox가 없으면 그 사실만 적는다
 #   system-lib-ls.txt   같은 폴더의 이름·크기·링크 대상(ls -lR, busybox 없이)
+#   features.txt, permissions-ls.txt, featurexml-<onebin>.cfg  지금 켜진 순정 기능(pm list features), /system/etc/permissions
+#                       목록, 기능을 지우는 순정 설정. Wi-Fi 칩 전원이 달린 핫스팟 기능이 켜졌는지 본다
 #   hmgapi-status.txt   HMG-API가 바꾼 파일마다 순정·기대·지금 md5(hmgapid engine status). 모드가 적용된 뒤에도 순정 md5를 안다
 #   car-report*         HMG-API Car Report(hmgapid engine report: 이 차에서 찾은 훅 지점, map 확인, 기능, 오류).
 #                       HMG-API가 VIN·일련번호를 넣지 않고 기록 줄을 가린다
@@ -259,6 +261,14 @@ diag() {
     for _s in wifi_on wifi_ap_on; do echo "$_s: $(settings get global $_s 2>/dev/null)"; done
   } > $_d/info.txt 2>&1
   ls -lR $ROOT/system/lib > $_d/system-lib-ls.txt 2>&1
+  # 순정 기능(Wi-Fi 칩 전원은 핫스팟 기능 com.hkmc.software.wifihotspot에 달림): 지금 켜진 기능, 권한 파일 목록, 기능을 지우는 featurexml.cfg
+  pm list features > $_d/features.txt 2>&1
+  ls -l $ROOT/system/etc/permissions > $_d/permissions-ls.txt 2>&1
+  for _f in $ROOT/system/onebin/*/featurexml.cfg; do
+    [ -f "$_f" ] || continue
+    _o=${_f%/featurexml.cfg}; _o=${_o##*/}
+    cp "$_f" $_d/featurexml-$_o.cfg
+  done
   if [ -n "$_bb" ]; then
     { $_bb find $ROOT/system/lib -type f; $_bb find $ROOT/system/lib -type l; } 2>/dev/null | $_bb sort | $_bb xargs $_bb md5sum > $_d/system-lib-md5.txt 2>&1
   else

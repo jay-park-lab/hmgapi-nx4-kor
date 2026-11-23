@@ -13,6 +13,7 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
   - 따로 설치하던 무선 모드 `wireless-carplay-aa` 2.4.5(한국 차 빌드)를 이 모드에 합쳤습니다.
     - 합친 것: `hooks.jar`, `recipes/`, `files/`, `settings.json`, `patches.json`의 changes, `mod.json`의 `parts`·`feature_flags`·`hooks`. 바이트는 바꾸지 않았고, `settings.json`의 설명 한 줄만 고쳤습니다.
     - 원래 `mod.json`은 `wireless/mod-2.4.5.json`, 컴파일용 stubs는 `wireless/stubs/`에 둡니다.
+    - 2026-11-23: 순정 핫스팟 기능을 켜던 `patches.json`의 `featurexml.cfg` 줄 주석(part `projection`)을 빼고, `mod.json`의 `"wifi": {"hotspot": true}`로 HMG-API에 맡겼습니다. HMG-API 공식 무선 모드가 rc.8에서 한 것과 같은 길입니다(`wireless/README.md`).
   - `svc/hotspot.sh`의 자동 설정을 바꿨습니다.
     - 무선 모드 설치·업데이트 대신, 이 모드의 무선 기능을 HMG-API 1.1.0의 이 차 map(`state/local-map.json`)으로 확인하고 적용합니다.
     - `bin/status.sh`의 판정과 상태 파일 키, `scripts/post.sh`·`scripts/preun.sh`도 그에 맞췄습니다.

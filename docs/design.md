@@ -32,6 +32,31 @@ NX4 KOR는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 내비 2
 2. 따로 설치된 `wireless-carplay-aa`가 있으면 적용하지 않고 HMG-API 앱에서 지우라고 안내합니다(USB 설치기는 설치 전에 지움).
 3. **map:** HMG-API에 NX4 map이 없습니다. 처음에는 `hmgapid engine map-car --write`로 이 차의 파일에서 map을 만들고(`/data/hmgapi/state/local-map.json`, HMG-API를 업데이트해도 남음) `verify-map`으로 확인합니다. 확인에 실패하면 만든 map을 지우고(`map-car --forget`) 다시 만들지 않습니다(`$BK/automap.bad`, 모드를 지웠다 다시 설치하면 다시 시도). HMG-API에 이 차 map이 이미 있으면 그것을 확인만 합니다.
 4. **적용:** `engine plan`에 이 모드의 변경이 있으면 Wi-Fi 칩을 확인한 뒤(한 번도 켜지 않은 칩은 한 번 깨움) `engine apply`를 합니다. 계획에 다른 모드의 변경이 섞여 있으면 적용하지 않고 HMG-API 앱에서 적용하라고 안내합니다. 적용하면 "재부팅 필요"가 되고 상태 화면의 [지금 재부팅]이 그 일을 합니다.
+   - **핫스팟 기능을 먼저 켜는 갈래(`hotspot_first`):** 칩이 안 보이고 순정 핫스팟 기능(`com.hkmc.software.wifihotspot`, `pm list features`)이 꺼져 있으면, 칩을 깨우거나 "부품 없음"으로 판정하지 않고 먼저 적용합니다.
+     - 까닭: HMG-API는 한국 판처럼 이 기능이 꺼진 내비를 "칩에 전원이 안 들어감"(`SystemCheck`의 `unpowered`, Car Report `wifi: unpowered`)으로 봅니다.
+     - 이 모드는 `mod.json`의 `"wifi": {"hotspot": true}`로 HMG-API에 이 기능을 켜 달라고 합니다(HMG-API rc.3부터, rc.7·rc.8 같음).
+       - 순정 권한 파일이 있으면 HMG-API가 `featurexml.cfg`에서 그 파일을 지우는 줄을 막습니다.
+       - 한국 판처럼 없으면 HMG-API가 자기 권한 파일을 이 모드 몫으로 넣습니다. 계획은 `change /system/etc/permissions/com.hkmc.software.wifihotspot.xml [nx4-kor]`이고 `mod-test.sh`의 엔진 시험이 봅니다.
+       - 2.0.2까지는 `patches.json`의 줄 주석만 했는데, 순정 파일이 없는 한국 판에서는 기능이 켜지지 않았을 것입니다.
+     - 2026-11-23 NX4HEV 260902(2.0.2): 기능이 꺼진 채 Wi-Fi를 깨우니 드라이버가 칩 전원을 넣지 못했고(`failed to power up DHD generic adapter`), 순정이 `module_version=3`을 남겼습니다. 그래서 2.0.2까지는 기능을 켜 보기도 전에 "부품 없음"으로 굳혔습니다.
+     - **시험입니다. 칩이 살아날 가능성은 낮게 봅니다.**
+       - Korea Projection 이슈 [#125](https://github.com/StopDragon/korea-projection/issues/125)를 보면, 같은 판(NX4HEV V039 260902, tcc803x)에서 무선이 되는 차도 순정 핫스팟 기능이 꺼져 있었습니다. 그 차는 Wi-Fi를 켜자 칩이 바로 보였습니다.
+       - 같은 판에서 "부품 없음"인 차(2021년 7월 NX4HEV, 투싼 가솔린 여럿, #126)도 있습니다. 원본은 생산 시기·사양 차이로 보고, 1.8.0에서 USB Wi-Fi 동글을 시험 중입니다.
+     - 적용하면 `$BK/wifi.hotspot`을 남기고 "Wi-Fi 칩 전원을 켜려고 순정 핫스팟 기능을 켰습니다. 내비를 3분 후 재부팅해 주세요"를 보입니다. 기능이 꺼진 채 지난 판이 남긴 부품 없음 기록(`wifi.nopart`)은 근거가 모자라 지웁니다.
+     - 같은 때 모은 칩 근거도 켠 뒤의 판정에 쓰지 않습니다(`pre_hotspot_evidence`, PR #42 리뷰 5).
+       - 순정 Wi-Fi 기록 `nochip-wifi.txt`(`$BK`와 `$W`)는 `nochip-wifi.pre-hotspot.txt`로 이름만 바꿔 진단용으로 남깁니다.
+       - USB 진단 기록은 `$W`의 것만 `logs/`에 넣고 `$BK`(백업 폴더)는 넣지 않습니다. USB 업데이트는 `$W`를 지우므로(`preun.sh`), 2.0.2에서 올린 차처럼 `$BK` 사본만 남았으면 그것을 `$W`에도 둡니다. 다음 업데이트 전까지 진단 기록 `logs/nochip-wifi.pre-hotspot.txt`로 볼 수 있습니다(PR #42 리뷰 6).
+       - 순정 `module_version` 기록(`$BK/wifi.modver`)은 지웁니다.
+       - 그대로 두면 켠 뒤에 무슨 일이 있었든 세 번째 부팅 판정이 이 옛 근거로 `nowlanfail`이 됩니다.
+     - 재부팅 뒤에는 부팅마다 `ap.log`에 "순정 핫스팟 기능을 켜 본 차: 지금 기능 켜짐|꺼짐, Wi-Fi 칩 보임|안보임"을 남깁니다. 칩이 보이면 핫스팟이 그대로 켜지고, 안 보이면 핫스팟 쪽의 Wi-Fi 장치 판정(`nowlan` 등)으로 갑니다.
+     - **켜 본 뒤에도 칩이 없으면** 무선 기능은 적용된 채 남습니다. 예전에는 칩이 없는 차에 적용하지 않았으므로, 이 갈래에서 처음 생기는 상태입니다(PR #42 리뷰 2).
+       - 적용돼 설정이 끝난 차(`setup_done`)가 되므로, 서비스가 부팅마다 핫스팟을 띄우려고 Wi-Fi를 한 번 켭니다(`take_wlan0`의 `svc wifi enable`). Wi-Fi를 켜면 USB·블루투스가 다시 시작돼 유선 카플레이가 잠깐 끊길 수 있습니다. 칩 깨우기(`wake_wifi`)는 이것을 몇 번으로 막아 두었지만, 여기서는 지울 때까지 부팅마다 합니다.
+       - 상태 화면은 wlan0이 안 생기는 부팅을 셉니다. 두 부팅 동안은 "Wi-Fi를 켜는 중입니다… (확인 n/3)"(`wifioff`)이고, 세 번째 부팅부터 칩 실패 근거(커널의 `failed to power up DHD`, 순정 `module_version=3`)가 있으면 "이 차는 Wi-Fi 칩이 켜지지 않아…"(`nowlanfail`, 지우는 법)로 끝납니다. 근거가 없으면 "Wi-Fi 장치가 계속 켜지지 않습니다"(`nowlanrepeat`)에 머뭅니다. 그래서 최종 판정까지 재부팅을 세 번 합니다.
+       - 이 근거는 켠 뒤의 기록에서 나옵니다. 부팅마다 wlan0이 없으면 `wlan_fail`이 순정 Wi-Fi 기록을 `$W/nowlan-wifi.txt`에 남기고, 그 안의 "판정 근거: 순정 module_version=…" 줄과 커널 줄을 `chip_fail_evidence`가 봅니다. 시험 결과도 이 파일(진단 기록 `logs/nowlan-wifi.txt`)로 봅니다.
+       - 무선 iAP2 속성(`persist.sys.iap2.wifi=t`, `persist.iap2.iden.wireless=t`)과 무선 기능 파일이 Wi-Fi 없는 차에 켜진 채 남습니다. 유선 카플레이에 영향이 있는지는 차에서만 알 수 있습니다.
+       - 그때는 USB `NX4/UNINSTALL`로 지웁니다. 부팅마다 Wi-Fi를 켜는 것을 코드로 줄일지는 차 결과를 보고 정합니다.
+     - `"wifi": {"hotspot": true}`는 이 갈래만이 아니라 모드를 적용하는 모든 NX4에서 순정 핫스팟 기능을 켭니다. 칩이 있는 차에서는 순정 핫스팟 메뉴가 생기거나 순정이 AP를 띄울 수 있고, 그때 우리 핫스팟은 비켜 줍니다(`ap_yield`).
+   - **부품 없음이 굳은 차(`nopart_final`):** 핫스팟 기능을 켜 본 뒤(`wifi.hotspot`)이거나 기능이 원래 켜져 있던 차의 `wifi.nopart`입니다. 서비스가 시작하자마자 그 판정을 진행 기록에 쓰고, 부팅마다 2분씩 "설치 중"을 다시 보이지 않습니다. "부품 없음" 알림도 처음 한 번만 씁니다.
 5. 새 판으로 업데이트했는데 적용할 것이 없으면(훅 코드만 바뀜) 재부팅만 안내합니다.
 
 핫스팟은 무선 기능이 적용된 뒤(`persist.sys.iap2.wifi=t`)에만 켭니다. 순정 무선 카플레이가 있는 트림은 순정 카플레이 AP를 그대로 씁니다.
@@ -88,6 +113,7 @@ Engineering Mode → USB Copy → DSP → Update OTA가 `ota_package.tar`의 `tr
     | `info.txt` | 스틱·설치된 모드 판, HMG-API 판, `getprop` 몇 개(`ro.build.product` 등), `/system/bin/busybox` 유무, md5에 쓴 busybox, `settings get global wifi_on`·`wifi_ap_on` |
     | `system-lib-md5.txt` | `/system/lib` 아래(하위 폴더 포함) 모든 파일과 링크의 md5와 경로. 공식 모드의 네이티브 레시피(`libCarPlayCore.so`, `libiap2session.so` 등)가 이 차의 라이브러리에 맞는지 PC에서 견줍니다 |
     | `system-lib-ls.txt` | 같은 폴더의 `ls -lR`(이름·크기·링크 대상). busybox 없이 모읍니다 |
+    | `features.txt`, `permissions-ls.txt`, `featurexml-<onebin>.cfg` | 지금 켜진 순정 기능(`pm list features`), `/system/etc/permissions` 목록, 기능을 지우는 순정 설정 사본. Wi-Fi 칩 전원이 달린 순정 핫스팟 기능이 켜졌는지 봅니다(자동 설정 4의 "핫스팟 기능을 먼저 켜는 갈래") |
     | `hmgapi-status.txt` | `hmgapid engine status`. HMG-API가 바꾼 파일마다 순정·기대·지금 md5가 있어, 모드가 적용된 뒤에도 순정 md5를 압니다 |
     | `car-report.txt`, `car-report-*.json`·`.md` | `hmgapid engine report`(HMG-API Car Report)의 출력과 보고서 파일. 이 차에서 찾은 훅 지점(`map_car`), map 확인, 기능, 모드, 오류가 들어 있습니다. HMG-API가 VIN·일련번호를 넣지 않고 기록 줄을 가립니다 |
     | `logs/` | 이 모드의 `ap.log`, 서비스 기록(`/data/hmgapi/logs/nx4-kor/`), `/data/local/tmp/nx4-kor/*.txt`(map 만들기·확인·계획·적용 결과), `/data/local/tmp/nx4-kor-*.txt`(상태 파일), HMG-API 설치 기록 |
@@ -142,6 +168,13 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - **DSP OTA 뒤 재부팅하지 않고 끝내도 되는지.** OTA 화면이 이상하게 남으면 상태 화면의 [지금 재부팅]이나 RESET을 쓰세요.
 - **DSP OTA 화면 위로 상태 화면이 열리는지**(`am start`). 안 열리면 재부팅 뒤 같은 USB로 Update OTA를 다시 누릅니다.
 - HMG-API 설치기가 NX4의 `app_process`를 아는지(모르면 `HMGAPI/FORCE`).
+- **순정 핫스팟 기능을 켜면 Wi-Fi 칩이 살아나는지.** 2.0.2에서 NX4HEV 260902는 칩이 안 보이고 순정 `module_version=3`이어서 "부품 없음"으로 끝났습니다. HMG-API는 같은 차를 `unpowered`(핫스팟 기능이 꺼져 칩에 전원이 안 들어감)로 봅니다.
+  - 업데이트 뒤 첫 설정에서 "Wi-Fi 칩 전원을 켜려고 순정 핫스팟 기능을 켰습니다"가 나오고 재부팅을 안내하는지
+  - 재부팅 뒤 `ap.log`의 "순정 핫스팟 기능을 켜 본 차: 지금 기능 …, Wi-Fi 칩 …" 줄. 기능이 "켜짐"인지(꺼짐이면 HMG-API가 켜지 못한 것: 진단 기록의 `featurexml-*.cfg`·`permissions-ls.txt`·`hmgapi-status.txt`를 봄), 칩이 "보임"인지
+  - 칩이 보이면 핫스팟이 켜지고 폰이 붙는지. 안 보이면 진단 기록의 `logs/`(`nowlan-wifi.txt` 등)와 커널 줄(`failed to power up DHD`)이 그대로인지
+  - 결과는 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적습니다. 칩이 끝내 없으면 무선 기능이 적용된 채 남으므로 NX4 KOR를 지웁니다.
+  - 칩이 끝내 없을 때, 지우기 전까지 유선 카플레이·블루투스가 그대로인지 봅니다(부팅 직후 Wi-Fi를 켜면서 끊기는지 포함). 상태 화면이 "확인 1/3"·"2/3"을 거쳐 세 번째 부팅에 "칩이 켜지지 않아"로 끝나는지도 봅니다.
+  - 칩이 있는 NX4에서는 순정 핫스팟 기능이 켜진 뒤에도 우리 핫스팟·무선 연결이 그대로인지 봅니다(순정 핫스팟 메뉴가 생기는지, 순정이 AP를 띄우는지).
 - **함께 넣은 busybox가 NX4에서 도는지.** NX4 내비에 `/system/bin/busybox`가 없으면 모드의 `bin/busybox`(`/data/hmgapi/mods/nx4-kor/bin/busybox`)만 쓸 수 있습니다. `ap.log`에 "시작 안 함: busybox가 없음"이 없어야 하고, 상태 화면에 "쓸 수 있는 busybox가 없어" 알림이 없어야 합니다. 2.0.0-beta.4까지의 묶음에는 busybox가 없었습니다.
   - 함께 넣은 busybox를 쓰면 `hotspot.sh`가 K3·K8(tcc803x)용 갈래 두 개를 켭니다. 부팅마다 순정 카플레이 AP를 최대 90초 기다리고(`STOCK_GRACE`), 순정 AP 저장값 `wifi_ap_on`을 0으로 맞추지 않습니다(`apon_off`). NX4에서 처음 켜지는 것이라 함께 봅니다.
     - 부팅 뒤 `ap.log`의 "순정 카플레이 AP를 최대 90초 기다림(busybox 없는 내비)" 줄과 무선 연결까지 걸린 시간
