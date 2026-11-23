@@ -22,6 +22,7 @@
      - busybox와 그 라이선스 안내가 모드(`bin/`)와 USB 맨 위(`BUSYBOX-LICENSE.txt`)에 들었는지
      - 공식 무선 모드 zip(`NX4/wireless/wireless-carplay-aa.zip`)이 `NOTICE.md`의 SHA-256과 같고, 그 `mod.json`과 `WIRELESS-SOURCE.txt`가 들었는지
      - 옛 2.0.x 되돌리기 스크립트(`NX4/legacy-2.0/`)가 들었는지. `build.sh`가 태그 `v2.0.4-beta.1`에서 꺼내므로 `build` job도 저장소를 태그까지 받습니다(`fetch-depth: 0`)
+     - 묶음의 nx4-kor(`payload/mod.json`)가 공식 무선 모드와 충돌을 선언하지 않는지(옛 2.0.x 꼴이면 2.1.0 설치기가 멈춤). 그래서 nx4-kor 2.1.0(PR #50)이 합쳐지기 전의 커밋으로는 릴리스를 낼 수 없습니다
    - 키 파일을 지우고, 두 zip만 다음 job에 넘깁니다.
 5. `publish` job(배포 키 없음, 저장소 쓰기)이 릴리스를 만들어 두 파일을 올립니다. 릴리스 글에는 다음이 들어갑니다.
    - 파일 설명

@@ -65,8 +65,9 @@ PROG=$ROOT/data/local/tmp/nx4-kor-progress.txt
 BOOT_ID=${BOOT_ID:-/proc/sys/kernel/random/boot_id}
 UPTIME=${UPTIME:-/proc/uptime}
 U=
-# 이번에 HMG-API에서 모드를 지웠는가(그 되돌리기 줄을 계획에서 받는다)
+# 이번에 HMG-API에서 모드를 지웠는가, 판을 바꿔 설치했는가(그 되돌리기 줄을 끝 계획에서 받는다)
 REMOVED=0
+UPDATED=0
 # 진행 기록을 쓰기 시작했는가(무엇을 바꾸기 시작한 뒤에만 쓴다)
 P_ON=0
 # 상태 화면을 열었는가
@@ -77,6 +78,8 @@ DONE_REBOOT_MSG="무선 카플레이 설정을 마쳤습니다. 내비를 3분 �
 DONE_MSG="무선 카플레이 설정이 끝나 있습니다."
 OTHERPLAN_MSG="HMG-API에 다른 모드의 바뀐 내용이 함께 있어 자동으로 적용하지 않았습니다. 차를 세운 뒤 HMG-API 앱에서 변경 사항을 적용하고 내비를 재부팅해 주세요."
 HOOKS_MSG="HMG-API 계획에 켜지지 않는 훅이나 문제가 있어 적용하지 않았습니다. HMG-API 앱에서 변경 사항을 확인해 주세요."
+# engine plan이 계획을 내지 못함(끝나지 않은 적용·trial 등, 종료 코드 0·3이 아님)
+PLANFAIL_MSG="HMG-API가 변경 사항 계획을 내지 못했습니다(끝나지 않은 적용 등). 내비를 재부팅한 뒤 다시 해 주세요. 같으면 USB의 NX4/install.log를 확인해 주세요."
 APPLYFAIL_MSG="무선 기능 적용에 실패했습니다. HMG-API 앱에서 변경 사항을 확인해 주세요."
 NOMAP_MSG="HMG-API가 이 차의 map을 만들지 못해 무선 기능을 적용하지 않았습니다. USB의 NX4/install.log를 확인해 주세요."
 MAPFAIL_MSG="이 차의 map을 확인하지 못해 무선 기능을 적용하지 않았습니다. USB의 NX4/install.log를 확인해 주세요."
@@ -267,17 +270,20 @@ plan_ours() {
   done
   return 0
 }
-# 계획 파일 $1을 본다. 결과: P_TODO=1(적용할 줄이 있음), P_WHY(적용하면 안 되는 까닭 other|hooks|problem, 없으면 빈 값).
-# $2: pre    시작 전. 다른 모드의 변경(change·update·setting·bind)과 HMG-API 밖에서 바뀐 파일(rebase)만 본다
-#     revert 지우기. 되돌리기(restore·setting … back to stock·unbind)만 받는다
+# 계획 파일 $1을 본다. 결과: P_TODO=1(적용할 줄이 있음), P_REV=1(되돌리기 줄이 있음),
+# P_WHY(적용하면 안 되는 까닭 other|hooks|problem, 없으면 빈 값).
+# 되돌리기 줄(restore … (stock)·setting … back to stock·unbind)에는 모드 이름이 없어 누구의 되돌리기인지 모른다.
+# $2: pre    시작 전. 다른 모드의 변경(change·update·setting·bind)과 HMG-API 밖에서 바뀐 파일(rebase)만 본다.
+#            되돌리기 줄은 P_REV로 알리고, 이번에 지울 모드가 없는 실행이면 부른 쪽이 멈춘다(끝에서 받을 수 없으므로)
+#     revert 지우기. 되돌리기만 받는다
 #     remove 옛 2.0.x 정리. 되돌리기와 우리 두 모드의 변경을 받는다(훅 줄은 보지 않음)
-#     final  마지막. 우리 두 모드의 변경, 이번에 지운 모드(REMOVED=1)의 되돌리기만 받고, 훅이 꺼지거나(hooks are off,
-#            won't load) 문제(problem)가 있으면 적용하지 않는다
+#     final  마지막. 우리 두 모드의 변경, 이번에 지운 모드(REMOVED=1)나 판을 바꿔 설치한 모드(UPDATED=1)의 되돌리기만 받고,
+#            훅이 꺼지거나(hooks are off, won't load) 문제(problem)가 있으면 적용하지 않는다
 # 설명 줄(지금 켜져 있는 것의 설명이라 늘 나온다)은 변경이 아니다: app·service·usb(HMG-API 1.0.2부터), event·vehicle·driving·
 # panel·button(ModRuntime), home Wi-Fi·wifi·network·projection(rc.5~rc.8), note·probe·override·skip·WARNING, 같은 지점을 함께
 # 쓰는 훅 안내(hooks … share it), "<id>: part … left out". 모르는 줄은 pre가 아니면 적용하지 않는 쪽으로 본다
 plan_check() {
-  P_TODO=0; P_WHY=
+  P_TODO=0; P_WHY=; P_REV=0
   _md=$2
   [ -s "$1" ] || { [ "$_md" = pre ] || P_WHY=other; return 0; }
   set -f
@@ -285,8 +291,8 @@ plan_check() {
     case "$_l" in
       "same     "*|"") ;;
       "restore  "*|"setting  "*" back to stock"|"unbind   "*)
-        P_TODO=1
-        [ "$_md" = final ] && [ "$REMOVED" != 1 ] && P_WHY=${P_WHY:-other} ;;
+        P_TODO=1; P_REV=1
+        [ "$_md" = final ] && [ "$REMOVED" != 1 ] && [ "$UPDATED" != 1 ] && P_WHY=${P_WHY:-other} ;;
       "change   "*|"update   "*|"setting  "*|"bind     "*)
         P_TODO=1
         if [ "$_md" = revert ] || ! plan_ours "$_l"; then P_WHY=${P_WHY:-other}; fi ;;
@@ -306,15 +312,18 @@ plan_check() {
   set +f
   return 0
 }
-# 계획을 받아(기록에도 남김) plan_check로 본다
+# 계획을 받아(기록에도 남김) plan_check로 본다. 종료 코드는 0(계획) 또는 3(문제 목록, 아래 줄에 problem)이어야 한다.
+# 그 밖(예: rc.8의 "an earlier apply isn't finished or is a trial", 종료 1)이면 계획을 읽을 수 없다: P_WHY=noplan
 plan_run() {
   $HMGAPID engine plan > $STAGE/plan.txt 2>&1
-  { echo "--- engine plan ($1)"; cat $STAGE/plan.txt; echo "---"; } >> $LOG
+  P_RC=$?
+  { echo "--- engine plan ($1, 종료 코드 $P_RC)"; cat $STAGE/plan.txt; echo "---"; } >> $LOG
   plan_check $STAGE/plan.txt "$1"
+  case $P_RC in 0|3) ;; *) P_WHY=noplan ;; esac
 }
 # P_WHY에 맞는 안내
 plan_msg() {
-  case "$P_WHY" in hooks|problem) echo "$HOOKS_MSG" ;; *) echo "$OTHERPLAN_MSG" ;; esac
+  case "$P_WHY" in hooks|problem) echo "$HOOKS_MSG" ;; noplan) echo "$PLANFAIL_MSG" ;; *) echo "$OTHERPLAN_MSG" ;; esac
 }
 
 app_installed() { pm path $APP_ID 2>/dev/null | grep -q '^package:'; }
@@ -589,6 +598,21 @@ if [ -f $K/UNINSTALL ] || [ -f $K/UNINSTALL-ALL ]; then
       NX4_APP=$SRC sh $SRC/bin/uninstall.sh >> $LOG 2>&1
       rc=$?
     fi
+    # 2.1.0 이후의 uninstall.sh는 2.0.x의 기록(backup)을 되돌리지 못해 그 폴더만 남긴다(2.0.x 위에 adb·HMG-API 앱으로 2.1.0을 넣은
+    # 차). 스틱의 legacy-2.0(그 판의 되돌리기)으로 마저 되돌린다
+    if [ $rc = 0 ] && [ -z "$LEG" ] && [ -d $NX4_ROOT/backup ] && [ -f $K/legacy-2.0/bin/uninstall.sh ]; then
+      log "2.0.x의 기록($NX4_ROOT/backup)이 남음: 스틱의 legacy-2.0으로 마저 되돌림"
+      if [ -x $HMGAPID ]; then
+        old_revert revert $K/legacy-2.0; _o=$?
+        if [ $_o = 2 ]; then MSG="HMG-API 앱에서 변경 사항을 적용해 주세요(NX4 KOR 삭제)."; rc=1
+        elif [ $_o != 0 ]; then rc=1; fi
+      elif stage_copy $K/legacy-2.0 $STAGE/old; then
+        [ -n "$ROOT" ] || mount -o remount,rw /system >/dev/null 2>&1
+        NX4_APP=$STAGE/old sh $STAGE/old/bin/uninstall.sh >> $LOG 2>&1 || rc=1
+      else
+        log "스틱의 legacy-2.0을 복사하지 못함"; rc=1
+      fi
+    fi
   fi
   if [ -n "$WDEL" ]; then
     # 공식 무선 모드도 지운다(nx4-kor가 그것을 requires할 수 있어 nx4-kor 다음에). 계획이 되돌리기뿐일 때만 적용한다
@@ -611,7 +635,8 @@ if [ -f $K/UNINSTALL ] || [ -f $K/UNINSTALL-ALL ]; then
   fi
   rm -rf $STAGE
   if [ $rc = 0 ]; then
-    if [ -n "$WDEL" ]; then toast "NX4 KOR와 공식 무선 모드를 지웠습니다. 재부팅합니다."
+    if [ -n "$WDEL" ] && [ -z "$SRC" ]; then toast "공식 무선 모드를 지웠습니다(NX4 KOR는 없었습니다). 재부팅합니다."
+    elif [ -n "$WDEL" ]; then toast "NX4 KOR와 공식 무선 모드를 지웠습니다. 재부팅합니다."
     else toast "NX4 KOR 모드를 지웠습니다. 재부팅합니다."; fi
   else toast "NX4 KOR 지우기 실패: ${MSG:-USB의 NX4/install.log를 보세요.}"; fi
   finish $rc reboot
@@ -627,6 +652,12 @@ if [ ! -f $Z ] || [ -z "$NEWV" ]; then
 fi
 if [ ! -f $WZ ] || [ -z "$WNEWV" ]; then
   toast "NX4 KOR: USB에 NX4/wireless(공식 무선 모드 $WMOD.zip, mod.json)가 없습니다. 아무것도 바꾸지 않았습니다."
+  finish 1
+fi
+# 스틱의 nx4-kor가 아직 옛 2.0.x 꼴(공식 무선 모드와 충돌 선언)이면 이 설치기와 함께 쓸 수 없다. 설치는 되지만(HMG-API는 설치 때
+# conflicts를 보지 않음) 끝 계획이 conflict 문제로 막혀, 2.0.x를 되돌린 뒤 아무것도 적용하지 못한 채 끝난다. 아무것도 바꾸기 전에 멈춘다
+if old_nx4 $PAY/mod.json; then
+  toast "NX4 KOR: 이 USB의 NX4 KOR($NEWV)는 옛 2.0.x 꼴(공식 무선 모드와 충돌)이라 이 설치기와 함께 쓸 수 없습니다. 2.1.0 이후의 USB 묶음을 써 주세요. 아무것도 바꾸지 않았습니다."
   finish 1
 fi
 
@@ -677,13 +708,30 @@ if [ ! -f $INST/mod.json ] && [ -d $NX4_ROOT/backup ] && [ ! -f $K/legacy-2.0/bi
   finish 1
 fi
 
+# 같은 판(다시 설치하지 않음)이면 상태 화면을 먼저 연다: 아래에서 멈춰도 화면이 열린다(타일이 없을 때 상태 화면을 여는 길).
+# 다시 설치하는 경우는 HMG-API가 앱을 바꾸므로 설치 뒤에 연다
+if [ -f $INST/mod.json ] && ! old_nx4 $INST/mod.json && [ "$(modver $INST/mod.json)" = "$NEWV" ] && [ ! -f $K/REINSTALL ] && app_installed; then
+  open_status
+fi
+
 rm -rf $STAGE
 mkdir -p $STAGE && cp $Z $STAGE/$MOD.zip && cp $WZ $STAGE/$WMOD.zip \
   || { rm -rf $STAGE; toast "NX4 KOR: USB에서 복사하지 못했습니다. 아무것도 바꾸지 않았습니다."; finish 1; }
 
-# 1. 시작 전 계획: 다른 모드의 적용하지 않은 변경이 있으면 끝에서 적용할 수 없다. 아무것도 바꾸지 않고 멈춘다
+# 1. 시작 전 계획: 다른 모드의 적용하지 않은 변경이 있으면 끝에서 적용할 수 없다. 아무것도 바꾸지 않고 멈춘다.
+#    되돌리기 줄(restore 등)은 누구의 것인지 모른다. 이번에 지울 모드(옛 2.0.x, 2.0.x의 기록만 남은 것, 한국 차 빌드)가 없으면
+#    앞서 다른 모드를 지우고 적용하지 않은 것이라 끝에서 받을 수 없다: 그때도 멈춘다
+WILLRM=
+old_nx4 $INST/mod.json && WILLRM=1
+[ ! -f $INST/mod.json ] && [ -d $NX4_ROOT/backup ] && WILLRM=1
+case "$(modkey $WINST/mod.json name)" in *"Korea Projection"*) WILLRM=1 ;; esac
 plan_run pre
-if [ -n "$P_WHY" ]; then
+if [ "$P_WHY" = noplan ]; then
+  rm -rf $STAGE
+  toast "NX4 KOR: $PLANFAIL_MSG 아무것도 바꾸지 않았습니다."
+  finish 1
+fi
+if [ -n "$P_WHY" ] || { [ $P_REV = 1 ] && [ -z "$WILLRM" ]; }; then
   rm -rf $STAGE
   toast "NX4 KOR: HMG-API에 다른 모드의 적용하지 않은 변경이 있습니다. HMG-API 앱에서 먼저 적용한 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
   finish 1
@@ -752,6 +800,8 @@ if [ -n "$WDO" ]; then
   $HMGAPID engine install $STAGE/$WMOD.zip --any-car >> $LOG 2>&1 || fail_out "$WFAIL_MSG"
   log "공식 무선 모드 설치됨: $WNEWV"
   CHANGED=1
+  # 판을 바꿨으면 새 판이 더는 바꾸지 않는 것의 되돌리기 줄이 끝 계획에 나올 수 있다
+  [ -n "$WOLDV" ] && UPDATED=1
 fi
 # 꺼 둔 공식 무선 모드는 켠다(꺼져 있으면 무선 카플레이가 되지 않는다)
 if [ -f $WINST/.disabled ]; then
@@ -779,8 +829,10 @@ else
   for _s in $RUNSVC; do $HMGAPID service-start $MOD $_s >> $LOG 2>&1; done
   log "설치됨: $NEWV"
   CHANGED=1
+  [ -n "$OLDV" ] && UPDATED=1
 fi
-open_status
+# 같은 판이면 위에서 이미 열었다. 설치했으면 HMG-API가 바꾼 앱으로 연다
+[ $ST_OPEN = 1 ] || open_status
 
 # 5. map: 없으면 이 차의 파일로 만들고(1~2분) 확인한다. 확인을 통과해야 다음 시작부터 훅이 켜진다
 _ok0=

@@ -334,6 +334,9 @@ jobs:
           for f in bin/uninstall.sh scripts/preun.sh svc/env.sh svc/hotspot.sh mod.json SOURCE; do
             [ -s "$D/NX4/legacy-2.0/$f" ] || { echo "::error::USB 묶음에 옛 2.0.x 되돌리기 스크립트(NX4/legacy-2.0/$f)가 없습니다"; exit 1; }
           done
+          # 묶음의 nx4-kor가 옛 2.0.x 꼴(공식 무선 모드와 충돌 선언)이면 2.1.0 설치기가 아무것도 하지 않고 멈춘다. 그런 묶음은 내지 않는다
+          python3 -c 'import json, sys; sys.exit("wireless-carplay-aa" in json.load(open(sys.argv[1])).get("conflicts", []))' "$D/NX4/install/payload/mod.json" \
+            || { echo "::error::USB 묶음의 nx4-kor(mod.json)가 공식 무선 모드와 충돌을 선언합니다(옛 2.0.x 꼴). nx4-kor 2.1.0이 합쳐진 뒤에 냅니다"; exit 1; }
           # busybox와 그 라이선스 안내가 모드와 USB 맨 위에 들어갔는지(build.sh는 NX4_BUSYBOX를 받으면 늘 넣는다)
           [ -f "$D/NX4/install/payload/bin/busybox" ] && [ -f "$D/NX4/install/payload/bin/busybox-LICENSE.txt" ] && [ -f "$D/BUSYBOX-LICENSE.txt" ] \
             || { echo "::error::USB 묶음에 busybox나 그 라이선스 안내가 없습니다"; exit 1; }
