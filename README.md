@@ -206,7 +206,9 @@ java -cp out/engine-host hmgapi.engine.Signing keygen <NX4_MOD_KEY에 적은 경
 sh scripts/build.sh
 
 # 앱 메뉴 타일 그림을 바꿀 때만(ImageMagick 필요): art/tile.svg → mod/icons/의 순정 꼴 그림 넷.
-# 상태 화면 앱 아이콘도 같은 그림(낮·밤)으로 둡니다(tests/mod-test.sh가 같은지 봅니다)
+# 상태 화면 앱 아이콘도 같은 그림(낮·밤)으로 둡니다(tests/mod-test.sh가 같은지 봅니다).
+# 지금 그림은 HMG-API rc.4 mkicon.sh와 ImageMagick 7.1.2(librsvg 없음, 내장 SVG 렌더러)로 만들었습니다.
+# ImageMagick 판이 다르거나 librsvg가 있으면 모양을 바꾸지 않아도 PNG가 조금 달라질 수 있으니, 모양을 바꿀 때만 다시 만듭니다
 sh <HMGAPI_SRC에 적은 HMG-API 소스>/tools/mkicon.sh art/tile.svg mod/icons
 cp mod/icons/icon.png app/res/drawable-hdpi/ic_launcher.png
 cp mod/icons/icon_night.png app/res/drawable-night-hdpi/ic_launcher.png
