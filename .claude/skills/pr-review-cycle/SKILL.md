@@ -25,7 +25,7 @@ argument-hint: "[PR 번호 | PR URL]"
 - **브랜치·머지·태그 규칙의 단일 출처는 [`docs/git-flow.md`](../../../docs/git-flow.md) 다.** 이 문서와
   다르면 그쪽을 따른다. 요점:
   - `feature/<주제>` 는 `develop` 으로, `release/<판>`·`hotfix/<판>` 은 `main` 으로 PR 을 열고, 합친 뒤
-    `develop` 에도 합친다.
+    `develop` 에도 합친다(`hotfix/main-readme` 는 규칙 13: `main` 에만 합침).
   - `main`·`develop` 에 직접 커밋·푸시하지 않는다.
   - 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는
     `release/`·`hotfix/` 에서만 바꾼다.
@@ -97,7 +97,10 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 ## 1. 커밋·푸시
 
 1. `git branch --show-current` 와 `git status --short` 로 브랜치와 남은 변경을 본다.
-2. 브랜치와 트리를 맞춘다(`docs/git-flow.md` 규칙 1–3, 11).
+2. 브랜치와 트리를 맞춘다(`docs/git-flow.md` 규칙 1–3, 11, 12).
+   - 새 작업 브랜치(와 그 워크트리)는 늘 `origin/develop` 에서 시작한다(규칙 12). 새 작업의 예외는 `hotfix/`(`origin/main`)뿐이다.
+     `release/<판>` 에서 시작하는 `feature/` 는 만들지 않는다. 이미 있는 브랜치(이어받은 PR 등)를 고칠 때는 새 작업이
+     아니므로 아래 "이미 있는 브랜치를 고칠 때" 대로 그 브랜치에서 연다. 리뷰어의 리뷰용 워크트리(head SHA 에 `--detach`)도 같다.
    - 이 세션이 메인 체크아웃에서 돌면 여기서 브랜치를 만들거나 커밋하지 않는다. 메인 체크아웃인지는
      `git worktree list` 첫 줄의 경로와 `git rev-parse --show-toplevel` 이 같은지로 본다.
      - `git fetch origin`, `git worktree add --no-track -b feature/<주제> .claude/worktrees/<주제> origin/develop` 로
@@ -238,18 +241,20 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
    합치기 선택지 설명에 "합친 뒤 7 단계대로 워크트리에서 나와(`ExitWorktree`) 워크트리와 브랜치를 지웁니다" 를 적는다.
    1 단계 2 에서 물어서 들어간 다른 세션의 워크트리면 "합친 뒤 워크트리에서 나오고, 그 워크트리와 로컬 브랜치는
    남깁니다" 로 적는다. `ExitWorktree` 는 사용자가 요청할 때만 부르는 도구라, 이 답이 그 요청이 된다.
-   `release/`·`hotfix/` 면 `v<판>` 태그와 `develop` 으로 되돌려 합치기까지 함께 묻는다.
+   `release/`·`hotfix/` 면 `v<판>` 태그와 `develop` 으로 되돌려 합치기까지 함께 묻는다. 단 `hotfix/main-readme`
+   (`docs/git-flow.md` 규칙 13)는 태그와 되돌려 합치기 없이 `main` 에만 합치고 지운다고 묻는다.
 3. **base 가 앞서 충돌이 있을 때** — PR 을 연 뒤라 rebase·강제 푸시하지 않는다.
    - `git fetch origin`
    - `git merge origin/<base>` 로 풀고 커밋·푸시한다. 푼 내용을 PR 코멘트로 남기고 재리뷰한다(5 단계 5).
 4. **합치기** — `gh pr merge <PR> --merge`. `--squash`·`--rebase` 를 쓰지 않는다. 브랜치 삭제는 7 단계에서 한다.
 5. `gh pr view <PR> --json state,mergeCommit` 로 합쳐졌는지 확인한다.
-6. **`release/`·`hotfix/` 만**
+6. **`release/`·`hotfix/` 만** (`hotfix/main-readme` 는 빼고: 규칙 13대로 태그·`develop` 되돌려 합치기 없이 바로 7 단계로)
    - 태그: `git fetch origin`, `git tag -a v<판> -m "NX4 KOR <판>" <merge commit>`, `git push origin v<판>`.
      로컬 `main` 으로 바꾸거나 옮기지 않는다. 태그는 지우거나 옮기지 않는다.
    - `develop` 으로 되돌려 합치기: `gh pr create --base develop --head <브랜치>`. 내용이 이미 리뷰된 것이라
      리뷰어는 띄우지 않고, 충돌이 있으면 3 처럼 푼다. 합치기는 위와 같이 `--merge`.
-   - `hotfix/` 인데 진행 중인 `release/` 가 있으면 거기에도 같은 방법으로 합친다.
+   - `hotfix/` 는 진행 중인 `release/` 에 합치지 않는다(`docs/git-flow.md` 규칙 12). 그 `release/` 에 고침이 필요하면
+     `develop` 에서 다음 판으로 다시 자른다.
    - 태그를 올리면 release 워크플로가 `production` 승인을 기다린 뒤 배포 묶음을 만들어 GitHub 릴리스에 올린다
      ([`docs/release.md`](../../../docs/release.md)). 승인은 사용자가 Actions 화면에서 한다. 대신 승인하거나
      승인 여부를 짐작해 말하지 않는다.
@@ -259,6 +264,7 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 ## 7. 정리
 
 `docs/git-flow.md` 규칙 10 을 따른다. `release/`·`hotfix/` 는 `main` 과 `develop` 양쪽에 합친 뒤에 지운다.
+`hotfix/main-readme`(규칙 13)는 `main` 에 합친 뒤 바로 지운다.
 
 1. 원격 브랜치: `git ls-remote origin refs/heads/<브랜치>` 가 합쳐진 PR 의 head SHA 와 같을 때만
    `git push origin --delete <브랜치>` 한다. 저장소 설정으로 이미 지워졌으면 건너뛴다.
@@ -270,6 +276,10 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
        보고에 적는다.
      - `git worktree remove .claude/worktrees/<이름>`, `git branch -d <브랜치>` 로 지운다. `git worktree remove` 가
        남은 변경 때문에 멈추면 `--force` 로 지우지 말고 무엇이 남았는지 사용자에게 알린다.
+     - `hotfix/main-readme` 는 `develop` 에 합치지 않으므로, 원격 브랜치가 지워진 뒤(1, `fetch --prune`)에는
+       `git branch -d` 가 "not fully merged" 로 거절될 수 있다. 그때는 `git merge-base --is-ancestor hotfix/main-readme
+       origin/main` 으로 `main` 에 들어갔는지 확인하고, 들어갔으면 사용자에게 물은 뒤 지운다(`-D` 는 쓰지 않는다.
+       `git branch --set-upstream-to=origin/main hotfix/main-readme` 뒤 `-d` 로 지운다).
    - 데스크톱 앱이 처음부터 워크트리로 연 세션이면 `git fetch origin`, `git switch --detach origin/<base>`,
      `git branch -d <브랜치>` 로 정리한다. 워크트리 폴더는 앱이 정리한다. 메인 체크아웃의 로컬 `<base>` 는 그 트리에서
      `git pull --ff-only` 로 맞추면 된다고 보고에 적는다.
