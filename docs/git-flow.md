@@ -22,7 +22,7 @@
 4. **판 번호는 `release/`와 `hotfix/` 브랜치에서만 바꿉니다.** `feature/`에서는 바꾸지 않습니다. 바꿀 곳은 세 군데이고 함께 바꿉니다.
    - `mod/mod.json`의 `version`
    - `app/AndroidManifest.xml`의 `versionName` (`mod.json`과 같은 값)
-   - `app/AndroidManifest.xml`의 `versionCode`: 지금까지 낸 묶음(`v2.*` 태그) 중 가장 큰 값보다 1 크게 합니다. `v1.*` 태그는 상태 화면 앱이 없던 예전 묶음이라 `app/AndroidManifest.xml`이 없습니다(PR #43 리뷰 7). 베타도 같습니다. 내려가면 차가 앱 업데이트를 받지 않습니다(HMG-API가 `pm install -r`로 넣어 낮은 값은 거절됨, 차에는 옛 상태 화면 앱이 남음).
+   - `app/AndroidManifest.xml`의 `versionCode`: 지금까지 낸 묶음(`v2.*` 태그) 중 가장 큰 값보다 1 크게 합니다. `v1.*` 태그는 예전 NEMESIS 묶음입니다. 그때의 상태 화면 앱은 패키지가 달라(`korea.projection.app`, `nemesis-pkg/app-src/`) 이 앱(`io.github.jayparklab.nx4kor`)의 `versionCode`와 상관없고, `app/AndroidManifest.xml`도 없습니다(PR #43 리뷰 7·8). 베타도 같습니다. 내려가면 차가 앱 업데이트를 받지 않습니다(HMG-API가 `pm install -r`로 넣어 낮은 값은 거절됨, 차에는 옛 상태 화면 앱이 남음).
      - `develop`의 값은 뒤처져 있습니다. 2.0.3까지의 `release/`를 `develop`에 되돌려 합치지 않아 `develop`은 38인데, 낸 묶음은 `v2.0.3-beta.1`의 41까지입니다(PR #43 리뷰 6). 그래서 `develop`에서 자른 뒤 "1 올림"이 아니라 태그를 봅니다: `git tag --list 'v2.*'`의 태그마다 `git show <태그>:app/AndroidManifest.xml`. `release/2.0.4`의 첫 베타는 42입니다.
    - **베타는 판에도 꼬리를 붙입니다**(2026-11-23 사용자 결정). 차에서 확인하는 동안 `release/<판>`의 판은 `<판>-beta.<n>`(예: `2.0.4-beta.2`)이고, 정식으로 낼 때만 `<판>`(예: `2.0.4`)으로 바꿉니다. 숫자는 앞자리 0 없이 씁니다(`beta.02`가 아니라 `beta.2`, release 워크플로가 확인).
      - 까닭: 파일의 판이 베타와 정식에서 같으면, 고친 베타를 같은 판으로 낼 수 없습니다. USB 설치기는 판이 같으면 "같은 판이 이미 설치됨"으로 건너뛰고(`usb/troubleShooter`), 자동 설정도 새 판을 알아보지 못합니다(`$BK/applied`). 그래서 예전에는 고칠 때마다 판을 올렸습니다(2.0.0 → 2.0.3, 모두 베타).
