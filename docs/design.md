@@ -44,7 +44,8 @@ NX4 KOR는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 내비 2
        - 같은 판에서 "부품 없음"인 차(2021년 7월 NX4HEV, 투싼 가솔린 여럿, #126)도 있습니다. 원본은 생산 시기·사양 차이로 보고, 1.8.0에서 USB Wi-Fi 동글을 시험 중입니다.
      - 적용하면 `$BK/wifi.hotspot`을 남기고 "Wi-Fi 칩 전원을 켜려고 순정 핫스팟 기능을 켰습니다. 내비를 3분 후 재부팅해 주세요"를 보입니다. 기능이 꺼진 채 지난 판이 남긴 부품 없음 기록(`wifi.nopart`)은 근거가 모자라 지웁니다.
      - 같은 때 모은 칩 근거도 켠 뒤의 판정에 쓰지 않습니다(`pre_hotspot_evidence`, PR #42 리뷰 5).
-       - 순정 Wi-Fi 기록 `nochip-wifi.txt`(`$BK`와 `$W`)는 `nochip-wifi.pre-hotspot.txt`로 이름만 바꿔 진단용으로 남깁니다. `$W` 사본은 USB 진단 기록의 `logs/`에 들어갑니다.
+       - 순정 Wi-Fi 기록 `nochip-wifi.txt`(`$BK`와 `$W`)는 `nochip-wifi.pre-hotspot.txt`로 이름만 바꿔 진단용으로 남깁니다.
+       - USB 진단 기록은 `$W`의 것만 `logs/`에 넣고 `$BK`(백업 폴더)는 넣지 않습니다. USB 업데이트는 `$W`를 지우므로(`preun.sh`), 2.0.2에서 올린 차처럼 `$BK` 사본만 남았으면 그것을 `$W`에도 둡니다. 다음 업데이트 전까지 진단 기록 `logs/nochip-wifi.pre-hotspot.txt`로 볼 수 있습니다(PR #42 리뷰 6).
        - 순정 `module_version` 기록(`$BK/wifi.modver`)은 지웁니다.
        - 그대로 두면 켠 뒤에 무슨 일이 있었든 세 번째 부팅 판정이 이 옛 근거로 `nowlanfail`이 됩니다.
      - 재부팅 뒤에는 부팅마다 `ap.log`에 "순정 핫스팟 기능을 켜 본 차: 지금 기능 켜짐|꺼짐, Wi-Fi 칩 보임|안보임"을 남깁니다. 칩이 보이면 핫스팟이 그대로 켜지고, 안 보이면 핫스팟 쪽의 Wi-Fi 장치 판정(`nowlan` 등)으로 갑니다.

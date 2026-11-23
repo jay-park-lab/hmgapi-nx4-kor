@@ -1935,12 +1935,17 @@ hotspot_first() {
 }
 # 핫스팟 기능이 꺼진 채 모은 칩 근거(순정 module_version 기록 wifi.modver, 순정 Wi-Fi 기록 nochip-wifi.txt)를 치운다.
 # 그대로 두면 켠 뒤 wlan0이 세 부팅 안 생길 때 상태 화면 판정(status.sh chip_fail_evidence)이 이 옛 근거로 "칩 실패"가 된다.
-# 기록은 이름을 바꿔(nochip-wifi.pre-hotspot.txt) 진단용으로만 남기고($W 사본은 진단 기록 logs/에 들어감), module_version 기록은 지운다.
-# 켠 뒤의 판정은 그 뒤에 남는 기록(wlan_fail의 nowlan-wifi.txt, 그 안의 module_version 줄)으로 한다
+# 기록은 이름을 바꿔(nochip-wifi.pre-hotspot.txt) 진단용으로만 남기고, module_version 기록은 지운다.
+# USB 진단 기록은 $W의 것만 logs/에 넣고 $BK는 넣지 않는다. 업데이트(preun.sh)가 $W를 지워 $BK 사본만 남은 차(2.0.2에서 올린 차)는
+# $BK 것을 $W에도 둔다(다음 업데이트 전까지 진단 기록에 들어감). 켠 뒤의 판정은 그 뒤에 남는 기록(wlan_fail의 nowlan-wifi.txt,
+# 그 안의 module_version 줄)으로 한다
 pre_hotspot_evidence() {
   [ -f $BK/wifi.modver ] || [ -f $BK/nochip-wifi.txt ] || [ -f $NOCHIP_LOG ] || return 0
   [ -f $BK/nochip-wifi.txt ] && $BB mv -f $BK/nochip-wifi.txt $BK/nochip-wifi.pre-hotspot.txt
-  [ -f $NOCHIP_LOG ] && $BB mv -f $NOCHIP_LOG ${NOCHIP_LOG%.txt}.pre-hotspot.txt
+  _php=${NOCHIP_LOG%.txt}.pre-hotspot.txt
+  if [ -f $NOCHIP_LOG ]; then $BB mv -f $NOCHIP_LOG $_php
+  elif [ -s $BK/nochip-wifi.pre-hotspot.txt ] && [ -d ${NOCHIP_LOG%/*} ]; then cat $BK/nochip-wifi.pre-hotspot.txt 2>/dev/null > $_php
+  fi
   rm -f $BK/wifi.modver
   log "핫스팟 기능을 켜기 전의 Wi-Fi 칩 근거는 판정에 쓰지 않음(기록은 nochip-wifi.pre-hotspot.txt로 남김, module_version 기록은 지움)"
   return 0

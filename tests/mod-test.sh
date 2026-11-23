@@ -606,6 +606,9 @@ hfrun; stsh
 check "  hotspot_first가 옛 근거를 치우면(nochip-wifi.pre-hotspot.txt로 이름만 바꿈, wifi.modver 지움) nowlanrepeat" \
   'grep -qx rc=0 $T/hf.out && [ "$(sv verdict)" = nowlanrepeat ] && [ ! -f $T/sbk/wifi.modver ] && [ ! -f $T/sbk/nochip-wifi.txt ] && [ ! -f $T/sw/nochip-wifi.txt ] \
    && grep -q "failed to power up DHD" $T/sbk/nochip-wifi.pre-hotspot.txt && grep -q "failed to power up DHD" $T/sw/nochip-wifi.pre-hotspot.txt && grep -q "판정에 쓰지 않음" $T/hf.out' || cat $T/hf.out $T/st.out
+nlreset 없음; echo 3 > $T/sbk/wifi.modver; echo "[ 9.1] dhd: failed to power up DHD" > $T/sbk/nochip-wifi.txt; hfrun
+check "  업데이트가 \$W를 지워 \$BK 사본만 남은 차(2.0.2에서 올림)도 켜기 전 기록을 \$W에 둠(USB 진단 기록 logs/에 들어가게)" \
+  '[ ! -f $T/sbk/nochip-wifi.txt ] && grep -q "failed to power up DHD" $T/sbk/nochip-wifi.pre-hotspot.txt && grep -q "failed to power up DHD" $T/sw/nochip-wifi.pre-hotspot.txt && [ ! -f $T/sw/nochip-wifi.txt ]' || cat $T/hf.out
 nlreset 3; stsh
 check "  켠 뒤의 기록(이번 부팅 nowlan-wifi.txt)에 순정 module_version=3이면 nowlanfail, verdict_end=yes" \
   '[ "$(sv verdict)" = nowlanfail ] && [ "$(sv verdict_end)" = yes ]' || cat $T/st.out
