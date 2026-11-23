@@ -25,7 +25,7 @@ argument-hint: "[PR 번호 | PR URL]"
 - **브랜치·머지·태그 규칙의 단일 출처는 [`docs/git-flow.md`](../../../docs/git-flow.md) 다.** 이 문서와
   다르면 그쪽을 따른다. 요점:
   - `feature/<주제>` 는 `develop` 으로, `release/<판>`·`hotfix/<판>` 은 `main` 으로 PR 을 열고, 합친 뒤
-    `develop` 에도 합친다.
+    `develop` 에도 합친다(`hotfix/main-readme` 는 규칙 13: `main` 에만 합침).
   - `main`·`develop` 에 직접 커밋·푸시하지 않는다.
   - 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는
     `release/`·`hotfix/` 에서만 바꾼다.
@@ -276,6 +276,10 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
        보고에 적는다.
      - `git worktree remove .claude/worktrees/<이름>`, `git branch -d <브랜치>` 로 지운다. `git worktree remove` 가
        남은 변경 때문에 멈추면 `--force` 로 지우지 말고 무엇이 남았는지 사용자에게 알린다.
+     - `hotfix/main-readme` 는 `develop` 에 합치지 않으므로, 원격 브랜치가 지워진 뒤(1, `fetch --prune`)에는
+       `git branch -d` 가 "not fully merged" 로 거절될 수 있다. 그때는 `git merge-base --is-ancestor hotfix/main-readme
+       origin/main` 으로 `main` 에 들어갔는지 확인하고, 들어갔으면 사용자에게 물은 뒤 지운다(`-D` 는 쓰지 않는다.
+       `git branch --set-upstream-to=origin/main hotfix/main-readme` 뒤 `-d` 로 지운다).
    - 데스크톱 앱이 처음부터 워크트리로 연 세션이면 `git fetch origin`, `git switch --detach origin/<base>`,
      `git branch -d <브랜치>` 로 정리한다. 워크트리 폴더는 앱이 정리한다. 메인 체크아웃의 로컬 `<base>` 는 그 트리에서
      `git pull --ff-only` 로 맞추면 된다고 보고에 적는다.
