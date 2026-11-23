@@ -10,7 +10,7 @@
 | `develop` | `main` (처음 한 번) | — | 다음 판을 모으는 곳 |
 | `feature/<주제>` | `develop` | `develop` | 기능, 고침, 문서, 시험 등 모든 일반 작업 |
 | `release/<판>` | `develop` | `main`, `develop` | 판 번호 올리기, 차에서 확인만. 고침은 `develop`에서(규칙 12) |
-| `hotfix/<판>` | `main` | `main`, `develop` (진행 중인 `release/`에는 넣지 않음. 필요하면 그 `release/`를 `develop`에서 다음 판으로 다시 자름, 규칙 12) | 배포한 판의 급한 고침 |
+| `hotfix/<판>` | `main` | `main`, `develop` (진행 중인 `release/`에는 넣지 않음. 필요하면 `develop`을 그 `release/`에 합쳐 다음 베타를 냄, 규칙 12) | 배포한 판의 급한 고침 |
 
 ## 규칙
 
@@ -22,11 +22,18 @@
 4. **판 번호는 `release/`와 `hotfix/` 브랜치에서만 바꿉니다.** `feature/`에서는 바꾸지 않습니다. 바꿀 곳은 세 군데이고 함께 바꿉니다.
    - `mod/mod.json`의 `version`
    - `app/AndroidManifest.xml`의 `versionName` (`mod.json`과 같은 값)
-   - `app/AndroidManifest.xml`의 `versionCode` (1 올림. 내려가면 차가 앱 업데이트를 받지 않습니다)
+   - `app/AndroidManifest.xml`의 `versionCode`: 지금까지 낸 묶음(`v2.*` 태그) 중 가장 큰 값보다 1 크게 합니다. `v1.*` 태그는 예전 NEMESIS 묶음입니다. 그때의 상태 화면 앱은 패키지가 달라(`korea.projection.app`, `nemesis-pkg/app-src/`) 이 앱(`io.github.jayparklab.nx4kor`)의 `versionCode`와 상관없고, `app/AndroidManifest.xml`도 없습니다(PR #43 리뷰 7·8). 베타도 같습니다. 내려가면 차가 앱 업데이트를 받지 않습니다(HMG-API가 `pm install -r`로 넣어 낮은 값은 거절됨, 차에는 옛 상태 화면 앱이 남음).
+     - `develop`의 값은 뒤처져 있습니다. 2.0.3까지의 `release/`를 `develop`에 되돌려 합치지 않아 `develop`은 38인데, 낸 묶음은 `v2.0.3-beta.1`의 41까지입니다(PR #43 리뷰 6). 그래서 `develop`에서 자른 뒤 "1 올림"이 아니라 태그를 봅니다: `git tag --list 'v2.*'`의 태그마다 `git show <태그>:app/AndroidManifest.xml`. `release/2.0.4`의 첫 베타는 42입니다.
+   - **베타는 판에도 꼬리를 붙입니다**(2026-11-23 사용자 결정). 차에서 확인하는 동안 `release/<판>`의 판은 `<판>-beta.<n>`(예: `2.0.4-beta.2`)이고, 정식으로 낼 때만 `<판>`(예: `2.0.4`)으로 바꿉니다. 숫자는 앞자리 0 없이 씁니다(`beta.02`가 아니라 `beta.2`, release 워크플로가 확인).
+     - 까닭: 파일의 판이 베타와 정식에서 같으면, 고친 베타를 같은 판으로 낼 수 없습니다. USB 설치기는 판이 같으면 "같은 판이 이미 설치됨"으로 건너뛰고(`usb/troubleShooter`), 자동 설정도 새 판을 알아보지 못합니다(`$BK/applied`). 그래서 예전에는 고칠 때마다 판을 올렸습니다(2.0.0 → 2.0.3, 모두 베타).
+     - 판의 차례(semver, `2.0.3 < 2.0.4-beta.1 < 2.0.4-beta.2 < 2.0.4-beta.10 < 2.0.4`)를 보는 것은 HMG-API입니다. `engine install`은 설치된 판보다 낮은 판을 `--force` 없이 거절합니다. USB 설치기는 이 모드의 판이 같은지만 봅니다(같으면 건너뜀, `NX4/REINSTALL`이 있으면 다시 설치). 다르면 예전 판을 정리(`uninstall.sh --update`)한 뒤 `engine install`을 부르고, 거절되면 예전 판의 서비스를 다시 띄우고 실패로 끝냅니다.
+     - 그래서 정식 `<판>`이 들어간 차에는 같은 판의 베타(`<판>-beta.<n>`)를 넣지 않습니다(HMG-API가 거절).
+     - **새 방식은 2.0.4-beta.1부터입니다.** 2.0.3-beta.1까지는 파일의 판에 꼬리가 없었습니다(이미 공개한 `v2.0.3-beta.1`의 판은 `2.0.3`). 2.0.3의 베타를 꼬리 붙여 이어 가면, `v2.0.3-beta.1`을 넣은 차는 `2.0.3-beta.<n>`을 낮은 판이라 받지 못하고, 정식 `2.0.3`은 같은 판이라 건너뜁니다(PR #43 리뷰 2). 그래서 2.0.3은 정식으로 내지 않고 다음 판 2.0.4로 넘어갑니다.
+     - 상태 화면(설치 중 제목 "NX4 KOR <판> 설치 중", 확인 줄)은 앱의 `versionName`을 그대로 보이므로, 차에서 어느 베타인지 바로 보입니다.
 5. **PR은 merge commit으로 합칩니다.** squash와 rebase 합치기는 쓰지 않습니다. 작업 브랜치 단위의 이력이 `main`·`develop`에 그대로 남아야 합니다.
 6. **태그**
    - `release/`·`hotfix/`를 `main`에 합치면, 그 merge commit에 주석 태그 `v<판>`을 답니다(예: `v2.1.0`).
-   - 차에서 확인하려고 배포 전에 묶음을 만들 때는 `release/` 브랜치에 `v<판>-beta.<n>` 태그를 답니다(예: `v2.1.0-beta.1`).
+   - 차에서 확인하려고 배포 전에 묶음을 만들 때는 `release/` 브랜치에 `v<판>-beta.<n>` 태그를 답니다(예: `v2.1.0-beta.1`). 그 커밋의 파일 판은 태그에서 `v`만 뗀 것(`2.1.0-beta.1`)과 같아야 합니다(규칙 4, release 워크플로가 확인).
    - 태그는 지우거나 옮기지 않습니다. 틀렸으면 다음 번호로 새로 답니다.
 7. **배포 묶음**(`scripts/build.sh`의 결과)은 태그(`v<판>` 또는 `v<판>-beta.<n>`)를 단 커밋에서, 배포용 키로만 만듭니다. 태그를 올리면 GitHub Actions가 `production` 환경의 키로 만들어 릴리스에 올립니다([`release.md`](release.md)). PC에서 만들 때는 `.env.local`이 가리키는 배포용 키(저장소 밖)를 씁니다. 같은 태그로 다시 만들어 이미 낸 파일을 바꾸지 않습니다(서명이 만들 때마다 달라 SHA-256이 바뀝니다). 커밋하지 않은 수정이 있으면 만들지 않습니다(USB `README.txt`에 "커밋하지 않은 수정 포함"이 찍힙니다).
 8. **합치기 전에 확인합니다.**
@@ -45,8 +52,8 @@
     - 이미 있는 브랜치를 이어서 고치는 것(열린 PR의 리뷰 반영 등)은 새 작업이 아니므로 그 브랜치에서 워크트리를 엽니다(아래 "워크트리"). 리뷰어의 리뷰용 워크트리(head SHA에 `--detach`)도 같습니다.
     - `release/<판>`에서 시작하는 `feature/`(release에 고침을 옮겨 넣던 길, 예: #35)는 만들지 않습니다. `hotfix/`도 진행 중인 `release/`에 합치지 않습니다.
       - 고침은 `develop`에 합칩니다.
-      - 그 고침이 든 묶음이 필요하면 `develop`에서 `release/`를 다음 판으로 다시 자르고 `v<다음 판>-beta.1`을 답니다(2026-11-23 `release/2.0.0`의 `v2.0.0-beta.4` 다음이 `release/2.0.1`의 `v2.0.1-beta.1`).
-      - 지난 `release/`는 `main`에 합치지 않고 지웁니다. 지우기 전에 끝 커밋에 베타 태그가 있는지 봅니다(`git tag --points-at origin/release/<판>`). 있으면 그 태그가 끝 커밋을 남깁니다. 없으면(베타 전에 그만둔 판, 베타 뒤에 커밋이 더 있는 판) 지우지 말고 사용자에게 묻습니다.
+      - 그 고침이 든 묶음이 필요하면 판을 올리지 않고 같은 `release/<판>`에 `origin/develop`을 합친(merge commit) 뒤, 판을 다음 베타(`<판>-beta.<n+1>`)로 올리고 `v<판>-beta.<n+1>`을 답니다(규칙 4, 아래 "릴리스"). `develop`에 그 사이 들어온 다른 변경도 함께 들어오므로, 이번 판에 넣고 싶지 않은 것이 있으면 합치기 전에 사용자에게 묻습니다.
+      - 예전(2.0.3-beta.1까지)에는 파일의 판에 베타 꼬리가 없어, 고칠 때마다 `develop`에서 `release/`를 다음 판으로 다시 자르고 지난 `release/`를 지웠습니다(`release/2.0.0`의 `v2.0.0-beta.4` 다음이 `release/2.0.1`의 `v2.0.1-beta.1`, … `release/2.0.3`). 지난 `release/`를 지울 때는 끝 커밋에 베타 태그가 있는지 먼저 봅니다(`git tag --points-at origin/release/<판>`). 없으면 지우지 말고 사용자에게 묻습니다.
     - 데스크톱 앱이 `main`에서 만든 워크트리 세션도 작업 브랜치는 `origin/develop`에서 만듭니다.
 13. **`main`의 README 안내만 바꾸는 예외**(2026-11-23 사용자 결정). `main`에 정식 판이 아직 없는 동안, 저장소 첫 화면(`main`의 README)에 보일 안내를 넣을 때 씁니다. 그 안내와 어긋나는 README 줄(예: "릴리스 묶음은 없어 직접 만듭니다")도 함께 고칩니다.
     - 같은 내용을 먼저 `feature/`로 `develop`에 합쳐 둡니다.
@@ -90,11 +97,12 @@ git branch -d feature/<주제>
 git fetch origin
 git worktree add --no-track -b release/<판> .claude/worktrees/release-<판> origin/develop
 cd .claude/worktrees/release-<판>
-# mod/mod.json version, app/AndroidManifest.xml versionName·versionCode를 올리고 커밋
+# mod/mod.json version, app/AndroidManifest.xml versionName을 <판>-beta.1로,
+# versionCode를 지금까지 낸 묶음(v2.* 태그) 중 가장 큰 값 + 1로(develop 값 + 1이 아님, 규칙 4) 바꾸고 커밋
 git push -u origin release/<판>
 ```
 
-차에서 확인할 묶음이 필요하면 그 워크트리에서:
+차에서 확인할 묶음은 그 워크트리에서 답니다. 태그의 판은 파일의 판과 같습니다(규칙 4).
 
 ```sh
 git tag -a v<판>-beta.<n> -m "NX4 KOR <판> beta <n>"
@@ -102,12 +110,13 @@ git push origin v<판>-beta.<n>
 # Actions의 release 실행을 승인하면 시험판 릴리스에 묶음이 올라갑니다(release.md)
 ```
 
-차 확인에서 고칠 것이 나오면 그 `release/`를 고치지 않습니다(규칙 12).
+차 확인에서 고칠 것이 나오면 그 `release/`에서 고치지 않습니다(규칙 12).
 1. `develop`에서 시작한 `feature/`로 고쳐 `develop`에 합칩니다.
-2. `develop`에서 `release/<다음 판>`을 새로 잘라 판 번호를 올리고 `v<다음 판>-beta.1`을 답니다(위와 같은 순서).
-3. 지난 `release/<판>`은 `main`에 합치지 않고 지웁니다. 끝 커밋에 베타 태그가 있는지 먼저 봅니다(`git tag --points-at origin/release/<판>`). 없으면 지우지 말고 사용자에게 묻습니다.
+2. `release/<판>` 워크트리에서 `git fetch origin`, `git merge origin/develop`으로 고침을 들입니다(merge commit).
+   - 그 사이 `hotfix/`가 판을 올려 `develop`에 들어갔으면 판 세 곳(`mod.json` `version`, `versionName`, `versionCode`)이 충돌합니다. 판은 `release/` 쪽의 다음 베타(`<판>-beta.<n+1>`)로, `versionCode`는 낸 묶음 중 가장 큰 값보다 1 크게(규칙 4, 보통 두 쪽 중 큰 값 + 1) 풀고, 3의 판 올리기를 그 merge commit에서 함께 합니다.
+3. 판을 `<판>-beta.<n+1>`로, `versionCode`를 낸 묶음 중 가장 큰 값 + 1(보통 지난 베타 + 1)로 바꿔 커밋하고 푸시한 뒤 `v<판>-beta.<n+1>`을 답니다(위와 같은 순서).
 
-확인이 끝나면 `main`에 합치고 태그를 답니다. 로컬 `main`으로 바꾸지 않고, 합친 merge commit에 바로 답니다.
+확인이 끝나면 판을 `<판>`으로(꼬리를 떼고), `versionCode`를 낸 묶음 중 가장 큰 값 + 1로 바꿔 `release/<판>`에 커밋합니다. 그다음 `main`에 합치고 태그를 답니다. 로컬 `main`으로 바꾸지 않고, 합친 merge commit에 바로 답니다. 정식 묶음은 마지막 베타와 판 문자열·`versionCode`만 다릅니다.
 
 ```sh
 gh pr create --base main --head release/<판>

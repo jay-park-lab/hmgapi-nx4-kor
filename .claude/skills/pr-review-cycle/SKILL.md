@@ -28,7 +28,7 @@ argument-hint: "[PR 번호 | PR URL]"
     `develop` 에도 합친다(`hotfix/main-readme` 는 규칙 13: `main` 에만 합침).
   - `main`·`develop` 에 직접 커밋·푸시하지 않는다.
   - 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는
-    `release/`·`hotfix/` 에서만 바꾼다.
+    `release/`·`hotfix/` 에서만 바꾼다. 베타는 판에도 꼬리를 붙이고(`<판>-beta.<n>`), 정식으로 낼 때 뗀다(규칙 4).
   - 합치기는 merge commit 만(`gh pr merge --merge`). squash·rebase 합치기를 쓰지 않는다.
   - PR 을 연 뒤에는 강제 푸시하지 않는다. 뒤처지면 rebase 가 아니라 base 를 merge 해서 맞춘다.
 - GitHub 작업(PR 생성·조회·리뷰·답글)은 `gh` 와 `gh api` 로 한다. 저장소는
@@ -236,6 +236,10 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
    - 쌓인 PR 이면 base PR 이 먼저 합쳐졌는지 본다. 안 됐으면 base PR 부터 이 6 단계를 진행한다.
    - `docs/git-flow.md` 규칙 8 의 합치기 전 확인을 채웠는지 본다. `release/`·`hotfix/` 는 빌드·HMG-API 엔진
      시험까지 통과해야 하고, `docs/design.md` "차에서 확인할 것" 중 해당 항목의 확인 여부를 함께 적는다.
+   - `release/`·`hotfix/` 를 `main` 에 합치는 PR 이면 head 의 판이 정식(`<판>`, 꼬리 없음)인지 본다
+     (`git show <head SHA>:mod/mod.json`, `git show <head SHA>:app/AndroidManifest.xml` 의 `versionName`). 베타 판
+     (`<판>-beta.<n>`)이면 합치지 말고 알린다. 꼬리를 떼고 `versionCode` 를 올린 커밋이 먼저다(규칙 4). 베타 판으로 합치면
+     정식 태그 `v<판>` 의 release 워크플로가 판이 다르다고 멈춘다.
 2. `AskUserQuestion` — "PR #<번호> 를 merge commit 으로 합칠까요?" 선택지는 **합치기 (권장)** / **아직**.
    미룬 지적이 있거나, 엔진 시험을 건너뛰었거나, 차에서 확인하지 않았으면 질문에 그 사실을 함께 적는다.
    합치기 선택지 설명에 "합친 뒤 7 단계대로 워크트리에서 나와(`ExitWorktree`) 워크트리와 브랜치를 지웁니다" 를 적는다.
@@ -254,7 +258,7 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
    - `develop` 으로 되돌려 합치기: `gh pr create --base develop --head <브랜치>`. 내용이 이미 리뷰된 것이라
      리뷰어는 띄우지 않고, 충돌이 있으면 3 처럼 푼다. 합치기는 위와 같이 `--merge`.
    - `hotfix/` 는 진행 중인 `release/` 에 합치지 않는다(`docs/git-flow.md` 규칙 12). 그 `release/` 에 고침이 필요하면
-     `develop` 에서 다음 판으로 다시 자른다.
+     `develop` 에 합친 뒤 `release/<판>` 에 `origin/develop` 을 합치고 판을 다음 베타(`<판>-beta.<n+1>`)로 올린다(규칙 4).
    - 태그를 올리면 release 워크플로가 `production` 승인을 기다린 뒤 배포 묶음을 만들어 GitHub 릴리스에 올린다
      ([`docs/release.md`](../../../docs/release.md)). 승인은 사용자가 Actions 화면에서 한다. 대신 승인하거나
      승인 여부를 짐작해 말하지 않는다.

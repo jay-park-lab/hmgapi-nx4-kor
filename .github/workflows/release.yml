@@ -58,20 +58,21 @@ jobs:
         run: |
           set -eu
           fail() { echo "::error::$1"; exit 1; }
-          TV=${TAG#v}
-          if printf '%s\n' "$TV" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+'; then
-            V=${TV%-beta.*}
+          # 판은 태그에서 v만 뗀 것 그대로다. 베타는 파일의 판에도 꼬리가 붙는다(v2.0.4-beta.2 ↔ "2.0.4-beta.2", docs/git-flow.md 규칙 4)
+          # 숫자는 앞자리 0 없이(semver): beta.02는 HMG-API Version과 USB 설치기 vlt의 차례가 서로 달라 받지 않는다(PR #43 리뷰 4)
+          N='(0|[1-9][0-9]*)'
+          V=${TAG#v}
+          if printf '%s\n' "$V" | grep -Eqx "$N\.$N\.$N-beta\.[1-9][0-9]*"; then
             PRE=true
-          elif printf '%s\n' "$TV" | grep -Eqx '[0-9]+\.[0-9]+\.[0-9]+'; then
-            V=$TV
+          elif printf '%s\n' "$V" | grep -Eqx "$N\.$N\.$N"; then
             PRE=false
           else
-            fail "태그가 v<X.Y.Z> 또는 v<X.Y.Z>-beta.<n> 꼴이 아닙니다: $TAG"
+            fail "태그가 v<X.Y.Z> 또는 v<X.Y.Z>-beta.<n> 꼴이 아닙니다(숫자는 앞자리 0 없이, n은 1부터): $TAG"
           fi
           MV=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' mod/mod.json | head -1)
-          [ "$V" = "$MV" ] || fail "태그의 판($V)과 mod/mod.json version($MV)이 다릅니다"
+          [ "$V" = "$MV" ] || fail "태그의 판($V)과 mod/mod.json version($MV)이 다릅니다(베타는 -beta.<n>까지 같아야 합니다)"
           AV=$(sed -n 's/.*android:versionName="\([^"]*\)".*/\1/p' app/AndroidManifest.xml | head -1)
-          [ "$V" = "$AV" ] || fail "태그의 판($V)과 app/AndroidManifest.xml versionName($AV)이 다릅니다"
+          [ "$V" = "$AV" ] || fail "태그의 판($V)과 app/AndroidManifest.xml versionName($AV)이 다릅니다(베타는 -beta.<n>까지 같아야 합니다)"
           # Git Flow(docs/git-flow.md 규칙 6): 정식 태그는 main의 커밋, 베타 태그는 release/ 브랜치(또는 이미 합친 main)의 커밋
           C=$(git rev-parse HEAD)
           if [ "$PRE" = false ]; then
@@ -372,7 +373,8 @@ jobs:
             exit 1
           fi
           case $TAG in
-            *-beta.*) TITLE="NX4 KOR $V beta ${TAG##*-beta.}" ;;
+            # V에도 -beta.<n>이 붙어 있다(2.0.3-beta.2 → "NX4 KOR 2.0.3 beta 2")
+            *-beta.*) TITLE="NX4 KOR ${V%-beta.*} beta ${TAG##*-beta.}" ;;
             *) TITLE="NX4 KOR $V" ;;
           esac
           BB="BusyBox 1.36.1(Alpine busybox-static-1.36.1-r31)을 넣음. GPL-2.0, 대응 소스는 USB 맨 위 BUSYBOX-LICENSE.txt"
