@@ -22,8 +22,8 @@
 4. **판 번호는 `release/`와 `hotfix/` 브랜치에서만 바꿉니다.** `feature/`에서는 바꾸지 않습니다. 바꿀 곳은 세 군데이고 함께 바꿉니다.
    - `mod/mod.json`의 `version`
    - `app/AndroidManifest.xml`의 `versionName` (`mod.json`과 같은 값)
-   - `app/AndroidManifest.xml`의 `versionCode`: 지금까지 낸 묶음(`v*` 태그) 중 가장 큰 값보다 1 크게 합니다. 베타도 같습니다. 내려가면 차가 앱 업데이트를 받지 않습니다(HMG-API가 `pm install -r`로 넣어 낮은 값은 거절됨, 차에는 옛 상태 화면 앱이 남음).
-     - `develop`의 값은 뒤처져 있습니다. 2.0.3까지의 `release/`를 `develop`에 되돌려 합치지 않아 `develop`은 38인데, 낸 묶음은 `v2.0.3-beta.1`의 41까지입니다(PR #43 리뷰 6). 그래서 `develop`에서 자른 뒤 "1 올림"이 아니라 태그를 봅니다: `git show v<판>:app/AndroidManifest.xml`(태그마다). `release/2.0.4`의 첫 베타는 42입니다.
+   - `app/AndroidManifest.xml`의 `versionCode`: 지금까지 낸 묶음(`v2.*` 태그) 중 가장 큰 값보다 1 크게 합니다. `v1.*` 태그는 상태 화면 앱이 없던 예전 묶음이라 `app/AndroidManifest.xml`이 없습니다(PR #43 리뷰 7). 베타도 같습니다. 내려가면 차가 앱 업데이트를 받지 않습니다(HMG-API가 `pm install -r`로 넣어 낮은 값은 거절됨, 차에는 옛 상태 화면 앱이 남음).
+     - `develop`의 값은 뒤처져 있습니다. 2.0.3까지의 `release/`를 `develop`에 되돌려 합치지 않아 `develop`은 38인데, 낸 묶음은 `v2.0.3-beta.1`의 41까지입니다(PR #43 리뷰 6). 그래서 `develop`에서 자른 뒤 "1 올림"이 아니라 태그를 봅니다: `git tag --list 'v2.*'`의 태그마다 `git show <태그>:app/AndroidManifest.xml`. `release/2.0.4`의 첫 베타는 42입니다.
    - **베타는 판에도 꼬리를 붙입니다**(2026-11-23 사용자 결정). 차에서 확인하는 동안 `release/<판>`의 판은 `<판>-beta.<n>`(예: `2.0.4-beta.2`)이고, 정식으로 낼 때만 `<판>`(예: `2.0.4`)으로 바꿉니다. 숫자는 앞자리 0 없이 씁니다(`beta.02`가 아니라 `beta.2`, release 워크플로가 확인).
      - 까닭: 파일의 판이 베타와 정식에서 같으면, 고친 베타를 같은 판으로 낼 수 없습니다. USB 설치기는 판이 같으면 "같은 판이 이미 설치됨"으로 건너뛰고(`usb/troubleShooter`), 자동 설정도 새 판을 알아보지 못합니다(`$BK/applied`). 그래서 예전에는 고칠 때마다 판을 올렸습니다(2.0.0 → 2.0.3, 모두 베타).
      - 판의 차례(semver, `2.0.3 < 2.0.4-beta.1 < 2.0.4-beta.2 < 2.0.4-beta.10 < 2.0.4`)를 보는 것은 HMG-API입니다. `engine install`은 설치된 판보다 낮은 판을 `--force` 없이 거절합니다. USB 설치기는 이 모드의 판이 같은지만 봅니다(같으면 건너뜀, `NX4/REINSTALL`이 있으면 다시 설치). 다르면 예전 판을 정리(`uninstall.sh --update`)한 뒤 `engine install`을 부르고, 거절되면 예전 판의 서비스를 다시 띄우고 실패로 끝냅니다.
@@ -98,7 +98,7 @@ git fetch origin
 git worktree add --no-track -b release/<판> .claude/worktrees/release-<판> origin/develop
 cd .claude/worktrees/release-<판>
 # mod/mod.json version, app/AndroidManifest.xml versionName을 <판>-beta.1로,
-# versionCode를 지금까지 낸 묶음(v* 태그) 중 가장 큰 값 + 1로(develop 값 + 1이 아님, 규칙 4) 바꾸고 커밋
+# versionCode를 지금까지 낸 묶음(v2.* 태그) 중 가장 큰 값 + 1로(develop 값 + 1이 아님, 규칙 4) 바꾸고 커밋
 git push -u origin release/<판>
 ```
 
