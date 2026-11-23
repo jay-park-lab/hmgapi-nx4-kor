@@ -97,7 +97,9 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 ## 1. 커밋·푸시
 
 1. `git branch --show-current` 와 `git status --short` 로 브랜치와 남은 변경을 본다.
-2. 브랜치와 트리를 맞춘다(`docs/git-flow.md` 규칙 1–3, 11).
+2. 브랜치와 트리를 맞춘다(`docs/git-flow.md` 규칙 1–3, 11, 12).
+   - 새 워크트리와 작업 브랜치는 늘 `origin/develop` 에서 시작한다(규칙 12). 예외는 `hotfix/`(`origin/main`)뿐이다.
+     `release/<판>` 에서 시작하는 `feature/` 는 만들지 않는다.
    - 이 세션이 메인 체크아웃에서 돌면 여기서 브랜치를 만들거나 커밋하지 않는다. 메인 체크아웃인지는
      `git worktree list` 첫 줄의 경로와 `git rev-parse --show-toplevel` 이 같은지로 본다.
      - `git fetch origin`, `git worktree add --no-track -b feature/<주제> .claude/worktrees/<주제> origin/develop` 로
