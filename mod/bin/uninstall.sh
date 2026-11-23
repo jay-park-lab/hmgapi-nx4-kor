@@ -52,11 +52,13 @@ rc=$?
 mod_out || exit 1
 # 2.0.x의 백업 폴더($BK)가 남아 있으면 그것만 두고 지운다. 2.1.0은 $BK를 만들지 않는다: 있으면 2.0.x가 바꾼 것(Wi-Fi 설정 잠금,
 # 치운 crc32 파일, 순정 AP 저장값)을 되돌릴 기록이다. 지우면 되돌릴 길이 없어진다(2.0.x 위에 adb·HMG-API 앱으로 2.1.0을 넣은 차 등,
-# PR #50 리뷰 2). 2.0.x USB의 UNINSTALL이 남은 $NX4_ROOT를 보고 스틱의 2.0.x 사본으로 되돌린다
+# PR #50 리뷰 2). 2.0.x USB(v2.0.4-beta.1)의 UNINSTALL은 남은 $NX4_ROOT를 보고 스틱의 2.0.x 사본으로, 2.1.0 이후 USB의 UNINSTALL은
+# 함께 든 2.0.x 되돌리기(NX4/legacy-2.0, USB 설치기 작업 #52)로 되돌린다. 이 줄은 설치기 기록(NX4/install.log)에 남는다.
+# 화면(토스트)으로 알리는 것은 설치기가 한다(PR #50 리뷰 9)
 if [ -d $BK ]; then
   for _f in $NX4_ROOT/*; do [ "$_f" = "$BK" ] || rm -rf "$_f"; done
   echo "NX4 KOR 모드를 지웠습니다. 내비를 재부팅해 주세요."
-  echo "2.0.x가 바꾼 것(Wi-Fi 설정 잠금 등)의 기록이 남아 있어 $BK는 지우지 않았습니다. 2.0.x USB(v2.0.4-beta.1)의 UNINSTALL로 되돌려 주세요."
+  echo "2.0.x가 바꾼 것(Wi-Fi 설정 잠금 등)을 되돌릴 기록이 남아 있어 백업 폴더($BK)는 지우지 않았습니다. 2.0.x USB(v2.0.4-beta.1) 또는 NX4 KOR 2.1.0 이후 USB의 UNINSTALL로 되돌려 주세요."
   exit 0
 fi
 rm -rf $NX4_ROOT

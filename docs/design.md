@@ -46,6 +46,7 @@
 | `bin/uninstall.sh` → `scripts/preun.sh` | 지우기(`engine remove`)·업데이트 전 정리 |
 
 - **지우기**(`bin/uninstall.sh`): 상태 화면의 감시자를 멈추고 작업 파일을 지운 뒤 `hmgapid engine remove nx4-kor`를 합니다. HMG-API는 그때 앱·서비스 목록(`state/apps.txt`·`services.txt`)을 다시 써서 상태 화면 앱과 서비스를 내립니다(rc.8 `Packages.remove` → `LiveState.publish`). 이 모드는 적용할 것이 없으므로 계획을 보거나 적용하지 않습니다. 그다음 기록 폴더 `/data/nx4-kor`를 지웁니다.
+  - 2.0.x의 백업 폴더(`$BK` = `/data/nx4-kor/backup`)가 있으면 그 폴더만 남깁니다. 2.1.0은 그 폴더를 만들지 않으므로, 있으면 2.0.x가 바꾼 것(Wi-Fi 설정 잠금, 치운 crc32 파일, 순정 AP 저장값)을 되돌릴 기록입니다. 출력에 "2.0.x USB(v2.0.4-beta.1) 또는 NX4 KOR 2.1.0 이후 USB의 UNINSTALL로 되돌려 주세요"를 남기고(설치기 `NX4/install.log`), 종료 코드는 0입니다(PR #50 리뷰 2·9).
   - `--update`(새 판으로 바꾸기 전)는 감시자와 작업 파일만 정리합니다. 설치 진행 기록은 USB 설치기가 쓰는 파일이라 두고, 지울 때만 지웁니다.
   - 2.0.x가 바꾼 것(Wi-Fi 설정 잠금, 무선 권한 파일, 순정 AP 저장값, 한국 포크 무선 기능)은 2.1.0의 지우기가 되돌리지 않습니다. USB 설치기가 2.1.0을 넣기 전에 옛 판 자신의 `bin/uninstall.sh`로 정리합니다.
 

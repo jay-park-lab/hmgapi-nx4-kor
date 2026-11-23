@@ -140,6 +140,7 @@ NX4 KOR에는 설정이 없습니다. 무선 기능의 설정은 HMG-API 앱의 
 - 상태 화면의 감시자를 멈추고 작업 파일(`/data/local/tmp/nx4-kor*`)을 지웁니다.
 - HMG-API에서 이 모드를 지웁니다(`engine remove`). HMG-API가 상태 화면 앱과 서비스를 내립니다. 이 모드는 시스템 파일·Wi-Fi 설정을 바꾸지 않아 적용할 것이 없습니다.
 - 기록 폴더(`/data/nx4-kor`)를 지웁니다. HMG-API가 만든 이 차의 map(`state/local-map.json`)은 남깁니다.
+- 2.0.x의 백업 폴더(`/data/nx4-kor/backup`, Wi-Fi 설정 잠금 등을 되돌릴 기록)가 남아 있으면 그 폴더만 남기고, 2.0.x USB(`v2.0.4-beta.1`) 또는 NX4 KOR 2.1.0 이후 USB의 UNINSTALL로 되돌리라고 USB의 `NX4/install.log`에 적습니다.
 
 주의할 점:
 - 공식 무선 모드·HMG-API를 함께 지울지와 USB `UNINSTALL`이 그것을 어떻게 하는지는 USB 설치기 작업([#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45))과 상태 화면 지우기 버튼([#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44))에서 정합니다.

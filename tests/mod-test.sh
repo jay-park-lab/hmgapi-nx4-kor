@@ -211,7 +211,7 @@ check "uninstall.sh: HMG-API를 먼저 지웠으면 preun.sh로 되돌리고, �
 rm -rf $I; cp -R $F $I; mkdir -p $T/kp/backup $T/kp/logs; echo orig > $T/kp/backup/wpaconf.orig; : > $T/kp/logs/ap.log; : > $T/calls; rm -f $T/stublog
 ur $I
 check "uninstall.sh: 2.0.x 백업(backup/)이 있으면 그것만 남기고(기록 그대로) 나머지를 지우고, 2.0.x USB의 UNINSTALL로 되돌리라고 알림" \
-  '[ "$(cat $T/u.rc)" = 0 ] && grep -qx orig $T/kp/backup/wpaconf.orig && [ ! -d $T/kp/logs ] && [ ! -d $I ] && grep -q "2.0.x USB(v2.0.4-beta.1)의 UNINSTALL" $T/u.out' || cat $T/u.out
+  '[ "$(cat $T/u.rc)" = 0 ] && grep -qx orig $T/kp/backup/wpaconf.orig && [ ! -d $T/kp/logs ] && [ ! -d $I ] && grep -q "백업 폴더($T/kp/backup)는 지우지 않았습니다" $T/u.out && grep -q "2.0.x USB(v2.0.4-beta.1) 또는 NX4 KOR 2.1.0 이후 USB의 UNINSTALL" $T/u.out' || cat $T/u.out
 rm -rf $I $T/kp
 
 # --- troubleShooter(USB 설치기) ---

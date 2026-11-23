@@ -104,7 +104,7 @@ HMG-API는 훅 때문에 내비가 제대로 뜨지 못한다고 보면 스스�
 
 1. **NX4 KOR만 지우기**
    - 설치 USB의 `NX4` 폴더에 빈 파일 `UNINSTALL`을 만들고 Engineering Mode → USB Copy → DSP → Update OTA를 누릅니다.
-   - 2.1.0의 NX4 KOR는 HMG-API에서 이 모드를 지우고(상태 화면 앱·서비스가 내려감) 작업 파일·기록 폴더를 지웁니다. 시스템 파일·Wi-Fi 설정은 바꾸지 않았으므로 되돌릴 것이 없습니다. 공식 무선 모드를 함께 지울지는 USB 설치기 작업([#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45))에서 정합니다.
+   - 2.1.0의 NX4 KOR는 HMG-API에서 이 모드를 지우고(상태 화면 앱·서비스가 내려감) 작업 파일·기록 폴더를 지웁니다. 2.0.x의 백업 폴더(`/data/nx4-kor/backup`)가 남아 있으면 그것만 남기고 USB의 `NX4/install.log`에 "…2.0.x USB(v2.0.4-beta.1) 또는 NX4 KOR 2.1.0 이후 USB의 UNINSTALL로 되돌려 주세요"를 적습니다. 그때는 그 USB로 UNINSTALL을 한 번 더 합니다. 시스템 파일·Wi-Fi 설정은 바꾸지 않았으므로 되돌릴 것이 없습니다. 공식 무선 모드를 함께 지울지는 USB 설치기 작업([#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45))에서 정합니다.
    - 2.0.x를 쓰던 차에 남은 것(이 모드의 핫스팟, Wi-Fi 설정 파일 잠금, 순정 AP 저장값, 무선 권한 파일)은 USB 설치기가 옛 판 자신의 삭제로 되돌립니다.
    - HMG-API를 먼저 지웠어도 됩니다. 그때는 남은 모드 폴더나 USB의 사본으로 지웁니다. 자세한 것은 [README](../README.md) "삭제".
 2. **HMG-API까지 지우기**
