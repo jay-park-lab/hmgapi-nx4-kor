@@ -7,7 +7,7 @@
 #      --update면 감시자와 작업 파일만 정리한다.
 #   2. HMG-API를 먼저 지운 경우(hmgapid도 설치 기록도 없음): HMG-API 삭제는 이 모드의 서비스를 멈추지만, 모드 폴더를 남기고
 #      (--purge 아니면) 앱은 꺼 두기만 한다. 그래서 모드 폴더를 직접 지우고 앱을 pm으로 지운다.
-#   3. 기록 폴더($NX4_ROOT)를 지운다.
+#   3. 기록 폴더($NX4_ROOT)를 지운다. 2.0.x의 백업 폴더($BK)가 남아 있으면 그것만 두고 2.0.x USB로 되돌리라고 알린다.
 # 2.1.0의 이 모드는 시스템 파일·Wi-Fi 설정을 바꾸지 않는다(무선은 HMG-API와 공식 무선 모드가 맡음). 2.0.x가 바꾼 것은 그 판 자신의
 # uninstall.sh가 되돌린다(USB 설치기가 2.1.0을 넣기 전에 부름).
 # NX4_APP: 모드 파일 위치(기본: 이 스크립트가 든 모드 폴더). 모드 폴더가 없으면(HMG-API 앱에서 지움, HMG-API --purge) USB 설치기가
@@ -35,7 +35,7 @@ mod_out() {
     return 0
   fi
   [ -f $HMGDATA/mods/$NX4_MOD_ID/mod.json ] || return 0
-  echo "HMG-API에서 모드를 지우지 못함: HMG-API 앱에서 NX4 KOR를 지우고 변경 사항을 적용해 주세요"
+  echo "HMG-API에서 모드를 지우지 못함: HMG-API 앱에서 NX4 KOR를 지워 주세요"
   return 1
 }
 
@@ -50,6 +50,15 @@ sh $NX4_APP/scripts/preun.sh
 rc=$?
 [ $rc = 0 ] || echo "scripts/preun.sh 종료 코드 $rc (위 출력 참고). 모드는 계속 지운다"
 mod_out || exit 1
+# 2.0.x의 백업 폴더($BK)가 남아 있으면 그것만 두고 지운다. 2.1.0은 $BK를 만들지 않는다: 있으면 2.0.x가 바꾼 것(Wi-Fi 설정 잠금,
+# 치운 crc32 파일, 순정 AP 저장값)을 되돌릴 기록이다. 지우면 되돌릴 길이 없어진다(2.0.x 위에 adb·HMG-API 앱으로 2.1.0을 넣은 차 등,
+# PR #50 리뷰 2). 2.0.x USB의 UNINSTALL이 남은 $NX4_ROOT를 보고 스틱의 2.0.x 사본으로 되돌린다
+if [ -d $BK ]; then
+  for _f in $NX4_ROOT/*; do [ "$_f" = "$BK" ] || rm -rf "$_f"; done
+  echo "NX4 KOR 모드를 지웠습니다. 내비를 재부팅해 주세요."
+  echo "2.0.x가 바꾼 것(Wi-Fi 설정 잠금 등)의 기록이 남아 있어 $BK는 지우지 않았습니다. 2.0.x USB(v2.0.4-beta.1)의 UNINSTALL로 되돌려 주세요."
+  exit 0
+fi
 rm -rf $NX4_ROOT
 echo "NX4 KOR 모드를 지웠습니다. 내비를 재부팅해 주세요."
 exit 0

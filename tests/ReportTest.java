@@ -130,10 +130,12 @@ public class ReportTest {
         Report hoff = Report.parse(GOOD.replace("hooks=on", "hooks=off").replace("hookmap=mapped", "hookmap=mismatch"));
         check("훅 칸: 꺼짐이면 map 상태와 '마지막 부팅 기록', 기록 없음 '-'", row(hoff, "HMG-API 훅").startsWith("꺼짐 (mismatch")
             && "-".equals(row(Report.parse(GOOD.replace("hooks=on\n", "hooks=\n")), "HMG-API 훅")) && "켜짐".equals(row(r, "HMG-API 훅")));
-        check("무선 연결용 Wi-Fi 칸: 켜짐, 일반 핫스팟, 요청 없음, 켰다가 꺼짐, 못 켬(다시 시도), 꺼짐",
+        check("무선 연결용 Wi-Fi 칸: 켜짐, 일반 핫스팟, 다른 SSID·확인 못 함(영문 코드 없이), 요청 없음, 켰다가 꺼짐, 못 켬(다시 시도), 꺼짐",
             "켜짐".equals(row(r, "무선 연결용 Wi-Fi (HMG-API)"))
             && "켜짐 (일반 핫스팟)".equals(row(Report.parse(GOOD.replace("ap_mode=projection", "ap_mode=hotspot")), "무선 연결용 Wi-Fi (HMG-API)"))
-            && "켜짐 (unknown)".equals(row(Report.parse(GOOD.replace("ap_mode=projection", "ap_mode=unknown")), "무선 연결용 Wi-Fi (HMG-API)"))
+            && "켜짐 (SSID 확인 못 함)".equals(row(Report.parse(GOOD.replace("ap_mode=projection", "ap_mode=unknown")), "무선 연결용 Wi-Fi (HMG-API)"))
+            && "켜짐 (다른 SSID)".equals(row(Report.parse(GOOD.replace("ap_mode=projection", "ap_mode=other")), "무선 연결용 Wi-Fi (HMG-API)"))
+            && "켜짐 (SSID 확인 못 함)".equals(row(Report.parse(GOOD.replace("ap_mode=projection\n", "")), "무선 연결용 Wi-Fi (HMG-API)"))
             && "꺼짐 (HMG-API에 요청 없음)".equals(row(Report.parse(GOOD.replace("ap=yes", "ap=no").replace("proj=yes", "proj=no")), "무선 연결용 Wi-Fi (HMG-API)"))
             && "꺼짐 (이번 부팅에 켰다가 꺼짐)".equals(row(Report.parse(GOOD.replace("ap=yes", "ap=no")), "무선 연결용 Wi-Fi (HMG-API)"))
             && "꺼짐 (켜지 못함, 다시 시도 중)".equals(row(Report.parse(GOOD.replace("ap=yes", "ap=no").replace("ap_boot=yes", "ap_boot=no").replace("ap_fail=no", "ap_fail=yes")), "무선 연결용 Wi-Fi (HMG-API)"))

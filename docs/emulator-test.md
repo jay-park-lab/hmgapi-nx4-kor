@@ -255,6 +255,17 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
 
 ## 마지막 결과
 
+2026-11-24, PR #50(2.1.0 상태 판정)의 앱(테스트 키), 에뮬레이터 37.2.13, Android 7.0 arm64 이미지, 창 없이(`-no-window`) 띄워 화면을 찍음.
+
+- 시나리오 10개(`ready connected installing reboot failed nowireless nowifipart nocar nobb hint`) 모두 위 표대로 나옴.
+  - 자세히 표를 내려 보면 새 줄(공식 무선 모드 "2.2.0-rc.9, 켜짐", 순정 핫스팟 기능 (Wi-Fi 칩 전원), Wi-Fi 칩, 무선 연결용 Wi-Fi (HMG-API))이 줄바꿈 없이 한 줄씩 보임.
+  - `nowifipart`: 노란 띠 네 줄, 지우는 법 줄 없음, 표의 Wi-Fi 칩 "안 보임", 무선 연결용 Wi-Fi "꺼짐 (켜지 못함, 다시 시도 중)".
+  - `nowireless`: 빨간 띠 네 줄, 표의 무선 연결용 Wi-Fi "꺼짐 (이번 부팅에 켰다가 꺼짐)".
+- [지금 재부팅] 5단계(감시자 없음, 확인 창, 보냄, `guard`·`cmd` 답, `<` 닫기) 모두 위대로 나옴.
+- `logcat`에 이 앱의 크래시 없음.
+
+아래는 그 전 결과입니다.
+
 2026-11-20, 앱 2.0.0(versionCode 38, 순정 5W 모양 #28), 에뮬레이터 37.2.13, Android 7.0 arm64 이미지.
 
 - 시나리오 9개 모두 위 표대로 나옴. 바꾸기 전(2026-11-19 모양)과 나란히 찍어 비교함.

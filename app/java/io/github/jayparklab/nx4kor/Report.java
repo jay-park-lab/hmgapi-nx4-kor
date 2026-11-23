@@ -538,7 +538,9 @@ final class Report {
             String m = get("ap_mode");
             if ("hotspot".equals(m)) return "켜짐 (일반 핫스팟)";
             if ("projection".equals(m)) return "켜짐";
-            return "켜짐 (" + (m.isEmpty() ? "?" : m) + ")";
+            if ("other".equals(m)) return "켜짐 (다른 SSID)";
+            // unknown(설정을 못 읽음 등)·빈 값·모르는 값: 영문 코드를 보이지 않는다(PR #50 리뷰 6)
+            return "켜짐 (SSID 확인 못 함)";
         }
         if ("no".equals(get("proj"))) return "꺼짐 (HMG-API에 요청 없음)";
         if (yes("ap_boot")) return "꺼짐 (이번 부팅에 켰다가 꺼짐)";

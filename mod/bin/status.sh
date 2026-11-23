@@ -108,7 +108,7 @@ zygote_info() {
 # 부팅 뒤 초(시계가 바뀌어도 거꾸로 가지 않는다). 읽지 못하면 빈 값
 up_s() { $BB awk '{ print int($1) }' $UPTIME 2>/dev/null; }
 # 프로젝션 AP를 기다리는 시간(부팅 뒤 초). HMG-API Wi-Fi 지기는 Android Wi-Fi 서비스가 뜨자마자 한 번 띄우고, 안 되면 약 1분 동안
-# 다시 시도한다. 그 안에 ap.boot·ap.fail이 모두 없으면 "켜는 중", 지나면 "켜지 않았음"으로 본다
+# 자주, 그 뒤 30초마다 다시 시도한다. 이 시간 전에는 AP가 없어도(ap.fail이 있어도) "켜는 중"으로 보고, 지나면 "부품 없음"·"못 켬"을 낸다
 AP_WAIT=${AP_WAIT:-300}
 
 # --- 판정은 한 곳에서 ---
@@ -116,7 +116,8 @@ AP_WAIT=${AP_WAIT:-300}
 # 상태 화면 앱은 상태 파일의 verdict·verdict_lv·verdict_msg를 그대로 보인다.
 # 판정 순서: HMG-API 부팅 보호 → 설치 중 → 이 모드의 차가 아님 → HMG-API 판 → 설치기가 남긴 재부팅 필요·실패 →
 # 공식 무선 모드(설치·켜짐·판) → HMG-API 훅(map) → 공식 모드의 훅 → 무선 카플레이 설정 → 무선 기능 → 프로젝션 AP 요청 →
-# 연결됨 → 다른 Wi-Fi 패키지 → AP 켜짐(준비됨·일반 핫스팟) → Wi-Fi 클라이언트 → Wi-Fi 부품 없음 → AP 꺼짐·켜는 중·못 켬.
+# 연결됨 → 다른 Wi-Fi 패키지 → AP 켜짐(준비됨·일반 핫스팟) → Wi-Fi 클라이언트 → AP 꺼짐 → 켜는 중(부팅 뒤 5분 전) →
+# Wi-Fi 부품 없음 → 못 켬.
 st_collect() {
   [ "$SC_DONE" = 1 ] && return 0
   SC_DONE=1
@@ -213,19 +214,21 @@ st_verdict() {
   elif [ "$K_WPA" = yes ]; then
     # 내비의 Wi-Fi 클라이언트(HMG-API 집 Wi-Fi 포함)가 켜져 있으면 HMG-API 지기는 라디오를 건드리지 않는다(Wi-Fi 칩은 하나)
     _vs wificlient 1 "내비가 일반 Wi-Fi에 접속하는 중이라 무선 연결용 Wi-Fi가 꺼져 있습니다. HMG-API 앱의 Home Wi-Fi를 쓰면 주차를 풀 때 돌아옵니다."
-  elif [ "$K_CHIP" = no ] && [ "$K_WLAN" = no ] && [ "$K_APFAIL" = yes ] && [ "$K_APBOOT" = no ] \
-      && k_feat com.hkmc.software.wifihotspot; then
-    # 칩 전원이 달린 순정 핫스팟 기능은 켜졌는데(HMG-API가 켬) 칩이 SDIO에 한 번도 보이지 않았고, HMG-API가 이번 부팅에 AP를
-    # 띄우지 못했다. 2026-11-23 NX4HEV 260902가 이랬다(커널 "failed to power up DHD generic adapter", #38). 무선은 USB Wi-Fi 동글(#48)로.
-    # 유선 카플레이·안드로이드 오토와 계기판 길안내(공식 모드)는 그대로라 "이 차는 안 됨"(지우는 법)으로 끝내지 않는다
-    _vs nowifipart 1 "이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 무선 카플레이·안드로이드 오토를 쓸 수 없습니다. 유선 연결과 계기판 길안내는 그대로 쓸 수 있습니다."
   elif [ "$K_APBOOT" = yes ]; then
     # 이번 부팅에 떴다가 지금은 꺼짐(차가 끈 것은 HMG-API 지기가 다시 켜지 않는다). 폰이 붙을 때 공식 모드가 다시 켠다(HMG-API rc.8)
     _vs apoff 1 "무선 연결용 Wi-Fi가 지금 꺼져 있습니다. 폰을 연결해 보고, 안 되면 내비를 3분 후 재부팅해 주세요."
+  elif [ -z "$K_UP" ] || [ "$K_UP" -lt "$AP_WAIT" ]; then
+    # 부팅 뒤 AP_WAIT(5분) 전: 지기는 첫 시도가 실패하면 바로 ap.fail을 쓰고 다시 시도한다. 칩이 SDIO에 늦게 올라오는 첫 부팅도 있어
+    # 그 사이에는 "부품 없음"·"못 켬"으로 굳히지 않는다(PR #50 리뷰 3)
+    _vs apwait 1 "무선 연결용 Wi-Fi를 켜는 중입니다. 1~2분 뒤 화면을 다시 열어 주세요."
+  elif [ "$K_CHIP" = no ] && [ "$K_WLAN" = no ] && [ "$K_APFAIL" = yes ] && k_feat com.hkmc.software.wifihotspot; then
+    # 부팅 뒤 5분이 지났고, 칩 전원이 달린 순정 핫스팟 기능은 켜졌는데(HMG-API가 켬) 칩이 SDIO에 한 번도 보이지 않았고(HMG-API의
+    # public/wifi-chip도 없음), wlan0이 없고, HMG-API가 이번 부팅에 AP를 띄우지 못했다. 2026-11-23 NX4HEV 260902가 이랬다(커널
+    # "failed to power up DHD generic adapter", #38). 무선은 USB Wi-Fi 동글(#48)로. 동글이 wlan0을 만들면 이 판정으로 가지 않는다.
+    # 유선 카플레이·안드로이드 오토와 계기판 길안내(공식 모드)는 그대로라 "이 차는 안 됨"(지우는 법)으로 끝내지 않는다
+    _vs nowifipart 1 "이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 무선 카플레이·안드로이드 오토를 쓸 수 없습니다. 유선 연결과 계기판 길안내는 그대로 쓸 수 있습니다."
   elif [ "$K_APFAIL" = yes ]; then
     _vs apfail 1 "HMG-API가 무선 연결용 Wi-Fi를 아직 켜지 못했습니다(다시 시도하는 중). 내비를 3분 후 재부팅해도 같으면 HMG-API 기록(/data/hmgapi/logs/hmgapi/wifi.log)을 확인해 주세요."
-  elif [ -z "$K_UP" ] || [ "$K_UP" -lt "$AP_WAIT" ]; then
-    _vs apwait 1 "무선 연결용 Wi-Fi를 켜는 중입니다. 1~2분 뒤 화면을 다시 열어 주세요."
   else
     _vs apfail 1 "HMG-API가 이번 부팅에 무선 연결용 Wi-Fi를 켜지 않았습니다. 내비를 3분 후 재부팅해도 같으면 HMG-API 기록(/data/hmgapi/logs/hmgapi/wifi.log)을 확인해 주세요."
   fi

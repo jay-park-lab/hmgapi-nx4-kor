@@ -74,8 +74,10 @@
   | 14 | `aphotspot` | AP가 일반 핫스팟 SSID(softap.conf의 S1)로 떠 있음 |
   | 15 | `ready` | AP가 떠 있음(프로젝션 AP는 카플레이 SSID S2) |
   | 16 | `wificlient` | AP 없이 Wi-Fi 클라이언트(`wpa_supplicant`, HMG-API 집 Wi-Fi 포함)가 돎. HMG-API는 이때 라디오를 건드리지 않음 |
-  | 17 | `nowifipart` | **Wi-Fi 부품이 없는 차**: 순정 핫스팟 기능(칩 전원)은 켜졌는데 칩이 SDIO에 한 번도 안 보였고(HMG-API `public/wifi-chip`도 없음), `wlan0`이 없고, HMG-API가 이번 부팅에 AP를 띄우지 못함(`wifi/ap.fail`만). 2026-11-23 NX4HEV 260902가 이랬습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로라 "안 됨"으로 끝내지 않고(노랑), 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다 |
-  | 18 | `apoff`, `apfail`, `apwait` | 이번 부팅에 떴다가 꺼짐(`wifi/ap.boot`), 띄우지 못함(`wifi/ap.fail`, 또는 부팅 뒤 5분이 지나도 기록 없음), 아직 켜는 중(부팅 뒤 5분 전) |
+  | 17 | `apoff` | 이번 부팅에 떴다가 지금 꺼짐(`wifi/ap.boot`) |
+  | 18 | `apwait` | 부팅 뒤 5분 전이고 AP가 아직 없음(`wifi/ap.fail`이 있어도). HMG-API 지기는 첫 시도가 실패하면 바로 `ap.fail`을 쓰고 다시 시도하며, 칩이 SDIO에 늦게 올라오는 첫 부팅도 있어 이 사이에는 "부품 없음"·"못 켬"으로 굳히지 않습니다 |
+  | 19 | `nowifipart` | **Wi-Fi 부품이 없는 차**: 부팅 뒤 5분이 지났고, 순정 핫스팟 기능(칩 전원)은 켜졌는데 칩이 SDIO에 한 번도 안 보였고(HMG-API `public/wifi-chip`도 없음), `wlan0`이 없고, HMG-API가 이번 부팅에 AP를 띄우지 못함(`wifi/ap.fail`만). 2026-11-23 NX4HEV 260902가 이랬습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로라 "안 됨"으로 끝내지 않고(노랑), 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다 |
+  | 20 | `apfail` | 부팅 뒤 5분이 지나도 AP를 띄우지 못함(`wifi/ap.fail`, 또는 기록 없음). USB 동글처럼 `wlan0`이 있는 차도 여기로 옵니다 |
 
   - HMG-API의 프로젝션 AP 기록은 HMG-API Wi-Fi 지기(rc.8 `engine/HomeWifi.java`, 서비스 `hmgapi wifi`)의 것입니다. 부팅마다 Android Wi-Fi 서비스가 뜨자마자 한 번 띄우고, 이번 부팅 id를 `wifi/ap.boot`(떴거나 이미 떠 있었음, Wi-Fi 클라이언트가 켜져 있어 두었음)나 `wifi/ap.fail`(다시 시도 중)에 씁니다. 그 줄은 `/data/hmgapi/logs/hmgapi/wifi.log`에 남습니다. 차가 나중에 끈 AP는 지기가 다시 켜지 않고, 폰이 붙을 때 공식 모드가 다시 켭니다(rc.8 `hmgapi.hook.Wifi.projectionAp`).
   - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
@@ -183,12 +185,12 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - HMG-API 설치기가 NX4의 `app_process`를 아는지(모르면 `HMGAPI/FORCE`).
 - **Wi-Fi 부품이 없는 차에서 상태 화면이 "부품 없음"을 보이는지**(2026-11-23 NX4HEV 260902, 2.0.4-beta.1에서 순정 핫스팟 기능을 켜도 칩이 올라오지 않음, #38).
   - 공식 모드를 적용하고 재부팅한 뒤 HMG-API 기록 `/data/hmgapi/logs/hmgapi/wifi.log`에 `projection AP: not up yet, trying again (…)`이 남고, 상태 화면이 `nowifipart`(노랑, "Wi-Fi 부품이 없는 것으로 보여…")인지. 표의 "Wi-Fi 칩"이 "안 보임", "순정 핫스팟 기능"이 "예"인지
-  - 부팅 직후 5분 동안은 `apwait`("켜는 중")이 맞는지, 그 뒤 판정이 바뀌는지
+  - 부팅 뒤 5분 동안은 `apwait`("켜는 중")이고 그 뒤 `nowifipart`로 바뀌는지(첫 시도 실패로 `ap.fail`이 먼저 생겨도 5분 전에는 "부품 없음"이 나오지 않아야 함)
   - 유선 카플레이·안드로이드 오토와 계기판 길안내(공식 모드)가 그대로인지. HMG-API 지기가 부팅마다 AP를 다시 시도하면서(약 1분, 그 뒤 30초마다) 유선 연결이 끊기는지도 봅니다
   - 결과는 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에, 동글로 무선을 보는 일은 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적습니다.
 - **함께 넣은 busybox가 NX4에서 도는지.** NX4 내비에 `/system/bin/busybox`가 없으면 상태 화면 스크립트는 모드의 `bin/busybox`(`/data/hmgapi/mods/nx4-kor/bin/busybox`)만 쓸 수 있습니다. 상태 화면이 "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함)"를 보이지 않아야 합니다.
 - **HMG-API가 없는 차에서 릴리스 USB 하나로 설치되는지.** 첫 Update OTA에서 NX4 KOR 설치기가 스틱의 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)로 넘겨 HMG-API가 설치되고 재부팅되는지, 두 번째 Update OTA에서 NX4 KOR가 설치되는지(USB의 `HMGAPI/install.log`, `NX4/install.log`).
-- **HMG-API가 1.1.0-rc.4보다 낮은 차에서 HMG-API를 먼저 올리는지.** 첫 Update OTA가 따로 설치한 무선 모드(`wireless-carplay-aa`)를 지우지 않고 HMG-API 설치기의 업데이트 갈래로 HMG-API를 올린 뒤 재부팅하는지, 두 번째에 NX4 KOR가 설치되는지. HMG-API 설치기를 `/storage/upgrade`가 아니라 스틱의 `NX4/hmgapi`에서 `exec`로 돌리는 길은 차에서 처음 돕니다. NEMESIS로 설치한 HMG-API라면 NEMESIS 목록의 판도 함께 봅니다.
+- **HMG-API가 이 모드의 최소 판(1.1.0-rc.8)보다 낮은 차에서 HMG-API를 먼저 올리는지.** 첫 Update OTA가 따로 설치한 무선 모드(`wireless-carplay-aa`)를 지우지 않고 HMG-API 설치기의 업데이트 갈래로 HMG-API를 올린 뒤 재부팅하는지, 두 번째에 NX4 KOR가 설치되는지. HMG-API 설치기를 `/storage/upgrade`가 아니라 스틱의 `NX4/hmgapi`에서 `exec`로 돌리는 길은 차에서 처음 돕니다. NEMESIS로 설치한 HMG-API라면 NEMESIS 목록의 판도 함께 봅니다.
 - **칩이 있는 차(또는 동글 뒤)에서 HMG-API 프로젝션 AP를 상태 화면이 바르게 읽는지.**
   - 부팅 뒤 `wifi.log`에 `projection AP: up in mode 2 (requested by wireless-carplay-aa)`(또는 `already up`)가 남고, 상태 화면이 `ready`, 표의 "무선 연결용 Wi-Fi"가 "켜짐"인지. 이 판정은 netd가 띄운 `hostapd` 설정의 `ssid=`가 softap.conf의 카플레이 SSID(S2)인지로 합니다(`svc/lib.sh` `ap_ssid`). 순정 일반 핫스팟 SSID(S1)면 `aphotspot`입니다.
   - 폰을 무선으로 붙이면 `connected`와 "카플레이 N대 연결됨"이 나오는지(로컬 포트 7000, Wi-Fi 쪽 주소)

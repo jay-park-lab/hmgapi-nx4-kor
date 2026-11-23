@@ -200,13 +200,19 @@ check "uninstall.sh: preun.sh(삭제 갈래, HMG-API에서 모드를 뺌) → /d
 # preun.sh가 모드를 빼지 못했으면(HMG-API 앱에서 지워야 함) 실패로 끝내고 알림
 cp -R $F $I; printf '#!/bin/sh\nexit 0\n' > $I/scripts/preun.sh; mkdir -p $T/kp; : > $T/calls
 ur $I
-check "uninstall.sh: 모드가 HMG-API에 남았으면 실패(1)로 끝내고 HMG-API 앱에서 지우라고 알림" '[ "$(cat $T/u.rc)" = 1 ] && grep -q "HMG-API 앱에서 NX4 KOR를 지우고" $T/u.out'
+check "uninstall.sh: 모드가 HMG-API에 남았으면 실패(1)로 끝내고 HMG-API 앱에서 지우라고 알림(적용할 것은 없음)" '[ "$(cat $T/u.rc)" = 1 ] && grep -q "HMG-API 앱에서 NX4 KOR를 지워 주세요" $T/u.out && ! grep -q "적용해 주세요" $T/u.out'
 rm -rf $I
 # HMG-API를 먼저 지운 경우(hmgapid 명령·installed.txt 없음): preun.sh는 그대로 돌리고, 남은 모드 폴더를 직접 지우고, 앱은 pm으로 지움
 cp -R $F $I; mkdir -p $T/kp; : > $T/calls; rm -f $T/stublog
 (env -u NX4_APP PATH=$P0 HMGAPID=$T/nohmgapid HMGDATA=$HD NX4_ROOT=$T/kp sh $I/bin/uninstall.sh) > $T/u.out 2>&1; echo $? > $T/u.rc
 check "uninstall.sh: HMG-API를 먼저 지웠으면 preun.sh로 되돌리고, 남은 모드 폴더·앱(pm)을 직접 지움" \
   '[ "$(cat $T/u.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$I .*NX4_UPDATE= " $T/stublog && grep -qx "pm uninstall io.github.jayparklab.nx4kor" $T/calls && [ ! -d $I ] && [ ! -d $T/kp ] && grep -q "HMG-API가 먼저 지워져" $T/u.out'
+# 2.0.x의 백업(backup/: Wi-Fi 잠금·순정 AP 저장값을 되돌릴 기록)이 남은 차: 그 폴더만 남기고 2.0.x USB로 되돌리라고 알림(PR #50 리뷰 2)
+rm -rf $I; cp -R $F $I; mkdir -p $T/kp/backup $T/kp/logs; echo orig > $T/kp/backup/wpaconf.orig; : > $T/kp/logs/ap.log; : > $T/calls; rm -f $T/stublog
+ur $I
+check "uninstall.sh: 2.0.x 백업(backup/)이 있으면 그것만 남기고(기록 그대로) 나머지를 지우고, 2.0.x USB의 UNINSTALL로 되돌리라고 알림" \
+  '[ "$(cat $T/u.rc)" = 0 ] && grep -qx orig $T/kp/backup/wpaconf.orig && [ ! -d $T/kp/logs ] && [ ! -d $I ] && grep -q "2.0.x USB(v2.0.4-beta.1)의 UNINSTALL" $T/u.out' || cat $T/u.out
+rm -rf $I $T/kp
 
 # --- troubleShooter(USB 설치기) ---
 R=$T/root; U=$T/usb0; K=$U/NX4
@@ -389,24 +395,25 @@ ts $U
 check "USB 설치기: 업데이트 설치가 거절되면 실패로 끝내고 예전 판의 서비스를 다시 띄움" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "설치 실패" $T/ts.out && grep -qx "hmgapid service-start nx4-kor ap" $T/calls'
 rm -f $T/install-fail
 # 지우기
-: > $K/UNINSTALL; : > $T/ap-running; rm -f $T/stublog; mkdir -p $R/data/nx4-kor/backup
+: > $K/UNINSTALL; : > $T/ap-running; rm -f $T/stublog; mkdir -p $R/data/nx4-kor/logs
 ts $U
 check "USB 설치기: UNINSTALL이면 설치된 모드의 uninstall.sh로 되돌리고 모드를 지움" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$HD/mods/nx4-kor " $T/stublog && grep -qx "hmgapid engine remove nx4-kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && grep -q "지웠습니다" $T/ts.out'
 ts $U
 check "USB 설치기: 지울 것이 없으면 아무것도 하지 않음" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "설치되어 있지 않습니다" $T/ts.out && ! grep -q "engine remove" $T/calls'
 # 모드는 HMG-API 앱에서 먼저 지웠고 되돌릴 기록만 남은 경우: 스틱의 사본(/data로 복사)으로 되돌림
-mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog
+# (2.1.0이 남기는 기록은 logs/. 2.0.x의 backup/은 2.1.0 uninstall.sh가 남기고 2.0.x USB로 안내한다, PR #50 리뷰 2)
+mkdir -p $R/data/nx4-kor/logs; rm -f $T/stublog
 ts $U
 check "USB 설치기: 모드가 이미 지워졌어도 기록이 남았으면 스틱의 사본으로 되돌림" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$R/data/local/tmp/nx4-kor-usb/payload " $T/stublog && [ ! -d $R/data/nx4-kor ] && [ ! -d $R/data/local/tmp/nx4-kor-usb ]'
 # HMG-API를 먼저 지운 뒤(hmgapid 없음): 일반 삭제는 모드 폴더를 남긴다 → 그 폴더의 uninstall.sh로, purge는 /data/hmgapi째 없다 → 스틱 사본으로
 ts0() { : > $T/calls; rm -f $K/install.log; (env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/nohmgapid NX4_USB_DIRS=$U NX4_APP_WAIT=4 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
-mkdir -p $HD/mods $R/data/nx4-kor/backup; cp -R $F $HD/mods/nx4-kor; rm -f $HD/installed.txt $T/stublog
+mkdir -p $HD/mods $R/data/nx4-kor/logs; cp -R $F $HD/mods/nx4-kor; rm -f $HD/installed.txt $T/stublog
 ts0
 check "USB 설치기: HMG-API를 먼저 지운 뒤(일반 삭제)에도 UNINSTALL이 됨: 남은 모드 폴더의 uninstall.sh로 되돌리고 모드 폴더·앱을 지움" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$HD/mods/nx4-kor " $T/stublog && grep -qx "pm uninstall io.github.jayparklab.nx4kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && [ ! -d $R/data/nx4-kor ] && grep -q "지웠습니다" $T/ts.out && grep -q "HMG-API가 없음" $K/install.log'
-mv $HD $T/hd.purged; mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog
+mv $HD $T/hd.purged; mkdir -p $R/data/nx4-kor/logs; rm -f $T/stublog
 ts0
 check "USB 설치기: HMG-API를 먼저 완전 삭제(--purge)한 뒤에도 기록이 남았으면 스틱의 사본으로 되돌림" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$R/data/local/tmp/nx4-kor-usb/payload " $T/stublog && [ ! -d $R/data/nx4-kor ]'
@@ -558,14 +565,18 @@ check "status.sh: AP가 일반 핫스팟 SSID(S1)로 떠 있으면 verdict=aphot
 streset; echo "555 wifi 0:00 /system/bin/wpa_supplicant -iwlan0 -Dnl80211" > $T/ps.out; stsh
 check "status.sh: AP 없이 Wi-Fi 클라이언트가 돌면 verdict=wificlient" '[ "$(sv verdict)" = wificlient ] && [ "$(sv wpa)" = yes ] && [ "$(sv ap)" = no ]' || cat $T/status.txt
 # Wi-Fi 부품이 없는 차(2026-11-23 NX4HEV 260902): 순정 핫스팟 기능은 켜졌는데 칩이 SDIO에 한 번도 안 보였고, wlan0이 없고,
-# HMG-API가 이번 부팅에 AP를 띄우지 못함(ap.fail만)
+# HMG-API가 이번 부팅에 AP를 띄우지 못함(ap.fail만). 부팅 뒤 5분(AP_WAIT) 전에는 지기가 다시 시도하는 중이라 "켜는 중"(PR #50 리뷰 3)
 streset; noap; rm -f $T/wifiseen $SH/wifi/ap.boot; cat $T/bootid > $SH/wifi/ap.fail; stsh
-check "status.sh: Wi-Fi 부품이 없는 차 → verdict=nowifipart(노랑, 동글), '안 됨'으로 끝내지 않음, 요약 '부품 없음(USB 동글 필요)'" \
+check "status.sh: Wi-Fi 부품이 없어 보여도 부팅 뒤 5분 전(100초)이면 verdict=apwait(부품 없음으로 굳히지 않음)" '[ "$(sv verdict)" = apwait ] && [ "$(sv ap_fail)" = yes ]' || cat $T/status.txt
+echo "400.00 50.00" > $T/suptime; stsh
+check "  5분이 지나면(400초) verdict=nowifipart(노랑, 동글), '안 됨'으로 끝내지 않음, 요약 '부품 없음(USB 동글 필요)'" \
   '[ "$(sv verdict)" = nowifipart ] && [ "$(sv verdict_lv)" = 1 ] && [ "$(sv verdict_end)" = no ] && [ "$(sv s2)" = "무선 Wi-Fi: 부품 없음(USB 동글 필요)" ] && [ "$(sv s1)" = "설치: 끝남" ] && [ "$(sv chip)" = no ] && [ "$(sv ap_fail)" = yes ]' || cat $T/status.txt
-grep -v wifihotspot $T/features > $T/f2; mv $T/f2 $T/features; stsh
+mkdir -p $T/sysnet/wlan0; stsh
+check "  wlan0이 있으면(나중의 USB 동글 등) 부품 없음으로 보지 않음(apfail)" '[ "$(sv verdict)" = apfail ]' || cat $T/status.txt
+rm -rf $T/sysnet/wlan0; grep -v wifihotspot $T/features > $T/f2; mv $T/f2 $T/features; stsh
 check "  순정 핫스팟 기능(칩 전원)이 아직 꺼져 있으면 부품 없음으로 보지 않음(apfail)" '[ "$(sv verdict)" = apfail ]' || cat $T/status.txt
-streset; noap; rm -f $SH/wifi/ap.boot; cat $T/bootid > $SH/wifi/ap.fail; stsh
-check "status.sh: 칩을 본 적이 있는데 이번 부팅에 AP를 못 띄움(ap.fail) → verdict=apfail(wifi.log 안내)" '[ "$(sv verdict)" = apfail ] && grep -q "wifi.log" $T/status.txt' || cat $T/status.txt
+streset; noap; rm -f $SH/wifi/ap.boot; cat $T/bootid > $SH/wifi/ap.fail; echo "400.00 50.00" > $T/suptime; stsh
+check "status.sh: 칩을 본 적이 있는데 부팅 뒤 5분이 지나도 AP를 못 띄움(ap.fail) → verdict=apfail(wifi.log 안내)" '[ "$(sv verdict)" = apfail ] && grep -q "wifi.log" $T/status.txt' || cat $T/status.txt
 streset; noap; stsh
 check "status.sh: 이번 부팅에 떴던 AP가 지금 꺼져 있으면 verdict=apoff" '[ "$(sv verdict)" = apoff ] && [ "$(sv ap_boot)" = yes ]' || cat $T/status.txt
 streset; noap; echo other-boot > $SH/wifi/ap.boot; stsh
