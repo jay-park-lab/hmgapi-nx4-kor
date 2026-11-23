@@ -545,22 +545,27 @@ P
 : > $T/calls; srun
 check "setup_hmgapi: 차의 실제 계획(rc.7, home Wi-Fi·network 설명 줄)이 모두 same이면 칩이 보여도 다시 적용하지 않음, 설정 끝(재부팅 안내 없음)" \
   '! grep -q "engine apply" $T/calls && ! grep -q "^svc wifi" $T/calls && [ "$(st state)" = done ] && ! grep -q "설정을 마쳤습니다" $T/sprog' || { cat $T/s.out; cat $T/sprog; }
-# rc.8의 나머지 설명 줄(ModRuntime.describe, HomeWifi): 공식 무선 모드의 projection 요청이 내는 wifi 줄 포함
+# rc.8의 나머지 설명 줄. 글자는 rc.8이 내는 그대로(ModRuntime.java 464~486, Projection.java 121~125, HomeWifi.java 163~170,
+# Network.java 527). 공식 무선 모드의 projection AP 요청이 내는 wifi 줄 포함
 cat > $T/plan.out <<'P'
 same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml [nx4-kor]
 app      io.github.jayparklab.nx4kor (app/NX4KOR.apk) [nx4-kor]
-event    park -> runs svc/park.sh as root (30 s at most); [nx4-kor]
+event    park -> runs svc/park.sh as root (30 s at most); its apps and hooks hear it [nx4-kor]
 vehicle  reads speed, gear [nx4-kor]
 vehicle  may seat_heat (park only) [nx4-kor]
 driving  io.github.jayparklab.nx4kor/.StatusActivity closes while the car's driving restriction is on [nx4-kor]
 panel    "NX4" (io.github.jayparklab.nx4kor/.Widget) in the side panel [nx4-kor]
-button   star short -> io.github.jayparklab.nx4kor [nx4-kor]
+projection Android Auto density 160 [wireless-carplay-aa]
+projection events to its apps [nx4-kor]
+network  dns to the head unit (when connected) [wireless-carplay-aa]
+button   star short -> opens io.github.jayparklab.nx4kor/.StatusActivity [nx4-kor]
 home Wi-Fi  on: while the car is off, the hotspot off and the car's Wi-Fi client on the saved networks
 wifi     the projection AP up from boot, once each boot, unless a Wi-Fi client is on [wireless-carplay-aa]
-network  home Wi-Fi only (no cellular)
+network  home Wi-Fi only (no cellular) [nx4-kor]
+network  no cellular (home Wi-Fi is off) [wireless-carplay-aa]
 P
 : > $T/calls; srun
-check "  rc.8 설명 줄(event·vehicle·driving·panel·button·home Wi-Fi·wifi·network)도 변경이 아님 → 적용 없음, 설정 끝" \
+check "  rc.8 설명 줄(event·vehicle·driving·panel·projection·button·home Wi-Fi·wifi·network)도 변경이 아님 → 적용 없음, 설정 끝" \
   '! grep -q "engine apply" $T/calls && [ "$(st state)" = done ]' || { cat $T/s.out; cat $T/sprog; }
 printf 'change   /system/etc/permissions/x.xml [nx4-kor]\n' >> $T/plan.out
 : > $T/calls; srun

@@ -2150,18 +2150,21 @@ mod_ver() {
 # 계획($W/plan.txt)에 적용할 것이 없는가: 모든 줄이 "same …"(이미 그대로) 또는 "nothing changed"·"hook plan:"
 # 안내뿐일 때. 문제(problem)가 있거나 다른 줄이 하나라도 있으면 아니다(차주가 앱에서 보게 둔다).
 # 아래 설명 줄은 지금 켜져 있는 것의 설명이라 적용할 것이 없어도 늘 나온다: 변경으로 보지 않는다.
-#   app·service·usb(HMG-API 1.0.2부터), event·vehicle·driving·panel·button(ModRuntime.describe),
-#   home Wi-Fi·wifi·network(HomeWifi·Network, rc.5~rc.7부터). rc.8 소스(engine/ModRuntime.java 464~483,
-#   HomeWifi.java 163~168, Network.java 527)에서 확인. 2.0.4-beta.1 차 기록에서 "home Wi-Fi  off"와
+#   - 모드마다(ModRuntime.describe): app·service·usb(HMG-API 1.0.2부터), event·vehicle·driving·panel·button,
+#     projection(모드가 "projection"을 선언할 때, Projection.describe), network(모드가 "network"를 요청할 때, Network.describe)
+#   - 켜진 모드 전체(HomeWifi.describe): "home Wi-Fi  off|on: …"(늘 한 줄), "wifi     the projection AP …"(공식 무선 모드의
+#     projection 요청), 모드마다 "network  no cellular …"
+#   줄 머리는 HMG-API rc.8 소스(ModRuntime.java 464~486, Projection.java 118~127, HomeWifi.java 163~170,
+#   Network.java 523~530)에서 확인했다. 2.0.4-beta.1 차 기록(HMG-API rc.7)에서 "home Wi-Fi  off"와
 #   "network  no cellular [nx4-kor]"를 변경으로 봐 다 적용된 뒤에도 부팅마다 "적용할 것 있음"이 됐다(#45).
-#   공식 무선 모드(projection 요청)를 쓰면 "wifi     the projection AP up from boot …" 줄도 늘 나온다.
+#   "hooks    " 줄은 받지 않는다: 같은 머리에 정보 줄(… share it)과 문제 줄(… won't load)이 함께 있다.
 plan_nothing() {
   [ -s $W/plan.txt ] || return 1
   while IFS= read -r _l; do
     case "$_l" in
       "same     "*|"hook plan:"*|"note     "*|"") ;;
       "app      "*|"service  "*|"usb      "*) ;;
-      "event    "*|"vehicle  "*|"driving  "*|"panel    "*|"button   "*) ;;
+      "event    "*|"vehicle  "*|"driving  "*|"panel    "*|"button   "*|"projection "*) ;;
       "home Wi-Fi  "*|"wifi     "*|"network  "*) ;;
       # WARNING 줄(예: ADB TCP 스위치 경고)은 정보일 뿐이다
       "WARNING"*) ;;
