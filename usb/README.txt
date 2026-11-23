@@ -42,6 +42,8 @@ HMG-API 1.1.0-rc.4 이상이 필요합니다.
 같은 판을 다시 설치: NX4 폴더에 빈 파일 REINSTALL을 만듭니다.
 
 한 일은 USB의 NX4/install.log(HMG-API 설치는 HMGAPI/install.log)에 남습니다. NX4/install.log는 누를 때마다 아래에 이어 씁니다. 내비의 기록은 /data/nx4-kor/logs/ap.log입니다.
+누를 때마다 설치기가 먼저 진단 기록(내비의 기록, HMG-API Car Report, /system/lib 파일 이름·md5)을 NX4/diag/<시각>/에 모읍니다.
+  "진단 기록을 USB에 모으는 중"이 나오면 다음 메시지가 나올 때까지 USB를 빼지 마세요. Wi-Fi 비밀번호가 든 파일은 넣지 않습니다.
 끝나면 USB를 빼 주세요(꽂혀 있으면 유선 안드로이드 오토가 시작될 수 있습니다).
 
 라이선스

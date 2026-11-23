@@ -11,11 +11,12 @@
 #                                                 HMG-API가 아직 없거나 이 모드의 최소 판보다 낮으면 이것을 대신 돌린다
 #                                                 (재부팅 뒤 Update OTA를 한 번 더)
 # 한 일은 NX4/install.log에 남는다. 누를 때마다 그 아래에 이어 쓴다(앞의 시도 기록을 덮지 않음).
+# 누를 때마다 진단 기록도 NX4/diag/<시각>/에 모은다(아래 diag: /system/lib 파일 이름·md5, HMG-API Car Report, 이 모드의 기록).
 # 설치·업데이트 뒤에는 재부팅하지 않는다: 서비스가 첫 설정(map 만들기·확인, 무선 기능 적용, 3~5분)을 하는 동안 꺼지면
 # 안 된다. 대신 상태 화면을 열어 진행을 보여 주고, 끝나면 그 화면의 [지금 재부팅]을 누르게 한다.
 # 같은 판이 이미 있으면 상태 화면만 연다: HMG-API 훅이 켜지기 전에는 앱 메뉴에 타일이 없으므로 이것이 상태 화면을 여는 길이다.
 # 따로 설치된 무선 모드(wireless-carplay-aa: 예전에 따로 설치하던 한국 차 빌드나 HMG-API 공식판)가 있으면 지우고 적용한다: 이 모드에 같은 훅이 들어 있다.
-# 툴박스와 mksh만 쓴다(busybox 없음). ROOT·NX4_USB_DIRS·HMGAPID·NX4_APP_WAIT: PC 시험용.
+# 툴박스와 mksh만 쓴다. busybox는 진단 기록의 md5에만 쓴다(diag_bb). ROOT·NX4_USB_DIRS·HMGAPID·NX4_APP_WAIT: PC 시험용.
 export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin${PATH:+:$PATH}
 export LD_LIBRARY_PATH=/vendor/lib:/system/lib
 umask 077
@@ -171,6 +172,80 @@ open_status() {
   return 1
 }
 
+# --- 진단 기록 --- 공식 무선 모드를 이 차에서 시험하기 전에 알아 둘 것(#38)을 스틱의 NX4/diag/<시각>/에 모은다.
+# 누를 때마다 새 폴더에, 아무것도 바꾸기 전에 모은다(첫 설치 때는 순정 상태, 설정이 끝난 뒤 한 번 더 누르면 적용된 상태).
+#   info.txt            모드·HMG-API 판, 내비 판(getprop 몇 개), /system/bin/busybox가 있는지, Wi-Fi 설정값
+#   system-lib-md5.txt  /system/lib 아래(하위 폴더 포함) 모든 파일과 링크의 md5와 경로. 공식 모드 레시피가 이 차의
+#                       라이브러리에 맞는지 PC에서 견준다. md5를 셀 busybox가 없으면 그 사실만 적는다
+#   system-lib-ls.txt   같은 폴더의 이름·크기·링크 대상(ls -lR, busybox 없이)
+#   hmgapi-status.txt   HMG-API가 바꾼 파일마다 순정·기대·지금 md5(hmgapid engine status). 모드가 적용된 뒤에도 순정 md5를 안다
+#   car-report*         HMG-API Car Report(hmgapid engine report: 이 차에서 찾은 훅 지점, map 확인, 기능, 오류).
+#                       HMG-API가 VIN·일련번호를 넣지 않고 기록 줄을 가린다
+#   logs/               이 모드의 기록(ap.log, 서비스 기록, map 만들기·확인·계획·적용 결과, 상태 파일)과 HMG-API 설치 기록
+# HMG-API 명령은 HMG-API가 응답할 때만 돌린다. 비밀번호가 든 Wi-Fi 설정 파일(softap.conf·hostapd-nx4.conf·
+# wpa_supplicant.conf)과 이 모드의 백업 폴더($NX4_ROOT/backup)는 넣지 않는다. 못 모은 것은 기록만 하고 넘어간다.
+DIAGBB=$ROOT/data/local/tmp/nx4-kor-diag-busybox
+# md5를 셀 busybox: 내비의 것, 설치된 모드의 것, 스틱의 것(/data로 복사해서: 스틱은 실행이 막혀 있을 수 있다) 중 실행되는 첫 것
+diag_bb() {
+  for _b in $ROOT/system/bin/busybox $INST/bin/busybox; do
+    [ -f $_b ] && $_b true >/dev/null 2>&1 && { echo $_b; return 0; }
+  done
+  [ -f $PAY/bin/busybox ] || return 1
+  cp $PAY/bin/busybox $DIAGBB 2>/dev/null || return 1
+  chmod 755 $DIAGBB
+  $DIAGBB true >/dev/null 2>&1 || return 1
+  echo $DIAGBB
+}
+diag() {
+  _d=$K/diag/$(date '+%Y%m%d-%H%M%S')
+  [ -e $_d ] && _d=$_d-$$
+  if ! mkdir -p $_d/logs; then log "진단 기록: 스틱에 폴더를 만들지 못함"; return 0; fi
+  toast "NX4 KOR: 진단 기록을 USB에 모으는 중입니다. USB를 빼지 마세요..."
+  _bb=$(diag_bb)
+  {
+    echo "time: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "usb_mod: $(modver $PAY/mod.json)"
+    echo "installed_mod: $(modver $INST/mod.json)"
+    echo "hmgapi: $(hmgver)"
+    for _p in ro.build.product ro.build.display.id ro.build.version.release ro.board.platform ro.hardware; do
+      echo "$_p: $(getprop $_p 2>/dev/null)"
+    done
+    if [ -e $ROOT/system/bin/busybox ]; then echo "system_busybox: yes"; else echo "system_busybox: no"; fi
+    echo "md5_busybox: ${_bb:-none}"
+    for _s in wifi_on wifi_ap_on; do echo "$_s: $(settings get global $_s 2>/dev/null)"; done
+  } > $_d/info.txt 2>&1
+  ls -lR $ROOT/system/lib > $_d/system-lib-ls.txt 2>&1
+  if [ -n "$_bb" ]; then
+    { $_bb find $ROOT/system/lib -type f; $_bb find $ROOT/system/lib -type l; } 2>/dev/null | $_bb sort | $_bb xargs $_bb md5sum > $_d/system-lib-md5.txt 2>&1
+  else
+    echo "md5를 셀 busybox가 없음(내비·설치된 모드·스틱 모두): 이름·크기는 system-lib-ls.txt" > $_d/system-lib-md5.txt
+    log "진단 기록: md5를 셀 busybox가 없어 /system/lib는 이름·크기만 모음"
+  fi
+  rm -f $DIAGBB
+  if [ -x $HMGAPID ] && [ -d $HMGDATA ] && $HMGAPID ping >/dev/null 2>&1; then
+    $HMGAPID engine status > $_d/hmgapi-status.txt 2>&1
+    $HMGAPID engine report > $_d/car-report.txt 2>&1 || log "진단 기록: hmgapid engine report가 실패함(car-report.txt)"
+    # 보고서 파일(HMG-API 폴더의 public/reports)을 같은 폴더로 복사한다
+    while IFS= read -r _l; do
+      case "$_l" in
+        "saved: "*.json)
+          _r=$ROOT${_l#saved: }
+          cp "$_r" $_d/ 2>/dev/null
+          cp "${_r%.json}.md" $_d/ 2>/dev/null ;;
+      esac
+    done < $_d/car-report.txt
+  else
+    log "진단 기록: HMG-API가 응답하지 않아 HMG-API 상태·Car Report는 빠짐"
+  fi
+  [ -f $NX4_ROOT/logs/ap.log ] && cp $NX4_ROOT/logs/ap.log $_d/logs/ap.log
+  [ -d $HMGDATA/logs/$MOD ] && cp -r $HMGDATA/logs/$MOD $_d/logs/service
+  [ -f $HMGDATA/install.log ] && cp $HMGDATA/install.log $_d/logs/hmgapi-install.log
+  for _f in $ROOT/data/local/tmp/nx4-kor-*.txt $ROOT/data/local/tmp/nx4-kor/*.txt; do
+    [ -f "$_f" ] && cp "$_f" $_d/logs/
+  done
+  log "진단 기록을 모음: NX4/diag/${_d##*/}"
+}
+
 for d in ${NX4_USB_DIRS:-/storage/usb0 /storage/usb1 /storage/usb2 /mnt/media_rw/usb0 /mnt/media_rw/usb1 /mnt/media_rw/usb2}; do
   if [ -d "$d/NX4" ]; then U=$d; break; fi
 done
@@ -190,6 +265,7 @@ fi
 K=$U/NX4
 INST=$HMGDATA/mods/$MOD
 PAY=$K/install/payload
+diag
 
 # --- 지우기 --- HMG-API가 없어도 한다(HMG-API를 먼저 지운 경우: 이 모드가 직접 바꾼 Wi-Fi 잠금·순정 AP 저장값·권한 파일이 남아 있다)
 if [ -f $K/UNINSTALL ]; then

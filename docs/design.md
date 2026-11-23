@@ -68,6 +68,25 @@ Engineering Mode → USB Copy → DSP → Update OTA가 `ota_package.tar`의 `tr
 - 같은 판이면 상태 화면만 엽니다. `NX4/REINSTALL`이면 다시 설치합니다.
 - `NX4/UNINSTALL`: `bin/uninstall.sh` → `scripts/preun.sh`(핫스팟 멈춤 → HMG-API에서 이 모드를 빼고 적용 → 무선 권한 파일·Wi-Fi 잠금·순정 AP 저장값 되돌리기 → `$BK` 지우기) → 재부팅. HMG-API를 먼저 지웠어도 남은 모드 폴더나 스틱의 사본으로 되돌립니다. 이때 `/system`은 DSP OTA 프로세스에서 순정 `mount`로 엽니다.
 - 기록: 스틱의 `NX4/install.log`에 이어 씁니다. 시작할 때 스틱의 앞 기록을 내비 쪽 기록(`/data/local/tmp/nx4-kor-usb.log`)으로 옮겨 두고, 끝날 때 그 전체를 스틱에 씁니다. 그래서 여러 번 눌러도 앞의 시도가 남고(빈 줄로 나뉨), 한 번 누른 기록은 한 번만 들어갑니다. 비우려면 스틱에서 그 파일을 지웁니다.
+- 진단 기록(`diag`): 공식 무선 모드를 이 차에서 시험하기 전에 알아 둘 것([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38))을 adb 없이 가져오려고 둡니다.
+  - 누를 때마다 스틱의 `NX4/diag/<시각>/`에 새로 모읍니다. 스틱에 `NX4` 폴더가 있으면 지우기·설치·같은 판 어느 갈래든, **아무것도 바꾸기 전에** 모읍니다.
+    - 첫 설치 때는 순정 상태가 담깁니다. 설정이 끝나고 재부팅한 뒤 같은 USB로 한 번 더 누르면 적용된 상태가 담깁니다.
+    - 결과 안내(토스트)는 모은 뒤에 나오므로 마지막 문구가 가려지지 않습니다.
+  - 담는 것:
+
+    | 파일 | 내용 |
+    |---|---|
+    | `info.txt` | 스틱·설치된 모드 판, HMG-API 판, `getprop` 몇 개(`ro.build.product` 등), `/system/bin/busybox` 유무, md5에 쓴 busybox, `settings get global wifi_on`·`wifi_ap_on` |
+    | `system-lib-md5.txt` | `/system/lib` 아래(하위 폴더 포함) 모든 파일과 링크의 md5와 경로. 공식 모드의 네이티브 레시피(`libCarPlayCore.so`, `libiap2session.so` 등)가 이 차의 라이브러리에 맞는지 PC에서 견줍니다 |
+    | `system-lib-ls.txt` | 같은 폴더의 `ls -lR`(이름·크기·링크 대상). busybox 없이 모읍니다 |
+    | `hmgapi-status.txt` | `hmgapid engine status`. HMG-API가 바꾼 파일마다 순정·기대·지금 md5가 있어, 모드가 적용된 뒤에도 순정 md5를 압니다 |
+    | `car-report.txt`, `car-report-*.json`·`.md` | `hmgapid engine report`(HMG-API Car Report)의 출력과 보고서 파일. 이 차에서 찾은 훅 지점(`map_car`), map 확인, 기능, 모드, 오류가 들어 있습니다. HMG-API가 VIN·일련번호를 넣지 않고 기록 줄을 가립니다 |
+    | `logs/` | 이 모드의 `ap.log`, 서비스 기록(`/data/hmgapi/logs/nx4-kor/`), `/data/local/tmp/nx4-kor/*.txt`(map 만들기·확인·계획·적용 결과), `/data/local/tmp/nx4-kor-*.txt`(상태 파일), HMG-API 설치 기록 |
+
+  - md5는 busybox로 셉니다. 내비의 `/system/bin/busybox`, 설치된 모드의 `bin/busybox`, 스틱의 `payload/bin/busybox`(`/data/local/tmp`로 복사해 실행하고 지움) 순으로 실행되는 첫 것을 씁니다. 모두 없으면 그렇다고 적고 이름·크기만 남깁니다.
+  - HMG-API 명령(`engine status`·`report`)은 HMG-API가 응답할 때만 부릅니다. 둘 다 읽기만 합니다(Car Report는 HMG-API 폴더의 `public/reports`에도 씀).
+  - 비밀번호가 든 Wi-Fi 설정 파일(`softap.conf`, `hostapd-nx4.conf`, `wpa_supplicant.conf`)과 이 모드의 백업 폴더(`/data/nx4-kor/backup`)는 넣지 않습니다.
+  - 못 모은 것은 `install.log`에 적고 넘어갑니다. 설치·지우기 결과는 바꾸지 않습니다.
 
 adb가 있으면(HMG-API를 USB로 설치한 뒤에는 hmgapid가 root를 줌):
 
@@ -105,7 +124,8 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 
 - **HMG-API가 NX4에서 map을 만들고(`map-car --write`) 확인(`verify-map`)을 통과하는지.** 실패하면 무선 기능을 적용하지 않습니다(`/data/local/tmp/nx4-kor/map-car.txt`, `verify-map.txt`).
 - **무선 훅 36개 지점이 모두 NX4 map에 있는지.** 하나라도 없으면 HMG-API가 이 모드의 훅을 끄고 앱 메뉴 타일도 없어집니다(HMG-API 로그 `mods: nx4-kor not loaded: …`).
-- **네이티브 레시피가 NX4 라이브러리에 맞는지**(`libCarPlayCore.so` 등). 맞지 않는 레시피는 아무것도 쓰지 않습니다.
+- **네이티브 레시피가 NX4 라이브러리에 맞는지**(`libCarPlayCore.so` 등). 맞지 않는 레시피는 아무것도 쓰지 않습니다. USB 진단 기록의 `system-lib-md5.txt`(순정 상태일 때)나 `hmgapi-status.txt`의 순정 md5로 레시피의 기대 md5와 견줍니다.
+- **USB 진단 기록이 모이는지.** Update OTA마다 `NX4/diag/<시각>/`가 생기고 `system-lib-md5.txt`에 md5가 있는지(`info.txt`의 `md5_busybox`가 무엇인지), `car-report.txt`가 HMG-API의 "usage:"가 아니라 보고서인지(`engine report`가 없는 HMG-API 판이면 빠짐), 모으는 데 얼마나 걸리는지 봅니다.
 - **DSP OTA 뒤 재부팅하지 않고 끝내도 되는지.** OTA 화면이 이상하게 남으면 상태 화면의 [지금 재부팅]이나 RESET을 쓰세요.
 - **DSP OTA 화면 위로 상태 화면이 열리는지**(`am start`). 안 열리면 재부팅 뒤 같은 USB로 Update OTA를 다시 누릅니다.
 - HMG-API 설치기가 NX4의 `app_process`를 아는지(모르면 `HMGAPI/FORCE`).
