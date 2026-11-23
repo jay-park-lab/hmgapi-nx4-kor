@@ -121,7 +121,7 @@ case "\$1 \$2" in
   "engine plan")
     n=\$((\$(cat $T/plan.n 2>/dev/null || echo 0) + 1)); echo \$n > $T/plan.n
     if [ -f $T/plan.out.\$n ]; then cat $T/plan.out.\$n; else cat $T/plan.out 2>/dev/null; fi
-    exit \$(cat $T/plan.rc 2>/dev/null || echo 0) ;;
+    exit \$(cat $T/plan.rc.\$n 2>/dev/null || cat $T/plan.rc 2>/dev/null || echo 0) ;;
   "engine apply") exit \$(cat $T/apply.rc 2>/dev/null || echo 0) ;;
   "engine map-car")
     case "\$3" in
@@ -322,7 +322,7 @@ P
   echo 'setting  prop/persist.sys.iap2.wifi = t [wireless-carplay-aa]'
   cat $T/plan-same; } > $T/plan-new
 # 계획을 정한다: $1은 늘, 그 뒤는 2번째·3번째… 부름(plan.out.<n>)
-pset() { rm -f $T/plan.out.* $T/plan.n; cp $T/$1 $T/plan.out; shift; _n=2; for _p in "$@"; do cp $T/$_p $T/plan.out.$_n; _n=$((_n+1)); done; return 0; }
+pset() { rm -f $T/plan.out.* $T/plan.rc.* $T/plan.n; cp $T/$1 $T/plan.out; shift; _n=2; for _p in "$@"; do cp $T/$_p $T/plan.out.$_n; _n=$((_n+1)); done; return 0; }
 # 처음 설치처럼: map 없음, map-car --write가 map을 씀, verify-map 통과
 mapnew() { rm -rf $HD/state $T/verify.rc; echo "written: /data/hmgapi/state/local-map.json (this car's own map, status probed): run \`hmgapid engine verify-map\`, then restart, for its hooks" > $T/mapcar.out; : > $T/mapcar.writes; rm -f $T/mapcar.rc; }
 # 진단 기록 확인 창에는 [모으기]로 답한다(아래 확인 창 테스트에서만 바꿈). 앱이 있는지는 $T/app-ready(가짜 pm)
@@ -663,6 +663,12 @@ pset plan-same plan-oldother
 ts $U
 check "USB 설치기: 옛 2.0.x를 뺀 계획에 다른 모드의 변경이 있으면 적용하지 않고 멈춤(새로 설치하지 않음, state=fail)" \
   '[ "$(cat $T/ts.rc)" = 1 ] && grep -qx "hmgapid engine remove nx4-kor" $T/calls && ! grep -q "engine apply" $T/calls && ! grep -q "engine install" $T/calls && [ ! -f $T/stublog ] && [ "$(pg state)" = fail ] && pg stage | grep -q "다른 모드의 바뀐 내용"'
+# 옛 2.0.x를 뺀 뒤의 계획이 종료 1(끝나지 않은 적용 등)이면 "다른 모드" 문구가 아니라 계획을 내지 못했다고 알린다(PR #52 리뷰 3)
+oldmod 2.0.4-beta.1; mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog
+pset plan-same plan-notdone; echo 1 > $T/plan.rc.2
+ts $U
+check "USB 설치기: 옛 2.0.x를 뺀 뒤 계획을 내지 못하면(종료 1) 적용·설치 없이 PLANFAIL_MSG로 끝남, 종료 코드를 기록" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && ! grep -q "engine apply" $T/calls && ! grep -q "engine install" $T/calls && [ "$(pg state)" = fail ] && pg stage | grep -q "계획을 내지 못했습니다" && grep -q "^--- engine plan (remove, 종료 코드 1)" $K/install.log' || { cat $T/ts.out; cat $PG; }
 # 한국 차 빌드와 옛 2.0.x가 함께 있으면 한국 차 빌드를 먼저 지운다(옛 판 정리의 적용에 그 모드의 적용하지 않은 변경이 섞이지 않게)
 oldmod 2.0.4-beta.1; wmod 2.4.5 "Korea Projection: Wireless CarPlay + Android Auto"; mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog
 pset plan-same plan-oldgone plan-new; mapnew
@@ -684,6 +690,18 @@ ts $U
 check "USB 설치기: nx4-kor 없이 2.0.x 기록만 남았으면 스틱의 legacy-2.0(사본, payload busybox 포함)으로 되돌리고(남은 되돌리기 줄 적용) 새로 설치" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^legacy-uninstall NX4_APP=$R/data/local/tmp/nx4-kor-usb/old bb=yes *$" $T/stublog && [ ! -d $R/data/nx4-kor ] && ! grep -q "engine remove nx4-kor" $T/calls && [ $(at "engine apply") -lt $(at "nx4-kor.zip") ] && [ "$(grep -c "^hmgapid engine apply$" $T/calls)" = 2 ] && grep -q "2.0.x가 남긴 설정(Wi-Fi 잠금 등)을 되돌리는 중" $T/ts.out && [ -f $HD/mods/nx4-kor/mod.json ] && [ "$(pg state)" = reboot ]' || { cat $T/ts.out; cat $T/calls; cat $T/stublog; }
 rm -f $K/install/payload/bin/busybox
+# 2.0.x 위에 adb·HMG-API 앱으로 2.1.0 이후가 들어간 차(설치된 nx4-kor는 같은 판 2.1.0, 2.0.x 기록 backup이 남음): 2.1.0을 HMG-API에서 빼고
+# 적용한 뒤 legacy-2.0으로 되돌리고 nx4-kor를 다시 설치한다. 상태 화면은 다시 설치한 뒤에 연다(PR #52 리뷰 7)
+mkdir -p $R/data/nx4-kor/backup; echo 0 > $R/data/nx4-kor/backup/wifi_on; rm -f $T/stublog
+pset plan-same plan-oldgone plan-new; mapnew
+ts $U
+check "USB 설치기: 2.1.0이 설치됐는데 2.0.x 기록(backup)이 남았으면 2.1.0을 빼고(engine remove) 적용 → legacy-2.0으로 되돌림 → nx4-kor 다시 설치 → 상태 화면" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && [ $(at "engine remove nx4-kor") -lt $(at "engine apply") ] && [ $(at "engine apply") -lt $(at "nx4-kor.zip") ] && [ $(at "nx4-kor.zip") -lt $(at "StatusActivity") ] && grep -q "^legacy-uninstall NX4_APP=$R/data/local/tmp/nx4-kor-usb/old " $T/stublog && [ ! -d $R/data/nx4-kor ] && [ -f $HD/mods/nx4-kor/mod.json ] && [ "$(pg state)" = reboot ]' || { cat $T/ts.out; cat $T/calls; cat $T/stublog; }
+mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog; legoff
+ts $U
+check "  같은 차인데 스틱에 legacy-2.0이 없으면 아무것도 바꾸지 않고 멈춤(2.0.x USB로 안내, 기록 그대로)" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "2.0.x 릴리스 USB(v2.0.4-beta.1)의 NX4/UNINSTALL" $T/ts.out && ! engcalls && [ -d $R/data/nx4-kor/backup ] && [ ! -f $PG ]'
+legon; rm -rf $R/data/nx4-kor
 # 2.1.0 이후의 기록만 남은 차: 스틱의 사본으로 정리한 뒤 설치
 rm -rf $HD/mods/nx4-kor $R/data/nx4-kor; mkdir -p $R/data/nx4-kor/logs; rm -f $T/stublog
 pset plan-new; mapnew
