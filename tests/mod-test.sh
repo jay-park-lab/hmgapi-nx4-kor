@@ -593,6 +593,11 @@ pset plan-new; mapnew; echo "not written: HMG-API has a map for this car (nx4hev
 ts $U
 check "USB 설치기 map: HMG-API에 이 차 map이 있으면(not written) 그 map을 확인만 하고 적용" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "hmgapid engine map-car --write" $T/calls && grep -qx "hmgapid engine verify-map" $T/calls && ! grep -q "forget" $T/calls && grep -qx "hmgapid engine apply" $T/calls && [ "$(pg state)" = reboot ]'
+# HMG-API가 나중에 NX4 map을 담으면 --write는 "not written"(종료 0)이고 verify-map은 그 map을 본다: 확인에 실패해도 그 map은 지우지 않는다
+mapnew; echo "not written: HMG-API has a map for this car (nx4hev_kr): \`hmgapid engine map-car --local\` adds the points it lacks" > $T/mapcar.out; rm -f $T/mapcar.writes; echo 1 > $T/verify.rc
+ts $U
+check "USB 설치기 map: HMG-API의 map(not written)이 확인에 실패해도 지우지 않음(map-car --forget 없음), 적용하지 않음" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -qx "hmgapid engine verify-map" $T/calls && ! grep -q "forget" $T/calls && ! grep -q "engine apply" $T/calls && [ "$(pg state)" = fail ] && pg stage | grep -q "map을 확인하지 못해"'
 mapnew; echo "not written: this unit's product (X) doesn't say its model, region and firmware" > $T/mapcar.out; rm -f $T/mapcar.writes; echo 5 > $T/mapcar.rc
 ts $U
 check "USB 설치기 map: map을 만들지 못하면 확인·적용하지 않고 실패(state=fail, map을 만들지 못해)" \
