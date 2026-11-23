@@ -1,5 +1,5 @@
 > 🧪 **실험 중인 프로젝트입니다.** 일반 차주가 쓰기를 권하지 않습니다.
-> - 차에서 첫 시험을 하고 있습니다. 2.0.0 베타는 busybox가 빠져 무선 설정까지 가지 못했고, 2.0.1 베타로 다시 시험합니다.
+> - 차에서 첫 시험을 하고 있습니다. 2.0.0 베타는 busybox가 빠져 무선 설정까지 가지 못했고([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23#issuecomment-7089660707)), 2.0.1 베타로 다시 시험합니다.
 > - 시험 결과에 따라 이 프로젝트가 맡을 일을 다시 정합니다. HMG-API와 공식 무선 모드([Open-HMG/hmgapi-wireless-cp-aa](https://github.com/Open-HMG/hmgapi-wireless-cp-aa))가 NX4에서 하지 못하는 일만 맡도록 줄일 수 있습니다([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38)).
 > - 그래서 구성, 설치 방법, 판 번호가 예고 없이 크게 바뀔 수 있습니다.
 

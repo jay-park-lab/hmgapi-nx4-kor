@@ -98,8 +98,9 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 
 1. `git branch --show-current` 와 `git status --short` 로 브랜치와 남은 변경을 본다.
 2. 브랜치와 트리를 맞춘다(`docs/git-flow.md` 규칙 1–3, 11, 12).
-   - 새 워크트리와 작업 브랜치는 늘 `origin/develop` 에서 시작한다(규칙 12). 예외는 `hotfix/`(`origin/main`)뿐이다.
-     `release/<판>` 에서 시작하는 `feature/` 는 만들지 않는다.
+   - 새 작업 브랜치(와 그 워크트리)는 늘 `origin/develop` 에서 시작한다(규칙 12). 새 작업의 예외는 `hotfix/`(`origin/main`)뿐이다.
+     `release/<판>` 에서 시작하는 `feature/` 는 만들지 않는다. 이미 있는 브랜치(이어받은 PR 등)를 고칠 때는 새 작업이
+     아니므로 아래 "이미 있는 브랜치를 고칠 때" 대로 그 브랜치에서 연다. 리뷰어의 리뷰용 워크트리(head SHA 에 `--detach`)도 같다.
    - 이 세션이 메인 체크아웃에서 돌면 여기서 브랜치를 만들거나 커밋하지 않는다. 메인 체크아웃인지는
      `git worktree list` 첫 줄의 경로와 `git rev-parse --show-toplevel` 이 같은지로 본다.
      - `git fetch origin`, `git worktree add --no-track -b feature/<주제> .claude/worktrees/<주제> origin/develop` 로
@@ -251,7 +252,8 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
      로컬 `main` 으로 바꾸거나 옮기지 않는다. 태그는 지우거나 옮기지 않는다.
    - `develop` 으로 되돌려 합치기: `gh pr create --base develop --head <브랜치>`. 내용이 이미 리뷰된 것이라
      리뷰어는 띄우지 않고, 충돌이 있으면 3 처럼 푼다. 합치기는 위와 같이 `--merge`.
-   - `hotfix/` 인데 진행 중인 `release/` 가 있으면 거기에도 같은 방법으로 합친다.
+   - `hotfix/` 는 진행 중인 `release/` 에 합치지 않는다(`docs/git-flow.md` 규칙 12). 그 `release/` 에 고침이 필요하면
+     `develop` 에서 다음 판으로 다시 자른다.
    - 태그를 올리면 release 워크플로가 `production` 승인을 기다린 뒤 배포 묶음을 만들어 GitHub 릴리스에 올린다
      ([`docs/release.md`](../../../docs/release.md)). 승인은 사용자가 Actions 화면에서 한다. 대신 승인하거나
      승인 여부를 짐작해 말하지 않는다.
