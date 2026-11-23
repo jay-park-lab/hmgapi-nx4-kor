@@ -1897,6 +1897,49 @@ wifi_chip_seen() {
 wifi_was_off() {
   [ -f $BK/wifi_on ] && [ "$(cat $BK/wifi_on 2>/dev/null)" != 1 ]
 }
+# 순정 핫스팟 기능(com.hkmc.software.wifihotspot)이 지금 켜져 있는가(pm list features).
+# 한국 판 내비는 이 기능이 꺼져 있고, 그러면 내비가 Wi-Fi 칩에 전원을 넣지 않는다(HMG-API SystemCheck의 "unpowered").
+# 이 모드는 featurexml.cfg에서 이 기능을 지우는 줄을 막아 켠다(patches.json, part projection: 적용 뒤 재부팅해야 켜짐).
+# 2026-11-23 NX4HEV 260902: 기능이 꺼진 채 Wi-Fi를 켜니 드라이버가 칩 전원을 못 넣고(failed to power up DHD) 순정이
+# module_version=3을 남겨, 예전 판은 기능을 켜 보기도 전에 "부품 없음"으로 굳혔다
+HOTSPOT_FEAT=com.hkmc.software.wifihotspot
+hotspot_feat_on() {
+  _hf="
+$(pm list features 2>/dev/null)
+"
+  case "$_hf" in *"
+feature:$HOTSPOT_FEAT
+"*) return 0 ;; esac
+  return 1
+}
+# 핫스팟 기능을 먼저 켜 볼 차인가: 칩이 안 보이고, 순정 핫스팟 기능이 꺼져 있고, 아직 켜 본 적이 없다($BK/wifi.hotspot 없음).
+# 그런 차는 칩 깨우기·부품 없음 판정보다 이 모드의 적용(핫스팟 기능을 켬)을 먼저 하고, 칩은 재부팅 뒤에 본다.
+# 기능이 꺼진 채 지난 판이 남긴 부품 없음 기록(wifi.nopart)은 근거가 모자라므로 지운다(근거 기록 nochip-wifi.txt는 둔다)
+hotspot_first() {
+  wifi_chip_seen && return 1
+  [ -f $BK/wifi.hotspot ] && return 1
+  hotspot_feat_on && return 1
+  if [ -f $BK/wifi.nopart ]; then
+    rm -f $BK/wifi.nopart
+    log "부품 없음 기록을 지움: 순정 핫스팟 기능이 꺼진 채 판정한 것(기능을 켜고 재부팅한 뒤 다시 봄)"
+  fi
+  return 0
+}
+# 부품 없음 판정이 굳은 것인가: 기록이 있고, 핫스팟 기능을 켜 본 뒤(wifi.hotspot)이거나 기능이 이미 켜져 있던 차.
+# 굳은 차는 부팅마다 설정 진행("설치 중")을 다시 보이지 않고 바로 판정을 보인다(main, fix_perms)
+nopart_final() {
+  [ -f $BK/wifi.nopart ] || return 1
+  [ -f $BK/wifi.hotspot ] && return 0
+  hotspot_feat_on
+}
+# 서비스가 시작할 때의 설치 진행 기록. 설정이 끝난 차는 "확인 중", 부품 없음이 굳은 차는 그 판정, 아니면 시작(5%).
+# 같은 부팅에 서비스가 다시 시작돼도 "재부팅 필요"·"실패"는 덮지 않는다
+prog_start() {
+  if prog_final_this_boot; then :
+  elif setup_done; then prog 100 done "무선 카플레이 설정이 끝나 있습니다. 핫스팟을 켜는 중입니다."
+  elif nopart_final; then prog 100 fail "$NOPART_MSG"
+  else prog 3 run "설치를 시작했습니다"; fi
+}
 # 뒤에서 돌린 svc wifi enable 정리: 아직 돌면 멈추고, 끝났으면 실패한 종료 코드만 기록한다
 # $2=mv3: 1.7.4(P-1 리뷰 낮음 3) module_version 3을 봐서 일찍 끝내는 경우(멈춘 까닭을 그대로 적는다)
 svc_done() {
@@ -1912,6 +1955,8 @@ svc_done() {
 # Wi-Fi 판정 문구. 진행 기록·알림·상태 화면 판정(status.sh st_verdict)이 같은 문장을 쓴다
 WIFI_CHECK_MSG="Wi-Fi를 켜는 중입니다(재부팅 뒤 한 번 더 확인). 내비를 3분 후 재부팅해 주세요."
 NOPART_MSG="이 차의 내비에는 Wi-Fi 부품이 없어 무선 카플레이를 쓸 수 없습니다."
+# 핫스팟 기능을 먼저 켠 차(hotspot_first)의 재부팅 안내
+HOTSPOT_ON_MSG="Wi-Fi 칩 전원을 켜려고 순정 핫스팟 기능을 켰습니다. 내비를 3분 후 재부팅해 주세요(재부팅 뒤 Wi-Fi를 다시 확인)."
 NOCHIP_MSG="이 차는 Wi-Fi 칩이 켜지지 않아 무선 카플레이를 쓸 수 없습니다."
 # 무선 기능을 적용하지 못한 까닭. 진행 기록·상태 화면 판정(status.sh가 문구로 판정 코드를 정함)이 같은 문장을 쓴다
 NOCAR_MSG="지원하지 않는 차입니다(투싼 NX4 한국 내수 260902 전용). 아무것도 바꾸지 않았습니다."
@@ -2182,15 +2227,36 @@ setup_hmgapi() {
       fi
     fi
   fi
-  # 4. 적용: 계획에 이 모드의 변경이 있으면(처음 설치, 바뀐 기능 파일) Wi-Fi 칩을 확인한 뒤 적용한다
+  # 4. 적용: 계획에 이 모드의 변경이 있으면(처음 설치, 바뀐 기능 파일) Wi-Fi 칩을 확인한 뒤 적용한다.
+  #    다만 칩이 안 보이고 순정 핫스팟 기능이 꺼진 차(hotspot_first)는 칩 확인보다 적용(핫스팟 기능을 켬)을 먼저 한다
+  _hsp=0
   if [ $_fail = 0 ] && [ $_mapbad = 0 ]; then
     hmgapid engine plan > $W/plan.txt 2>&1
+    _np0=0; [ -f $BK/wifi.nopart ] && _np0=1
     if plan_nothing; then
       _av=$(cat $BK/applied 2>/dev/null)
       if [ -n "$_mv" ] && [ "$_av" != "$_mv" ]; then
         echo "$_mv" > $BK/applied
         # 새 판인데 적용할 것이 없음: 훅 코드(hooks.jar)만 바뀌었다. 다음 시작부터 새 판이 쓰인다
         [ -n "$_av" ] && { _newver=1; log "새 판($_av → $_mv): 적용할 변경 없음, 재부팅하면 새 판이 쓰임"; }
+      fi
+      # 핫스팟 기능을 켜려고 먼저 적용한 차: 재부팅 뒤 결과를 부팅마다 한 줄 남긴다(칩이 안 보여도 판정은 핫스팟을 켤 때 함)
+      if [ -f $BK/wifi.hotspot ]; then
+        _hf1=꺼짐; hotspot_feat_on && _hf1=켜짐
+        _hc1=안보임; wifi_chip_seen && _hc1=보임
+        log "순정 핫스팟 기능을 켜 본 차: 지금 기능 $_hf1, Wi-Fi 칩 $_hc1"
+      fi
+    elif hotspot_first; then
+      log "Wi-Fi 칩이 안 보이고 순정 핫스팟 기능이 꺼져 있음: 칩 확인 전에 무선 기능을 적용해 핫스팟 기능을 켬(칩은 재부팅 뒤 확인)"
+      if ! plan_only_mod; then
+        log "무선 기능 적용 안 함: 계획에 다른 변경이 있거나 훅이 꺼짐 ($W/plan.txt)"; _fail=1; LAST_MSG="$OTHERPLAN_MSG"
+      elif ptrack 85 run "Wi-Fi 칩 전원을 켜려고 무선 기능을 적용하는 중입니다"; hmgapid engine apply > $W/mod-apply.txt 2>&1; then
+        log "무선 기능 적용함 ($MOD_ID $_mv, 순정 핫스팟 기능을 켬)"; _restart=1; _hsp=1
+        echo "$_mv" > $BK/applied
+        : > $BK/wifi.hotspot
+      else
+        log "무선 기능 적용 실패 ($W/mod-apply.txt)"; _fail=1; LAST_MSG="$APPLYFAIL_MSG"
+        pnotice "NX4 KOR: $APPLYFAIL_MSG"
       fi
     elif wake_wifi; _wk=$?; [ $_wk != 0 ]; then
       log "무선 기능 적용 안 함: Wi-Fi 칩을 찾지 못함"
@@ -2200,7 +2266,8 @@ setup_hmgapi() {
       elif [ $_wk = 1 ]; then
         _fail=1
         if [ -f $BK/wifi.nopart ]; then LAST_MSG="$NOPART_MSG"; else LAST_MSG="$NOCHIP_MSG"; fi
-        pnotice "NX4 KOR: $LAST_MSG"
+        # 부품 없음은 생길 때 한 번만 알린다(굳은 차는 부팅마다 진행 기록 없이 이 갈래로 온다: P_ON=0이면 알림이 됨)
+        [ $_np0 = 1 ] && [ -f $BK/wifi.nopart ] || pnotice "NX4 KOR: $LAST_MSG"
       elif [ $_wk = 2 ] && [ -f $BK/wifi.nochip ]; then
         _wstop=1; LAST_MSG="$NOCHIP_MSG"
       elif [ $_wk = 2 ] && [ -f $BK/wifi.woke ]; then
@@ -2220,6 +2287,8 @@ setup_hmgapi() {
   # 진행 기록의 마지막 결과(상태 화면 앱이 보여 줌)
   if [ $_wstop = 1 ] && [ $_fail = 0 ]; then
     ptrack 100 fail "$LAST_MSG"
+  elif [ $_hsp = 1 ] && [ $_fail = 0 ]; then
+    ptrack 100 reboot "$HOTSPOT_ON_MSG"
   elif [ $_wchk = 1 ] && [ $_fail = 0 ]; then
     ptrack 100 reboot "$WIFI_CHECK_MSG"
   elif [ $_restart = 1 ] && [ $_fail = 0 ]; then
@@ -2264,8 +2333,10 @@ pnotice() {
 }
 fix_perms() {
   # 지원하지 않는 차는 진행 기록을 쓰지 않는다(main이 "지원하지 않는 차"를 쓴다). 권한 파일 확인은 그대로 한다.
+  # 부품 없음이 굳은 차(nopart_final)도 쓰지 않는다: main이 판정을 바로 썼고, 부팅마다 2분씩 "설치 중"을 다시 보이지 않게
   P_ON=0; setup_done || P_ON=1
   car_in "$(getprop ro.build.product 2>/dev/null)" "$CARS" || P_ON=0
+  nopart_final && P_ON=0
   # 같은 부팅에 서비스가 다시 시작돼도 이미 쓴 "재부팅 필요"를 run(기다림)·fail로 덮지 않는다. 덮으면 [지금 재부팅]
   # 버튼이 사라지고 차주가 할 일(재부팅)이 가려진다. 이번 실행은 진행 기록 없이 확인만 한다(재부팅 뒤 다시 본다).
   if [ "$P_ON" = 1 ] && prog_reboot_this_boot; then
@@ -2499,9 +2570,7 @@ main() {
   PSTART=$(date +%s); PUSTART=$(prog_up)
   # 설치 진행 기록: 설정이 끝난 차는 "확인 중", 아니면 시작(5%). 끝난 차도 핫스팟이 켜지면 "준비됨"으로 바꾼다.
   # 같은 부팅에 서비스가 다시 시작돼도 "재부팅 필요"·"실패"는 덮지 않는다
-  if prog_final_this_boot; then :
-  elif setup_done; then prog 100 done "무선 카플레이 설정이 끝나 있습니다. 핫스팟을 켜는 중입니다."
-  else prog 3 run "설치를 시작했습니다"; fi
+  prog_start
   # 확인되지 않은 차에서도 한다: HMG-API가 기록한 그대로만 되돌리므로 (md5 확인)
   # 뒤에서 돌린다: HMG-API가 늦거나 멈춰도 핫스팟은 바로 켠다 (출력은 같은 ap.log로)
   if ! fix_running; then

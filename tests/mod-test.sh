@@ -128,10 +128,12 @@ case "\$1 \$2" in
 esac
 exit 0
 E
+# pm list features: $T/features(한 줄에 feature:<이름>)가 지금 켜진 순정 기능. 없으면 아무것도 없음
 cat > $T/bin/pm <<E
 #!/bin/sh
 echo "pm \$*" >> $T/calls
 [ "\$1" = path ] && [ -f $T/app-ready ] && echo "package:/data/app/io.github.jayparklab.nx4kor-1.apk"
+[ "\$1 \$2" = "list features" ] && cat $T/features 2>/dev/null
 exit 0
 E
 # 진단 기록 확인 창(DiagActivity): $T/diag.reply가 앱의 답. 없으면 확인 창이 없는 예전 판 앱(am이 Error를 냄).
@@ -311,8 +313,14 @@ cp $T/bin/bb $R/system/bin/busybox
 echo aplog > $R/data/nx4-kor/logs/ap.log; echo svclog > $HD/logs/nx4-kor/ap.log; echo hmgapi-install > $HD/install.log
 echo mapcar > $R/data/local/tmp/nx4-kor/map-car.txt; echo status > $R/data/local/tmp/nx4-kor-status.txt
 echo "wpa_passphrase=SECRETPW" > $R/data/misc/wifi/softap.conf; echo SECRETPW > $R/data/nx4-kor/backup/softap.conf
+mkdir -p $R/system/etc/permissions $R/system/onebin/nx4hev_kr; : > $R/system/etc/permissions/com.hkmc.software.wifi.module.xml
+echo "-/system/etc/permissions/com.hkmc.software.wifihotspot.xml" > $R/system/onebin/nx4hev_kr/featurexml.cfg
+echo "feature:com.hkmc.software.wifi.module" > $T/features
 rm -rf $K/diag
 ts $U
+check "USB 설치기 진단 기록: 순정 기능(pm list features), /system/etc/permissions 목록, onebin마다 featurexml.cfg 사본" \
+  'grep -qx "feature:com.hkmc.software.wifi.module" $(dg)/features.txt && grep -q "com.hkmc.software.wifi.module.xml" $(dg)/permissions-ls.txt && grep -q "wifihotspot.xml" $(dg)/featurexml-nx4hev_kr.cfg' || ls $(dg)
+rm -f $T/features
 CORE5=$(md5sum < $R/system/lib/libCarPlayCore.so | cut -d" " -f1)
 check "USB 설치기 진단 기록: NX4/diag/<시각>/에 /system/lib 아래 모든 파일(하위 폴더·링크 포함)의 md5와 경로, ls -lR" \
   '[ "$(ls $K/diag | wc -l)" -eq 1 ] && grep -q "^$CORE5  .*/system/lib/libCarPlayCore.so$" $(dg)/system-lib-md5.txt && grep -q "^$CORE5  .*/system/lib/liblink.so$" $(dg)/system-lib-md5.txt && grep -q "  .*/system/lib/hw/gralloc.so$" $(dg)/system-lib-md5.txt && [ "$(wc -l < $(dg)/system-lib-md5.txt)" -eq 3 ] && grep -q "liblink.so -> libCarPlayCore.so" $(dg)/system-lib-ls.txt' || cat $(dg)/system-lib-md5.txt
@@ -507,6 +515,48 @@ sreset; echo 1 > $T/apply.rc; srun
 check "setup_hmgapi: 적용 실패 → 실패 문구(HMG-API 앱 확인)" '[ "$(st state)" = fail ] && grep -q "적용에 실패했습니다" $T/sprog'
 sreset; srun FAKE_PROD=DEPEHEV.KOR.0000.V039.001.260902
 check "setup_hmgapi: NX4가 아니면 아무것도 하지 않음(지원하지 않는 차)" '[ ! -s $T/calls ] && [ "$(st state)" = fail ] && grep -q "투싼 NX4 한국 내수 260902 전용" $T/sprog'
+# 칩이 안 보이는 차(SDIO 없음, 칩을 본 기록 없음). 순정 핫스팟 기능이 꺼져 있으면(한국 판) 칩 확인보다 적용(핫스팟 기능을 켬)을 먼저
+HSF=feature:com.hkmc.software.wifihotspot
+sreset; rm -f $T/wifiseen $T/features; srun
+check "setup_hmgapi: 칩이 안 보이고 순정 핫스팟 기능이 꺼져 있으면 Wi-Fi를 깨우지 않고 먼저 적용, wifi.hotspot 기록, 재부팅 안내(기능을 켰다)" \
+  'grep -qx "hmgapid engine apply" $T/calls && ! grep -q "^svc wifi" $T/calls && [ -f $T/sbk/wifi.hotspot ] && [ "$(cat $T/sbk/applied)" = "$V" ] && [ "$(st state)" = reboot ] && grep -q "순정 핫스팟 기능을 켰습니다" $T/sprog' || { cat $T/s.out; cat $T/sprog; }
+sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.nopart; srun
+check "setup_hmgapi: 기능이 꺼진 채 남은 지난 판의 부품 없음 기록(wifi.nopart)은 지우고 같은 길로 적용" \
+  '[ ! -f $T/sbk/wifi.nopart ] && grep -qx "hmgapid engine apply" $T/calls && [ -f $T/sbk/wifi.hotspot ] && grep -q "부품 없음 기록을 지움" $T/s.out' || cat $T/s.out
+sreset; rm -f $T/wifiseen; echo $HSF > $T/features; srun WAKE_MAX=1
+check "setup_hmgapi: 순정 핫스팟 기능이 이미 켜진 차는 예전처럼 Wi-Fi를 깨워 칩을 보고, 적용하지 않음(wifi.hotspot 없음)" \
+  'grep -qx "svc wifi enable" $T/calls && ! grep -q "engine apply" $T/calls && [ ! -f $T/sbk/wifi.hotspot ] && [ "$(st state)" = reboot ] && grep -q "Wi-Fi를 켜는 중입니다" $T/sprog' || { cat $T/s.out; cat $T/sprog; }
+sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.hotspot; : > $T/sbk/wifi.nopart; srun
+check "setup_hmgapi: 핫스팟 기능을 켜 본 뒤 굳은 부품 없음은 깨우지·적용하지 않고 실패, 알림을 다시 쓰지 않음" \
+  '! grep -q "^svc wifi" $T/calls && ! grep -q "engine apply" $T/calls && [ "$(st state)" = fail ] && grep -q "Wi-Fi 부품이 없어" $T/sprog && ! grep -q "안내(진행 기록에 남김): 이 차의 내비에는" $T/s.out' || { cat $T/s.out; cat $T/sprog; }
+sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.hotspot; : > $T/iap2; echo "$V" > $T/sbk/applied; : > $T/sbk/automap.checked; mkdir -p $SH/state; echo '{}' > $SH/state/local-map.json
+printf 'same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml\nhook plan: 1 mod\napp      io.github.jayparklab.nx4kor [nx4-kor]\n' > $T/plan.out; srun
+check "setup_hmgapi: 핫스팟 기능을 켜 본 차는 재부팅 뒤 지금 기능·칩 상태를 한 줄 남김(적용은 다시 안 함)" \
+  'grep -q "순정 핫스팟 기능을 켜 본 차: 지금 기능 꺼짐, Wi-Fi 칩 안보임" $T/s.out && ! grep -q "engine apply" $T/calls' || cat $T/s.out
+echo $HSF > $T/features; : > $T/wifiseen; srun
+check "  기능이 켜지고 칩이 보이면 그렇게 남김" 'grep -q "지금 기능 켜짐, Wi-Fi 칩 보임" $T/s.out' || cat $T/s.out
+# 서비스가 시작할 때의 진행 기록(prog_start): 부품 없음이 굳은 차는 2분씩 "설치 중"을 보이지 않고 판정을 바로
+psrun() { rm -f $T/sprog; (env PATH=$P0 HOTSPOT_LIB=1 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog BOOT_ID=$T/bootid UPTIME=$T/uptime \
+  sh -c ". $TP/svc/hotspot.sh; prog_start") > $T/ps.out 2>&1; }
+sreset; rm -f $T/features; : > $T/sbk/wifi.nopart; : > $T/sbk/wifi.hotspot; psrun
+check "prog_start: 핫스팟 기능을 켜 본 뒤의 부품 없음 → 시작하자마자 실패(부품 없음), '설치 중' 아님" '[ "$(st state)" = fail ] && grep -q "Wi-Fi 부품이 없어" $T/sprog' || cat $T/ps.out
+rm -f $T/sbk/wifi.hotspot; psrun
+check "  기능이 꺼진 채 남은 부품 없음(켜 본 적 없음) → 설치 시작(run, 설정이 기능을 켜 봄)" '[ "$(st state)" = run ] && [ "$(st pct)" = 3 ]'
+echo $HSF > $T/features; psrun
+check "  기능이 켜져 있던 차의 부품 없음 → 실패" '[ "$(st state)" = fail ]'
+rm -f $T/sbk/wifi.nopart; psrun
+check "  기록 없음 → 설치 시작(run)" '[ "$(st state)" = run ]'
+# fix_perms(부팅 뒤 설정): 부품 없음이 굳은 차는 진행 기록을 쓰지 않는다(main의 판정이 남음). 아닌 차는 진행을 씀
+fprun() { rm -f $T/sprog; (env PATH=$P0 HOTSPOT_LIB=1 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog NOTICE=$T/snotice BOOT_ID=$T/bootid \
+  UPTIME=$T/uptime WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio FIX_DELAY=0 sh -c ". $TP/svc/hotspot.sh; mkdir -p \$W; fix_perms") > $T/fp.out 2>&1; }
+sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.nopart; : > $T/sbk/wifi.hotspot; fprun
+check "fix_perms: 핫스팟 기능을 켜 본 뒤 부품 없음이 굳은 차는 진행 기록을 쓰지 않음('설치 중' 없음), Wi-Fi도 깨우지 않음" \
+  '[ ! -f $T/sprog ] && ! grep -q "^svc wifi" $T/calls && grep -q "Wi-Fi 칩을 찾지 못함" $T/fp.out' || cat $T/fp.out
+sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.nopart; fprun
+check "  기능이 꺼진 채 남은 부품 없음은 진행을 쓰며 핫스팟 기능을 켜러 적용(재부팅 안내)" \
+  '[ "$(st state)" = reboot ] && grep -q "순정 핫스팟 기능을 켰습니다" $T/sprog && grep -qx "hmgapid engine apply" $T/calls' || cat $T/fp.out
+# 뒤의 status.sh 시험은 "설치 중"(run)이 아닌 진행 기록을 전제한다
+rm -f $T/features $T/sprog; : > $T/wifiseen
 # status.sh: 판정 몇 가지(상태 파일)
 stsh() {
   (env PATH=$P0 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog NOTICE=$T/snotice BOOT_ID=$T/bootid UPTIME=$T/uptime \
