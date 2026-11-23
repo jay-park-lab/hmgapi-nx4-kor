@@ -45,7 +45,7 @@ NX4 KOR 모드(`mod/`)의 무선 부분은 Korea Projection(StopDragon)이 HMG-A
 |---|---|---|
 | 지원 차 | 한국 차(이 모드는 NX4만) | `system` 18항목. 미국·캐나다, 한국 260902는 기아만입니다. **NX4와 한국 현대 차는 없습니다.** 차별 패치 세트 17개에도 `NX4`가 없습니다 |
 | HMG-API 최소 판 | `>=1.1.0-rc.4` | `>=1.1.0-rc.6` |
-| 순정 핫스팟 메뉴 | `patches.json`의 featurexml 줄 주석 | `"wifi": {"hotspot": true}`(HMG-API가 같은 줄을 처리) |
+| 순정 핫스팟 메뉴 | 2.4.5는 `patches.json`의 featurexml 줄 주석. 이 모드는 2026-11-23부터 `"wifi": {"hotspot": true}`(아래) | `"wifi": {"hotspot": true}`(HMG-API가 같은 줄을 처리) |
 | 훅 지점 | 36개 | 49개. 우리 36개는 같은 이름·같은 방식(replace/change/observe)으로 다 있고, 13개가 더 있습니다(아래) |
 | 네이티브 레시피 | 5개 | 8개. 아래 "네이티브 레시피" 참고 |
 | `libleafiaaac.so` | md5 `a63e6492f38d541518b9606a978f5da3` | md5 `8b8e33a2a1669325e0d54bc355034ed6`. 소스에 코덱 로딩 경쟁 수정과 0비트 PCM 허용이 있습니다 |
@@ -94,7 +94,12 @@ NX4 KOR 모드(`mod/`)의 무선 부분은 Korea Projection(StopDragon)이 HMG-A
   - NX4 `libCarPlayUtils.so`가 변환기를 내장한 판(`e85385d7…`)이면 쓰이지 않습니다.
 - **NX4 AA 라이브러리가 `dbfe7bd2…`이면 `aa-tbt-dbfe7bd2.recipe` 더하기.** 우리 AA 레시피와 같은 한국어 UTF-8 수정을 넣어야 합니다.
 
-길게 보면 한국 포크의 변경을 rc.8 위로 옮겨 다시 빌드하는 것이 좋습니다. 그러면 BT 유지, 재연결, `park`, 두 폰 처리, `wifi.hotspot`을 얻습니다. 어느 쪽으로 갈지는 [#15](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/15)에서 정합니다.
+순정 핫스팟 기능은 이 모드도 2026-11-23부터 `mod.json`의 `"wifi": {"hotspot": true}`로 HMG-API에 맡깁니다(HMG-API rc.3부터).
+- 순정 권한 파일(`com.hkmc.software.wifihotspot.xml`)이 있으면 HMG-API가 `featurexml.cfg`에서 그 파일을 지우는 줄만 막습니다.
+- 없으면 HMG-API가 자기 권한 파일을 넣습니다. HMG-API 변경 기록에 따르면 한국 판 빌드에는 순정 파일이 없어, 2.4.5의 줄 주석만으로는 기능이 켜지지 않았습니다.
+- 공식 무선 모드 2.2.0-rc.9는 `"wifi": {"projection": true}`를 씁니다. HMG-API rc.8에서 이 요청은 핫스팟 기능을 함께 켜고, 부팅마다 프로젝션 AP도 HMG-API가 띄웁니다. 이 모드는 AP를 직접 띄우므로 `"hotspot"`만 씁니다.
+
+길게 보면 한국 포크의 변경을 rc.8 위로 옮겨 다시 빌드하는 것이 좋습니다. 그러면 BT 유지, 재연결, `park`, 두 폰 처리를 얻습니다. 어느 쪽으로 갈지는 [#15](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/15)에서 정합니다.
 
 ## 직접 다시 만들기
 

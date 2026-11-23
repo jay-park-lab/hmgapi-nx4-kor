@@ -32,7 +32,7 @@ for f in $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/usb/troubleShooter $B/
 done
 
 # --- mod.json: NX4 KOR 모드 + 합친 무선 모드(2.4.5) ---
-check "mod.json: 서비스·앱·런처, NX4.KOR 260902만, HMG-API 1.1.0-rc.4 이상, 따로 설치하는 무선 모드와 충돌 선언" 'python3 - "$PKG" <<PY
+check "mod.json: 서비스·앱·런처, NX4.KOR 260902만, HMG-API 1.1.0-rc.4 이상, 따로 설치하는 무선 모드와 충돌 선언, 순정 핫스팟 기능은 HMG-API에 요청" 'python3 - "$PKG" <<PY
 import json, os, sys
 d = sys.argv[1]
 m = json.load(open(os.path.join(d, "mod.json")))
@@ -47,6 +47,10 @@ assert m["system"] == {"model": ["NX4", "NX4HEV"], "region": ["KOR"], "firmware"
 assert m["provides"]["launcher"][0]["class"] == ".StatusActivity"
 assert m["conflicts"] == ["wireless-carplay-aa"]
 assert "logs" not in m
+# 순정 핫스팟 기능(Wi-Fi 칩 전원)은 HMG-API가 켠다(rc.3부터): 순정 파일이 있으면 featurexml 줄을 막고, 없으면(한국 판) HMG-API 파일을 넣음
+assert m["wifi"] == {"hotspot": True}, m.get("wifi")
+p = json.load(open(os.path.join(d, "patches.json")))
+assert not any("wifihotspot" in json.dumps(c) for c in p["changes"]), "featurexml 핫스팟 줄은 HMG-API가 처리"
 PY'
 check "mod.json: 무선 부분(parts·feature_flags·hooks)이 wireless/mod-2.4.5.json과 같고, 훅 jar·레시피·파일·설정이 있음" 'python3 - "$PKG" "$B/wireless/mod-2.4.5.json" <<PY
 import json, os, sys
@@ -701,6 +705,17 @@ if [ -n "$HMGAPI_SRC" ]; then
   # hmgapid는 상대 경로를 /data/hmgapi/mods/<모드>/ 아래로 푼다(svc_start): sh /data/hmgapi/mods/nx4-kor/svc/ap.sh
   check "HMG-API 엔진: NX4.KOR 260902에 설치됨(서명 확인), 서비스 ap(root, android, 다시 시작)·launch(manual)·앱이 등록됨, 무선 훅 파일이 모드 폴더에" \
     '[ "$(cat $T/eng.rc)" = 0 ] && grep -q "installed nx4-kor $V (author key" $T/eng.out && grep -qx "nx4-kor ap root android yes script svc/ap.sh -" $ER/data/hmgapi/state/services.txt && grep -qx "nx4-kor launch root manual no script svc/launch.sh -" $ER/data/hmgapi/state/services.txt && grep -qx "io.github.jayparklab.nx4kor nx4-kor" $ER/data/hmgapi/state/apps.txt && [ -f $ER/data/hmgapi/mods/nx4-kor/hooks.jar ] && [ -f $ER/data/hmgapi/mods/nx4-kor/recipes/carplay-core-wifi.recipe ]' || cat $T/eng.out
+  # 순정 핫스팟 기능(mod.json "wifi": {"hotspot": true}): 한국 판처럼 순정 권한 파일이 없으면 HMG-API가 자기 파일을 이 모드 몫으로
+  # 넣고 featurexml.cfg에서 그 파일을 지우는 줄을 막는다. 계획이 이 모드 것뿐이어야 자동 설정(plan_only_mod)이 적용한다
+  mkdir -p $ER/system/onebin/nx4hev_kr
+  printf '%s\n' -/system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml -/system/etc/permissions/com.hkmc.software.wifihotspot.xml > $ER/system/onebin/nx4hev_kr/featurexml.cfg
+  engp() { (HMGAPI_ROOT=$ER HMGAPI_HOST=1 HMGAPI_PRODUCT=NX4.KOR.0000.V039.001.260902 HMGAPI_ONEBIN=nx4hev_kr java -cp $T/eh hmgapi.engine.Engine $1) > $T/engp.out 2>&1; echo $? > $T/engp.rc; }
+  engp plan
+  check "HMG-API 엔진 계획: 순정 핫스팟 권한 파일이 없는 차에 HMG-API 파일을 이 모드 몫으로 넣음(featurexml.cfg도 이 모드 몫), 문제 없음" \
+    '[ "$(cat $T/engp.rc)" = 0 ] && grep -q "^change   /system/etc/permissions/com.hkmc.software.wifihotspot.xml \[nx4-kor\]" $T/engp.out && grep -q "^change   /system/onebin/nx4hev_kr/featurexml.cfg \[nx4-kor\]" $T/engp.out && ! grep -q "problem" $T/engp.out' || cat $T/engp.out
+  engp apply
+  check "  적용하면 핫스팟 기능 파일이 생기고 featurexml.cfg의 그 줄이 막힘(#)" \
+    'grep -q "<feature name=\"com.hkmc.software.wifihotspot\" />" $ER/system/etc/permissions/com.hkmc.software.wifihotspot.xml && grep -qx "#-/system/etc/permissions/com.hkmc.software.wifihotspot.xml" $ER/system/onebin/nx4hev_kr/featurexml.cfg' || cat $T/engp.out
   for prod in CVEV.USA.0000.V015 DEPEHEV.KOR.0000.V039.001.260902 NX4.KOR.0000.V040.001.261101; do
     ER=$T/er-$prod; eng $ER $prod
     check "HMG-API 엔진: $prod 에는 설치하지 않음(NX4.KOR 260902 전용)" '[ "$(cat $T/eng.rc)" != 0 ] && grep -q "refused" $T/eng.out && [ ! -d $ER/data/hmgapi/mods/nx4-kor ]' || cat $T/eng.out

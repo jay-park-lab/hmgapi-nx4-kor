@@ -743,7 +743,8 @@ hint_tick() {
 
 # 다른 hostapd(순정 핫스팟 등)가 돌 때 우리 핫스팟을 멈추고 비켜 준다(wlan0을 다투지 않게).
 # 0: 비켜 줌(이번 회차는 아무것도 하지 않음), 1: 우리 핫스팟을 돌려도 됨. 로그는 상태가 바뀔 때만 남긴다($W/ap.yield).
-# 모드가 적용되면 순정 핫스팟 메뉴가 꺼지므로(featurexml) 보통은 일어나지 않지만, 적용 직후 재부팅 전에는 있을 수 있다.
+# 모드가 적용되면 HMG-API가 순정 핫스팟 기능을 켠다(mod.json "wifi": {"hotspot": true}). 그래서 차주가 순정 핫스팟을
+# 켜거나 순정이 스스로 AP를 띄울 수 있고, 그때 여기서 비켜 준다.
 ap_yield() {
   if stock_ap_on; then
     # 다른 hostapd가 도는 동안은 우리 AP가 아니므로 AA 신호를 끈다
@@ -1898,10 +1899,12 @@ wifi_was_off() {
   [ -f $BK/wifi_on ] && [ "$(cat $BK/wifi_on 2>/dev/null)" != 1 ]
 }
 # 순정 핫스팟 기능(com.hkmc.software.wifihotspot)이 지금 켜져 있는가(pm list features).
-# 한국 판 내비는 이 기능이 꺼져 있고, 그러면 내비가 Wi-Fi 칩에 전원을 넣지 않는다(HMG-API SystemCheck의 "unpowered").
-# 이 모드는 featurexml.cfg에서 이 기능을 지우는 줄을 막아 켠다(patches.json, part projection: 적용 뒤 재부팅해야 켜짐).
+# HMG-API는 한국 판처럼 이 기능이 꺼진 내비를 "칩에 전원이 안 들어감"(SystemCheck "unpowered")으로 본다.
+# 이 모드는 mod.json "wifi": {"hotspot": true}로 HMG-API에 이 기능을 켜 달라고 한다(적용 뒤 재부팅해야 켜짐). 순정 권한 파일이
+# 있으면 featurexml.cfg에서 그 파일을 지우는 줄을 막고, 없으면(한국 판) HMG-API가 자기 권한 파일을 넣는다(HMG-API rc.3부터).
 # 2026-11-23 NX4HEV 260902: 기능이 꺼진 채 Wi-Fi를 켜니 드라이버가 칩 전원을 못 넣고(failed to power up DHD) 순정이
-# module_version=3을 남겨, 예전 판은 기능을 켜 보기도 전에 "부품 없음"으로 굳혔다
+# module_version=3을 남겨, 예전 판은 기능을 켜 보기도 전에 "부품 없음"으로 굳혔다. 다만 같은 판에서 무선이 되는 NX4HEV도
+# 이 기능이 꺼져 있었고 Wi-Fi를 켜자 칩이 바로 보였다(Korea Projection #125): 기능을 켜서 칩이 살아날지는 시험 중이다
 HOTSPOT_FEAT=com.hkmc.software.wifihotspot
 hotspot_feat_on() {
   _hf="
