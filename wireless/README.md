@@ -1,5 +1,7 @@
 # 무선 카플레이·안드로이드 오토 부분: 출처와 대응 소스
 
+> 2.0.x에만 해당합니다. 2.1.0부터는 공식 무선 모드를 고치지 않고 쓰므로 이 폴더의 한국 포크 2.4.5는 빠집니다([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38), [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)).
+
 NX4 KOR 모드(`mod/`)의 무선 부분은 Korea Projection(StopDragon)이 HMG-API에 따로 넣던 한국 차 빌드 무선 모드 `wireless-carplay-aa` **2.4.5**를 그대로 합친 것입니다(Korea Projection 1.7.4, 커밋 `e5221e0`의 `nemesis-pkg/korea.projection/hmgapi/wireless-carplay-aa.zip`).
 
 | `mod/`의 파일 | 2.4.5에서 |
