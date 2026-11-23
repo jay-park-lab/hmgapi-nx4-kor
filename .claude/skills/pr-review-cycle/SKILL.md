@@ -241,13 +241,14 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
    합치기 선택지 설명에 "합친 뒤 7 단계대로 워크트리에서 나와(`ExitWorktree`) 워크트리와 브랜치를 지웁니다" 를 적는다.
    1 단계 2 에서 물어서 들어간 다른 세션의 워크트리면 "합친 뒤 워크트리에서 나오고, 그 워크트리와 로컬 브랜치는
    남깁니다" 로 적는다. `ExitWorktree` 는 사용자가 요청할 때만 부르는 도구라, 이 답이 그 요청이 된다.
-   `release/`·`hotfix/` 면 `v<판>` 태그와 `develop` 으로 되돌려 합치기까지 함께 묻는다.
+   `release/`·`hotfix/` 면 `v<판>` 태그와 `develop` 으로 되돌려 합치기까지 함께 묻는다. 단 `hotfix/main-readme`
+   (`docs/git-flow.md` 규칙 13)는 태그와 되돌려 합치기 없이 `main` 에만 합치고 지운다고 묻는다.
 3. **base 가 앞서 충돌이 있을 때** — PR 을 연 뒤라 rebase·강제 푸시하지 않는다.
    - `git fetch origin`
    - `git merge origin/<base>` 로 풀고 커밋·푸시한다. 푼 내용을 PR 코멘트로 남기고 재리뷰한다(5 단계 5).
 4. **합치기** — `gh pr merge <PR> --merge`. `--squash`·`--rebase` 를 쓰지 않는다. 브랜치 삭제는 7 단계에서 한다.
 5. `gh pr view <PR> --json state,mergeCommit` 로 합쳐졌는지 확인한다.
-6. **`release/`·`hotfix/` 만**
+6. **`release/`·`hotfix/` 만** (`hotfix/main-readme` 는 빼고: 규칙 13대로 태그·`develop` 되돌려 합치기 없이 바로 7 단계로)
    - 태그: `git fetch origin`, `git tag -a v<판> -m "NX4 KOR <판>" <merge commit>`, `git push origin v<판>`.
      로컬 `main` 으로 바꾸거나 옮기지 않는다. 태그는 지우거나 옮기지 않는다.
    - `develop` 으로 되돌려 합치기: `gh pr create --base develop --head <브랜치>`. 내용이 이미 리뷰된 것이라
@@ -263,6 +264,7 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 ## 7. 정리
 
 `docs/git-flow.md` 규칙 10 을 따른다. `release/`·`hotfix/` 는 `main` 과 `develop` 양쪽에 합친 뒤에 지운다.
+`hotfix/main-readme`(규칙 13)는 `main` 에 합친 뒤 바로 지운다.
 
 1. 원격 브랜치: `git ls-remote origin refs/heads/<브랜치>` 가 합쳐진 PR 의 head SHA 와 같을 때만
    `git push origin --delete <브랜치>` 한다. 저장소 설정으로 이미 지워졌으면 건너뛴다.
