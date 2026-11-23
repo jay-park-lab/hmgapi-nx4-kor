@@ -1,8 +1,32 @@
 # NX4 KOR 설계
 
-NX4 KOR는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 내비 260902) 전용 HMG-API 모드 하나입니다. Korea Projection(StopDragon)의 핫스팟 서비스·상태 화면과, Korea Projection이 HMG-API에 따로 넣던 한국 차 빌드 무선 모드(`wireless-carplay-aa` 2.4.5)를 합쳤습니다.
+## 2.1.0 새 구조(계획)
 
-> ⚠️ 차에서 아직 확인하지 않았습니다. PC 시험(`tests/mod-test.sh`)과 HMG-API 1.1.0-rc.4와 1.1.0-rc.7 엔진(PC)에서만 확인했습니다(배포 워크플로는 rc.7로 시험·빌드). 아래 "차에서 확인할 것"을 먼저 봐 주세요.
+2026-11-23에 방향을 다시 정했습니다([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38), 할 일 [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45), 마일스톤 [2.1.0](https://github.com/jay-park-lab/hmgapi-nx4-kor/milestone/1)). 2.1.0은 다음 셋으로 됩니다.
+- HMG-API(1.1.0-rc.8 이상)
+- 공식 무선 모드 `wireless-carplay-aa`(2.2.0-rc.9 이상, 고치지 않음, NX4에는 `--any-car`로 설치)
+- 이 저장소의 NX4 추가분
+
+| 일 | 맡는 곳 | 지금(2.0.x)에서 |
+|---|---|---|
+| 무선 카플레이·AA 훅, 계기판·HUD 길안내 | 공식 무선 모드. 한국 맞춤(`tbt_fit`, `aa_name_hold`, `star_popup_skip`, 한국어 UTF-8 AA 레시피)이 필요하면 공식 모드에 기여 | 한국 포크 2.4.5를 이 모드에 합쳐 씀(아래 "모드 구성") |
+| 프로젝션 AP, 순정 핫스팟 기능 | HMG-API(`"wifi": {"projection": true}`) | `svc/hotspot.sh`가 순정 `hostapd`·`dnsmasq`로 직접 띄움 |
+| HMG-API 설치·업데이트, 공식 모드 설치, NX4 map, 진단, 되돌리기 | 이 저장소의 USB 설치기 | 설치기와 `setup_hmgapi` |
+| 설치 진행·판정 화면 | 이 저장소의 상태 화면 앱(지금 UI 유지, 지우기 버튼 [#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)). 판정은 새 구조에 맞춤 | 같은 앱 |
+| USB Wi-Fi 동글 | 이 저장소(나중에) | 없음 |
+
+- 공식 모드가 `replace`하는 훅 지점은 이 저장소의 추가 모드가 다시 걸 수 없습니다. 같은 지점을 `replace`하는 모드 둘은 함께 켜지지 않습니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)).
+- HMG-API는 모드를 지울 때 선언한 것(`patches.json`, `apps`, `services` 등)만 되돌리고, 지울 때 부르는 콜백이 없습니다(rc.8). 그래서 새 구조에서는 바꾸는 것을 선언으로 둡니다. 그래야 HMG-API 앱에서 지워도 남는 것이 없습니다.
+- 이 문서의 아래 절은 지금 코드인 **2.0.x** 구조를 적은 것입니다. 2.1.0 코드가 들어오면 그 변경에서 고칩니다.
+
+## 2.0.x 구조
+
+NX4 KOR 2.0.x는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 내비 260902) 전용 HMG-API 모드 하나입니다. Korea Projection(StopDragon)의 핫스팟 서비스·상태 화면과, Korea Projection이 HMG-API에 따로 넣던 한국 차 빌드 무선 모드(`wireless-carplay-aa` 2.4.5)를 합쳤습니다.
+
+> ⚠️ 차 확인은 일부만 됐습니다. 2026-11-23 NX4HEV 260902에서 2.0.2·2.0.4 베타로 다음이 동작했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
+> - USB 설치, map 만들기·확인(훅 지점 393/393), 자동 설정, 상태 화면, 진단
+>
+> 그 차는 Wi-Fi 부품이 없어 무선은 확인하지 못했습니다. 그 밖에는 PC 시험(`tests/mod-test.sh`)과 HMG-API 1.1.0-rc.4·rc.7 엔진(PC)에서만 확인했습니다. 아래 "차에서 확인할 것"을 먼저 봐 주세요.
 
 ## 모드 구성 (`mod/`)
 
