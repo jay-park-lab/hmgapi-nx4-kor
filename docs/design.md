@@ -18,7 +18,8 @@
 - 공식 모드가 `replace`하는 훅 지점은 이 저장소의 추가 모드가 다시 걸 수 없습니다. 같은 지점을 `replace`하는 모드 둘은 함께 켜지지 않습니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)).
 - HMG-API는 모드를 지울 때 선언한 것(`patches.json`, `apps`, `services` 등)만 되돌리고, 지울 때 부르는 콜백이 없습니다(rc.8). 그래서 새 구조에서는 바꾸는 것을 선언으로 둡니다. 그래야 HMG-API 앱에서 지워도 남는 것이 없습니다.
 - 판: 베타도 판에 꼬리를 붙입니다(`2.0.4-beta.1`부터, `docs/git-flow.md` 규칙 4). 2.0.x의 마지막 `release/2.0.4`는 `main`에 합치지 않고 지웁니다(끝 커밋은 `v2.0.4-beta.1` 태그가 남김).
-- 이 문서의 아래 절은 지금 코드인 **2.0.x** 구조를 적은 것입니다. 2.1.0 코드가 들어오면 그 변경에서 고칩니다.
+- **USB 설치기는 2.1.0 구조로 바뀌었습니다**(아래 "[설치·업데이트·지우기](#설치업데이트지우기-usbtroubleshooter)"). HMG-API 쪽 일(옛 2.0.x 정리, 공식 무선 모드 설치, map 만들기·확인, 계획 확인 뒤 적용)을 모두 설치기가 하고, nx4-kor 모드는 부팅 때 이 일을 하지 않습니다.
+- 이 문서의 나머지 절은 아직 **2.0.x** 구조를 적은 것입니다. 2.1.0 코드가 들어오면 그 변경에서 고칩니다.
 
 ## 2.0.x 구조
 
@@ -112,16 +113,59 @@ NX4 KOR 2.0.x는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 �
 
 ## 설치·업데이트·지우기 (`usb/troubleShooter`)
 
-Engineering Mode → USB Copy → DSP → Update OTA가 `ota_package.tar`의 `troubleShooter`를 root로 돌립니다(HMG-API USB 설치기와 같은 길).
+**2.1.0 구조입니다.** Engineering Mode → USB Copy → DSP → Update OTA가 `ota_package.tar`의 `troubleShooter`를 root로 돌립니다(HMG-API USB 설치기와 같은 길). HMG-API 쪽 일은 모두 이 설치기가 합니다. 예전(2.0.x)에는 모드 서비스(`setup_hmgapi`)가 부팅 뒤 map 만들기·확인과 적용을 했습니다.
 
-- HMG-API가 없으면 같은 스틱의 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)로 넘기거나 멈춥니다.
-- HMG-API가 있지만 이 모드의 최소 판(`mod.json` `hmgapi`의 `>=…`)보다 낮으면(`installed.txt`의 `version`) 엔진이 설치를 거절합니다. 그래서 아래 무선 모드 지우기 **전에** 봅니다.
-  - 같은 스틱의 HMG-API 설치기가 그 판 이상(`HMGAPI/install/payload/VERSION`)이면 그것으로 넘깁니다. HMG-API 설치기는 설치된 HMG-API도 업데이트하고 재부팅하며, 그 뒤 Update OTA를 한 번 더 누릅니다.
-  - 아니면 아무것도 바꾸지 않고 "HMG-API <최소 판> 이상으로 먼저 올려 주세요"로 멈춥니다.
-  - 판 비교는 HMG-API `Version`과 같은 규칙(semver, `-rc.N`까지)입니다. 최소 판에 꼬리가 없으면 그 판의 rc도 채웁니다(`meetsHmgapi`). 판을 읽지 못하거나 비교할 수 없는 꼬리면 기록만 하고 지나갑니다(엔진이 설치할 때 다시 봄).
-- 설치·업데이트: 따로 설치된 `wireless-carplay-aa`를 지우고 적용 → (업데이트면) `bin/uninstall.sh --update` → `hmgapid engine install` → 상태 화면 열기. 재부팅하지 않습니다(첫 설정 3~5분을 끊지 않게).
-- 같은 판이면 상태 화면만 엽니다. `NX4/REINSTALL`이면 다시 설치합니다.
-- `NX4/UNINSTALL`: `bin/uninstall.sh` → `scripts/preun.sh`(핫스팟 멈춤 → HMG-API에서 이 모드를 빼고 적용 → 무선 권한 파일·Wi-Fi 잠금·순정 AP 저장값 되돌리기 → `$BK` 지우기) → 재부팅. HMG-API를 먼저 지웠어도 남은 모드 폴더나 스틱의 사본으로 되돌립니다. 이때 `/system`은 DSP OTA 프로세스에서 순정 `mount`로 엽니다.
+스틱의 `NX4` 폴더:
+
+| 경로 | 내용 |
+|---|---|
+| `install/hmgapi-nx4-kor.zip`, `install/payload/` | nx4-kor 모드(서명됨)와 그것을 푼 것(판 확인, 모드가 이미 지워졌을 때의 되돌리기) |
+| `wireless/wireless-carplay-aa.zip`, `wireless/mod.json` | 공식 무선 모드(공식 릴리스 파일 그대로, `scripts/fetch-wireless.sh`)와 그 zip의 `mod.json`(판·HMG-API 최소 판을 zip을 풀지 않고 읽음) |
+| `legacy-2.0/` | 옛 2.0.x의 되돌리기 스크립트(태그 `v2.0.4-beta.1`에서 그대로, `scripts/build.sh`). 2.0.x를 HMG-API 앱에서 지운 차를 되돌림 |
+| `hmgapi/troubleShooter` | 같은 스틱에 함께 푼 HMG-API USB 묶음의 설치기 |
+| `UNINSTALL`, `UNINSTALL-ALL`, `REINSTALL` | 아래 "지우기", "같은 판" |
+
+**HMG-API 확인**(아무것도 바꾸기 전)
+- HMG-API가 없으면 같은 스틱의 HMG-API 설치기로 넘기거나 멈춥니다.
+- 최소 판은 설치기의 `HMG_MIN`(`1.1.0-rc.8`)과 스틱의 두 모드 `mod.json` `hmgapi`(`>=…`) 중 가장 높은 것입니다. 설치된 판(`installed.txt`의 `version`)이 낮으면 같은 스틱의 HMG-API 설치기가 그 판 이상(`HMGAPI/install/payload/VERSION`)일 때 그것으로 넘기고(업데이트 뒤 재부팅, Update OTA를 한 번 더), 아니면 "HMG-API <최소 판> 이상으로 먼저 올려 주세요"로 멈춥니다.
+- 판 비교는 HMG-API `Version`과 같은 규칙(semver, `-rc.N`까지)입니다. 최소 판에 꼬리가 없으면 그 판의 rc도 채웁니다(`meetsHmgapi`). 판을 읽지 못하거나 비교할 수 없는 꼬리면 기록만 하고 지나갑니다(엔진이 설치할 때 다시 봄).
+
+**설치·업데이트 순서**(같은 판도 같은 순서로 돌고, 이미 된 단계는 건너뜁니다)
+1. **시작 전 계획**(`engine plan`): 다른 모드의 적용하지 않은 변경(`change`·`update`·`setting`·`bind`)이나 HMG-API 밖에서 바뀐 파일(`rebase`)이 있으면 아무것도 바꾸지 않고 멈춥니다. 끝에서 적용할 수 없기 때문입니다.
+2. **옛 NX4 KOR 2.0.x 되돌리기**(`old_revert`): 설치된 nx4-kor의 `mod.json` `conflicts`에 `wireless-carplay-aa`가 있으면 2.0.x로 봅니다(판 번호로 가르지 않음. `develop`의 판은 `release/`에서만 바뀜). 공식 모드와 함께 설 수 없으므로 끝까지 되돌린 뒤에만 새로 설치합니다.
+   - 설치된 모드 폴더를 작업 폴더로 복사 → `engine remove nx4-kor` → 계획이 되돌리기와 우리 두 모드의 것뿐이면 `engine apply` → 옛 판의 `bin/uninstall.sh`를 사본으로 돌림.
+   - 까닭: 2.0.x의 `preun.sh`는 HMG-API rc.7부터 계획에 늘 나오는 설명 줄(`home Wi-Fi`, `network`)을 변경으로 봐 적용하지 않고, 그러면 무선 권한 파일 되돌리기(`perms_revert`)도 건너뜁니다. 설치기가 먼저 빼고 적용하면 `preun.sh`는 "HMG-API에 이 모드가 없음"으로 보고 이 모드가 직접 바꾼 것(무선 권한 파일, Wi-Fi 잠금, 순정 AP 저장값)을 되돌리고 기록(`/data/nx4-kor`)을 지웁니다.
+   - 뺀 뒤의 계획에 다른 모드의 변경이 있으면 적용하지 않고 멈춥니다("HMG-API 앱에서 적용").
+   - nx4-kor는 없고 2.0.x의 기록(`/data/nx4-kor/backup`, 2.1.0은 쓰지 않음)만 남은 차(HMG-API 앱에서 2.0.x를 지운 차)는 스틱의 `NX4/legacy-2.0`으로 같은 차례로 되돌립니다(2026-11-23 사용자 결정). 그 폴더는 `scripts/build.sh`가 태그 `v2.0.4-beta.1`에서 그 판의 `bin/uninstall.sh`·`scripts/preun.sh`·`svc/env.sh`·`svc/hotspot.sh`·`mod.json`을 고치지 않고 꺼내 넣은 것입니다(`SOURCE`에 태그와 커밋). busybox는 설치기가 payload의 것을 사본에 넣습니다. 모드 폴더가 없으니 `engine remove`는 하지 않고, 앱 삭제가 적용되지 않아 계획에 남은 되돌리기 줄을 받아 적용한 뒤 그 `uninstall.sh`를 돌립니다.
+     - 까닭: 2.1.0의 `bin/uninstall.sh`는 2.0.x가 바꾼 것을 되돌리지 못하고 기록 폴더째 지웁니다. 스틱의 payload 사본으로 돌리면 되돌릴 길이 없어집니다.
+     - `legacy-2.0`이 없는 스틱(직접 만든 묶음 등)이면 아무것도 바꾸지 않고 멈추고 2.0.x 릴리스 USB의 `NX4/UNINSTALL`로 안내합니다(`OLDLEFT_MSG`).
+   - 2.1.0 이후의 기록만 남은 차는 스틱의 사본(`payload/bin/uninstall.sh`)으로 정리합니다. 실패해도 설치는 계속합니다.
+3. **공식 무선 모드**(`wireless-carplay-aa`): 없거나 스틱의 판보다 낮으면 `hmgapid engine install <zip> --any-car`. NX4는 공식 모드의 `system` 목록에 없습니다. HMG-API는 `--any-car`를 `hmgapi.json` `overrides.ignore_system`에 남기고, 그 뒤 계획마다 `WARNING: wireless-carplay-aa: …`를 냅니다.
+   - 차주가 넣은 것이라도 같거나 높은 판이면 그대로 둡니다(HMG-API는 낮은 판을 `--force` 없이 받지 않음). 판을 비교할 수 없으면 그대로 둡니다. `NX4/REINSTALL`이면 같은 판을 다시 설치합니다.
+   - `mod.json` `name`에 "Korea Projection"이 든 것(한국 차 빌드 2.4.x, 같은 id)은 공식판이 아니고 작성자 키가 달라 그 위에 설치할 수 없습니다. 지우고(`engine remove`) 공식판을 설치합니다. 지우기는 2(옛 2.0.x 되돌리기)보다 먼저 합니다. 그래야 2의 적용에 한국 차 빌드의 적용하지 않은 변경이 섞이지 않습니다.
+   - 꺼 둔 것(`.disabled`)은 켭니다(`hmgapid enable`).
+4. **nx4-kor**: 같은 판이면 건너뜁니다(`NX4/REINSTALL`이면 다시). 업데이트면 돌던 서비스를 적어 두고 `bin/uninstall.sh --update` → `engine install` → 그 서비스를 다시 띄웁니다. 거절되면 예전 판의 서비스를 다시 띄우고 실패로 끝냅니다. 그다음 상태 화면을 엽니다.
+5. **map**(`hotspot.sh` `setup_hmgapi`와 같은 규칙): 이 차의 map(`state/local-map.json`)이 없으면 `engine map-car --write`(1~2분)로 만듭니다. "not written: HMG-API has a map"이면 HMG-API의 map을 씁니다. 그다음 늘 `engine verify-map`으로 확인합니다(확인을 통과해야 다음 시작부터 훅이 켜짐, `state/map-check.json`). 확인에 실패하면 이번에 만든 map만 지웁니다(`map-car --forget`). 이미 있던 map은 지우지 않습니다. 어느 쪽이든 적용하지 않고 실패로 끝냅니다.
+6. **적용**: 계획(`plan_check final`)이 우리 두 모드(`[nx4-kor]`, `[wireless-carplay-aa]`, 둘이 함께인 `[nx4-kor, wireless-carplay-aa]`)의 변경과 이번에 지운 모드의 되돌리기(`restore … (stock)`, `setting … back to stock`, `unbind`)뿐이고, 훅이 켜질 때(`hooks are off`·`hooks <id> won't load` 없음)만 `engine apply`를 합니다. `problem` 줄이나 모르는 줄이 있어도 적용하지 않습니다.
+   - 설명 줄은 변경이 아닙니다: `app`·`service`·`usb`, `event`·`vehicle`·`driving`·`panel`·`button`, `home Wi-Fi`·`wifi`·`network`·`projection`, `note`·`probe`·`override`·`skip`·`WARNING`, `hooks … share it`, `<id>: part … left out`(HMG-API rc.4·rc.8 소스에서 확인). `mod-test.sh`가 HMG-API 엔진(PC)의 실제 계획으로도 봅니다.
+7. 무엇이 바뀌었으면(옛 판 정리, 모드 설치·켜기, 처음 통과한 map 확인, 적용) 진행 기록을 "재부팅 필요"로 끝내고 상태 화면의 [지금 재부팅]을 안내합니다. 바뀐 것이 없으면 "설정이 끝나 있습니다"입니다. 설치기는 재부팅하지 않습니다.
+
+**진행 기록**: `/data/local/tmp/nx4-kor-progress.txt`를 2.0.x 서비스(`hotspot.sh` `prog`)와 같은 꼴로 씁니다. 상태 화면 앱(`Report.java`)이 그대로 읽어 막대를 보입니다.
+- 줄 차례: `pct`, `state`(`run`·`done`·`reboot`·`fail`), `stage`(한국어 문구), `start`, `t`, `boot`(이번 부팅 id), `step`(진행 중일 때 `<단계>/6`), `ust`, `ut`. 644로 씁니다.
+- 단계: 1 시작, 2 옛 판 정리, 3 공식 무선 모드, 4 NX4 KOR, 5 map 만들기·확인, 6 적용. 건너뛰는 단계가 있습니다.
+- 무엇을 바꾸기 시작한 뒤(시작 전 계획 확인 뒤)에만 씁니다. 그 전에 멈추면(HMG-API 없음·낮음, 다른 모드의 변경) 쓰지 않습니다.
+- 끝의 `stage` 문구는 설치기 머리말의 `*_MSG` 값입니다. 상태 판정(`bin/status.sh`)이 이 문장으로 판정 코드를 가르므로 바꾸면 함께 봅니다. `OTHERPLAN_MSG`·`APPLYFAIL_MSG`·`DONE_REBOOT_MSG`·`DONE_MSG`는 2.0.x 서비스와 같은 문장입니다.
+
+**같은 판**: nx4-kor와 공식 무선 모드를 다시 설치하지 않고 map도 다시 만들지 않습니다. 상태 화면을 열고 map 확인과 계획만 봅니다. 그래서 타일이 없을 때 상태 화면을 여는 길로도 씁니다.
+
+**지우기**
+- `NX4/UNINSTALL`: nx4-kor만 지웁니다. HMG-API, 공식 무선 모드, 이 차의 map은 남깁니다.
+  - 설치된 모드의 `bin/uninstall.sh` → `scripts/preun.sh`(HMG-API에서 이 모드를 빼고 적용 → 이 모드가 직접 바꾼 것 되돌리기 → 기록 지우기) → 재부팅.
+  - 옛 2.0.x면 위 2와 같이 설치기가 먼저 빼고 되돌리기만 적용한 뒤(`plan_check revert`) 옛 판의 `uninstall.sh`를 사본으로 돌립니다.
+  - HMG-API를 먼저 지웠어도 남은 모드 폴더나 스틱의 사본으로 되돌립니다. 이때 `/system`은 DSP OTA 프로세스에서 순정 `mount`로 엽니다.
+  - 모드 폴더 없이 2.0.x의 기록(`/data/nx4-kor/backup`)만 남았으면 스틱의 `NX4/legacy-2.0`으로 되돌립니다(위 2와 같음). HMG-API도 없으면 계획·적용 없이 그 사본의 `uninstall.sh`만 돌립니다. `legacy-2.0`이 없는 스틱이면 지우지 않고 멈춥니다.
+- `NX4/UNINSTALL-ALL`: 위와 같고, 그 뒤 공식 무선 모드도 `engine remove`하고 계획이 되돌리기뿐이면 적용합니다. 공식 무선 모드만 남은 차에서도 됩니다. 계획에 다른 변경이 있으면 적용하지 않고 "HMG-API 앱에서 변경 사항을 적용해 주세요(무선 모드 삭제)"로 알립니다. HMG-API와 map은 남깁니다(2026-11-23 사용자 결정).
+- 상태 화면의 지우기 버튼([#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44))은 아직 없습니다.
 - 기록: 스틱의 `NX4/install.log`에 이어 씁니다. 시작할 때 스틱의 앞 기록을 내비 쪽 기록(`/data/local/tmp/nx4-kor-usb.log`)으로 옮겨 두고, 끝날 때 그 전체를 스틱에 씁니다. 그래서 여러 번 눌러도 앞의 시도가 남고(빈 줄로 나뉨), 한 번 누른 기록은 한 번만 들어갑니다. 비우려면 스틱에서 그 파일을 지웁니다.
 - 진단 기록(`diag`): 공식 무선 모드를 이 차에서 시험하기 전에 알아 둘 것([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38))을 adb 없이 가져오려고 둡니다.
   - **먼저 화면에서 묻습니다**(`ask_diag`). Car Report가 map 만들기와 같은 분석(MapProbe)을 돌려 1~2분 걸리기 때문입니다(PR #41 리뷰 1).

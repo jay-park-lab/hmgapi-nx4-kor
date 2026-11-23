@@ -1,24 +1,45 @@
 #!/system/bin/sh
-# NX4 KOR USB 설치기. Engineering Mode > USB Copy > DSP > Update OTA가 스틱의 ota_package.tar에서
-# 이 파일을 꺼내 root로 돌린다(HMG-API의 USB 설치기와 같은 길). 그 뒤 OTA 화면에
-# 오류 684가 나오는 것은 정상이다(바꾼 것이 되돌려지지 않는다).
+# NX4 KOR USB 설치기(2.1.0 구조). Engineering Mode > USB Copy > DSP > Update OTA가 스틱의 ota_package.tar에서
+# 이 파일을 꺼내 root로 돌린다(HMG-API의 USB 설치기와 같은 길). 그 뒤 OTA 화면에 오류 684가 나오는 것은 정상이다.
+# 2.1.0은 HMG-API + 공식 무선 모드(wireless-carplay-aa, 고치지 않음) + NX4 추가분(nx4-kor)이다(docs/design.md "2.1.0 새 구조").
+# HMG-API 쪽 일은 모두 이 설치기가 한다: HMG-API 설치·업데이트(같은 스틱의 HMG-API 설치기로 넘김), 옛 NX4 KOR 2.0.x 정리,
+# 공식 무선 모드 설치(--any-car), nx4-kor 설치, 이 차의 map 만들기·확인, 계획 확인 뒤 적용. nx4-kor 모드는 부팅 때 이 일을 하지 않는다.
 # 스틱의 NX4 폴더를 본다:
-#   NX4/install/hmgapi-nx4-kor.zip  HMG-API 모드(서명됨): 설치·업데이트
-#   NX4/install/payload/              같은 모드를 푼 것(판 확인, 모드가 이미 지워졌을 때의 되돌리기)
-#   NX4/UNINSTALL                     있으면 지운다(되돌리고 재부팅). HMG-API를 먼저 지운 뒤에도 된다
-#   NX4/REINSTALL                     있으면 같은 판도 다시 설치한다
-#   NX4/hmgapi/troubleShooter         HMG-API USB 묶음을 같은 스틱에 함께 풀어 둔 경우의 HMG-API 설치기.
-#                                                 HMG-API가 아직 없거나 이 모드의 최소 판보다 낮으면 이것을 대신 돌린다
-#                                                 (재부팅 뒤 Update OTA를 한 번 더)
-# 한 일은 NX4/install.log에 남는다. 누를 때마다 그 아래에 이어 쓴다(앞의 시도 기록을 덮지 않음).
+#   NX4/install/hmgapi-nx4-kor.zip      nx4-kor 모드(서명됨)
+#   NX4/install/payload/                같은 모드를 푼 것(판 확인, 모드가 이미 지워졌을 때의 되돌리기)
+#   NX4/wireless/wireless-carplay-aa.zip  공식 무선 모드(공식 릴리스 그대로, scripts/fetch-wireless.sh)
+#   NX4/wireless/mod.json               그 zip의 mod.json(판·HMG-API 최소 판을 zip을 풀지 않고 읽는다)
+#   NX4/legacy-2.0/                     옛 2.0.x의 되돌리기 스크립트(태그 v2.0.4-beta.1에서 그대로, scripts/build.sh). 2.0.x를
+#                                       HMG-API 앱에서 지워 기록(/data/nx4-kor/backup)만 남은 차를 되돌린다(old_revert)
+#   NX4/UNINSTALL                       있으면 nx4-kor를 지운다(되돌리고 재부팅). HMG-API·공식 무선 모드·map은 남긴다.
+#                                       모드 폴더 없이 2.0.x의 기록만 남았으면 NX4/legacy-2.0으로 되돌린다(없으면 멈추고 2.0.x USB로 안내)
+#   NX4/UNINSTALL-ALL                   UNINSTALL과 같고, 공식 무선 모드도 지우고 적용한다(HMG-API·map은 남김)
+#   NX4/REINSTALL                       있으면 같은 판도 다시 설치한다(nx4-kor, 공식 무선 모드)
+#   NX4/hmgapi/troubleShooter           HMG-API USB 묶음을 같은 스틱에 함께 풀어 둔 경우의 HMG-API 설치기.
+#                                       HMG-API가 없거나 최소 판보다 낮으면 이것을 대신 돌린다(재부팅 뒤 Update OTA를 한 번 더)
+# 설치 순서(설치·업데이트·같은 판 모두 같다. 이미 된 단계는 건너뛴다):
+#   1. 시작 전 계획 확인: HMG-API에 다른 모드의 적용하지 않은 변경이 있으면 아무것도 바꾸지 않고 멈춘다(끝에서 적용할 수 없으므로)
+#   2. 옛 NX4 KOR 2.0.x(mod.json "conflicts"에 wireless-carplay-aa: 공식 모드와 함께 설 수 없음)를 끝까지 되돌린다(old_revert).
+#      nx4-kor는 없고 2.0.x의 기록(/data/nx4-kor/backup)만 남은 차(HMG-API 앱에서 지움)는 스틱의 NX4/legacy-2.0으로 같이 되돌린다.
+#      그것이 없는 스틱이면 아무것도 바꾸지 않고 2.0.x USB의 UNINSTALL로 안내한다(OLDLEFT_MSG).
+#      2.1.0 이후의 기록만 남았으면 스틱의 payload 사본으로 정리한다
+#   3. 공식 무선 모드: 없거나 스틱의 판보다 낮으면 engine install --any-car(NX4는 공식 목록에 없다). 같거나 높으면 그대로 둔다.
+#      Korea Projection의 한국 차 빌드(같은 id, 작성자 키가 다름)는 지우고 공식판을 넣는다
+#   4. nx4-kor: 같은 판이면 건너뜀(REINSTALL이면 다시), 아니면 예전 판 정리(bin/uninstall.sh --update) → engine install.
+#      그 뒤 상태 화면을 열어 아래 5·6의 진행을 보여 준다
+#   5. map: 이 차의 map(state/local-map.json)이 없으면 map-car --write로 만들고 verify-map으로 확인한다. 확인에 실패하면
+#      이번에 만든 map만 지운다(map-car --forget). 이미 있던 map은 확인만 하고 지우지 않는다(hotspot.sh setup_hmgapi와 같은 규칙)
+#   6. 계획(engine plan)이 우리 두 모드(nx4-kor, wireless-carplay-aa)의 변경(과 이번에 지운 모드의 되돌리기)뿐이고 훅이 켜질 때만
+#      engine apply. 아니면 적용하지 않고 HMG-API 앱에서 적용하라고 안내한다
+#   무엇이 바뀌었으면 재부팅을 안내한다(상태 화면의 [지금 재부팅]). 설치기는 재부팅하지 않는다.
+# 진행 기록: /data/local/tmp/nx4-kor-progress.txt(상태 화면 앱이 1초마다 읽어 막대로 보임). 형식은 2.0.x 서비스(hotspot.sh prog)와 같다.
+#   끝의 state·stage(상태 판정 status.sh가 문구로 가름): reboot "$DONE_REBOOT_MSG", done "$DONE_MSG",
+#   fail "$OTHERPLAN_MSG"·"$HOOKS_MSG"·"$APPLYFAIL_MSG"·"$NOMAP_MSG"·"$MAPFAIL_MSG"·"$WFAIL_MSG"·"$INSTFAIL_MSG"·"$OLDFAIL_MSG"(아래 값)
+# 한 일은 NX4/install.log에 남는다. 누를 때마다 그 아래에 이어 쓴다(앞의 시도 기록을 덮지 않음). HMG-API 명령의 출력도 함께 남긴다.
 # 누를 때마다 진단 기록을 모을지 화면에서 묻고(상태 화면 앱의 확인 창), [모으기]를 고르면 NX4/diag/<시각>/에 모은다
 # (아래 ask_diag·diag: /system/lib 파일 이름·md5, HMG-API Car Report, 이 모드의 기록).
-# 설치·업데이트 뒤에는 재부팅하지 않는다: 서비스가 첫 설정(map 만들기·확인, 무선 기능 적용, 3~5분)을 하는 동안 꺼지면
-# 안 된다. 대신 상태 화면을 열어 진행을 보여 주고, 끝나면 그 화면의 [지금 재부팅]을 누르게 한다.
-# 같은 판이 이미 있으면 상태 화면만 연다: HMG-API 훅이 켜지기 전에는 앱 메뉴에 타일이 없으므로 이것이 상태 화면을 여는 길이다.
-# 따로 설치된 무선 모드(wireless-carplay-aa: 예전에 따로 설치하던 한국 차 빌드나 HMG-API 공식판)가 있으면 지우고 적용한다: 이 모드에 같은 훅이 들어 있다.
 # 툴박스와 mksh만 쓴다. busybox는 진단 기록의 md5에만 쓴다(diag_bb).
-# ROOT·NX4_USB_DIRS·HMGAPID·NX4_APP_WAIT·NX4_DIAG_WAIT·NX4_DIAG_SHOWN: PC 시험용.
+# ROOT·NX4_USB_DIRS·HMGAPID·NX4_APP_WAIT·NX4_DIAG_WAIT·NX4_DIAG_SHOWN·BOOT_ID·UPTIME: PC 테스트용.
 export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin${PATH:+:$PATH}
 export LD_LIBRARY_PATH=/vendor/lib:/system/lib
 umask 077
@@ -31,9 +52,41 @@ export HMGAPID HMGDATA NX4_ROOT
 STAGE=$ROOT/data/local/tmp/nx4-kor-usb
 LOG=$ROOT/data/local/tmp/nx4-kor-usb.log
 MOD=nx4-kor
-OLD_MOD=wireless-carplay-aa
+# 공식 무선 모드(Open-HMG/hmgapi-wireless-cp-aa)
+WMOD=wireless-carplay-aa
 APP_ID=io.github.jayparklab.nx4kor
+# 이 설치기가 요구하는 HMG-API 최소 판(2.1.0 구조, 공식 무선 모드 2.2.0-rc.9의 "hmgapi"와 같다).
+# 스틱의 두 모드가 더 높은 판을 요구하면 그 판을 쓴다(need_hmg). release.yml이 이 줄을 읽는다
+HMG_MIN=1.1.0-rc.8
+# 이 차의 map(HMG-API engine map-car --write가 쓴다)과 확인 결과(verify-map이 쓴다)
+LOCALMAP=$HMGDATA/state/local-map.json
+MAPCHK=$HMGDATA/state/map-check.json
+PROG=$ROOT/data/local/tmp/nx4-kor-progress.txt
+BOOT_ID=${BOOT_ID:-/proc/sys/kernel/random/boot_id}
+UPTIME=${UPTIME:-/proc/uptime}
 U=
+# 이번에 HMG-API에서 모드를 지웠는가(그 되돌리기 줄을 계획에서 받는다)
+REMOVED=0
+# 진행 기록을 쓰기 시작했는가(무엇을 바꾸기 시작한 뒤에만 쓴다)
+P_ON=0
+# 상태 화면을 열었는가
+ST_OPEN=0
+
+# 끝 문구(진행 기록 stage). 상태 판정이 문장으로 가르므로 바꾸면 mod/bin/status.sh도 함께 본다
+DONE_REBOOT_MSG="무선 카플레이 설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요."
+DONE_MSG="무선 카플레이 설정이 끝나 있습니다."
+OTHERPLAN_MSG="HMG-API에 다른 모드의 바뀐 내용이 함께 있어 자동으로 적용하지 않았습니다. 차를 세운 뒤 HMG-API 앱에서 변경 사항을 적용하고 내비를 재부팅해 주세요."
+HOOKS_MSG="HMG-API 계획에 켜지지 않는 훅이나 문제가 있어 적용하지 않았습니다. HMG-API 앱에서 변경 사항을 확인해 주세요."
+APPLYFAIL_MSG="무선 기능 적용에 실패했습니다. HMG-API 앱에서 변경 사항을 확인해 주세요."
+NOMAP_MSG="HMG-API가 이 차의 map을 만들지 못해 무선 기능을 적용하지 않았습니다. USB의 NX4/install.log를 확인해 주세요."
+MAPFAIL_MSG="이 차의 map을 확인하지 못해 무선 기능을 적용하지 않았습니다. USB의 NX4/install.log를 확인해 주세요."
+WFAIL_MSG="공식 무선 모드(wireless-carplay-aa)를 설치하지 못했습니다. USB의 NX4/install.log를 확인해 주세요."
+INSTFAIL_MSG="NX4 KOR 설치에 실패했습니다. USB의 NX4/install.log를 확인해 주세요."
+OLDFAIL_MSG="옛 NX4 KOR를 되돌리지 못해 새로 설치하지 않았습니다. USB의 NX4/install.log를 확인해 주세요."
+# 옛 2.0.x는 HMG-API 앱에서 지워졌고 그 판이 직접 바꾼 것의 기록($NX4_ROOT/backup: Wi-Fi 잠금·순정 AP 저장값·무선 권한 파일)만
+# 남은 차. 스틱의 NX4/legacy-2.0(그 판의 되돌리기 스크립트)으로 되돌린다. 그것이 없는 스틱이면 2.1.0의 nx4-kor(payload 사본)는
+# 그것을 되돌리지 못하고 기록 폴더를 지우기만 하므로, 손대지 않고 2.0.x 판의 USB로 안내한다
+OLDLEFT_MSG="옛 NX4 KOR 2.0.x가 남긴 설정(Wi-Fi 잠금 등)이 있어 이 USB로는 되돌릴 수 없습니다. 2.0.x 릴리스 USB(v2.0.4-beta.1)의 NX4/UNINSTALL로 먼저 되돌린 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
 
 log() { echo "$(date '+%m-%d %H:%M:%S') $1" >> $LOG; }
 toast() {
@@ -62,33 +115,66 @@ END
   exec /data/local/tmp/nx4-kor-ota-finish.sh
 }
 
-# mod.json의 첫 "version" 값(맨 위 버전). 없으면 빈 값
-modver() {
+# --- 설치 진행 기록(상태 화면 앱 Report.java가 읽는다) ---
+# key=value 줄, 누구나 읽을 수 있게(644), 비밀값 없음. 2.0.x 서비스(hotspot.sh prog)와 같은 줄·순서:
+#   pct 0~100, state run|done|reboot|fail, stage 지금 단계(한국어), start 시작 시각(초), t 마지막으로 쓴 시각(초),
+#   boot 이번 부팅 id(앱이 지난 부팅 기록을 가려냄), step 진행 중일 때 <단계>/<전체>, ust·ut 시작·지금의 부팅 뒤 초
+# 단계(step)는 진행률로 정한다: 1 시작(~9) · 2 옛 판 정리(~19) · 3 공식 무선 모드(~34) · 4 NX4 KOR(~49) · 5 map(~79) · 6 적용(80~)
+PSTART=$(date +%s)
+prog_up() { _pu=; read -r _pu _px < $UPTIME 2>/dev/null; echo "${_pu%%.*}"; }
+PUSTART=$(prog_up)
+prog_step() {
+  [ "$1" = run ] || return 0
+  if [ "$2" -le 9 ]; then echo 1/6; elif [ "$2" -le 19 ]; then echo 2/6; elif [ "$2" -le 34 ]; then echo 3/6
+  elif [ "$2" -le 49 ]; then echo 4/6; elif [ "$2" -le 79 ]; then echo 5/6; else echo 6/6; fi
+}
+prog() {
+  P_ON=1
+  _bid=$(cat $BOOT_ID 2>/dev/null)
+  ( umask 022
+    { echo "pct=$1"; echo "state=$2"; echo "stage=$3"; echo "start=$PSTART"; echo "t=$(date +%s)"; echo "boot=$_bid"
+      echo "step=$(prog_step "$2" "$1")"; echo "ust=$PUSTART"; echo "ut=$(prog_up)"; } > $PROG.tmp \
+      && chmod 644 $PROG.tmp && mv $PROG.tmp $PROG ) 2>/dev/null
+  return 0
+}
+
+# mod.json에서 키 $2의 첫 값(맨 위 값: "version", "name"). 없으면 빈 값
+modkey() {
   _v=
   [ -f "$1" ] || return 0
   while IFS= read -r _l; do
     case "$_l" in
-      *'"version"'*) _v=${_l#*'"version"'}; _v=${_v#*\"}; _v=${_v%%\"*}; break ;;
+      *"\"$2\""*) _v=${_l#*\"$2\"}; _v=${_v#*\"}; _v=${_v%%\"*}; break ;;
     esac
   done < "$1"
   echo "$_v"
 }
+modver() { modkey "$1" version; }
 
 # mod.json "hmgapi"가 ">=X" 하나이면 X(모드가 요구하는 HMG-API 최소 판). 다른 꼴이거나 없으면 빈 값
 modneed() {
-  _v=
-  [ -f "$1" ] || return 0
-  while IFS= read -r _l; do
-    case "$_l" in
-      *'"hmgapi"'*) _v=${_l#*'"hmgapi"'}; _v=${_v#*\"}; _v=${_v%%\"*}; break ;;
-    esac
-  done < "$1"
+  _v=$(modkey "$1" hmgapi)
   case "$_v" in
     '>='*' '*) _v= ;;
     '>='?*) _v=${_v#'>='} ;;
     *) _v= ;;
   esac
   echo "$_v"
+}
+
+# mod.json "conflicts"에 공식 무선 모드가 있는가: 옛 NX4 KOR 2.0.x(한국 포크 무선 모드를 합친 판)다.
+# 판 번호로 가르지 않는다(develop의 판은 release/에서만 바뀐다)
+old_nx4() {
+  _in=0
+  [ -f "$1" ] || return 1
+  while IFS= read -r _l; do
+    case "$_l" in *'"conflicts"'*) _in=1 ;; esac
+    if [ $_in = 1 ]; then
+      case "$_l" in *"\"$WMOD\""*) return 0 ;; esac
+      case "$_l" in *"]"*) _in=0 ;; esac
+    fi
+  done < "$1"
+  return 1
 }
 
 # 설치된 HMG-API 판(installed.txt의 version 줄). 없으면 빈 값
@@ -158,10 +244,83 @@ hmg_meets() {
   case $? in 0) return 1 ;; 1) return 0 ;; *) return 2 ;; esac
 }
 
+# 요구하는 HMG-API 최소 판: HMG_MIN과 인자로 받은 판들 중 가장 높은 것(비교할 수 없는 판은 기록만 하고 뺀다)
+need_hmg() {
+  _n=$HMG_MIN
+  for _c in "$@"; do
+    [ -n "$_c" ] || continue
+    vlt "$_n" "$_c"
+    case $? in 0) _n=$_c ;; 2) log "HMG-API 최소 판 $_c를 $_n과 비교하지 못함: 빼고 봄" ;; esac
+  done
+  echo "$_n"
+}
+
+# --- HMG-API 계획 읽기 ---
+# 계획 줄 하나의 모드 목록(첫 "[a, b]")이 모두 우리 두 모드(nx4-kor, wireless-carplay-aa)인가
+plan_ours() {
+  case "$1" in *"["*"]"*) ;; *) return 1 ;; esac
+  _pm=${1#*"["}; _pm=${_pm%%"]"*}
+  _po=$IFS; IFS=', '; set -- $_pm; IFS=$_po
+  [ $# -gt 0 ] || return 1
+  for _px in "$@"; do
+    case "$_px" in "$MOD"|"$WMOD") ;; *) return 1 ;; esac
+  done
+  return 0
+}
+# 계획 파일 $1을 본다. 결과: P_TODO=1(적용할 줄이 있음), P_WHY(적용하면 안 되는 까닭 other|hooks|problem, 없으면 빈 값).
+# $2: pre    시작 전. 다른 모드의 변경(change·update·setting·bind)과 HMG-API 밖에서 바뀐 파일(rebase)만 본다
+#     revert 지우기. 되돌리기(restore·setting … back to stock·unbind)만 받는다
+#     remove 옛 2.0.x 정리. 되돌리기와 우리 두 모드의 변경을 받는다(훅 줄은 보지 않음)
+#     final  마지막. 우리 두 모드의 변경, 이번에 지운 모드(REMOVED=1)의 되돌리기만 받고, 훅이 꺼지거나(hooks are off,
+#            won't load) 문제(problem)가 있으면 적용하지 않는다
+# 설명 줄(지금 켜져 있는 것의 설명이라 늘 나온다)은 변경이 아니다: app·service·usb(HMG-API 1.0.2부터), event·vehicle·driving·
+# panel·button(ModRuntime), home Wi-Fi·wifi·network·projection(rc.5~rc.8), note·probe·override·skip·WARNING, 같은 지점을 함께
+# 쓰는 훅 안내(hooks … share it), "<id>: part … left out". 모르는 줄은 pre가 아니면 적용하지 않는 쪽으로 본다
+plan_check() {
+  P_TODO=0; P_WHY=
+  _md=$2
+  [ -s "$1" ] || { [ "$_md" = pre ] || P_WHY=other; return 0; }
+  set -f
+  while IFS= read -r _l; do
+    case "$_l" in
+      "same     "*|"") ;;
+      "restore  "*|"setting  "*" back to stock"|"unbind   "*)
+        P_TODO=1
+        [ "$_md" = final ] && [ "$REMOVED" != 1 ] && P_WHY=${P_WHY:-other} ;;
+      "change   "*|"update   "*|"setting  "*|"bind     "*)
+        P_TODO=1
+        if [ "$_md" = revert ] || ! plan_ours "$_l"; then P_WHY=${P_WHY:-other}; fi ;;
+      "rebase   "*) P_WHY=${P_WHY:-other} ;;
+      "hooks are off"*|"hooks    "*"won't load"*) [ "$_md" = final ] && P_WHY=${P_WHY:-hooks} ;;
+      "hooks    "*" share it"*) ;;
+      "problem  "*|"nothing changed"*problem*) [ "$_md" = pre ] || P_WHY=${P_WHY:-problem} ;;
+      "nothing changed"*|"nothing to do"*|"hook plan:"*) ;;
+      "note     "*|"probe    "*|"override "*|"skip     "*|"WARNING"*|"author   "*) ;;
+      "app      "*|"service  "*|"usb      "*) ;;
+      "event    "*|"vehicle  "*|"driving  "*|"panel    "*|"button   "*) ;;
+      "home Wi-Fi  "*|"wifi     "*|"network  "*|"projection "*) ;;
+      *": part "*" left out"*) ;;
+      *) [ "$_md" = pre ] || P_WHY=${P_WHY:-other} ;;
+    esac
+  done < "$1"
+  set +f
+  return 0
+}
+# 계획을 받아(기록에도 남김) plan_check로 본다
+plan_run() {
+  $HMGAPID engine plan > $STAGE/plan.txt 2>&1
+  { echo "--- engine plan ($1)"; cat $STAGE/plan.txt; echo "---"; } >> $LOG
+  plan_check $STAGE/plan.txt "$1"
+}
+# P_WHY에 맞는 안내
+plan_msg() {
+  case "$P_WHY" in hooks|problem) echo "$HOOKS_MSG" ;; *) echo "$OTHERPLAN_MSG" ;; esac
+}
+
 app_installed() { pm path $APP_ID 2>/dev/null | grep -q '^package:'; }
 
 # 상태 화면을 연다. 앱은 HMG-API가 설치한다(mod.json "apps", hmgapid가 apps.txt가 바뀌면 engine apps를 돌림): 최대 NX4_APP_WAIT초 기다린다.
-# 화면이 열리면 앱이 HMG-API 서비스 launch(bin/status.sh)를 불러 상태를 새로 쓴다.
+# 화면이 열리면 앱이 HMG-API 서비스 launch(bin/status.sh)를 불러 상태를 새로 쓰고, 진행 기록이 있으면 막대를 보인다.
 open_status() {
   _i=0
   while [ $_i -lt ${NX4_APP_WAIT:-90} ] && ! app_installed; do sleep 2; _i=$((_i+2)); done
@@ -169,15 +328,66 @@ open_status() {
     log "상태 화면 앱이 아직 설치되지 않음(HMG-API가 설치 중일 수 있음, hmgapid engine apps)"
     return 1
   fi
-  if am start -n $APP_ID/.StatusActivity >> $LOG 2>&1; then log "상태 화면을 엶"; return 0; fi
+  if am start -n $APP_ID/.StatusActivity >> $LOG 2>&1; then log "상태 화면을 엶"; ST_OPEN=1; return 0; fi
   log "상태 화면을 열지 못함"
   return 1
 }
 
-# --- 진단 기록 --- 공식 무선 모드를 이 차에서 시험하기 전에 알아 둘 것(#38)을 스틱의 NX4/diag/<시각>/에 모은다.
+# 실패로 끝낸다: 진행 기록(쓰기 시작했으면)·토스트·작업 폴더 정리
+fail_out() {
+  [ $P_ON = 1 ] && prog 100 fail "$1"
+  rm -rf $STAGE
+  toast "NX4 KOR: $1"
+  finish 1
+}
+
+# 모드 파일을 /data의 작업 폴더로 복사한다($1 → $2. 스틱은 실행이 막혀 있을 수 있고, 모드 폴더는 engine remove가 지운다).
+# 옛 판의 스크립트는 내비에 busybox가 없으면 모드 폴더의 bin/busybox를 쓴다. 스틱의 legacy-2.0에는 없으니 payload의 것을 넣는다
+stage_copy() {
+  rm -rf $2
+  mkdir -p $STAGE && cp -r $1 $2 || return 1
+  if [ ! -f $2/bin/busybox ] && [ -f $PAY/bin/busybox ]; then
+    mkdir -p $2/bin && cp $PAY/bin/busybox $2/bin/busybox && chmod 755 $2/bin/busybox
+  fi
+  return 0
+}
+
+# --- 옛 NX4 KOR 2.0.x 되돌리기 ---
+# 2.0.x의 bin/uninstall.sh → scripts/preun.sh는 HMG-API에서 모드를 뺀 뒤 계획을 읽고 적용하는데, HMG-API rc.7부터 계획에 늘 나오는
+# 설명 줄(home Wi-Fi·network 등)을 변경으로 봐 적용하지 않고, 그러면 무선 권한 파일 되돌리기(perms_revert)도 건너뛴다.
+# 그래서 이 설치기가 먼저 모드를 빼고(engine remove) 계획을 읽어 적용한 뒤, 옛 판의 uninstall.sh를 사본으로 돌린다. 그때 preun.sh는
+# "HMG-API에 이 모드가 없음"으로 보고 이 모드가 직접 바꾼 것(무선 권한 파일, Wi-Fi 잠금, 순정 AP 저장값)을 되돌리고 기록을 지운다.
+# 옛 판이 HMG-API 앱에서 이미 지워져 모드 폴더 없이 기록($NX4_ROOT/backup)만 남은 차는 스틱의 NX4/legacy-2.0(scripts/build.sh가
+# 태그 v2.0.4-beta.1에서 그대로 꺼낸 그 판의 되돌리기 스크립트)을 사본으로 돌린다. 그 앱 삭제가 적용되지 않아 남은 되돌리기 줄도 받는다.
+# $1: 계획을 볼 꼴(revert: 지우기, remove: 설치 전 정리), $2: 옛 판 파일(설치된 모드 폴더 또는 스틱의 legacy-2.0).
+# 0 끝남, 1 실패, 2 계획에 다른 변경이 있어 적용하지 않음(멈춤)
+old_revert() {
+  stage_copy $2 $STAGE/old || { log "옛 판을 복사하지 못함"; return 1; }
+  if [ -f $INST/mod.json ]; then
+    if ! $HMGAPID engine remove $MOD >> $LOG 2>&1; then log "옛 판을 HMG-API에서 빼지 못함"; return 1; fi
+  fi
+  REMOVED=1
+  plan_run "$1"
+  if [ -n "$P_WHY" ]; then
+    log "옛 판을 HMG-API에서 뺐지만 적용하지 않음: 계획에 다른 변경이 있음($P_WHY)"
+    return 2
+  fi
+  if [ $P_TODO = 1 ]; then
+    if ! $HMGAPID engine apply >> $LOG 2>&1; then log "옛 판을 뺀 것을 적용하지 못함"; return 1; fi
+    log "옛 판을 HMG-API에서 빼고 적용함"
+  fi
+  NX4_APP=$STAGE/old sh $STAGE/old/bin/uninstall.sh >> $LOG 2>&1
+  _rc=$?
+  rm -rf $STAGE/old
+  [ $_rc = 0 ] || { log "옛 판의 uninstall.sh 종료 코드 $_rc"; return 1; }
+  log "옛 판이 직접 바꾼 것(무선 권한 파일, Wi-Fi 잠금, 순정 AP 저장값)을 되돌리고 기록을 지움"
+  return 0
+}
+
+# --- 진단 기록 --- 공식 무선 모드를 이 차에서 테스트하기 전에 알아 둘 것(#38)을 스틱의 NX4/diag/<시각>/에 모은다.
 # Car Report가 map 만들기와 같은 분석(1~2분)을 돌리므로 먼저 화면에서 묻는다(ask_diag). [모으기]를 고른 때만, 아무것도
 # 바꾸기 전에 새 폴더에 모은다. 묻지 못하면(상태 화면 앱이 없거나 확인 창이 없는 예전 판) 모으지 않는다.
-#   info.txt            모드·HMG-API 판, 내비 판(getprop 몇 개), /system/bin/busybox가 있는지, Wi-Fi 설정값
+#   info.txt            모드·공식 무선 모드·HMG-API 판, 내비 판(getprop 몇 개), /system/bin/busybox가 있는지, Wi-Fi 설정값
 #   system-lib-md5.txt  /system/lib 아래(하위 폴더 포함) 모든 파일과 링크의 md5와 경로. 공식 모드 레시피가 이 차의
 #                       라이브러리에 맞는지 PC에서 견준다. md5를 셀 busybox가 없으면 그 사실만 적는다
 #   system-lib-ls.txt   같은 폴더의 이름·크기·링크 대상(ls -lR, busybox 없이)
@@ -252,6 +462,8 @@ diag() {
     echo "time: $(date '+%Y-%m-%d %H:%M:%S')"
     echo "usb_mod: $(modver $PAY/mod.json)"
     echo "installed_mod: $(modver $INST/mod.json)"
+    echo "usb_wireless: $(modver $WJ)"
+    echo "installed_wireless: $(modver $HMGDATA/mods/$WMOD/mod.json)"
     echo "hmgapi: $(hmgver)"
     for _p in ro.build.product ro.build.display.id ro.build.version.release ro.board.platform ro.hardware; do
       echo "$_p: $(getprop $_p 2>/dev/null)"
@@ -319,40 +531,106 @@ fi
 K=$U/NX4
 INST=$HMGDATA/mods/$MOD
 PAY=$K/install/payload
+WINST=$HMGDATA/mods/$WMOD
+WZ=$K/wireless/$WMOD.zip
+WJ=$K/wireless/mod.json
 ask_diag && diag
 
-# --- 지우기 --- HMG-API가 없어도 한다(HMG-API를 먼저 지운 경우: 이 모드가 직접 바꾼 Wi-Fi 잠금·순정 AP 저장값·권한 파일이 남아 있다)
-if [ -f $K/UNINSTALL ]; then
+# --- 지우기 --- nx4-kor만 지운다(UNINSTALL-ALL이면 공식 무선 모드도). HMG-API와 이 차의 map은 남긴다.
+# HMG-API가 없어도 한다(HMG-API를 먼저 지운 경우: 이 모드가 직접 바꾼 Wi-Fi 잠금·순정 AP 저장값·권한 파일이 남아 있다)
+if [ -f $K/UNINSTALL ] || [ -f $K/UNINSTALL-ALL ]; then
+  ALL=
+  [ -f $K/UNINSTALL-ALL ] && ALL=1
   if [ -x $HMGAPID ] && ! $HMGAPID ping >/dev/null 2>&1; then
     toast "NX4 KOR: HMG-API가 응답하지 않습니다. 재부팅하고 다시 해 주세요. 아무것도 바꾸지 않았습니다."
     finish 1
   fi
+  SRC=; LEG=
+  rm -rf $STAGE
   if [ -f $INST/bin/uninstall.sh ]; then
     SRC=$INST
+  elif [ -d $NX4_ROOT/backup ]; then
+    # 모드 폴더 없이 옛 2.0.x의 기록만 남음(HMG-API 앱에서 지움): 그 판의 되돌리기(스틱의 legacy-2.0)로. 없으면 멈춘다
+    if [ ! -f $K/legacy-2.0/bin/uninstall.sh ]; then toast "NX4 KOR: $OLDLEFT_MSG"; finish 1; fi
+    SRC=$K/legacy-2.0; LEG=1
   elif [ -d $NX4_ROOT ] && [ -f $PAY/bin/uninstall.sh ]; then
-    # 모드 폴더가 없고(HMG-API 앱에서 지움, HMG-API --purge) 되돌릴 기록($NX4_ROOT)만 남은 경우: 스틱의 사본으로 되돌린다.
+    # 모드 폴더가 없고(HMG-API 앱에서 지움, HMG-API --purge) 2.1.0 이후의 기록($NX4_ROOT)만 남은 경우: 스틱의 사본으로 정리한다.
     # /data로 복사해서 돌린다(스틱은 실행이 막혀 있을 수 있는데, 함께 넣은 busybox를 실행해야 한다)
-    rm -rf $STAGE
-    mkdir -p $STAGE && cp -r $PAY $STAGE/payload || { toast "NX4 KOR: USB에서 복사하지 못했습니다. 아무것도 바꾸지 않았습니다."; finish 1; }
+    stage_copy $PAY $STAGE/payload || { rm -rf $STAGE; toast "NX4 KOR: USB에서 복사하지 못했습니다. 아무것도 바꾸지 않았습니다."; finish 1; }
     SRC=$STAGE/payload
-  else
+  fi
+  WDEL=
+  [ -n "$ALL" ] && [ -x $HMGAPID ] && [ -f $WINST/mod.json ] && WDEL=1
+  if [ -z "$SRC" ] && [ -z "$WDEL" ]; then
+    rm -rf $STAGE
     toast "NX4 KOR 모드가 설치되어 있지 않습니다. 아무것도 바꾸지 않았습니다."
     finish 1
   fi
   [ -x $HMGAPID ] || log "HMG-API가 없음: 이 모드가 직접 바꾼 것만 되돌리고 남은 모드 폴더·앱을 지움"
-  # 권한 파일을 되돌리려면 /system을 쓰기로 열어야 한다. hmgapid가 없으면 열 수 없지만 이 프로세스(DSP OTA)에서는
-  # 순정 mount가 된다(HMG-API 설치기와 같음). 재부팅이 ro로 되돌린다
-  [ -n "$ROOT" ] || mount -o remount,rw /system >/dev/null 2>&1
   toast "NX4 KOR: 지우는 중..."
-  NX4_APP=$SRC sh $SRC/bin/uninstall.sh >> $LOG 2>&1
-  rc=$?
+  rc=0; MSG=
+  if [ -n "$SRC" ]; then
+    if [ -x $HMGAPID ] && { [ -n "$LEG" ] || { [ "$SRC" = "$INST" ] && old_nx4 $INST/mod.json; }; }; then
+      # 옛 2.0.x: HMG-API rc.7부터의 계획에서도 끝까지 되돌리도록 이 설치기가 먼저 빼고(남은 되돌리기 줄과 함께) 적용한 뒤
+      # 그 판 자신의 uninstall.sh를 사본으로 돌린다(old_revert)
+      log "옛 NX4 KOR($(modver $SRC/mod.json))를 지움"
+      old_revert revert $SRC; _o=$?
+      if [ $_o = 2 ]; then MSG="HMG-API 앱에서 변경 사항을 적용해 주세요(NX4 KOR 삭제)."; rc=1
+      elif [ $_o != 0 ]; then rc=1; fi
+    else
+      # HMG-API를 먼저 지운 차의 스틱 legacy-2.0도 /data로 복사해서 돌린다
+      if [ -n "$LEG" ]; then
+        stage_copy $SRC $STAGE/old || { toast "NX4 KOR: USB에서 복사하지 못했습니다. 아무것도 바꾸지 않았습니다."; finish 1; }
+        SRC=$STAGE/old
+      fi
+      # 권한 파일을 되돌리려면 /system을 쓰기로 열어야 한다. hmgapid가 없으면 열 수 없지만 이 프로세스(DSP OTA)에서는
+      # 순정 mount가 된다(HMG-API 설치기와 같음). 재부팅이 ro로 되돌린다
+      [ -n "$ROOT" ] || mount -o remount,rw /system >/dev/null 2>&1
+      NX4_APP=$SRC sh $SRC/bin/uninstall.sh >> $LOG 2>&1
+      rc=$?
+    fi
+  fi
+  if [ -n "$WDEL" ]; then
+    # 공식 무선 모드도 지운다(nx4-kor가 그것을 requires할 수 있어 nx4-kor 다음에). 계획이 되돌리기뿐일 때만 적용한다
+    mkdir -p $STAGE
+    if $HMGAPID engine remove $WMOD >> $LOG 2>&1; then
+      REMOVED=1
+      plan_run revert
+      if [ -n "$P_WHY" ]; then
+        log "공식 무선 모드를 지웠지만 적용하지 않음: 계획에 다른 변경이 있음"
+        MSG="HMG-API 앱에서 변경 사항을 적용해 주세요(무선 모드 삭제)."; rc=1
+      elif [ $P_TODO = 1 ] && ! $HMGAPID engine apply >> $LOG 2>&1; then
+        log "공식 무선 모드를 지웠지만 적용 실패"
+        MSG="HMG-API 앱에서 변경 사항을 적용해 주세요(무선 모드 삭제)."; rc=1
+      else
+        log "공식 무선 모드를 지우고 적용함"
+      fi
+    else
+      log "공식 무선 모드를 지우지 못함"; rc=1
+    fi
+  fi
   rm -rf $STAGE
-  if [ $rc = 0 ]; then toast "NX4 KOR 모드를 지웠습니다. 재부팅합니다."
-  else toast "NX4 KOR 지우기 실패: USB의 NX4/install.log를 보세요."; fi
+  if [ $rc = 0 ]; then
+    if [ -n "$WDEL" ]; then toast "NX4 KOR와 공식 무선 모드를 지웠습니다. 재부팅합니다."
+    else toast "NX4 KOR 모드를 지웠습니다. 재부팅합니다."; fi
+  else toast "NX4 KOR 지우기 실패: ${MSG:-USB의 NX4/install.log를 보세요.}"; fi
   finish $rc reboot
 fi
 
-# HMG-API가 먼저 있어야 한다(서비스·앱·훅을 HMG-API가 맡는다)
+# --- 설치·업데이트 ---
+Z=$K/install/hmgapi-nx4-kor.zip
+NEWV=$(modver $PAY/mod.json)
+WNEWV=$(modver $WJ)
+if [ ! -f $Z ] || [ -z "$NEWV" ]; then
+  toast "NX4 KOR: USB에 NX4/install(hmgapi-nx4-kor.zip, payload)이 없습니다. 아무것도 바꾸지 않았습니다."
+  finish 1
+fi
+if [ ! -f $WZ ] || [ -z "$WNEWV" ]; then
+  toast "NX4 KOR: USB에 NX4/wireless(공식 무선 모드 $WMOD.zip, mod.json)가 없습니다. 아무것도 바꾸지 않았습니다."
+  finish 1
+fi
+
+# HMG-API가 먼저 있어야 한다(서비스·앱·훅·map·적용을 HMG-API가 맡는다)
 if [ ! -x $HMGAPID ] || [ ! -d $HMGDATA ]; then
   if [ -f $K/hmgapi/troubleShooter ] && [ -d $U/HMGAPI/install/payload ]; then
     toast "NX4 KOR: HMG-API를 먼저 설치합니다. 재부팅된 뒤 Update OTA를 한 번 더 눌러 주세요."
@@ -367,12 +645,12 @@ if ! $HMGAPID ping >/dev/null 2>&1; then
   toast "NX4 KOR: HMG-API가 응답하지 않습니다. HMG-API를 설치한 뒤라면 재부팅하고 다시 해 주세요. 아무것도 바꾸지 않았습니다."
   finish 1
 fi
-# HMG-API가 이 모드의 최소 판(mod.json "hmgapi")보다 낮으면 엔진이 설치를 거절한다. 따로 설치된 무선 모드를 지우기 전에 본다:
-# 같은 스틱의 HMG-API 설치기가 그 판 이상이면 그것으로 올리고(HMG-API 설치기는 업데이트도 한다, 재부팅 뒤 Update OTA를 한 번 더),
-# 아니면 아무것도 바꾸지 않고 멈춘다. 판을 읽거나 비교할 수 없으면 기록만 하고 지나간다(엔진이 설치할 때 다시 본다)
-NEED=$(modneed $PAY/mod.json)
+# HMG-API가 최소 판(HMG_MIN, 스틱의 두 모드의 mod.json "hmgapi" 중 가장 높은 것)보다 낮으면 엔진이 설치를 거절한다. 아무것도 바꾸기
+# 전에 본다: 같은 스틱의 HMG-API 설치기가 그 판 이상이면 그것으로 올리고(HMG-API 설치기는 업데이트도 한다, 재부팅 뒤 Update OTA를
+# 한 번 더), 아니면 아무것도 바꾸지 않고 멈춘다. 설치된 판을 읽거나 비교할 수 없으면 기록만 하고 지나간다(엔진이 설치할 때 다시 본다)
+NEED=$(need_hmg "$(modneed $PAY/mod.json)" "$(modneed $WJ)")
 HAVE=$(hmgver)
-if [ -n "$NEED" ] && [ -n "$HAVE" ]; then
+if [ -n "$HAVE" ]; then
   hmg_meets "$HAVE" "$NEED"
   rc=$?
   if [ $rc = 1 ]; then
@@ -389,66 +667,179 @@ if [ -n "$NEED" ] && [ -n "$HAVE" ]; then
   fi
   [ $rc = 2 ] && log "HMG-API 판($HAVE)과 최소 판($NEED)을 비교하지 못함: 그대로 진행"
 else
-  log "HMG-API 판(${HAVE:-모름})이나 최소 판(${NEED:-모름})을 읽지 못함: 그대로 진행"
+  log "HMG-API 판을 읽지 못함(최소 판 $NEED): 그대로 진행"
 fi
 
-# --- 설치·업데이트 ---
-Z=$K/install/hmgapi-nx4-kor.zip
-NEWV=$(modver $PAY/mod.json)
-if [ ! -f $Z ] || [ -z "$NEWV" ]; then
-  toast "NX4 KOR: USB에 NX4/install(hmgapi-nx4-kor.zip, payload)이 없습니다. 아무것도 바꾸지 않았습니다."
+# 옛 2.0.x가 남긴 기록만 있는 차(HMG-API 앱에서 지움)는 스틱의 legacy-2.0으로 되돌린다(아래 2). 그것이 없는 스틱이면 되돌릴 수 없다.
+# 그 위에 설치하면 2.1.0을 지울 때(bin/uninstall.sh) 기록 폴더째 지워져 되돌릴 길이 없어지므로, 아무것도 바꾸지 않고 멈춘다
+if [ ! -f $INST/mod.json ] && [ -d $NX4_ROOT/backup ] && [ ! -f $K/legacy-2.0/bin/uninstall.sh ]; then
+  toast "NX4 KOR: $OLDLEFT_MSG"
   finish 1
 fi
-OLDV=$(modver $INST/mod.json)
-if [ -n "$OLDV" ] && [ "$OLDV" = "$NEWV" ] && [ ! -f $K/REINSTALL ]; then
-  log "같은 판($NEWV)이 이미 설치됨: 상태 화면만 엶"
-  if open_status; then toast "NX4 KOR $NEWV: 이미 설치되어 있습니다. 상태 화면을 엽니다."
-  else toast "NX4 KOR $NEWV: 이미 설치되어 있습니다(상태 화면은 열지 못함)."; fi
-  finish 0
-fi
+
 rm -rf $STAGE
-mkdir -p $STAGE && cp $Z $STAGE/$MOD.zip || { toast "NX4 KOR: USB에서 복사하지 못했습니다. 아무것도 바꾸지 않았습니다."; finish 1; }
-# 따로 설치된 무선 모드: 같은 훅 지점을 두 모드가 바꾸게 되므로 먼저 지운다. 계획이 그 모드의 되돌리기뿐일 때만 적용한다.
-# 못 하면 계속 설치한다. 지우지 못했으면 서비스가 oldmod("HMG-API 앱에서 그 모드를 지우고 적용")를, 지웠지만
-# 적용하지 않았으면(engine remove는 모드 폴더를 바로 지우고 되돌리기가 계획에 남음) otherplan("HMG-API 앱에서 적용")을 보인다
-if [ -f $HMGDATA/mods/$OLD_MOD/mod.json ]; then
-  toast "NX4 KOR: 따로 설치된 무선 모드($OLD_MOD)를 지우는 중..."
-  if $HMGAPID engine remove $OLD_MOD >> $LOG 2>&1; then
-    _bad=0
-    $HMGAPID engine plan > $STAGE/plan.txt 2>&1 || _bad=1
-    cat $STAGE/plan.txt >> $LOG
-    while IFS= read -r _l; do
-      case "$_l" in
-        "restore  "*|"setting  "*" back to stock"*|"unbind   "*|"same     "*|"hook plan:"*|"note     "*|"WARNING"*|"app      "*|"service  "*|"usb      "*|"") ;;
-        "nothing changed"*problem*) _bad=1 ;;
-        "nothing changed"*) ;;
-        *) _bad=1 ;;
-      esac
-    done < $STAGE/plan.txt
-    if [ $_bad = 0 ] && $HMGAPID engine apply >> $LOG 2>&1; then log "따로 설치된 무선 모드를 지우고 적용함"
-    else log "따로 설치된 무선 모드를 지웠지만 적용하지 않음(HMG-API 앱에서 적용 필요)"; fi
-  else
-    log "따로 설치된 무선 모드를 지우지 못함(HMG-API 앱에서 지워 주세요)"
-  fi
-fi
-if [ -n "$OLDV" ]; then
-  toast "NX4 KOR: $OLDV에서 $NEWV(으)로 바꾸는 중..."
-  # 예전 판의 정리: 서비스를 멈추고 작업 파일만 지운다
-  NX4_APP=$INST sh $INST/bin/uninstall.sh --update >> $LOG 2>&1 || log "예전 판 정리가 실패했지만 계속함"
-else
-  toast "NX4 KOR $NEWV: 설치하는 중..."
-fi
-if ! $HMGAPID engine install $STAGE/$MOD.zip >> $LOG 2>&1; then
+mkdir -p $STAGE && cp $Z $STAGE/$MOD.zip && cp $WZ $STAGE/$WMOD.zip \
+  || { rm -rf $STAGE; toast "NX4 KOR: USB에서 복사하지 못했습니다. 아무것도 바꾸지 않았습니다."; finish 1; }
+
+# 1. 시작 전 계획: 다른 모드의 적용하지 않은 변경이 있으면 끝에서 적용할 수 없다. 아무것도 바꾸지 않고 멈춘다
+plan_run pre
+if [ -n "$P_WHY" ]; then
   rm -rf $STAGE
-  # 업데이트였으면 멈춘 서비스를 예전 판으로 다시 띄운다
-  [ -n "$OLDV" ] && $HMGAPID service-start $MOD ap >> $LOG 2>&1
-  toast "NX4 KOR 설치 실패: USB의 NX4/install.log를 보세요."
+  toast "NX4 KOR: HMG-API에 다른 모드의 적용하지 않은 변경이 있습니다. HMG-API 앱에서 먼저 적용한 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
   finish 1
 fi
-rm -rf $STAGE
-# 업데이트는 서비스를 멈춰 두었다: 새 판으로 다시 띄운다(새로 설치면 hmgapid가 곧 띄운다, Android가 켜져 있음)
-[ -n "$OLDV" ] && $HMGAPID service-start $MOD ap >> $LOG 2>&1
-log "설치됨: $NEWV"
+prog 3 run "설치를 시작했습니다"
+CHANGED=0
+
+# Korea Projection의 한국 차 빌드(같은 id wireless-carplay-aa, 2.4.x): 공식판이 아니고 작성자 키가 달라 그 위에 공식판을 설치할 수
+# 없다. 먼저 지운다(아래 옛 2.0.x 정리의 적용에 한국 차 빌드의 적용하지 않은 변경이 섞이지 않게 그보다 앞에서)
+WOLDV=$(modver $WINST/mod.json)
+case "$(modkey $WINST/mod.json name)" in
+  *"Korea Projection"*)
+    toast "NX4 KOR: Korea Projection 무선 모드($WOLDV)를 공식판으로 바꾸는 중..."
+    prog 8 run "Korea Projection 무선 모드를 지우는 중입니다"
+    $HMGAPID engine remove $WMOD >> $LOG 2>&1 || fail_out "$WFAIL_MSG"
+    log "Korea Projection 무선 모드($WOLDV)를 지움: 공식판을 설치함"
+    REMOVED=1; CHANGED=1; WOLDV= ;;
+esac
+
+# 2. 옛 NX4 KOR 2.0.x: 공식 무선 모드와 함께 설 수 없다(conflicts). 끝까지 되돌린 뒤에만 새로 설치한다
+OLDV=$(modver $INST/mod.json)
+if [ -n "$OLDV" ] && old_nx4 $INST/mod.json; then
+  toast "NX4 KOR: 옛 NX4 KOR($OLDV)를 먼저 되돌리는 중..."
+  prog 12 run "옛 NX4 KOR($OLDV)를 되돌리는 중입니다"
+  old_revert remove $INST; _o=$?
+  [ $_o = 2 ] && fail_out "$OTHERPLAN_MSG"
+  [ $_o = 0 ] || fail_out "$OLDFAIL_MSG"
+  CHANGED=1; OLDV=
+elif [ -z "$OLDV" ] && [ -d $NX4_ROOT/backup ]; then
+  # nx4-kor는 없고 2.0.x의 기록만 남음(HMG-API 앱에서 2.0.x를 지운 차): 그 판의 되돌리기(스틱의 legacy-2.0)로 끝까지 되돌린다.
+  # 앱의 삭제가 적용되지 않아 계획에 남은 되돌리기 줄도 함께 적용한다
+  toast "NX4 KOR: 옛 NX4 KOR 2.0.x가 남긴 설정(Wi-Fi 잠금 등)을 되돌리는 중..."
+  prog 12 run "옛 NX4 KOR 2.0.x가 남긴 설정을 되돌리는 중입니다"
+  log "nx4-kor는 없고 2.0.x의 기록($NX4_ROOT/backup)이 남음: 스틱의 legacy-2.0($(cat $K/legacy-2.0/SOURCE 2>/dev/null))으로 되돌림"
+  old_revert remove $K/legacy-2.0; _o=$?
+  [ $_o = 2 ] && fail_out "$OTHERPLAN_MSG"
+  [ $_o = 0 ] || fail_out "$OLDFAIL_MSG"
+  CHANGED=1
+elif [ -z "$OLDV" ] && [ -d $NX4_ROOT ] && [ -f $PAY/bin/uninstall.sh ]; then
+  # nx4-kor는 없고 2.1.0 이후의 기록만 남음(HMG-API 앱에서 지운 차): 스틱의 사본으로 정리한다
+  prog 12 run "남은 NX4 KOR 설정을 정리하는 중입니다"
+  log "nx4-kor는 없고 기록($NX4_ROOT)이 남음: 스틱의 사본으로 정리"
+  if stage_copy $PAY $STAGE/payload; then
+    NX4_APP=$STAGE/payload sh $STAGE/payload/bin/uninstall.sh >> $LOG 2>&1 || log "남은 설정 되돌리기가 실패했지만 계속함"
+  else
+    log "스틱의 사본을 복사하지 못해 남은 설정을 되돌리지 않음(계속함)"
+  fi
+  rm -rf $STAGE/payload
+fi
+
+# 3. 공식 무선 모드: 차주가 넣은 것이라도 같은 판 이상이면 그대로 둔다(HMG-API는 낮은 판을 --force 없이 받지 않는다)
+WDO=1
+if [ -n "$WOLDV" ]; then
+  vlt "$WOLDV" "$WNEWV"
+  case $? in
+    1) if [ -f $K/REINSTALL ] && [ "$WOLDV" = "$WNEWV" ]; then log "공식 무선 모드 $WOLDV: REINSTALL로 다시 설치"
+       else log "공식 무선 모드 $WOLDV가 이미 있음(스틱 $WNEWV): 그대로 둠"; WDO=; fi ;;
+    2) log "공식 무선 모드 판($WOLDV)을 스틱의 판($WNEWV)과 비교하지 못함: 그대로 둠"; WDO= ;;
+  esac
+fi
+if [ -n "$WDO" ]; then
+  prog 25 run "공식 무선 모드를 설치하는 중입니다"
+  if [ -n "$WOLDV" ]; then toast "NX4 KOR: 공식 무선 모드를 $WOLDV에서 $WNEWV(으)로 바꾸는 중..."
+  else toast "NX4 KOR: 공식 무선 모드 $WNEWV를 설치하는 중..."; fi
+  # NX4는 공식 모드의 차 목록에 없다: --any-car(HMG-API 앱의 "Install anyway"). zip은 install 바로 뒤에 와야 한다
+  $HMGAPID engine install $STAGE/$WMOD.zip --any-car >> $LOG 2>&1 || fail_out "$WFAIL_MSG"
+  log "공식 무선 모드 설치됨: $WNEWV"
+  CHANGED=1
+fi
+# 꺼 둔 공식 무선 모드는 켠다(꺼져 있으면 무선 카플레이가 되지 않는다)
+if [ -f $WINST/.disabled ]; then
+  $HMGAPID enable $WMOD >> $LOG 2>&1 && { log "꺼져 있던 공식 무선 모드를 켬"; CHANGED=1; }
+fi
+
+# 4. nx4-kor
+if [ -n "$OLDV" ] && [ "$OLDV" = "$NEWV" ] && [ ! -f $K/REINSTALL ]; then
+  log "같은 판($NEWV)이 이미 설치됨: 다시 설치하지 않음"
+else
+  prog 40 run "NX4 KOR를 설치하는 중입니다"
+  RUNSVC=
+  if [ -n "$OLDV" ]; then
+    toast "NX4 KOR: $OLDV에서 $NEWV(으)로 바꾸는 중..."
+    # 예전 판의 정리: 서비스를 멈추고 작업 파일만 지운다. 돌던 서비스는 설치 뒤(또는 실패하면 예전 판으로) 다시 띄운다
+    RUNSVC=$($HMGAPID services $MOD 2>/dev/null | while read -r _m _n _s _r; do [ "$_m" = $MOD ] && [ "$_s" = running ] && echo $_n; done)
+    NX4_APP=$INST sh $INST/bin/uninstall.sh --update >> $LOG 2>&1 || log "예전 판 정리가 실패했지만 계속함"
+  else
+    toast "NX4 KOR $NEWV: 설치하는 중..."
+  fi
+  if ! $HMGAPID engine install $STAGE/$MOD.zip >> $LOG 2>&1; then
+    for _s in $RUNSVC; do $HMGAPID service-start $MOD $_s >> $LOG 2>&1; done
+    fail_out "$INSTFAIL_MSG"
+  fi
+  for _s in $RUNSVC; do $HMGAPID service-start $MOD $_s >> $LOG 2>&1; done
+  log "설치됨: $NEWV"
+  CHANGED=1
+fi
 open_status
-toast "NX4 KOR $NEWV 설치됨. 상태 화면에서 설정이 끝나면(3~5분) [지금 재부팅]을 눌러 주세요. 그동안 끄지 마세요."
+
+# 5. map: 없으면 이 차의 파일로 만들고(1~2분) 확인한다. 확인을 통과해야 다음 시작부터 훅이 켜진다
+_ok0=
+[ -f $MAPCHK ] && while IFS= read -r _l; do case "$_l" in *'"ok": true'*|*'"ok":true'*) _ok0=1 ;; esac; done < $MAPCHK
+_mine=0
+if [ -f $LOCALMAP ]; then
+  log "이 차의 map이 있음($LOCALMAP): 확인만 함"
+else
+  toast "NX4 KOR: 이 차의 map을 만드는 중입니다(1~2분). USB를 빼지 마세요..."
+  prog 55 run "이 차의 map을 만드는 중입니다(1~2분)"
+  $HMGAPID engine map-car --write > $STAGE/map-car.txt 2>&1; _rc=$?
+  { echo "--- engine map-car --write"; cat $STAGE/map-car.txt; echo "---"; } >> $LOG
+  _wr=; _nw=
+  while IFS= read -r _l; do
+    case "$_l" in
+      "written: "*) _wr=1 ;;
+      "not written: HMG-API has a map"*) _nw=1 ;;
+    esac
+  done < $STAGE/map-car.txt
+  if [ $_rc = 0 ] && [ -n "$_wr" ]; then _mine=1; log "이 차의 파일로 map을 만듦"
+  elif [ $_rc = 0 ] && [ -n "$_nw" ]; then log "HMG-API에 이 차 map이 이미 있음(그 map을 확인)"
+  else fail_out "$NOMAP_MSG"; fi
+fi
+prog 70 run "map을 확인하는 중입니다"
+$HMGAPID engine verify-map > $STAGE/verify-map.txt 2>&1; _rc=$?
+{ echo "--- engine verify-map"; cat $STAGE/verify-map.txt; echo "---"; } >> $LOG
+if [ $_rc != 0 ]; then
+  if [ $_mine = 1 ]; then
+    $HMGAPID engine map-car --forget >> $LOG 2>&1
+    log "map 확인 실패: 이번에 만든 map을 지움"
+  else
+    log "map 확인 실패: 이미 있던 map은 지우지 않음"
+  fi
+  fail_out "$MAPFAIL_MSG"
+fi
+if [ -z "$_ok0" ]; then log "map 확인 통과(다음 시작부터 훅이 켜짐)"; CHANGED=1
+else log "map 확인 통과"; fi
+
+# 6. 적용: 계획이 우리 두 모드의 변경(과 이번에 지운 모드의 되돌리기)뿐이고 훅이 켜질 때만
+prog 82 run "변경 사항을 확인하는 중입니다"
+plan_run final
+[ -n "$P_WHY" ] && fail_out "$(plan_msg)"
+if [ $P_TODO = 1 ]; then
+  toast "NX4 KOR: 무선 기능을 적용하는 중..."
+  prog 90 run "무선 기능을 적용하는 중입니다"
+  $HMGAPID engine apply >> $LOG 2>&1 || fail_out "$APPLYFAIL_MSG"
+  log "적용함"
+  CHANGED=1
+fi
+rm -rf $STAGE
+if [ $CHANGED = 1 ]; then
+  prog 100 reboot "$DONE_REBOOT_MSG"
+  log "설치를 마침($NEWV, 공식 무선 모드 $(modver $WINST/mod.json)): 재부팅 필요"
+  [ $ST_OPEN = 1 ] || open_status
+  toast "NX4 KOR $NEWV 설치를 마쳤습니다. 상태 화면의 [지금 재부팅]이나 RESET으로 내비를 재부팅해 주세요."
+else
+  prog 100 done "$DONE_MSG"
+  log "바꿀 것이 없음: 설정이 끝나 있음"
+  [ $ST_OPEN = 1 ] || open_status
+  toast "NX4 KOR $NEWV: 이미 설치되어 있고 설정이 끝나 있습니다."
+fi
 finish 0

@@ -9,23 +9,26 @@
    - 태그의 판(`v`를 뗀 것)이 `mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`과 같은지 봅니다. 베타는 `-beta.<n>`까지 같아야 합니다(`v2.0.4-beta.2` ↔ `2.0.4-beta.2`, `git-flow.md` 규칙 4). 숫자에 앞자리 0이 있는 태그(`v2.0.4-beta.02`)는 받지 않습니다. 2.0.3-beta.1까지는 꼬리를 빼고 비교했습니다.
    - 정식 태그의 커밋이 `main`에 있는지, 베타 태그의 커밋이 `release/` 브랜치나 `main`에 있는지 봅니다.
    - 같은 태그의 릴리스가 이미 있는지 봅니다(아래 "같은 태그로 다시 만들지 않습니다").
-   - JDK 21(Temurin), HMG-API `v1.1.0-rc.7`(커밋 `5732e26`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
+   - JDK 21(Temurin), HMG-API `v1.1.0-rc.8`(커밋 `939484e`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
 3. Actions의 release 실행이 `production` 승인을 기다립니다. 실행 화면의 **Review deployments**에서 아래 "승인하기 전에"를 확인하고 승인합니다.
 4. `build` job(배포 키 있음, 저장소 읽기만)이 돕니다.
    - JDK 21, Android SDK(`build-tools;37.0.0`, `platforms;android-19`), HMG-API 소스를 준비합니다.
-   - 키를 꺼내기 전에 HMG-API USB 묶음(아래 "HMG-API를 USB 묶음에 함께")과 busybox(아래 "busybox")를 받아 확인합니다.
+   - 키를 꺼내기 전에 공식 무선 모드(아래 "공식 무선 모드를 USB 묶음에 함께"), HMG-API USB 묶음(아래 "HMG-API를 USB 묶음에 함께")과 busybox(아래 "busybox")를 받아 확인합니다.
    - 배포 키를 러너 임시 폴더의 파일로 꺼내고(umask 077), `scripts/build-app.sh`, `scripts/build.sh`를 돌립니다.
    - 다음을 봅니다. 하나라도 다르면 멈춥니다.
      - 앱 서명 인증서가 `.github/release/app-cert.sha256`과 같은지
      - 모드가 `.github/release/mod.key.pub`의 UUID로 서명됐는지
      - USB 묶음의 맨 위 설치기가 `usb/troubleShooter`이고, HMG-API 설치기(`NX4/hmgapi/troubleShooter`)와 같은 판의 payload가 함께 들었으며, `HMGAPI/updates`는 없는지
      - busybox와 그 라이선스 안내가 모드(`bin/`)와 USB 맨 위(`BUSYBOX-LICENSE.txt`)에 들었는지
+     - 공식 무선 모드 zip(`NX4/wireless/wireless-carplay-aa.zip`)이 `NOTICE.md`의 SHA-256과 같고, 그 `mod.json`과 `WIRELESS-SOURCE.txt`가 들었는지
+     - 옛 2.0.x 되돌리기 스크립트(`NX4/legacy-2.0/`)가 들었는지. `build.sh`가 태그 `v2.0.4-beta.1`에서 꺼내므로 `build` job도 저장소를 태그까지 받습니다(`fetch-depth: 0`)
    - 키 파일을 지우고, 두 zip만 다음 job에 넘깁니다.
 5. `publish` job(배포 키 없음, 저장소 쓰기)이 릴리스를 만들어 두 파일을 올립니다. 릴리스 글에는 다음이 들어갑니다.
    - 파일 설명
    - 모드 UUID, 앱 서명 인증서 SHA-256
    - 넣은 busybox(BusyBox 1.36.1, Alpine `busybox-static-1.36.1-r31`)
    - 필요한 HMG-API 최소 판, 함께 넣은 HMG-API 판과 그 대응 소스(커밋)
+   - 함께 넣은 공식 무선 모드 판과 그 대응 소스(태그)
    - 소스 커밋
    - 두 파일의 SHA-256
    - 자동 변경 목록
@@ -115,15 +118,15 @@ gh secret list --env production
 릴리스의 USB 묶음에는 HMG-API USB 묶음이 함께 들어갑니다. 그래서 HMG-API가 없는 차도 USB 하나로 설치합니다.
 
 - **차에서:** NX4 KOR 설치기(`usb/troubleShooter`)가 HMG-API를 먼저 봅니다([`design.md`](design.md) "설치·업데이트·지우기").
-  - HMG-API가 없거나 모드의 최소 판(`mod/mod.json` `hmgapi`)보다 낮으면, 첫 Update OTA에서 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)를 대신 돌립니다. HMG-API가 설치(또는 업데이트)되고 재부팅되면 같은 USB로 한 번 더 누릅니다.
-  - 낮은 판일 때는 따로 설치된 무선 모드를 지우기 전에 넘기므로, 설치가 거절되어 무선 모드만 사라지는 일이 없습니다.
-  - 최소 판 이상이면 한 번에 NX4 KOR를 설치합니다.
+  - HMG-API가 없거나 최소 판(설치기의 `HMG_MIN`과 스틱의 두 모드 `mod.json` `hmgapi` 중 가장 높은 것)보다 낮으면, 첫 Update OTA에서 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)를 대신 돌립니다. HMG-API가 설치(또는 업데이트)되고 재부팅되면 같은 USB로 한 번 더 누릅니다.
+  - 낮은 판일 때는 아무것도 바꾸기 전에 넘기므로, 설치가 거절되어 옛 판만 지워지는 일이 없습니다.
+  - 최소 판 이상이면 한 번에 공식 무선 모드와 NX4 KOR를 설치합니다.
 - **HMG-API 앱으로 모드를 넣는 길을 쓰지 않는 까닭:** HMG-API 문서의 방법(USB `HMGAPI/updates/`에 모드 zip, 앱의 "Check USB updates")은 HMG-API 앱을 열어야 합니다. 그런데 HMG-API에 NX4 map이 없어 처음에는 앱 타일이 생기지 않습니다(NEMESIS나 adb가 있어야 엽니다).
 - **어떻게 넣나:** 워크플로 맨 위 `HMGAPI_USB_URL`(HMG-API 릴리스의 `hmgapi-<판>-usb.zip`)을 받습니다. 다음 둘이 맞을 때만 `HMGAPI_USB_ZIP`으로 `scripts/build.sh`에 넘깁니다.
   - 파일의 SHA-256이 `HMGAPI_USB_SHA256`과 같은지
   - 그 안의 `HMGAPI/install/payload/VERSION`이 `HMGAPI_COMMIT` 소스의 판(`Engine.java`의 `HMGAPI_VERSION`)과 같은지
-  - 그 판이 모드의 최소 판을 채우는지(비교는 `usb/troubleShooter`의 `vlt`·`hmg_meets`를 그대로 씁니다). 못 채우면 설치기가 낮은 HMG-API를 올릴 수 없습니다
-- **싣지 않는 것:** HMG-API 스틱의 `HMGAPI/updates/`(HMG-API 앱용 업데이트와 공식 모드 묶음: `wireless-carplay-aa`, `adb`, `nemesis-shortcut`)와 `NEMESIS.data`는 `build.sh`가 뺍니다. HMG-API 설치기는 `HMGAPI/install`만 씁니다. `wireless-carplay-aa`는 이 모드와 함께 둘 수 없습니다. 서명 확인 step이 `HMGAPI/updates`가 없는지도 봅니다.
+  - 그 판이 설치기의 최소 판(`HMG_MIN`)과 두 모드(`mod/mod.json`, 공식 무선 모드)의 `hmgapi`를 모두 채우는지(비교는 `usb/troubleShooter`의 `vlt`·`hmg_meets`를 그대로 씁니다). 못 채우면 설치기가 낮은 HMG-API를 올릴 수 없습니다. 릴리스 글의 최소 판은 그중 가장 높은 것입니다
+- **싣지 않는 것:** HMG-API 스틱의 `HMGAPI/updates/`(HMG-API 앱용 업데이트와 공식 모드 묶음: `wireless-carplay-aa`, `adb`, `nemesis-shortcut`)와 `NEMESIS.data`는 `build.sh`가 뺍니다. HMG-API 설치기는 `HMGAPI/install`만 씁니다. 공식 무선 모드는 아래 "공식 무선 모드를 USB 묶음에 함께"대로 고정한 판을 따로 넣습니다. 서명 확인 step이 `HMGAPI/updates`가 없는지도 봅니다.
 - **배포 키를 가진 job이 받는 까닭:** `build.sh`가 USB 묶음을 만들 때 넣어야 해서 `build` job에서 받습니다. 키를 꺼내기 전에 받고, 그 안의 것은 실행하지 않습니다. 풀어서 USB 묶음에 옮겨 담기만 합니다.
 - **라이선스:** HMG-API(AGPL-3.0)에서 설치에 쓰는 것만 고치지 않고 함께 배포합니다. `build.sh`가 USB 맨 위 `HMGAPI-SOURCE.txt`에 판, 대응 소스(태그), 뺀 것을 적습니다. 릴리스 글에는 대응 소스를 `HMGAPI_COMMIT`(커밋)으로 적습니다. 태그는 옮겨질 수 있기 때문입니다.
 - **PC 빌드:** `.env.local`의 `HMGAPI_USB_ZIP`이 없으면 NX4 KOR만 넣습니다.
@@ -138,6 +141,16 @@ gh secret list --env production
   - 같은 태그는 다시 쓸 수 없습니다. 태그 push로 도는 워크플로는 그 태그 커밋의 `release.yml`을 쓰기 때문입니다.
   - 받을 수 있는지는 태그를 달기 전에 `curl -sSI -o /dev/null -w '%{http_code}\n' <HMGAPI_USB_URL>`로 봅니다. 200이나 302면 됩니다.
   - 정식판 직전에 지워지면 차에서 확인하지 않은 판으로 옮겨야 합니다. 그래도 사본은 두지 않기로 했습니다(위 "어느 HMG-API 판을 쓰나").
+
+### 공식 무선 모드를 USB 묶음에 함께
+
+2.1.0부터 USB 묶음에 HMG-API의 공식 무선 모드 `wireless-carplay-aa`([Open-HMG/hmgapi-wireless-cp-aa](https://github.com/Open-HMG/hmgapi-wireless-cp-aa))를 고치지 않고 넣습니다. NX4 KOR 설치기가 NX4에 `--any-car`로 설치합니다([`design.md`](design.md) "설치·업데이트·지우기").
+
+- **어떻게 넣나:** `build` job의 "공식 무선 모드" step이 `scripts/fetch-wireless.sh`로 그 릴리스의 `wireless-carplay-aa-<판>.zip`을 받아 `NX4_WIRELESS_ZIP`으로 `scripts/build.sh`에 넘깁니다. 키를 꺼내기 전에 받고, 풀거나 실행하지 않습니다(`build.sh`가 `mod.json`만 꺼냅니다).
+- **고정:** 판은 `scripts/fetch-wireless.sh`의 `WV`, SHA-256은 `NOTICE.md` "공식 무선 모드"의 "공식 모드 zip SHA-256"에 둡니다. 받은 파일이 그 값과 다르면 멈춥니다. 서명 확인 step은 USB 묶음 안의 zip도 그 값과 같은지 봅니다.
+- **판을 바꿀 때:** `fetch-wireless.sh`의 `WV`, `NOTICE.md`의 판·파일 이름·크기·SHA-256·대응 소스 줄을 함께 바꿉니다(`tests/mod-test.sh`가 둘이 같은지 봅니다). SHA-256은 공식 릴리스의 `SHA256SUMS`나 GitHub이 기록한 파일 digest에서 읽고, 받은 파일로 `shasum -a 256`을 돌려 같은지도 봅니다. 새 판이 더 높은 HMG-API를 요구하면(`mod.json` `hmgapi`) 위 HMG-API 고정값도 함께 옮깁니다("HMG-API USB 묶음" step이 확인).
+- **라이선스:** AGPL-3.0. `build.sh`가 USB 맨 위 `WIRELESS-SOURCE.txt`에 판, SHA-256, 대응 소스(태그)를 적고, 릴리스 글에도 적습니다.
+- **PC 빌드:** `.env.local`의 `NX4_WIRELESS_ZIP`이 없으면 공식 릴리스에서 받아 `out/wireless`에 둡니다. 주면 그 파일을 SHA-256 확인 없이 씁니다(인터넷 없이 만들 때).
 
 ## production 환경 (처음 한 번, 저장소 관리자)
 
@@ -226,7 +239,7 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
 
 - `check` job이 통과했는지 봅니다. 승인 요청은 `check`가 통과한 태그에만 뜹니다.
 - 태그가 기대한 커밋인지 봅니다. 정식 태그는 `main`의 merge commit, 베타 태그는 `release/<판>`의 끝입니다.
-- 지난 릴리스 태그 이후 `build` job에서 도는 코드가 바뀌었으면, 그 변경이 리뷰를 거쳐 합친 것인지 봅니다. 대상은 `.github/`, `scripts/`, `mod/build.sh`(있으면 안 됨), HMG-API 고정값(`HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`)입니다.
+- 지난 릴리스 태그 이후 `build` job에서 도는 코드가 바뀌었으면, 그 변경이 리뷰를 거쳐 합친 것인지 봅니다. 대상은 `.github/`, `scripts/`, `mod/build.sh`(있으면 안 됨), HMG-API 고정값(`HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`), 공식 무선 모드 고정값(`scripts/fetch-wireless.sh`의 `WV`, `NOTICE.md`의 "공식 모드 zip SHA-256")입니다.
 
   ```sh
   git diff --stat <지난 태그> <이번 태그> -- .github scripts mod/build.sh

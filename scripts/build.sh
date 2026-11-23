@@ -18,10 +18,19 @@
 #                   none이면 넣지 않는다(내비에 /system/bin/busybox가 없으면 무선 설정을 하지 않는 묶음이 된다)
 #   NX4_BUSYBOX_LICENSE  그 busybox의 라이선스 안내(GPL-2.0, 대응 소스 위치. 기본 <NX4_BUSYBOX>-LICENSE.txt)
 #   HMGAPI_USB_ZIP  HMG-API USB 묶음(hmgapi-<버전>-usb.zip). 주면 같은 USB에 함께 넣는다(HMG-API가 없으면 그것부터 설치)
+#   NX4_WIRELESS_ZIP  USB에 함께 넣을 공식 무선 모드 zip(wireless-carplay-aa-<판>.zip, 고치지 않은 공식 릴리스 파일). 주지 않으면
+#                   공식 릴리스에서 받는다(scripts/fetch-wireless.sh: 고정한 판, NOTICE.md의 SHA-256과 같을 때만. <OUT>/wireless에 둠.
+#                   미러는 NX4_WIRELESS_URL). 준 파일은 SHA-256을 보지 않고 쓴다(인터넷 없이 만들 때 받아 둔 파일을 가리킨다)
+#   NX4_LEGACY_REF  옛 2.0.x 되돌리기 스크립트를 꺼낼 git 태그(기본 v2.0.4-beta.1, 2.0.x의 마지막 묶음). 테스트·관리용
 #   OUT             결과 폴더(기본 out)
+# 옛 2.0.x 되돌리기: 2.1.0의 nx4-kor는 2.0.x가 직접 바꾼 것(Wi-Fi 잠금, 순정 AP 저장값, 무선 권한 파일)을 되돌리지 못한다. 그래서
+# 2.0.x를 HMG-API 앱에서 지운 차를 위해 그 판의 되돌리기 스크립트(bin/uninstall.sh, scripts/preun.sh, svc/env.sh, svc/hotspot.sh,
+# mod.json)를 태그에서 고치지 않고 꺼내 USB의 NX4/legacy-2.0/에 넣는다(설치기 old_revert). busybox는 설치기가 payload의 것을 쓴다.
+# 그 태그가 이 저장소에 있어야 한다(없으면 git fetch origin --tags).
 # 라이선스: 모드와 USB에 LICENSE(AGPL-3.0)·NOTICE.md를 넣는다. busybox(GPL-2.0)를 넣으면 그 안내(bin/busybox-LICENSE.txt,
 # USB 맨 위 BUSYBOX-LICENSE.txt)도 넣고, 안내가 없으면 만들지 않는다. HMG-API를 함께 넣으면
-# 그 소스 위치(HMGAPI-SOURCE.txt)를 적는다. USB README.txt에는 이 묶음을 만든 소스 커밋을 적는다.
+# 그 소스 위치(HMGAPI-SOURCE.txt)를, 공식 무선 모드(AGPL-3.0)는 그 판과 소스 위치(WIRELESS-SOURCE.txt)를 적는다.
+# USB README.txt에는 이 묶음을 만든 소스 커밋을 적는다.
 set -e
 B=$(cd "$(dirname "$0")/.." && pwd)
 . "$B/scripts/local-env.sh"
@@ -44,7 +53,7 @@ trap 'rm -rf "$W"' EXIT
 M=$W/nx4-kor
 mkdir -p "$M"
 cp -R "$PKG/." "$M/"
-# NX4 map은 모드에 없다: 그 차에서 HMG-API가 만든다(svc/hotspot.sh setup_hmgapi, engine map-car --write → verify-map)
+# NX4 map은 모드에 없다: 그 차에서 HMG-API가 만든다(USB 설치기 usb/troubleShooter가 engine map-car --write → verify-map)
 
 APK=${NX4_APK:-$PKG/app/NX4KOR.apk}
 [ -f "$APK" ] || { echo "상태 화면 앱이 없습니다: $APK (scripts/build-app.sh로 만들거나 NX4_APK로 주세요)" >&2; exit 1; }
@@ -52,7 +61,7 @@ mkdir -p "$M/app"
 [ "$APK" -ef "$M/app/NX4KOR.apk" ] || cp "$APK" "$M/app/NX4KOR.apk"
 
 # busybox: 이 모드의 스크립트는 busybox로 돈다. NX4 내비에 /system/bin/busybox가 없으면 함께 넣은 것만 쓸 수 있으므로
-# 늘 넣는다(내비에 있으면 hotspot.sh가 그것을 먼저 쓴다). 넣지 않으려면 NX4_BUSYBOX=none
+# 늘 넣는다(내비에 있으면 모드 스크립트가 그것을 먼저 쓴다). 넣지 않으려면 NX4_BUSYBOX=none
 BBX=${NX4_BUSYBOX:-$PKG/bin/busybox}
 if [ "$NX4_BUSYBOX" = none ]; then
   BBX=
@@ -96,6 +105,23 @@ MZ=$OUT/hmgapi-nx4-kor-$V.zip
 cp "$Z" "$MZ"
 echo "만듦: $MZ"
 
+# 공식 무선 모드(wireless-carplay-aa): USB 설치기가 NX4에 --any-car로 설치한다. 공식 릴리스 파일을 고치지 않고 넣는다
+WZIP=$NX4_WIRELESS_ZIP
+if [ -z "$WZIP" ]; then
+  # 받지 못하거나 SHA-256이 다르면 fetch-wireless.sh가 멈추고(set -e) 여기서 끝난다
+  sh "$B/scripts/fetch-wireless.sh" "$OUT/wireless" > "$W/fetch-wireless.out"
+  head -n 1 "$W/fetch-wireless.out"
+  WZIP=$(tail -n 1 "$W/fetch-wireless.out")
+else
+  echo "참고: NX4_WIRELESS_ZIP($WZIP)은 SHA-256을 보지 않고 씁니다"
+fi
+[ -f "$WZIP" ] || { echo "공식 무선 모드 zip이 없습니다: $WZIP (NX4_WIRELESS_ZIP을 비우면 공식 릴리스에서 받습니다)" >&2; exit 1; }
+mkdir -p "$W/wireless"
+unzip -p "$WZIP" mod.json > "$W/wireless/mod.json" 2>/dev/null || true
+WID=$(sed -n 's/^ *"id": *"\([^"]*\)".*/\1/p' "$W/wireless/mod.json" | head -1)
+WV=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$W/wireless/mod.json" | head -1)
+[ "$WID" = wireless-carplay-aa ] && [ -n "$WV" ] || { echo "공식 무선 모드 zip이 아닙니다(mod.json id ${WID:-없음}): $WZIP" >&2; exit 1; }
+
 # USB 묶음
 S=$W/usb
 mkdir -p "$S"
@@ -111,8 +137,8 @@ with tarfile.open(sys.argv[1]) as t:
     open(sys.argv[2], "wb").write(t.extractfile("troubleShooter").read())
 PY
   [ -f "$S/README.txt" ] && mv "$S/README.txt" "$S/HMGAPI-README.txt"
-  # HMG-API 묶음의 다른 USB 설치 길(NEMESIS.data)과 HMG-API 앱이 읽는 업데이트·모드 묶음(HMGAPI/updates: 공식 모드들,
-  # 그중 wireless-carplay-aa는 이 모드와 함께 둘 수 없다)은 쓰지 않으므로 뺀다. HMG-API 설치기는 HMGAPI/install만 쓴다
+  # HMG-API 묶음의 다른 USB 설치 길(NEMESIS.data)과 HMG-API 앱이 읽는 업데이트·모드 묶음(HMGAPI/updates)은 쓰지 않으므로 뺀다.
+  # HMG-API 설치기는 HMGAPI/install만 쓴다. 공식 무선 모드는 우리 설치기가 고정한 판(NX4/wireless, 아래)으로 넣는다
   rm -f "$S/NEMESIS.data"
   rm -rf "$S/HMGAPI/updates"
   # HMG-API(AGPL-3.0)를 그대로 함께 배포하므로 그 판과 대응 소스 위치를 적는다
@@ -132,6 +158,31 @@ cp "$B/LICENSE" "$B/NOTICE.md" "$S/"
 mkdir -p "$S/NX4/install/payload"
 cp "$MZ" "$S/NX4/install/hmgapi-nx4-kor.zip"
 unzip -q "$MZ" -d "$S/NX4/install/payload"
+# 옛 2.0.x 되돌리기 스크립트(위 머리말): 태그의 파일을 그대로
+LREF=${NX4_LEGACY_REF:-v2.0.4-beta.1}
+for f in bin/uninstall.sh scripts/preun.sh svc/env.sh svc/hotspot.sh mod.json; do
+  mkdir -p "$S/NX4/legacy-2.0/$(dirname "$f")"
+  (cd "$B" && git show "$LREF:mod/$f") > "$S/NX4/legacy-2.0/$f" 2>/dev/null \
+    || { echo "옛 2.0.x 되돌리기 스크립트(mod/$f)를 git 태그 $LREF에서 꺼내지 못했습니다(git fetch origin --tags)" >&2; exit 1; }
+done
+chmod 755 "$S/NX4/legacy-2.0/bin/uninstall.sh" "$S/NX4/legacy-2.0/scripts/preun.sh" "$S/NX4/legacy-2.0/svc/env.sh" "$S/NX4/legacy-2.0/svc/hotspot.sh"
+grep -q '"wireless-carplay-aa"' "$S/NX4/legacy-2.0/mod.json" \
+  || { echo "git 태그 $LREF의 mod/mod.json이 옛 2.0.x(공식 무선 모드와 충돌 선언)가 아닙니다" >&2; exit 1; }
+LREV=$(cd "$B" && git rev-parse --short "$LREF^{commit}" 2>/dev/null) || LREV=
+echo "$LREF ${LREV:-커밋 모름}" > "$S/NX4/legacy-2.0/SOURCE"
+# 공식 무선 모드: zip 그대로와, 설치기가 판·HMG-API 최소 판을 풀지 않고 읽을 mod.json
+mkdir -p "$S/NX4/wireless"
+cp "$WZIP" "$S/NX4/wireless/wireless-carplay-aa.zip"
+cp "$W/wireless/mod.json" "$S/NX4/wireless/mod.json"
+WSHA=$( (sha256sum "$WZIP" 2>/dev/null || shasum -a 256 "$WZIP") | cut -d' ' -f1)
+cat > "$S/WIRELESS-SOURCE.txt" <<EOF
+공식 무선 모드 wireless-carplay-aa $WV: 이 USB의 NX4/wireless/wireless-carplay-aa.zip (mod.json은 그 zip에서 꺼낸 것)
+- Open-HMG/hmgapi-wireless-cp-aa(VysseCodes)의 릴리스 파일 wireless-carplay-aa-$WV.zip을 고치지 않고 넣었습니다.
+  SHA-256 $WSHA
+- NX4 KOR USB 설치기가 투싼 NX4에 HMG-API의 "Install anyway"(engine install --any-car)로 설치합니다.
+- 라이선스: GNU AGPL-3.0 (이 USB의 LICENSE와 같은 라이선스)
+- 대응 소스: https://github.com/Open-HMG/hmgapi-wireless-cp-aa/tree/v$WV
+EOF
 python3 - "$B/usb/troubleShooter" "$S/ota_package.tar" <<'PY'
 import io, sys, tarfile
 data = open(sys.argv[1], "rb").read()
