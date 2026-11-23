@@ -7,9 +7,9 @@ Android 에뮬레이터에서 NX4 KOR 상태 화면 앱(`io.github.jayparklab.nx
 | 파일 (`/data/local/tmp/`) | 차에서 쓰는 쪽 | 시험에서 넣는 것 |
 |---|---|---|
 | `nx4-kor-status.txt` | `mod/bin/status.sh` | `tests/emu/scen.sh` |
-| `nx4-kor-progress.txt` | `mod/svc/hotspot.sh` (설치 진행) | `tests/emu/scen.sh` |
-| `nx4-kor-notice.txt` | `mod/svc/hotspot.sh` (알림) | `tests/emu/scen.sh hint` |
-| `nx4-kor-hint.txt` | `mod/svc/hotspot.sh` (`hint_write`) | `tests/emu/scen.sh hint` |
+| `nx4-kor-progress.txt` | USB 설치기 (설치 진행, 형식은 `mod/svc/lib.sh` `PROG`) | `tests/emu/scen.sh` |
+| `nx4-kor-notice.txt` | 알림(2.0.x 서비스·USB 설치기) | `tests/emu/scen.sh hint` |
+| `nx4-kor-hint.txt` | 2.0.x 서비스(`hint_write`). 2.1.0에는 쓰는 곳이 없고 앱은 그대로 읽음 | `tests/emu/scen.sh hint` |
 | `nx4-kor-watch.txt` | `mod/bin/status.sh --watch` (재부팅 요청 감시자) | `tests/emu/watch.sh on` |
 | `nx4-kor-reboot-result.txt` | `mod/bin/status.sh --watch` | `tests/emu/watch.sh answer <code>` |
 
@@ -105,7 +105,7 @@ $ADB install -r mod/app/NX4KOR.apk
 ## 상태 화면 시나리오
 
 ```sh
-for s in ready connected installing reboot mapfail oldmod nocar nobb hint; do
+for s in ready connected installing reboot failed nowireless nowifipart nocar nobb hint; do
   sh tests/emu/shot.sh $s
 done
 ```
@@ -122,12 +122,13 @@ done
 
 | 시나리오 | 넣는 것 | 볼 것 |
 |---|---|---|
-| `ready` | `verdict=ready`, 진행 100% | 시안 세로 표시와 시안 글자 "무선 카플레이·안드로이드 오토 준비됨."(띠 없음), [지금 재부팅]. 왼쪽 칸에 설치 "끝남", 무선 Wi-Fi "켜짐", 폰 연결 "지금 연결된 폰 없음", "자세히" 표 |
-| `connected` | `cp_conn=1`, `verdict=connected` | 시안 표시와 시안 "무선 카플레이 연결됨, 안드로이드 오토 준비됨", 왼쪽 칸 폰 연결 "카플레이 1대 연결됨" |
+| `ready` | `verdict=ready`, 진행 100% | 시안 세로 표시와 시안 글자 "무선 카플레이·안드로이드 오토 준비됨."(띠 없음), [지금 재부팅]. 왼쪽 칸에 설치 "끝남", 무선 Wi-Fi "켜짐(HMG-API)", 폰 연결 "지금 연결된 폰 없음", "자세히" 표(공식 무선 모드 "2.2.0-rc.9, 켜짐", 무선 연결용 Wi-Fi "켜짐") |
+| `connected` | `cp_conn=1`, `verdict=connected` | 시안 표시와 시안 "무선 카플레이 연결됨", 왼쪽 칸 폰 연결 "카플레이 1대 연결됨" |
 | `installing` | 진행 `pct=55`, `step=3/5`, `state=run` | 상태 화면 대신 설치 진행 화면(가운데 정렬): "NX4 KOR 2.0.0 설치 중", "단계 3/5 · map을 확인하는 중입니다", 시안 막대 55%, 시안 "55%"와 회색 "경과 2분 02초", 회색 "보통 5분 안에 끝납니다 …", 맨 아래 [닫기] 블록 |
 | `reboot` | `verdict=reboot` | 노란 띠 "내비를 3분 후 재부팅해 주세요." |
-| `mapfail` | `verdict=mapfail`, `hookmap=mismatch` | 빨간 띠(긴 문구가 네 줄로 줄바꿈), 왼쪽 칸 설치 "안 됨(오른쪽 안내를 보세요)" |
-| `oldmod` | `verdict=oldmod`, `oldmod=yes` | 빨간 띠 "따로 설치된 무선 모드(wireless-carplay-aa)가 있어 …" 다섯 줄 |
+| `failed` | `verdict=failed`(설치기가 쓴 실패 문장), `hookmap=mismatch` | 빨간 띠(설치기 문장), 왼쪽 칸 설치 "안 됨(오른쪽 안내를 보세요)" |
+| `nowireless` | `verdict=nowireless`, `wm=no` | 빨간 띠 "공식 무선 모드(Wireless CarPlay + Android Auto)가 설치되어 있지 않습니다 …", 표의 공식 무선 모드 "없음 (설치 필요)" |
+| `nowifipart` | `verdict=nowifipart`(수준 1), `chip=no`, `ap_fail=yes` | 노란 띠 "이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 …"(지우는 법 줄 없음), 왼쪽 칸 무선 Wi-Fi "부품 없음(USB 동글 필요)", 표의 Wi-Fi 칩 "안 보임" |
 | `nocar` | 다른 차 `product`, `verdict_end=yes` | 빨간 띠 "지원하지 않는 차입니다 …"와 그 아래 회색 지우는 방법 안내 |
 | `nobb` | 짧은 상태 파일(`support=nobb`) | 노란 띠 "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함) …", 왼쪽 칸은 요약 없이 짧은 표, **[지금 재부팅] 없음** |
 | `hint` | `ready`와 같고 힌트(`iph=wifi`, `aa=cpwait`)·알림 | 시안 판정 아래 노란 띠 두 개(아이폰 Wi-Fi 다시 연결, 안드로이드 오토는 카플레이 연결 중이라 대기), 연노랑 띠 "알림 HH:MM …", 맨 아래 [지금 재부팅] |
@@ -244,7 +245,7 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
 
 ## 이 시험이 보지 않는 것
 
-- root 쪽 스크립트(`svc/hotspot.sh`, `bin/status.sh --watch`), HMG-API 엔진, 실제 Wi-Fi·카플레이·안드로이드 오토. 판정 코드가 맞게 나오는지는 `tests/mod-test.sh`가 봅니다.
+- root 쪽 스크립트(`bin/status.sh`·`--watch`, `svc/lib.sh`), HMG-API 엔진, 실제 Wi-Fi·카플레이·안드로이드 오토. 판정 코드가 맞게 나오는지는 `tests/mod-test.sh`가 봅니다.
 - 차의 Android와의 차이(에뮬레이터는 Android 7.0): 글꼴, 화면 밀도, 위젯 모양, SELinux와 파일 권한(차에서 앱이 `/data/local/tmp` 파일을 읽을 수 있는지).
   - 화면 크기는 밀도가 아니라 화면 폭에 맞춰 늘이거나 줄이므로(`Ui.px`) 밀도가 달라도 배치는 같습니다.
   - 에뮬레이터 맨 위의 Android 상태 줄(시각·배터리)이 차에서 어떻게 보일지는 이 시험이 보지 않습니다.
@@ -253,6 +254,17 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
 - 진단 확인 창이 DSP OTA 화면 위에 뜨는지, USB 설치기가 답을 기다리는 흐름. 설치기 쪽은 `tests/mod-test.sh`가 가짜 `am`으로 봅니다.
 
 ## 마지막 결과
+
+2026-11-24, PR #50(2.1.0 상태 판정)의 앱(테스트 키), 에뮬레이터 37.2.13, Android 7.0 arm64 이미지, 창 없이(`-no-window`) 띄워 화면을 찍음.
+
+- 시나리오 10개(`ready connected installing reboot failed nowireless nowifipart nocar nobb hint`) 모두 위 표대로 나옴.
+  - 자세히 표를 내려 보면 새 줄(공식 무선 모드 "2.2.0-rc.9, 켜짐", 순정 핫스팟 기능 (Wi-Fi 칩 전원), Wi-Fi 칩, 무선 연결용 Wi-Fi (HMG-API))이 줄바꿈 없이 한 줄씩 보임.
+  - `nowifipart`: 노란 띠 네 줄, 지우는 법 줄 없음, 표의 Wi-Fi 칩 "안 보임", 무선 연결용 Wi-Fi "꺼짐 (켜지 못함, 다시 시도 중)".
+  - `nowireless`: 빨간 띠 네 줄, 표의 무선 연결용 Wi-Fi "꺼짐 (이번 부팅에 켰다가 꺼짐)".
+- [지금 재부팅] 5단계(감시자 없음, 확인 창, 보냄, `guard`·`cmd` 답, `<` 닫기) 모두 위대로 나옴.
+- `logcat`에 이 앱의 크래시 없음.
+
+아래는 그 전 결과입니다.
 
 2026-11-20, 앱 2.0.0(versionCode 38, 순정 5W 모양 #28), 에뮬레이터 37.2.13, Android 7.0 arm64 이미지.
 

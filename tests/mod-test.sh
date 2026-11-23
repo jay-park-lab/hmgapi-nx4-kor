@@ -6,7 +6,7 @@
 #                                          (PC JVM)에 설치해 서비스·앱 등록과 차종 제한(NX4.KOR 260902만)을 본다
 #                                          (HMGAPI_SRC는 .env.local에 적어도 된다)
 # 가짜 도구: hmgapid, pm, am, getprop, settings, svc, sleep. 서비스 래퍼는 가짜 스크립트를 부르게 해서 넘기는 값을 보고,
-# post.sh·preun.sh·hotspot.sh(setup_hmgapi)는 진짜를 돌린다.
+# preun.sh·status.sh(svc/lib.sh)는 진짜를 돌린다.
 B=$(cd "$(dirname "$0")/.." && pwd)
 # .env.local에서는 HMGAPI_SRC만 읽는다. 시험이 부르는 build.sh는 .env.local을 읽지 않게 한다
 # (NX4_BUSYBOX 같은 개인 설정이 섞이면 시험 결과가 PC마다 달라진다)
@@ -31,48 +31,30 @@ for f in $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/usb/troubleShooter $B/
   for KSH in $KSHS; do check "구문 검사 $(basename $KSH): ${f#$B/}" '$KSH -n $f'; done
 done
 
-# --- mod.json: NX4 KOR 모드 + 합친 무선 모드(2.4.5) ---
-check "mod.json: 서비스·앱·런처, NX4.KOR 260902만, HMG-API 1.1.0-rc.4 이상, 따로 설치하는 무선 모드와 충돌 선언, 순정 핫스팟 기능은 HMG-API에 요청" 'python3 - "$PKG" <<PY
+# --- mod.json: NX4 KOR 모드(2.1.0: 상태 화면 앱과 그 서비스만. 무선은 HMG-API와 공식 무선 모드 wireless-carplay-aa가 맡음) ---
+check "mod.json: launch 서비스·앱·런처만, NX4.KOR 260902만, HMG-API 1.1.0-rc.8 이상, 훅·무선 부분·Wi-Fi 요청·충돌·requires 없음" 'python3 - "$PKG" <<PY
 import json, os, sys
 d = sys.argv[1]
 m = json.load(open(os.path.join(d, "mod.json")))
 assert m["id"] == "nx4-kor"
-assert m["hmgapi"] == ">=1.1.0-rc.4", m["hmgapi"]
+assert m["hmgapi"] == ">=1.1.0-rc.8", m["hmgapi"]
 for s in m["services"]:
     assert os.path.isfile(os.path.join(d, s["script"])), s
-assert {s["name"]: s["start"] for s in m["services"]} == {"ap": "android", "launch": "manual"}
-assert all(s["user"] == "root" for s in m["services"])
+assert [(s["name"], s["start"], s["user"], s["restart"]) for s in m["services"]] == [("launch", "manual", "root", False)], m["services"]
 assert m["apps"] == [{"apk": "app/NX4KOR.apk", "package": "io.github.jayparklab.nx4kor"}], m["apps"]
 assert m["system"] == {"model": ["NX4", "NX4HEV"], "region": ["KOR"], "firmware": ["260902"]}
-assert m["provides"]["launcher"][0]["class"] == ".StatusActivity"
-assert m["conflicts"] == ["wireless-carplay-aa"]
-assert "logs" not in m
-# 순정 핫스팟 기능(Wi-Fi 칩 전원)은 HMG-API가 켠다(rc.3부터): 순정 파일이 있으면 featurexml 줄을 막고, 없으면(한국 판) HMG-API 파일을 넣음
-assert m["wifi"] == {"hotspot": True}, m.get("wifi")
-p = json.load(open(os.path.join(d, "patches.json")))
-assert not any("wifihotspot" in json.dumps(c) for c in p["changes"]), "featurexml 핫스팟 줄은 HMG-API가 처리"
+# 앱 메뉴 타일은 하나. 그림 키(icon*)는 아래 타일 그림 테스트가 본다
+assert list(m["provides"]) == ["launcher"] and len(m["provides"]["launcher"]) == 1, m["provides"]
+t = m["provides"]["launcher"][0]
+assert {k: t[k] for k in t if not k.startswith("icon")} == {"package": "io.github.jayparklab.nx4kor", "class": ".StatusActivity"}, t
+# 공식 무선 모드와 같은 훅을 걸지 않는다(#17). requires로 걸면 공식 모드가 없거나 꺼질 때 HMG-API가 이 모드의 앱·서비스까지 멈춘다
+for k in ("hooks", "parts", "feature_flags", "wifi", "conflicts", "requires", "logs", "probe", "network"):
+    assert k not in m, k
 PY'
-check "mod.json: 무선 부분(parts·feature_flags·hooks)이 wireless/mod-2.4.5.json과 같고, 훅 jar·레시피·파일·설정이 있음" 'python3 - "$PKG" "$B/wireless/mod-2.4.5.json" <<PY
-import json, os, sys
-d = sys.argv[1]
-m = json.load(open(os.path.join(d, "mod.json"))); w = json.load(open(sys.argv[2]))
-for k in ("parts", "feature_flags", "hooks"):
-    assert m[k] == w[k], k
-assert os.path.isfile(os.path.join(d, m["hooks"]["jar"]))
-for lib, rs in m["hooks"]["native"].items():
-    for r in rs:
-        assert os.path.isfile(os.path.join(d, r)), r
-p = json.load(open(os.path.join(d, "patches.json")))
-assert list(p) == ["changes"], list(p)
-for c in p["changes"]:
-    if "src" in c: assert os.path.isfile(os.path.join(d, c["src"])), c
-s = json.load(open(os.path.join(d, "settings.json")))
-keys = [x["key"] for x in s["settings"]]
-assert keys == ["tbt", "tbt_fit", "bridge", "audio", "now_playing", "menu", "usb_drives", "aa_ready_resend", "aa_name_hold", "star_popup_skip"], keys
-assert not os.path.exists(os.path.join(d, "patches")) and not os.path.exists(os.path.join(d, "stubs"))
-PY'
-check "hotspot.sh: 모드 id·HMG-API 최소 판이 mod.json과 같음, env.sh의 NX4_MOD_ID도 같음" \
-  'grep -q "^MOD_ID=\${NX4_MOD_ID:-nx4-kor}$" $PKG/svc/hotspot.sh && grep -q "^HMG_MIN=1.1.0-rc.4$" $PKG/svc/hotspot.sh && grep -q "^NX4_MOD_ID=nx4-kor$" $PKG/svc/env.sh'
+check "빠진 것: 한국 포크 무선 모드(hooks.jar·레시피·libleafiaaac.so·patches.json·settings.json, wireless/), 핫스팟 서비스(svc/ap.sh·hotspot.sh, scripts/post.sh)" \
+  '[ ! -e $PKG/hooks.jar ] && [ ! -e $PKG/recipes ] && [ ! -e $PKG/files ] && [ ! -e $PKG/patches.json ] && [ ! -e $PKG/settings.json ] && [ ! -e $B/wireless ] && [ ! -e $PKG/svc/ap.sh ] && [ ! -e $PKG/svc/hotspot.sh ] && [ ! -e $PKG/scripts/post.sh ] && [ -f $PKG/svc/lib.sh ]'
+check "lib.sh: 모드 id·HMG-API 최소 판이 mod.json과 같음, 공식 무선 모드 최소 판, env.sh의 NX4_MOD_ID도 같음, 앱 Report의 최소 판도 같음" \
+  'grep -q "^MOD_ID=\${NX4_MOD_ID:-nx4-kor}$" $PKG/svc/lib.sh && grep -q "^HMG_MIN=1.1.0-rc.8$" $PKG/svc/lib.sh && grep -q "^WM_ID=wireless-carplay-aa$" $PKG/svc/lib.sh && grep -q "^WM_MIN=2.2.0-rc.9$" $PKG/svc/lib.sh && grep -q "^NX4_MOD_ID=nx4-kor$" $PKG/svc/env.sh && grep -q "MIN_HMGAPI = \"1.1.0-rc.8\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java && grep -q "MIN_WIRELESS = \"2.2.0-rc.9\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java'
 check "launch 서비스 이름 = 앱이 부르는 이름" 'grep -q "\"service-start\", \"launch\"" $B/app/java/io/github/jayparklab/nx4kor/StatusActivity.java'
 # 앱 메뉴 타일 그림(#47): HMG-API tools/mkicon.sh가 만드는 순정 꼴(99x99 투명 타일) 넷. 원본 모양은 art/tile.svg
 check "mod.json: 앱 메뉴 타일에 낮·밤·꺼짐(낮·밤) 그림 넷(icons/), 모두 모드 안의 99x99 투명 PNG(RGBA, 꺼짐은 투명 팔레트일 수 있음)" 'python3 - "$PKG" <<PY
@@ -204,41 +186,32 @@ P0=$T/bin:/usr/bin:/bin:/usr/sbin:/sbin
 echo test-boot-id > $T/bootid
 echo "100.00 50.00" > $T/uptime
 
-# 가짜 모드 폴더: 래퍼(svc/ap.sh·launch.sh·env.sh, bin/uninstall.sh)는 진짜, 나머지 스크립트 자리에는 받은 환경을 적는 가짜.
+# 가짜 모드 폴더: 래퍼(svc/launch.sh·env.sh, bin/uninstall.sh)는 진짜, 나머지 스크립트 자리에는 받은 환경을 적는 가짜.
 # 가짜 preun.sh는 진짜처럼 삭제 때 HMG-API에서 이 모드를 뺀다
 mkfix() {
   rm -rf $1; mkdir -p $1; cp -R $PKG/. $1/
-  for s in scripts/post.sh svc/hotspot.sh bin/status.sh; do
+  for s in bin/status.sh; do
     printf '#!/bin/sh\necho "%s NX4_APP=$NX4_APP APP=$APP BK=$BK APLOG=$APLOG NX4_UPDATE=$NX4_UPDATE NX4_APLOG=$NX4_APLOG" >> %s/stublog\necho "out of %s"\n' $s $T $s > $1/$s
   done
   printf '#!/bin/sh\necho "scripts/preun.sh NX4_APP=$NX4_APP APP=$APP BK=$BK APLOG=$APLOG NX4_UPDATE=$NX4_UPDATE NX4_APLOG=$NX4_APLOG" >> %s/stublog\n[ "$NX4_UPDATE" = 1 ] || { command -v hmgapid >/dev/null 2>&1 && hmgapid engine remove nx4-kor >/dev/null; }\nexit 0\n' $T > $1/scripts/preun.sh
   mkdir -p $1/app; echo apk > $1/app/NX4KOR.apk
 }
 
-# --- ap.sh ---
 F=$T/mod; mkfix $F
-apr() { (env -u NX4_APP PATH=$P0 HMGAPI_MOD_DIR=$F NX4_ROOT=$T/kp sh $F/svc/ap.sh) > $T/ap.out 2>&1; }
-rm -f $T/stublog; apr
-check "ap.sh: 처음에 post.sh를 한 번 돌리고 표시(post.done)를 남김" 'grep -q "^scripts/post.sh" $T/stublog && [ -f $T/kp/backup/post.done ]'
-check "ap.sh: hotspot.sh에 위치를 넘김(APP=모드 폴더, BK·APLOG는 /data/nx4-kor 아래)" \
-  'grep -q "^svc/hotspot.sh NX4_APP=$F APP=$F BK=$T/kp/backup APLOG=$T/kp/logs/ap.log NX4_UPDATE= NX4_APLOG=$T/kp/logs/ap.log" $T/stublog'
-check "ap.sh: hotspot.sh 출력은 APLOG로(덧붙이기), 래퍼의 줄은 hmgapid 기록으로" 'grep -q "out of svc/hotspot.sh" $T/kp/logs/ap.log && ! grep -q "out of svc/hotspot.sh" $T/ap.out && grep -q "hotspot.sh 시작" $T/ap.out'
-rm -f $T/stublog; apr
-check "ap.sh: 두 번째 시작에는 post.sh를 다시 돌리지 않음" '! grep -q "^scripts/post.sh" $T/stublog && grep -q "^svc/hotspot.sh" $T/stublog'
 
-# --- launch.sh ---
+# --- launch.sh(이 모드의 서비스는 이것 하나) ---
 rm -f $T/stublog
 (env -u NX4_APP PATH=$P0 HMGAPI_MOD_DIR=$F NX4_ROOT=$T/kp sh $F/svc/launch.sh) > $T/l.out 2>&1
-check "launch.sh: bin/status.sh를 모드 위치로 돌림(NX4_APLOG로 ap.log 위치를 넘김)" 'grep -q "^bin/status.sh NX4_APP=$F APP=$F BK=$T/kp/backup APLOG=$T/kp/logs/ap.log NX4_UPDATE= NX4_APLOG=$T/kp/logs/ap.log" $T/stublog'
+check "launch.sh: bin/status.sh를 모드 위치로 돌림(NX4_APLOG로 ap.log 위치를 넘김), 기록 폴더만 만듦(backup 없음)" \
+  'grep -q "^bin/status.sh NX4_APP=$F APP=$F BK=$T/kp/backup APLOG=$T/kp/logs/ap.log NX4_UPDATE= NX4_APLOG=$T/kp/logs/ap.log" $T/stublog && [ -d $T/kp/logs ] && [ ! -d $T/kp/backup ]'
 
 # --- uninstall.sh ---
 ur() { (env -u NX4_APP PATH=$P0 HMGDATA=$HD NX4_ROOT=$T/kp sh $1/bin/uninstall.sh $2) > $T/u.out 2>&1; echo $? > $T/u.rc; }
 mkdir -p $HD/mods; rm -rf $HD/mods/nx4-kor; cp -R $F $HD/mods/nx4-kor; I=$HD/mods/nx4-kor
-mkdir -p $T/kp/backup; : > $T/kp/backup/post.done; : > $T/ap-running; : > $T/calls; rm -f $T/stublog
+mkdir -p $T/kp/logs; : > $T/calls; rm -f $T/stublog
 ur $I --update
-check "uninstall.sh --update: 서비스 ap를 멈추고 멈출 때까지 기다림" 'grep -qx "hmgapid service-stop nx4-kor ap" $T/calls && grep -q "hmgapid services nx4-kor" $T/calls'
-check "uninstall.sh --update: preun.sh를 NX4_UPDATE=1로(업데이트 갈래), 모드는 지우지 않음, post.done을 지워 새 판이 post.sh를 다시 돌리게" \
-  'grep -q "^scripts/preun.sh NX4_APP=$I .*NX4_UPDATE=1" $T/stublog && ! grep -q "engine remove" $T/calls && [ -d $I ] && [ ! -f $T/kp/backup/post.done ] && [ "$(cat $T/u.rc)" = 0 ]'
+check "uninstall.sh --update: preun.sh를 NX4_UPDATE=1로(업데이트 갈래), 모드·기록 폴더는 지우지 않음, 서비스를 멈추지 않음(ap 서비스 없음)" \
+  'grep -q "^scripts/preun.sh NX4_APP=$I .*NX4_UPDATE=1" $T/stublog && ! grep -q "engine remove" $T/calls && ! grep -q "service-stop" $T/calls && [ -d $I ] && [ -d $T/kp ] && [ "$(cat $T/u.rc)" = 0 ]'
 : > $T/calls; rm -f $T/stublog
 ur $I
 check "uninstall.sh: preun.sh(삭제 갈래, HMG-API에서 모드를 뺌) → /data/nx4-kor 지움" \
@@ -246,13 +219,19 @@ check "uninstall.sh: preun.sh(삭제 갈래, HMG-API에서 모드를 뺌) → /d
 # preun.sh가 모드를 빼지 못했으면(HMG-API 앱에서 지워야 함) 실패로 끝내고 알림
 cp -R $F $I; printf '#!/bin/sh\nexit 0\n' > $I/scripts/preun.sh; mkdir -p $T/kp; : > $T/calls
 ur $I
-check "uninstall.sh: 모드가 HMG-API에 남았으면 실패(1)로 끝내고 HMG-API 앱에서 지우라고 알림" '[ "$(cat $T/u.rc)" = 1 ] && grep -q "HMG-API 앱에서 NX4 KOR를 지우고" $T/u.out'
+check "uninstall.sh: 모드가 HMG-API에 남았으면 실패(1)로 끝내고 HMG-API 앱에서 지우라고 알림(적용할 것은 없음)" '[ "$(cat $T/u.rc)" = 1 ] && grep -q "HMG-API 앱에서 NX4 KOR를 지워 주세요" $T/u.out && ! grep -q "적용해 주세요" $T/u.out'
 rm -rf $I
 # HMG-API를 먼저 지운 경우(hmgapid 명령·installed.txt 없음): preun.sh는 그대로 돌리고, 남은 모드 폴더를 직접 지우고, 앱은 pm으로 지움
 cp -R $F $I; mkdir -p $T/kp; : > $T/calls; rm -f $T/stublog
 (env -u NX4_APP PATH=$P0 HMGAPID=$T/nohmgapid HMGDATA=$HD NX4_ROOT=$T/kp sh $I/bin/uninstall.sh) > $T/u.out 2>&1; echo $? > $T/u.rc
 check "uninstall.sh: HMG-API를 먼저 지웠으면 preun.sh로 되돌리고, 남은 모드 폴더·앱(pm)을 직접 지움" \
   '[ "$(cat $T/u.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$I .*NX4_UPDATE= " $T/stublog && grep -qx "pm uninstall io.github.jayparklab.nx4kor" $T/calls && [ ! -d $I ] && [ ! -d $T/kp ] && grep -q "HMG-API가 먼저 지워져" $T/u.out'
+# 2.0.x의 백업(backup/: Wi-Fi 잠금·순정 AP 저장값을 되돌릴 기록)이 남은 차: 그 폴더만 남기고 2.0.x USB로 되돌리라고 알림(PR #50 리뷰 2)
+rm -rf $I; cp -R $F $I; mkdir -p $T/kp/backup $T/kp/logs; echo orig > $T/kp/backup/wpaconf.orig; : > $T/kp/logs/ap.log; : > $T/calls; rm -f $T/stublog
+ur $I
+check "uninstall.sh: 2.0.x 백업(backup/)이 있으면 그것만 남기고(기록 그대로) 나머지를 지우고, 2.0.x USB의 UNINSTALL로 되돌리라고 알림" \
+  '[ "$(cat $T/u.rc)" = 0 ] && grep -qx orig $T/kp/backup/wpaconf.orig && [ ! -d $T/kp/logs ] && [ ! -d $I ] && grep -q "백업 폴더($T/kp/backup)는 지우지 않았습니다" $T/u.out && grep -q "2.0.x USB(v2.0.4-beta.1) 또는 NX4 KOR 2.1.0 이후 USB의 UNINSTALL" $T/u.out' || cat $T/u.out
+rm -rf $I $T/kp
 
 # --- troubleShooter(USB 설치기) ---
 R=$T/root; U=$T/usb0; K=$U/NX4
@@ -435,281 +414,195 @@ ts $U
 check "USB 설치기: 업데이트 설치가 거절되면 실패로 끝내고 예전 판의 서비스를 다시 띄움" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "설치 실패" $T/ts.out && grep -qx "hmgapid service-start nx4-kor ap" $T/calls'
 rm -f $T/install-fail
 # 지우기
-: > $K/UNINSTALL; : > $T/ap-running; rm -f $T/stublog; mkdir -p $R/data/nx4-kor/backup
+: > $K/UNINSTALL; : > $T/ap-running; rm -f $T/stublog; mkdir -p $R/data/nx4-kor/logs
 ts $U
 check "USB 설치기: UNINSTALL이면 설치된 모드의 uninstall.sh로 되돌리고 모드를 지움" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$HD/mods/nx4-kor " $T/stublog && grep -qx "hmgapid engine remove nx4-kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && grep -q "지웠습니다" $T/ts.out'
 ts $U
 check "USB 설치기: 지울 것이 없으면 아무것도 하지 않음" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "설치되어 있지 않습니다" $T/ts.out && ! grep -q "engine remove" $T/calls'
 # 모드는 HMG-API 앱에서 먼저 지웠고 되돌릴 기록만 남은 경우: 스틱의 사본(/data로 복사)으로 되돌림
-mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog
+# (2.1.0이 남기는 기록은 logs/. 2.0.x의 backup/은 2.1.0 uninstall.sh가 남기고 2.0.x USB로 안내한다, PR #50 리뷰 2)
+mkdir -p $R/data/nx4-kor/logs; rm -f $T/stublog
 ts $U
 check "USB 설치기: 모드가 이미 지워졌어도 기록이 남았으면 스틱의 사본으로 되돌림" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$R/data/local/tmp/nx4-kor-usb/payload " $T/stublog && [ ! -d $R/data/nx4-kor ] && [ ! -d $R/data/local/tmp/nx4-kor-usb ]'
 # HMG-API를 먼저 지운 뒤(hmgapid 없음): 일반 삭제는 모드 폴더를 남긴다 → 그 폴더의 uninstall.sh로, purge는 /data/hmgapi째 없다 → 스틱 사본으로
 ts0() { : > $T/calls; rm -f $K/install.log; (env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/nohmgapid NX4_USB_DIRS=$U NX4_APP_WAIT=4 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
-mkdir -p $HD/mods $R/data/nx4-kor/backup; cp -R $F $HD/mods/nx4-kor; rm -f $HD/installed.txt $T/stublog
+mkdir -p $HD/mods $R/data/nx4-kor/logs; cp -R $F $HD/mods/nx4-kor; rm -f $HD/installed.txt $T/stublog
 ts0
 check "USB 설치기: HMG-API를 먼저 지운 뒤(일반 삭제)에도 UNINSTALL이 됨: 남은 모드 폴더의 uninstall.sh로 되돌리고 모드 폴더·앱을 지움" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$HD/mods/nx4-kor " $T/stublog && grep -qx "pm uninstall io.github.jayparklab.nx4kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && [ ! -d $R/data/nx4-kor ] && grep -q "지웠습니다" $T/ts.out && grep -q "HMG-API가 없음" $K/install.log'
-mv $HD $T/hd.purged; mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog
+mv $HD $T/hd.purged; mkdir -p $R/data/nx4-kor/logs; rm -f $T/stublog
 ts0
 check "USB 설치기: HMG-API를 먼저 완전 삭제(--purge)한 뒤에도 기록이 남았으면 스틱의 사본으로 되돌림" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^scripts/preun.sh NX4_APP=$R/data/local/tmp/nx4-kor-usb/payload " $T/stublog && [ ! -d $R/data/nx4-kor ]'
 mv $T/hd.purged $HD
 rm -f $K/UNINSTALL
 
-# --- 진짜 스크립트: post.sh·preun.sh·hotspot.sh(setup_hmgapi) ---
+# --- 진짜 스크립트: preun.sh·status.sh(svc/lib.sh) ---
 # 차의 PATH로 바꾸는 맨 윗줄만 시험용 PATH로 바꾼 사본으로 돌린다. 나머지는 그대로
 TP=$T/pkg; rm -rf $TP; cp -R $PKG $TP
-for f in svc/hotspot.sh scripts/post.sh scripts/preun.sh bin/status.sh; do
+for f in svc/lib.sh scripts/preun.sh bin/status.sh; do
   sed "s#^export PATH=.*#export PATH=$P0#" $PKG/$f > $TP/$f
 done
-# post.sh: 설치 전 Wi-Fi 상태 기록, 앱은 설치하지 않음(HMG-API가 설치)
-: > $T/calls; rm -rf $T/pbk
-(env PATH=$P0 BB_SYS=$T/bin/bb NX4_APP=$TP BK=$T/pbk W=$T/pw NOTICE=$T/pnotice BOOT_ID=$T/bootid sh $TP/scripts/post.sh) > $T/p.out 2>&1
-check "post.sh: BK에 설치 전 Wi-Fi 상태를 적고 앱은 설치하지 않음(pm install 없음)" '[ "$(cat $T/pbk/wifi_on 2>/dev/null)" = 1 ] && grep -qx "settings get global wifi_on" $T/calls && ! grep -q "^pm" $T/calls' || cat $T/p.out
-# preun.sh: 업데이트 갈래
-prun() { (env PATH=${PP:-$P0} BB_SYS=$T/bin/bb NX4_APP=$TP BK=$T/ubk W=$T/uw CONF=$T/uconf HINT=$T/uhint PROG=$T/uprog NOTICE=$T/unotice HMGDATA=$T/uh BOOT_ID=$T/bootid MOUNTS=$T/mounts "$@" sh $TP/scripts/preun.sh) > $T/pu.out 2>&1; echo $? > $T/pu.rc; }
-pureset() { rm -rf $T/ubk $T/uh; mkdir -p $T/ubk $T/uh/mods/nx4-kor; : > $T/ubk/keep; echo '{"id": "nx4-kor"}' > $T/uh/mods/nx4-kor/mod.json; : > $T/uh/installed.txt; : > $T/calls; }
+# preun.sh: 업데이트 갈래. 작업 폴더·상태 화면 파일만 지우고, 진행 기록(USB 설치기가 씀)·알림은 둔다
+prun() { (env PATH=${PP:-$P0} BB_SYS=$T/bin/bb NX4_APP=$TP W=$T/uw HINT=$T/uhint PROG=$T/uprog NOTICE=$T/unotice RBRES=$T/urbres HMGDATA=$T/uh BOOT_ID=$T/bootid "$@" sh $TP/scripts/preun.sh) > $T/pu.out 2>&1; echo $? > $T/pu.rc; }
+pureset() {
+  rm -rf $T/uw $T/uh; mkdir -p $T/uw $T/uh/mods/nx4-kor; : > $T/uw/watch.until
+  for f in uhint uprog unotice urbres; do echo x > $T/$f; done
+  echo '{"id": "nx4-kor"}' > $T/uh/mods/nx4-kor/mod.json; : > $T/uh/installed.txt; : > $T/calls
+}
 pureset; prun NX4_UPDATE=1
-check "preun.sh: NX4_UPDATE=1이면 업데이트 갈래로 끝나고 BK를 남김, 모드를 지우지 않음" '[ "$(cat $T/pu.rc)" = 0 ] && grep -q "NX4 KOR 업데이트: 이전 판 정리" $T/pu.out && [ -f $T/ubk/keep ] && ! grep -q "engine remove" $T/calls'
-# preun.sh: 삭제 → HMG-API에서 이 모드를 빼고, 계획이 되돌리기뿐이면 적용
-pureset; printf 'restore  /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml [nx4-kor]\nsetting  persist.sys.iap2.wifi back to stock\nhook plan: 0 mods\n' > $T/plan.out
-prun
-check "preun.sh: 삭제면 engine remove nx4-kor → 계획(되돌리기뿐) → apply, BK 지움, 끝 문구" \
-  '[ "$(cat $T/pu.rc)" = 0 ] && grep -qx "hmgapid engine remove nx4-kor" $T/calls && grep -qx "hmgapid engine apply" $T/calls && [ ! -d $T/ubk ] && grep -q "지우고 적용함" $T/pu.out && grep -q "NX4 KOR를 지웠습니다" $T/pu.out' || cat $T/pu.out
-pureset; printf 'restore  /system/lib/libleafiaaac.so [nx4-kor]\nchange   /system/framework/framework.odex [other-mod]\n' > $T/plan.out
-prun
-check "preun.sh: 계획에 다른 모드의 변경이 있으면 적용하지 않고 HMG-API 앱에서 적용하라고 안내, 권한 파일 되돌리기 건너뜀" \
-  '! grep -q "engine apply" $T/calls && grep -q "HMG-API 앱에서 변경 사항을 적용해 주세요" $T/pu.out && grep -q "되돌리기 건너뜀" $T/pu.out'
-pureset; echo "nothing changed" > $T/plan.out
-prun
-check "preun.sh: 적용한 적이 없으면(nothing changed) 적용하지 않고 끝냄" '! grep -q "engine apply" $T/calls && grep -q "되돌릴 변경 없음" $T/pu.out && [ ! -d $T/ubk ]'
+check "preun.sh: NX4_UPDATE=1이면 작업 폴더·상태 안내를 지우고 끝남, 진행 기록(설치기가 씀)·알림은 둠, HMG-API를 부르지 않음" \
+  '[ "$(cat $T/pu.rc)" = 0 ] && grep -q "NX4 KOR 업데이트: 이전 판 정리" $T/pu.out && [ ! -d $T/uw ] && [ ! -f $T/uhint ] && [ -f $T/uprog ] && [ -f $T/unotice ] && ! grep -q "^hmgapid" $T/calls' || cat $T/pu.out
+# preun.sh: 상태 화면이 띄운 감시자(status.sh --watch)를 멈춘다. 명령줄은 가짜 /proc의 cmdline(NUL로 나눔)으로 본다
+# (멈출 프로세스는 하위 셸에서 띄워 이 셸의 작업으로 남지 않게 한다: 멈추면 바로 거둬져 kill -0이 실패한다)
+pureset; (sleep 20 >/dev/null 2>&1 & echo $! > $T/slp.pid); SLP=$(cat $T/slp.pid)
+mkdir -p $T/uproc/$SLP; printf 'sh\0/data/hmgapi/mods/nx4-kor/bin/status.sh\0--watch\0' > $T/uproc/$SLP/cmdline
+echo "$SLP test-boot-id" > $T/uw/watch.pid; prun NX4_UPDATE=1 PROC=$T/uproc
+_k=0; while kill -0 $SLP 2>/dev/null && [ $_k -lt 30 ]; do /bin/sleep 0.1; _k=$((_k+1)); done
+check "  감시자(watch.pid의 status.sh)를 멈춤" '! kill -0 $SLP 2>/dev/null' || { kill $SLP 2>/dev/null; cat $T/pu.out; }
+rm -rf $T/uproc $T/slp.pid
+# preun.sh: 삭제 → HMG-API에서 이 모드를 뺀다(engine remove). 이 모드는 시스템 파일을 바꾸지 않아 계획·적용은 하지 않는다
+# (앱·서비스는 HMG-API가 목록을 다시 써서 내림). 진행 기록·알림·재부팅 결과도 지운다
+pureset; prun
+check "preun.sh: 삭제면 engine remove nx4-kor만(계획·적용 없음), 진행 기록·알림·재부팅 결과 지움, 끝 문구" \
+  '[ "$(cat $T/pu.rc)" = 0 ] && grep -qx "hmgapid engine remove nx4-kor" $T/calls && ! grep -q "engine plan" $T/calls && ! grep -q "engine apply" $T/calls && [ ! -f $T/uprog ] && [ ! -f $T/unotice ] && [ ! -f $T/urbres ] && grep -q "HMG-API에서 이 모드를 지움" $T/pu.out && grep -qx "NX4 KOR를 지웠습니다." $T/pu.out' || cat $T/pu.out
+pureset; rm -f $T/uh/mods/nx4-kor/mod.json; prun
+check "  HMG-API에 이 모드가 없으면(이미 지워짐) HMG-API에서 지우지 않음" '! grep -q "engine remove" $T/calls && grep -q "이미 지워짐" $T/pu.out' || cat $T/pu.out
 # preun.sh: HMG-API를 먼저 지웠으면(hmgapid 명령도 installed.txt도 없음) HMG-API를 부르지 않고 끝까지 감
 mkdir -p $T/bin2; for b in $T/bin/*; do [ "${b##*/}" = hmgapid ] || cp $b $T/bin2/; done
 P2=$T/bin2:/usr/bin:/bin:/usr/sbin:/sbin
 sed "s#^export PATH=.*#export PATH=$P2#" $PKG/scripts/preun.sh > $TP/scripts/preun.sh
-sed "s#^export PATH=.*#export PATH=$P2#" $PKG/svc/hotspot.sh > $TP/svc/hotspot.sh
+sed "s#^export PATH=.*#export PATH=$P2#" $PKG/svc/lib.sh > $TP/svc/lib.sh
 pureset; rm -f $T/uh/installed.txt
-(env PATH=$P2 BB_SYS=$T/bin2/bb NX4_APP=$TP BK=$T/ubk W=$T/uw CONF=$T/uconf HINT=$T/uhint PROG=$T/uprog NOTICE=$T/unotice HMGDATA=$T/uh BOOT_ID=$T/bootid sh $TP/scripts/preun.sh) > $T/pu.out 2>&1
-check "preun.sh: HMG-API를 먼저 지웠으면 HMG-API를 부르지 않고 되돌리기를 끝까지 함, BK 지움" \
-  '! grep -q "^hmgapid" $T/calls && grep -q "HMG-API가 먼저 지워져 있음" $T/pu.out && ! grep -q "되돌리기 건너뜀" $T/pu.out && [ ! -d $T/ubk ]' || cat $T/pu.out
+prun PATH=$P2 BB_SYS=$T/bin2/bb
+check "preun.sh: HMG-API를 먼저 지웠으면 HMG-API를 부르지 않고 작업 파일을 지우고 끝냄" \
+  '! grep -q "^hmgapid" $T/calls && grep -q "HMG-API가 먼저 지워져 있음" $T/pu.out && [ ! -d $T/uw ] && [ ! -f $T/uprog ] && [ "$(cat $T/pu.rc)" = 0 ]' || cat $T/pu.out
 sed "s#^export PATH=.*#export PATH=$P0#" $PKG/scripts/preun.sh > $TP/scripts/preun.sh
-sed "s#^export PATH=.*#export PATH=$P0#" $PKG/svc/hotspot.sh > $TP/svc/hotspot.sh
+sed "s#^export PATH=.*#export PATH=$P0#" $PKG/svc/lib.sh > $TP/svc/lib.sh
 
-# hotspot.sh perms_revert(삭제 때): 우리가 쓴 무선 권한 파일만, 내용이 그대로이고 HMG-API가 관리하지 않을 때만 지움
-PR=$T/pr
-CPW=com.hkmc.software.connectivity.carplay_wireless; APW=com.hkmc.software.connectivity.androidauto_wireless
-prrun() { (env PATH=$P0 HOTSPOT_LIB=1 BB=$T/bin/bb APP=$TP W=$PR/w BK=$PR/bk PERMS=$PR/perms MOUNTS=$PR/mounts APLOG=$PR/ap.log HMGDATA=$PR/hd BOOT_ID=$T/bootid \
-  sh -c ". $TP/svc/hotspot.sh; perms_revert; echo rc=\$?") > $PR/out 2>&1; }
-prreset() {
-  rm -rf $PR $T/status.out; mkdir -p $PR/perms $PR/bk $PR/w; : > $T/calls
-  echo "/dev/block/system /system ext4 rw,relatime 0 0" > $PR/mounts
-  for n in $CPW $APW; do printf '<permissions>\n    <feature name="%s" />\n</permissions>\n' $n > $PR/perms/$n.xml; echo $n >> $PR/bk/perms.ours; done
-}
-prreset; prrun
-check "perms_revert: 우리가 쓴 무선 권한 파일 2개를 지움(/system이 rw면 remount 없음), 기록에 이름만" \
-  'grep -qx rc=0 $PR/out && [ ! -e $PR/perms/$CPW.xml ] && [ ! -e $PR/perms/$APW.xml ] && grep -q "원래대로(없음): $CPW" $PR/out && ! grep -q remount $T/calls'
-prreset; echo changed >> $PR/perms/$CPW.xml; prrun
-check "  perms_revert: 내용이 바뀐 파일은 그대로 둠(다른 쪽이 바꾼 것)" '[ -e $PR/perms/$CPW.xml ] && [ ! -e $PR/perms/$APW.xml ] && grep -q "내용이 바뀜" $PR/out'
-prreset; echo "CHANGED $PR/perms/$APW.xml [nx4-kor] expected x, found y" > $T/status.out; prrun
-check "  perms_revert: HMG-API가 관리하는 파일은 HMG-API에 맡김" '[ -e $PR/perms/$APW.xml ] && [ ! -e $PR/perms/$CPW.xml ] && grep -q "HMG-API 모드가 관리 중" $PR/out'
-prreset; echo "/dev/block/system /system ext4 ro,relatime 0 0" > $PR/mounts; prrun
-check "  perms_revert: /system을 쓰기로 열지 못하면 아무것도 지우지 않고 실패(1)" 'grep -qx rc=1 $PR/out && [ -e $PR/perms/$CPW.xml ] && grep -qx "hmgapid remount rw" $T/calls && grep -q "열지 못함" $PR/out'
-
-# hotspot.sh setup_hmgapi: 이 차의 map 만들기·확인 → 무선 기능 적용(통합한 모드)
+# --- status.sh: 판정(상태 파일). 2.1.0: HMG-API + 공식 무선 모드(wireless-carplay-aa) + 이 모드 ---
+# 가짜 ps: $T/ps.out이 있으면 그 줄(PID … 명령), 없으면 이 PC의 ps. hostapd·wpa_supplicant가 도는지만 본다
+printf '#!/bin/sh\nif [ -f %s/ps.out ]; then echo "PID USER TIME COMMAND"; cat %s/ps.out; else exec /bin/ps "$@"; fi\n' $T $T > $T/bin/ps; chmod +x $T/bin/ps
 SH=$T/sh
-srun() {
-  rm -f $T/sprog
-  (env PATH=$P0 HOTSPOT_LIB=1 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog NOTICE=$T/snotice BOOT_ID=$T/bootid \
-     UPTIME=$T/uptime WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio "$@" sh -c ". $TP/svc/hotspot.sh; mkdir -p \$W; P_ON=1; setup_hmgapi; echo rc=\$?") > $T/s.out 2>&1
-}
-st() { sed -n "s/^$1=//p" $T/sprog; }
-sreset() {
-  rm -rf $SH $T/sbk $T/sw $T/mapcar.* $T/verify.rc $T/apply.rc $T/iap2
-  mkdir -p $SH/maps $SH/mods/nx4-kor $T/sbk; cp $PKG/mod.json $SH/mods/nx4-kor/mod.json; : > $T/wifiseen; : > $T/calls
-  printf 'change   /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml [nx4-kor]\nsetting  persist.sys.iap2.wifi = t [nx4-kor]\napp      io.github.jayparklab.nx4kor [nx4-kor]\nservice  nx4-kor ap\n' > $T/plan.out
-  echo "written: /data/hmgapi/state/local-map.json (this car's own map, status probed): run \`hmgapid engine verify-map\`, then restart, for its hooks" > $T/mapcar.out
-  : > $T/mapcar.writes
-}
-sreset; srun
-check "setup_hmgapi: 처음(map 없음) → map-car --write → verify-map → 계획이 이 모드뿐 → apply → 재부팅 필요, 적용한 판 기록" \
-  'grep -qx "hmgapid engine map-car --write" $T/calls && grep -qx "hmgapid engine verify-map" $T/calls && grep -qx "hmgapid engine apply" $T/calls && [ "$(st state)" = reboot ] && grep -q "설정을 마쳤습니다" $T/sprog && [ "$(cat $T/sbk/applied)" = "$V" ] && [ -f $T/sbk/automap.checked ] && [ -f $SH/state/local-map.json ]' || { cat $T/s.out; cat $T/sprog; }
-: > $T/calls; : > $T/iap2
-printf 'same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml\nhook plan: 1 mod\napp      io.github.jayparklab.nx4kor [nx4-kor]\nservice  nx4-kor ap\nusb      none\n' > $T/plan.out
-srun
-check "setup_hmgapi: 다음 부팅(적용됨) → map을 다시 만들거나 확인하지 않고 적용도 하지 않음, 설정 끝(app·service·usb 줄은 변경이 아님)" \
-  '! grep -q "map-car" $T/calls && ! grep -q "verify-map" $T/calls && ! grep -q "engine apply" $T/calls && [ "$(st state)" = done ]' || { cat $T/s.out; cat $T/sprog; }
-# HMG-API 계획의 설명 줄(#45): 2.0.4-beta.1 차(NX4HEV, HMG-API rc.7)의 실제 plan.txt. "home Wi-Fi  off"·"network  …"를 변경으로 봐
-# 칩이 있는 차에서 부팅마다 다시 적용하고 재부팅을 안내했다(PR #46 리뷰 7에서 재현)
-cat > $T/plan.out <<'P'
-same     /system/etc/permissions/com.hkmc.software.connectivity.androidauto_wireless.xml [nx4-kor]
-same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml [nx4-kor]
-same     /system/etc/permissions/com.hkmc.software.wifihotspot.xml [nx4-kor]
-same     /system/lib/libleafiaaac.so [nx4-kor]
-same     /system/onebin/nx4hev_kr/featurexml.cfg [nx4-kor]
-same     setting prop/persist.iap2.iden.wireless = t [nx4-kor]
-same     setting prop/persist.ium.support = carplay [nx4-kor]
-same     setting prop/persist.sys.iap2.wifi = t [nx4-kor]
-app      io.github.jayparklab.nx4kor (app/NX4KOR.apk) [nx4-kor]
-service  nx4-kor/ap as root, at android, restarted if it stops [nx4-kor]
-service  nx4-kor/launch as root, at manual [nx4-kor]
-home Wi-Fi  off
-network  no cellular [nx4-kor]
-P
-: > $T/calls; srun
-check "setup_hmgapi: 차의 실제 계획(rc.7, home Wi-Fi·network 설명 줄)이 모두 same이면 칩이 보여도 다시 적용하지 않음, 설정 끝(재부팅 안내 없음)" \
-  '! grep -q "engine apply" $T/calls && ! grep -q "^svc wifi" $T/calls && [ "$(st state)" = done ] && ! grep -q "설정을 마쳤습니다" $T/sprog' || { cat $T/s.out; cat $T/sprog; }
-# rc.8의 나머지 설명 줄. 글자는 rc.8 코드가 내는 꼴 그대로(ModRuntime.java 464~486, Projection.java 121~125, HomeWifi.java 163~170,
-# Network.java 257·527). 공식 무선 모드의 projection AP 요청이 내는 wifi 줄과 방화벽 규칙(공식 rc.9 mod.json 첫 규칙) 줄 포함.
-# 줄 머리를 모은 표본이라 실제 한 계획은 아니다(예: "home Wi-Fi  on"과 "no cellular (home Wi-Fi is off)"는 함께 나오지 않음)
-cat > $T/plan.out <<'P'
-same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml [nx4-kor]
-app      io.github.jayparklab.nx4kor (app/NX4KOR.apk) [nx4-kor]
-event    park -> runs svc/park.sh as root (30 s at most); its apps and hooks hear it [nx4-kor]
-vehicle  reads speed, gear [nx4-kor]
-vehicle  may seat_heat (park only) [nx4-kor]
-driving  io.github.jayparklab.nx4kor/.StatusActivity closes while the car's driving restriction is on [nx4-kor]
-panel    "NX4" (io.github.jayparklab.nx4kor/.Widget) in the side panel [nx4-kor]
-projection Android Auto density 160 [wireless-carplay-aa]
-projection events to its apps [nx4-kor]
-network  firewall filter input: accept tcp port 40515 in hotspot to hotspot (IPv4, 1 rule) (when settings.aa_firewall) [wireless-carplay-aa]
-button   star short -> opens io.github.jayparklab.nx4kor/.StatusActivity [nx4-kor]
-home Wi-Fi  on: while the car is off, the hotspot off and the car's Wi-Fi client on the saved networks
-wifi     the projection AP up from boot, once each boot, unless a Wi-Fi client is on [wireless-carplay-aa]
-network  home Wi-Fi only (no cellular) [nx4-kor]
-network  no cellular (home Wi-Fi is off) [wireless-carplay-aa]
-P
-: > $T/calls; srun
-check "  rc.8 설명 줄(event·vehicle·driving·panel·projection·button·home Wi-Fi·wifi·network)도 변경이 아님 → 적용 없음, 설정 끝" \
-  '! grep -q "engine apply" $T/calls && [ "$(st state)" = done ]' || { cat $T/s.out; cat $T/sprog; }
-printf 'change   /system/etc/permissions/x.xml [nx4-kor]\n' >> $T/plan.out
-: > $T/calls; srun
-check "  설명 줄과 함께 진짜 변경(change) 줄이 있으면 그대로 적용함(설명 줄이 변경을 가리지 않음)" \
-  'grep -qx "hmgapid engine apply" $T/calls && [ "$(st state)" = reboot ]' || { cat $T/s.out; cat $T/sprog; }
-printf 'same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml\nhook plan: 1 mod\napp      io.github.jayparklab.nx4kor [nx4-kor]\nservice  nx4-kor ap\nusb      none\n' > $T/plan.out
-echo 1.9.0 > $T/sbk/applied; : > $T/calls
-srun
-check "setup_hmgapi: 새 판인데 적용할 것이 없으면(훅 코드만 바뀜) 적용하지 않고 재부팅 안내, 판 기록을 바꿈" \
-  '! grep -q "engine apply" $T/calls && [ "$(st state)" = reboot ] && grep -q "새 판($V)을 쓰려면" $T/sprog && [ "$(cat $T/sbk/applied)" = "$V" ]'
-sreset; echo 3 > $T/verify.rc; srun
-check "setup_hmgapi: map 확인 실패 → 만든 map을 지움(map-car --forget), automap.bad, 적용 안 함, 실패 문구" \
-  'grep -qx "hmgapid engine map-car --forget" $T/calls && [ -f $T/sbk/automap.bad ] && [ ! -f $SH/state/local-map.json ] && ! grep -q "engine apply" $T/calls && [ "$(st state)" = fail ] && grep -q "map을 확인하지 못해" $T/sprog'
-: > $T/calls; srun
-check "setup_hmgapi: map 확인에 실패한 기록이 있으면 다시 만들지 않음" '! grep -q "map-car" $T/calls && [ "$(st state)" = fail ] && grep -q "map을 확인하지 못해" $T/sprog'
-sreset; rm -f $T/mapcar.writes; echo "not written: HMG-API has a map for this car (hyundai/nx4/kor/260902): \`hmgapid engine map-car --local\` adds the points it lacks" > $T/mapcar.out; srun
-check "setup_hmgapi: HMG-API에 이 차 map이 이미 있으면 그 map을 확인만 하고 적용(지우지 않음)" \
-  '[ -f $T/sbk/automap.shipped ] && grep -qx "hmgapid engine verify-map" $T/calls && grep -qx "hmgapid engine apply" $T/calls && [ "$(st state)" = reboot ]'
-sreset; rm -f $T/mapcar.writes; echo "map-car: 0 hook point(s) found" > $T/mapcar.out; srun
-check "setup_hmgapi: map을 만들지 못하면 적용하지 않고 다음 부팅에 다시(실패 기록 없음)" \
-  '! grep -q "engine apply" $T/calls && [ "$(st state)" = fail ] && grep -q "map을 만들지 못해" $T/sprog && [ ! -f $T/sbk/automap.bad ]'
-sreset; printf 'change   /system/etc/permissions/x.xml [nx4-kor]\nchange   /system/framework/framework.odex [other-mod]\n' > $T/plan.out; srun
-check "setup_hmgapi: 계획에 다른 모드의 변경이 있으면 적용하지 않고 HMG-API 앱에서 적용하라고 안내" \
-  '! grep -q "engine apply" $T/calls && [ "$(st state)" = fail ] && grep -q "다른 모드의 바뀐 내용" $T/sprog'
-sreset; mkdir -p $SH/mods/wireless-carplay-aa; echo '{}' > $SH/mods/wireless-carplay-aa/mod.json; srun
-check "setup_hmgapi: 따로 설치된 무선 모드가 있으면 map·적용 없이 그 모드를 지우라고 안내" \
-  '! grep -q "map-car" $T/calls && ! grep -q "engine apply" $T/calls && [ "$(st state)" = fail ] && grep -q "wireless-carplay-aa" $T/sprog'
-sreset; echo 1 > $T/apply.rc; srun
-check "setup_hmgapi: 적용 실패 → 실패 문구(HMG-API 앱 확인)" '[ "$(st state)" = fail ] && grep -q "적용에 실패했습니다" $T/sprog'
-sreset; srun FAKE_PROD=DEPEHEV.KOR.0000.V039.001.260902
-check "setup_hmgapi: NX4가 아니면 아무것도 하지 않음(지원하지 않는 차)" '[ ! -s $T/calls ] && [ "$(st state)" = fail ] && grep -q "투싼 NX4 한국 내수 260902 전용" $T/sprog'
-# 칩이 안 보이는 차(SDIO 없음, 칩을 본 기록 없음). 순정 핫스팟 기능이 꺼져 있으면(한국 판) 칩 확인보다 적용(핫스팟 기능을 켬)을 먼저
-HSF=feature:com.hkmc.software.wifihotspot
-sreset; rm -f $T/wifiseen $T/features; srun
-check "setup_hmgapi: 칩이 안 보이고 순정 핫스팟 기능이 꺼져 있으면 Wi-Fi를 깨우지 않고 먼저 적용, wifi.hotspot 기록, 재부팅 안내(기능을 켰다)" \
-  'grep -qx "hmgapid engine apply" $T/calls && ! grep -q "^svc wifi" $T/calls && [ -f $T/sbk/wifi.hotspot ] && [ "$(cat $T/sbk/applied)" = "$V" ] && [ "$(st state)" = reboot ] && grep -q "순정 핫스팟 기능을 켰습니다" $T/sprog' || { cat $T/s.out; cat $T/sprog; }
-check "  ap.log 안내 줄도 진행 기록과 같은 문장(핫스팟 기능을 켰다, '설정을 마쳤습니다' 아님)" \
-  'grep -q "안내(진행 기록에 남김): Wi-Fi 칩 전원을 켜려고 순정 핫스팟 기능을 켰습니다" $T/s.out && ! grep -q "안내(진행 기록에 남김): 무선 카플레이 설정을 마쳤습니다" $T/s.out' || cat $T/s.out
-sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.nopart; srun
-check "setup_hmgapi: 기능이 꺼진 채 남은 지난 판의 부품 없음 기록(wifi.nopart)은 지우고 같은 길로 적용" \
-  '[ ! -f $T/sbk/wifi.nopart ] && grep -qx "hmgapid engine apply" $T/calls && [ -f $T/sbk/wifi.hotspot ] && grep -q "부품 없음 기록을 지움" $T/s.out' || cat $T/s.out
-sreset; rm -f $T/wifiseen; echo $HSF > $T/features; srun WAKE_MAX=1
-check "setup_hmgapi: 순정 핫스팟 기능이 이미 켜진 차는 예전처럼 Wi-Fi를 깨워 칩을 보고, 적용하지 않음(wifi.hotspot 없음)" \
-  'grep -qx "svc wifi enable" $T/calls && ! grep -q "engine apply" $T/calls && [ ! -f $T/sbk/wifi.hotspot ] && [ "$(st state)" = reboot ] && grep -q "Wi-Fi를 켜는 중입니다" $T/sprog' || { cat $T/s.out; cat $T/sprog; }
-sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.hotspot; : > $T/sbk/wifi.nopart; srun
-check "setup_hmgapi: 핫스팟 기능을 켜 본 뒤 굳은 부품 없음은 깨우지·적용하지 않고 실패, 알림을 다시 쓰지 않음" \
-  '! grep -q "^svc wifi" $T/calls && ! grep -q "engine apply" $T/calls && [ "$(st state)" = fail ] && grep -q "Wi-Fi 부품이 없어" $T/sprog && ! grep -q "안내(진행 기록에 남김): 이 차의 내비에는" $T/s.out' || { cat $T/s.out; cat $T/sprog; }
-sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.hotspot; : > $T/iap2; echo "$V" > $T/sbk/applied; : > $T/sbk/automap.checked; mkdir -p $SH/state; echo '{}' > $SH/state/local-map.json
-printf 'same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml\nhook plan: 1 mod\napp      io.github.jayparklab.nx4kor [nx4-kor]\n' > $T/plan.out; srun
-check "setup_hmgapi: 핫스팟 기능을 켜 본 차는 재부팅 뒤 지금 기능·칩 상태를 한 줄 남김(적용은 다시 안 함)" \
-  'grep -q "순정 핫스팟 기능을 켜 본 차: 지금 기능 꺼짐, Wi-Fi 칩 안보임" $T/s.out && ! grep -q "engine apply" $T/calls' || cat $T/s.out
-echo $HSF > $T/features; : > $T/wifiseen; srun
-check "  기능이 켜지고 칩이 보이면 그렇게 남김" 'grep -q "지금 기능 켜짐, Wi-Fi 칩 보임" $T/s.out' || cat $T/s.out
-# 서비스가 시작할 때의 진행 기록(prog_start): 부품 없음이 굳은 차는 2분씩 "설치 중"을 보이지 않고 판정을 바로
-psrun() { rm -f $T/sprog; (env PATH=$P0 HOTSPOT_LIB=1 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog BOOT_ID=$T/bootid UPTIME=$T/uptime \
-  WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio sh -c ". $TP/svc/hotspot.sh; prog_start") > $T/ps.out 2>&1; }
-sreset; rm -f $T/features $T/wifiseen; : > $T/sbk/wifi.nopart; : > $T/sbk/wifi.hotspot; psrun
-check "prog_start: 핫스팟 기능을 켜 본 뒤의 부품 없음 → 시작하자마자 실패(부품 없음), '설치 중' 아님" '[ "$(st state)" = fail ] && grep -q "Wi-Fi 부품이 없어" $T/sprog' || cat $T/ps.out
-: > $T/wifiseen; psrun
-check "  기록이 있어도 지금 칩이 보이면 굳은 것이 아님 → 설치 시작(run, 설정이 기록을 지우고 적용)" '[ "$(st state)" = run ]' || cat $T/ps.out
-rm -f $T/wifiseen
-rm -f $T/sbk/wifi.hotspot; psrun
-check "  기능이 꺼진 채 남은 부품 없음(켜 본 적 없음) → 설치 시작(run, 설정이 기능을 켜 봄)" '[ "$(st state)" = run ] && [ "$(st pct)" = 3 ]'
-echo $HSF > $T/features; psrun
-check "  기능이 켜져 있던 차의 부품 없음 → 실패" '[ "$(st state)" = fail ]'
-rm -f $T/sbk/wifi.nopart; psrun
-check "  기록 없음 → 설치 시작(run)" '[ "$(st state)" = run ]'
-# fix_perms(부팅 뒤 설정): 부품 없음이 굳은 차는 진행 기록을 쓰지 않는다(main의 판정이 남음). 아닌 차는 진행을 씀
-fprun() { rm -f $T/sprog; (env PATH=$P0 HOTSPOT_LIB=1 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog NOTICE=$T/snotice BOOT_ID=$T/bootid \
-  UPTIME=$T/uptime WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio FIX_DELAY=0 sh -c ". $TP/svc/hotspot.sh; mkdir -p \$W; fix_perms") > $T/fp.out 2>&1; }
-sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.nopart; : > $T/sbk/wifi.hotspot; fprun
-check "fix_perms: 핫스팟 기능을 켜 본 뒤 부품 없음이 굳은 차는 진행 기록을 쓰지 않음('설치 중' 없음), Wi-Fi도 깨우지 않음" \
-  '[ ! -f $T/sprog ] && ! grep -q "^svc wifi" $T/calls && grep -q "Wi-Fi 칩을 찾지 못함" $T/fp.out' || cat $T/fp.out
-sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.nopart; fprun
-check "  기능이 꺼진 채 남은 부품 없음은 진행을 쓰며 핫스팟 기능을 켜러 적용(재부팅 안내)" \
-  '[ "$(st state)" = reboot ] && grep -q "순정 핫스팟 기능을 켰습니다" $T/sprog && grep -qx "hmgapid engine apply" $T/calls' || cat $T/fp.out
-sreset; rm -f $T/features; : > $T/sbk/wifi.nopart; : > $T/sbk/wifi.hotspot; fprun
-check "  부품 없음 기록이 있어도 칩이 다시 보인 부팅은 진행을 쓰며 기록을 지우고 적용(재부팅 안내, '부품 없음' 아님)" \
-  '[ ! -f $T/sbk/wifi.nopart ] && grep -qx "hmgapid engine apply" $T/calls && [ "$(st state)" = reboot ] && grep -q "설정을 마쳤습니다" $T/sprog' || cat $T/fp.out
-# 뒤의 status.sh 시험은 "설치 중"(run)이 아닌 진행 기록을 전제한다
-rm -f $T/features $T/sprog; : > $T/wifiseen
-# status.sh: 판정 몇 가지(상태 파일)
 stsh() {
-  (env PATH=$P0 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog NOTICE=$T/snotice BOOT_ID=$T/bootid UPTIME=$T/uptime \
-     WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio STATUS=$T/status.txt HINT=$T/shint SRC=$T/nosoftap HMGINST=$T/sinst HMGLOG=$T/shlog \
-     HOOKSTARTS=$T/sstarts NX4_DMESG=$T/sdmesg RPT_SYNC=1 "$@" sh $TP/bin/status.sh) > $T/st.out 2>&1
+  (env PATH=$P0 BB=$T/bin/bb APP=$TP W=$T/sw HMGDATA=$SH PROG=$T/sprog BOOT_ID=$T/bootid UPTIME=$T/suptime \
+     WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio SYSNET=$T/sysnet PROCNET=$T/procnet PROC=$T/sproc STATUS=$T/status.txt SRC=$T/softap.conf \
+     HMGINST=$T/sinst HMGLOG=$T/shlog HOOKSTARTS=$T/sstarts NX4_DMESG=$T/sdmesg RPT_SYNC=1 "$@" sh $TP/bin/status.sh) > $T/st.out 2>&1
 }
 sv() { sed -n "s/^$1=//p" $T/status.txt; }
-: > $T/sdmesg; printf 'version 1.1.0-rc.4\nbuild x\n' > $T/sinst
-sreset; mkdir -p $SH/mods/wireless-carplay-aa; echo '{}' > $SH/mods/wireless-carplay-aa/mod.json; stsh
-check "status.sh: 따로 설치된 무선 모드가 있으면 verdict=oldmod, 상태 파일에 판(mod.json)과 oldmod=yes" \
-  '[ "$(sv verdict)" = oldmod ] && [ "$(sv oldmod)" = yes ] && [ "$(sv pkgver)" = "$V" ] && ! grep -qE "^(mod|modver|mod_pending|mod_pin|mod_foreign|wp|first)=" $T/status.txt' || cat $T/st.out
-sreset; printf 'version 1.0.2\n' > $T/sinst; stsh
-check "status.sh: HMG-API가 1.1.0-rc.4보다 낮으면 verdict=oldhmgapi" '[ "$(sv verdict)" = oldhmgapi ] && grep -q "1.1.0-rc.4 이상" $T/status.txt'
-printf 'version 1.1.0-rc.4\n' > $T/sinst
-sreset; stsh FAKE_PROD=DEPEHEV.KOR.0000.V039.001.260902
+# 순정 AP 설정(softap.conf 형식 3: int, writeUTF 문자열 S1 일반 핫스팟 SSID, S2 카플레이 SSID, S3, S4 비밀번호)
+python3 - $T/softap.conf <<'PY'
+import struct, sys
+d = struct.pack(">i", 3)
+for s in (b"NX4 Hotspot", b"CarPlayNX4", b"x", b"SECRETPW123"):
+    d += struct.pack(">H", len(s)) + s
+open(sys.argv[1], "wb").write(d)
+PY
+# 준비된 차: HMG-API rc.8(훅 켜짐, map 확인됨), 공식 모드 2.2.0-rc.9가 켜지고 훅이 켜짐, 무선 기능·순정 핫스팟 기능 켜짐,
+# 프로젝션 AP 요청이 있고 이번 부팅에 떠서 netd(99)가 띄운 hostapd(1234)가 카플레이 SSID(S2)로 돎, Wi-Fi 칩을 본 기록
+streset() {
+  rm -rf $SH $T/sw $T/sproc $T/sysnet $T/procnet $T/shlog $T/sprog $T/status.txt $T/ps.out $T/wifiseen $T/sstarts
+  mkdir -p $SH/mods/wireless-carplay-aa $SH/state $SH/wifi $SH/settings $T/sw $T/sproc/1234 $T/sproc/99 $T/sysnet/wlan0 $T/procnet $T/shlog
+  printf '{\n  "id": "wireless-carplay-aa",\n  "version": "2.2.0-rc.9"\n}\n' > $SH/mods/wireless-carplay-aa/mod.json
+  printf 'version 1.1.0-rc.8\nbuild x\n' > $T/sinst
+  printf '%s\n' feature:com.hkmc.software.connectivity.carplay_wireless feature:com.hkmc.software.connectivity.androidauto_wireless \
+    feature:com.hkmc.software.wifihotspot > $T/features
+  printf '%s\n' "11-23 06:00:01.000 I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" \
+    "11-23 06:00:02.000 I/HMG-API: mods: wireless-carplay-aa: this mod is for other cars; overrides.ignore_system is set, loading it at the owner's risk" \
+    "11-23 06:00:02.000 I/HMG-API: mods: loaded wireless-carplay-aa 2.2.0-rc.9" > $T/shlog/log.log
+  echo "projection wireless-carplay-aa" > $SH/state/wifi.txt
+  cat $T/bootid > $SH/wifi/ap.boot
+  : > $T/wifiseen; : > $T/sdmesg
+  echo "100.00 50.00" > $T/suptime
+  echo "1234 root 0:00 hostapd -e /data/misc/wifi/entropy.bin $T/hapd.conf" > $T/ps.out
+  echo "1234 (hostapd) S 99 1234" > $T/sproc/1234/stat; echo "99 (netd) S 1 99" > $T/sproc/99/stat
+  printf 'hostapd\0-e\0/data/misc/wifi/entropy.bin\0%s\0' $T/hapd.conf > $T/sproc/1234/cmdline
+  printf 'interface=wlan0\nssid=CarPlayNX4\nwpa_passphrase=SECRETPW123\n' > $T/hapd.conf
+}
+# 지금 Wi-Fi AP가 없는 차(hostapd·wlan0 없음)
+noap() { : > $T/ps.out; rm -rf $T/sysnet/wlan0; }
+streset; stsh
+check "status.sh: 준비된 차 → verdict=ready(수준 0), 공식 모드·훅·프로젝션 AP 값, 요약 '무선 Wi-Fi: 켜짐(HMG-API)'" \
+  '[ "$(sv verdict)" = ready ] && [ "$(sv verdict_lv)" = 0 ] && [ "$(sv wm)" = yes ] && [ "$(sv wm_ver)" = 2.2.0-rc.9 ] && [ "$(sv wm_on)" = yes ] && [ "$(sv wm_hooks)" = on ] && [ "$(sv hooks)" = on ] && [ "$(sv hookmap)" = verified ] && [ "$(sv proj)" = yes ] && [ "$(sv ap_boot)" = yes ] && [ "$(sv ap)" = yes ] && [ "$(sv ap_mode)" = projection ] && [ "$(sv chip)" = yes ] && [ "$(sv feat_hotspot)" = yes ] && [ "$(sv s2)" = "무선 Wi-Fi: 켜짐(HMG-API)" ] && [ "$(sv pkgver)" = "$V" ]' || cat $T/st.out $T/status.txt
+check "  상태 파일·한 줄 요약에 SSID·비밀번호가 없고, 2.0.x 키(우리 핫스팟·합친 무선 모드)가 없음, 한 줄 요약에 판정 코드" \
+  '! grep -qE "CarPlayNX4|SECRETPW|NX4 Hotspot" $T/status.txt $T/st.out && ! grep -qE "^(our_ap|our_dhcp|stock_ssid|stock_seen|applied|oldmod|mod_on|mod_hooks|nowlan|softap_strings|ssid_len|pass_len)=" $T/status.txt && grep -qx "NX4 KOR: 무선 연결용 Wi-Fi 켜짐, 카플레이 연결 0개, 판정 ready" $T/st.out' || cat $T/st.out
+streset; stsh FAKE_PROD=DEPEHEV.KOR.0000.V039.001.260902
 check "status.sh: NX4가 아니면 verdict=nocar, verdict_end=yes" '[ "$(sv verdict)" = nocar ] && [ "$(sv verdict_end)" = yes ] && [ "$(sv tested)" = no ]'
 check "status.sh: 상태 파일과 한 줄 요약에 NEMESIS·Korea Projection·제보 문구 없음" '! grep -qE "NEMESIS|Korea Projection|제보|QR" $T/status.txt $T/st.out'
-# 무선 기능이 적용된 뒤 wlan0이 세 부팅 안 생긴 차(이번 부팅 nowlan 기록 있음). 칩 실패(nowlanfail)는 근거가 있을 때만.
-# 핫스팟 기능을 먼저 켠 차는 켜기 전(2.0.2 때, 기능 꺼짐)의 근거(wifi.modver=3, nochip-wifi.txt)를 치우고 켠 뒤의 기록으로만 판정
-nlreset() {
-  sreset; : > $T/iap2; rm -f $T/wifiseen; mkdir -p $T/sw
-  echo feature:com.hkmc.software.connectivity.carplay_wireless > $T/features
-  cat $T/bootid > $T/sw/nowlan; echo "3 x" > $T/sbk/nowlan.boots
-  printf '# wlan0 없음 기록\n판정 근거: 순정 module_version=%s (3이면 …)\n## 커널 (Wi-Fi 드라이버, 마지막 60줄)\n' "$1" > $T/sw/nowlan-wifi.txt
-}
-hfrun() { (env PATH=$P0 HOTSPOT_LIB=1 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog BOOT_ID=$T/bootid UPTIME=$T/uptime \
-  WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio sh -c ". $TP/svc/hotspot.sh; hotspot_first; echo rc=\$?") > $T/hf.out 2>&1; }
-nlreset 없음; stsh
-check "status.sh: 적용 뒤 wlan0이 세 부팅 안 생기고 칩 실패 근거가 없으면 verdict=nowlanrepeat(끝이 아님)" \
-  '[ "$(sv verdict)" = nowlanrepeat ] && [ "$(sv verdict_end)" = no ]' || cat $T/st.out $T/status.txt
-nlreset 없음; echo 3 > $T/sbk/wifi.modver; echo "[ 9.1] dhd: failed to power up DHD" > $T/sbk/nochip-wifi.txt; cp $T/sbk/nochip-wifi.txt $T/sw/nochip-wifi.txt; stsh
-check "  핫스팟 기능이 꺼진 채 모은 옛 근거(wifi.modver=3, nochip-wifi.txt)가 남아 있으면 nowlanfail(리뷰 5가 짚은 판정)" \
-  '[ "$(sv verdict)" = nowlanfail ]' || cat $T/st.out
-hfrun; stsh
-check "  hotspot_first가 옛 근거를 치우면(nochip-wifi.pre-hotspot.txt로 이름만 바꿈, wifi.modver 지움) nowlanrepeat" \
-  'grep -qx rc=0 $T/hf.out && [ "$(sv verdict)" = nowlanrepeat ] && [ ! -f $T/sbk/wifi.modver ] && [ ! -f $T/sbk/nochip-wifi.txt ] && [ ! -f $T/sw/nochip-wifi.txt ] \
-   && grep -q "failed to power up DHD" $T/sbk/nochip-wifi.pre-hotspot.txt && grep -q "failed to power up DHD" $T/sw/nochip-wifi.pre-hotspot.txt && grep -q "판정에 쓰지 않음" $T/hf.out' || cat $T/hf.out $T/st.out
-nlreset 없음; echo 3 > $T/sbk/wifi.modver; echo "[ 9.1] dhd: failed to power up DHD" > $T/sbk/nochip-wifi.txt; hfrun
-check "  업데이트가 \$W를 지워 \$BK 사본만 남은 차(2.0.2에서 올림)도 켜기 전 기록을 \$W에 둠(USB 진단 기록 logs/에 들어가게)" \
-  '[ ! -f $T/sbk/nochip-wifi.txt ] && grep -q "failed to power up DHD" $T/sbk/nochip-wifi.pre-hotspot.txt && grep -q "failed to power up DHD" $T/sw/nochip-wifi.pre-hotspot.txt && [ ! -f $T/sw/nochip-wifi.txt ]' || cat $T/hf.out
-nlreset 3; stsh
-check "  켠 뒤의 기록(이번 부팅 nowlan-wifi.txt)에 순정 module_version=3이면 nowlanfail, verdict_end=yes" \
-  '[ "$(sv verdict)" = nowlanfail ] && [ "$(sv verdict_end)" = yes ]' || cat $T/st.out
-nlreset 31; stsh
-check "  module_version 줄은 3 그대로일 때만 근거(31 등은 아님)" '[ "$(sv verdict)" = nowlanrepeat ]' || cat $T/st.out
-rm -f $T/features $T/iap2; : > $T/wifiseen
+streset; rm -f $T/sinst; stsh
+check "status.sh: HMG-API가 없으면 verdict=nohmgapi(1.1.0-rc.8 이상을 먼저)" '[ "$(sv verdict)" = nohmgapi ] && grep -q "1.1.0-rc.8 이상" $T/status.txt'
+streset; printf 'version 1.1.0-rc.7\n' > $T/sinst; stsh
+check "status.sh: HMG-API 1.1.0-rc.7(2.0.x가 받던 판)은 rc 꼬리까지 비교해 verdict=oldhmgapi" '[ "$(sv verdict)" = oldhmgapi ] && grep -q "1.1.0-rc.8 이상으로" $T/status.txt' || cat $T/status.txt
+streset; printf 'version 1.1.0-rc.10\n' > $T/sinst; stsh
+check "  1.1.0-rc.10은 지원(ready)" '[ "$(sv verdict)" = ready ]' || cat $T/status.txt
+# 설치 진행 기록(USB 설치기가 지금 형식 그대로 씀): 이번 부팅 것만
+spr() { printf 'pct=%s\nstate=%s\nstage=%s\nstart=1\nt=2\nboot=%s\nstep=\nust=1\nut=95\n' "$1" "$2" "$3" "${4:-test-boot-id}" > $T/sprog; }
+streset; spr 40 run "map을 확인하는 중입니다"; stsh
+check "status.sh: 이번 부팅 진행 기록 state=run → verdict=installing" '[ "$(sv verdict)" = installing ] && [ "$(sv s1)" = "설치: 진행 중" ] && [ "$(sv state)" = run ]'
+streset; spr 100 reboot "설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요."; stsh
+check "  state=reboot → verdict=reboot(재부팅 안내, 노랑)" '[ "$(sv verdict)" = reboot ] && [ "$(sv verdict_lv)" = 1 ] && [ "$(sv s1)" = "설치: 재부팅 필요" ]'
+streset; spr 100 fail "이 차의 map을 확인하지 못했습니다(설치기 기록을 보세요)."; stsh
+check "  state=fail → verdict=failed, 설치기가 쓴 이유 문장이 판정 문구(빨강)" '[ "$(sv verdict)" = failed ] && [ "$(sv verdict_lv)" = 2 ] && [ "$(sv verdict_msg)" = "이 차의 map을 확인하지 못했습니다(설치기 기록을 보세요)." ]' || cat $T/status.txt
+streset; spr 100 fail "지난 부팅의 실패" other-boot; stsh
+check "  지난 부팅의 진행 기록은 보지 않음(ready)" '[ "$(sv verdict)" = ready ]'
+# 공식 무선 모드(requires로 걸지 않으므로 없거나 꺼진 것을 상태 화면이 알림)
+streset; rm -rf $SH/mods/wireless-carplay-aa; stsh
+check "status.sh: 공식 무선 모드가 없으면 verdict=nowireless(USB 설치기로 다시 설치), wm=no" '[ "$(sv verdict)" = nowireless ] && [ "$(sv wm)" = no ] && [ "$(sv verdict_lv)" = 2 ] && grep -q "USB 설치기로 다시 설치" $T/status.txt' || cat $T/status.txt
+streset; : > $SH/mods/wireless-carplay-aa/.disabled; stsh
+check "  HMG-API 앱에서 꺼 두었으면 verdict=wirelessoff, wm_on=no" '[ "$(sv verdict)" = wirelessoff ] && [ "$(sv wm_on)" = no ]'
+streset; sed 's/2.2.0-rc.9/2.2.0-rc.5/' $SH/mods/wireless-carplay-aa/mod.json > $T/wmj; mv $T/wmj $SH/mods/wireless-carplay-aa/mod.json; stsh
+check "  판이 2.2.0-rc.9보다 낮으면 verdict=oldwireless(그 판과 최소 판)" '[ "$(sv verdict)" = oldwireless ] && grep -q "2.2.0-rc.5" $T/status.txt && grep -q "2.2.0-rc.9 이상으로" $T/status.txt' || cat $T/status.txt
+streset; sed 's/2.2.0-rc.9/2.2.1/' $SH/mods/wireless-carplay-aa/mod.json > $T/wmj; mv $T/wmj $SH/mods/wireless-carplay-aa/mod.json; stsh
+check "  2.2.1은 지원(ready)" '[ "$(sv verdict)" = ready ] && [ "$(sv wm_ver)" = 2.2.1 ]'
+# HMG-API 훅·map(마지막 부팅 기록)
+streset; printf '%s\n' "x I/HMG-API: hook map: none for hyundai/nx4/kor/260902, hooks off" > $T/shlog/log.log; stsh
+check "status.sh: map이 없어 훅이 꺼졌으면 verdict=hooksoff, USB 설치기를 다시 실행하라고 안내" '[ "$(sv verdict)" = hooksoff ] && [ "$(sv hookmap)" = none ] && grep -q "USB 설치기를 다시 실행" $T/status.txt' || cat $T/status.txt
+# 공식 모드의 훅: 같은 지점을 replace하는 다른 모드와 겹침(#17)과 그 밖의 이유
+streset; printf '%s\n' "x I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" \
+  "x I/HMG-API: mods: wireless-carplay-aa not loaded: conflict: wireless-carplay-aa 2.2.0-rc.9 and kr-tbt 1.0.0 both replace framework.navigation_cluster.update_tbt_info; turn one of them off" > $T/shlog/log.log; stsh
+check "status.sh: 공식 모드가 다른 모드와 훅이 겹쳐 꺼졌으면 verdict=wmhooksoff, 겹치는 모드를 끄라고 안내" '[ "$(sv verdict)" = wmhooksoff ] && [ "$(sv wm_hooks)" = off ] && grep -q "겹치는 모드를 끈" $T/status.txt' || cat $T/status.txt
+streset; printf '%s\n' "x I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" "x I/HMG-API: mods: wireless-carplay-aa not loaded: hook point dipo.carplay.session_created isn't in this car's map" > $T/shlog/log.log; stsh
+check "  그 밖의 이유면 HMG-API 앱의 Mods에서 이유를 보라고 안내" '[ "$(sv verdict)" = wmhooksoff ] && grep -q "Mods에서 이유를" $T/status.txt' || cat $T/status.txt
+streset; printf '{"bridge": false}\n' > $SH/settings/wireless-carplay-aa.json; stsh
+check "status.sh: 공식 모드 설정의 Wireless CarPlay(bridge)가 꺼졌으면 verdict=bridgeoff" '[ "$(sv verdict)" = bridgeoff ] && [ "$(sv bridge)" = off ]'
+streset; echo feature:com.hkmc.software.wifihotspot > $T/features; stsh
+check "status.sh: 무선 카플레이 기능이 아직 꺼져 있으면 verdict=nofeat" '[ "$(sv verdict)" = nofeat ] && [ "$(sv feat_carplay)" = no ]'
+streset; echo "home" > $SH/state/wifi.txt; stsh
+check "status.sh: HMG-API에 공식 모드의 프로젝션 AP 요청이 없으면 verdict=noproj" '[ "$(sv verdict)" = noproj ] && [ "$(sv proj)" = no ]'
+# 연결: wlan0 주소(IPv6)의 7000번 포트 ESTABLISHED 하나
+streset; echo "fe800000000000000000000000000001 03 40 20 80 wlan0" > $T/procnet/if_inet6
+echo "  0: 000080FE000000000000000001000000:1B58 000080FE000000000000000002000000:C350 01 00000000:00000000 00:00000000 00000000 0 0 1" > $T/procnet/tcp6
+noap; stsh
+check "status.sh: 무선 카플레이가 연결돼 있으면(AP 판정보다 앞) verdict=connected, 요약 '카플레이 1대 연결됨'" '[ "$(sv verdict)" = connected ] && [ "$(sv cp_conn)" = 1 ] && [ "$(sv s3)" = "폰 연결: 카플레이 1대 연결됨" ]' || cat $T/st.out $T/status.txt
+# 순정(netd)이 아닌 hostapd: 부모가 netd가 아님
+streset; echo "77 (fooapd) S 1 77" > $T/sproc/99/stat; stsh
+check "status.sh: 순정이 아닌 hostapd(다른 Wi-Fi 패키지)가 돌면 verdict=otherwifi, other_ap=yes" '[ "$(sv verdict)" = otherwifi ] && [ "$(sv other_ap)" = yes ] && [ "$(sv s2)" = "무선 Wi-Fi: 다른 패키지가 씀" ]' || cat $T/status.txt
+streset; printf 'interface=wlan0\nssid=NX4 Hotspot\n' > $T/hapd.conf; stsh
+check "status.sh: AP가 일반 핫스팟 SSID(S1)로 떠 있으면 verdict=aphotspot, ap_mode=hotspot" '[ "$(sv verdict)" = aphotspot ] && [ "$(sv ap_mode)" = hotspot ] && [ "$(sv verdict_lv)" = 1 ]' || cat $T/status.txt
+streset; echo "555 wifi 0:00 /system/bin/wpa_supplicant -iwlan0 -Dnl80211" > $T/ps.out; stsh
+check "status.sh: AP 없이 Wi-Fi 클라이언트가 돌면 verdict=wificlient" '[ "$(sv verdict)" = wificlient ] && [ "$(sv wpa)" = yes ] && [ "$(sv ap)" = no ]' || cat $T/status.txt
+# Wi-Fi 부품이 없는 차(2026-11-23 NX4HEV 260902): 순정 핫스팟 기능은 켜졌는데 칩이 SDIO에 한 번도 안 보였고, wlan0이 없고,
+# HMG-API가 이번 부팅에 AP를 띄우지 못함(ap.fail만). 부팅 뒤 5분(AP_WAIT) 전에는 지기가 다시 시도하는 중이라 "켜는 중"(PR #50 리뷰 3)
+streset; noap; rm -f $T/wifiseen $SH/wifi/ap.boot; cat $T/bootid > $SH/wifi/ap.fail; stsh
+check "status.sh: Wi-Fi 부품이 없어 보여도 부팅 뒤 5분 전(100초)이면 verdict=apwait(부품 없음으로 굳히지 않음)" '[ "$(sv verdict)" = apwait ] && [ "$(sv ap_fail)" = yes ]' || cat $T/status.txt
+echo "400.00 50.00" > $T/suptime; stsh
+check "  5분이 지나면(400초) verdict=nowifipart(노랑, 동글), '안 됨'으로 끝내지 않음, 요약 '부품 없음(USB 동글 필요)'" \
+  '[ "$(sv verdict)" = nowifipart ] && [ "$(sv verdict_lv)" = 1 ] && [ "$(sv verdict_end)" = no ] && [ "$(sv s2)" = "무선 Wi-Fi: 부품 없음(USB 동글 필요)" ] && [ "$(sv s1)" = "설치: 끝남" ] && [ "$(sv chip)" = no ] && [ "$(sv ap_fail)" = yes ]' || cat $T/status.txt
+mkdir -p $T/sysnet/wlan0; stsh
+check "  wlan0이 있으면(나중의 USB 동글 등) 부품 없음으로 보지 않음(apfail)" '[ "$(sv verdict)" = apfail ]' || cat $T/status.txt
+rm -rf $T/sysnet/wlan0; grep -v wifihotspot $T/features > $T/f2; mv $T/f2 $T/features; stsh
+check "  순정 핫스팟 기능(칩 전원)이 아직 꺼져 있으면 부품 없음으로 보지 않음(apfail)" '[ "$(sv verdict)" = apfail ]' || cat $T/status.txt
+streset; noap; rm -f $SH/wifi/ap.boot; cat $T/bootid > $SH/wifi/ap.fail; echo "400.00 50.00" > $T/suptime; stsh
+check "status.sh: 칩을 본 적이 있는데 부팅 뒤 5분이 지나도 AP를 못 띄움(ap.fail) → verdict=apfail(wifi.log 안내)" '[ "$(sv verdict)" = apfail ] && grep -q "wifi.log" $T/status.txt' || cat $T/status.txt
+streset; noap; stsh
+check "status.sh: 이번 부팅에 떴던 AP가 지금 꺼져 있으면 verdict=apoff" '[ "$(sv verdict)" = apoff ] && [ "$(sv ap_boot)" = yes ]' || cat $T/status.txt
+streset; noap; echo other-boot > $SH/wifi/ap.boot; stsh
+check "status.sh: 지난 부팅의 기록뿐이고 부팅 뒤 5분 전이면 verdict=apwait(켜는 중)" '[ "$(sv verdict)" = apwait ] && [ "$(sv ap_boot)" = no ] && [ "$(sv s2)" = "무선 Wi-Fi: 켜는 중" ]' || cat $T/status.txt
+echo "400.00 50.00" > $T/suptime; stsh
+check "  부팅 뒤 5분이 지나도 기록이 없으면 verdict=apfail(켜지 않았음)" '[ "$(sv verdict)" = apfail ] && grep -q "켜지 않았습니다" $T/status.txt' || cat $T/status.txt
+rm -f $T/ps.out $T/features
 
 # status.sh --watch: 상태 화면의 [지금 재부팅] 요청(앱 개인 폴더의 reboot.req)을 받는 감시자
 RW=$T/rw; rm -rf $RW; mkdir -p $RW/w $RW/bk $RW/proc
@@ -805,8 +698,8 @@ if [ -n "$HMGAPI_SRC" ]; then
   check "USB 묶음: ota_package.tar = 우리 troubleShooter(0755, root), HMG-API 설치기는 NX4/hmgapi로, NEMESIS.data 뺌, README 판 채움" \
     'python3 -c "import tarfile,sys; t=tarfile.open(sys.argv[1]); m=t.getmembers(); assert [x.name for x in m]==[\"troubleShooter\"] and m[0].mode==0o755 and m[0].uid==0; assert t.extractfile(\"troubleShooter\").read()==open(sys.argv[2],\"rb\").read()" $T/ux/ota_package.tar $B/usb/troubleShooter && grep -q "HMG-API troubleShooter" $T/ux/NX4/hmgapi/troubleShooter && [ ! -f $T/ux/NEMESIS.data ] && [ -d $T/ux/HMGAPI/install/payload ] && grep -q "NX4 KOR $V" $T/ux/README.txt'
   P=$T/ux/NX4/install/payload
-  check "USB 묶음: payload = 서명된 모드를 푼 것(mod.json, 스크립트, 무선 훅·레시피·패치·설정, 앱, busybox, 서명), 따로 넣는 무선 모드 zip 없음" \
-    '[ -f $P/mod.json ] && [ -f $P/svc/ap.sh ] && [ -f $P/svc/hotspot.sh ] && [ -f $P/hooks.jar ] && [ -f $P/patches.json ] && [ -f $P/settings.json ] && [ -f $P/files/libleafiaaac.so ] && [ "$(ls $P/recipes | wc -l | tr -d " ")" = 5 ] && [ -f $P/app/NX4KOR.apk ] && [ -f $P/bin/busybox ] && [ -d $P/META-HMGAPI ] && [ ! -d $P/hmgapi ] && [ ! -d $P/patches ]'
+  check "USB 묶음: payload = 서명된 모드를 푼 것(mod.json, 스크립트, 앱, busybox, 서명), 한국 포크 무선 부분(훅·레시피·패치·설정)과 핫스팟 서비스 없음" \
+    '[ -f $P/mod.json ] && [ -f $P/svc/launch.sh ] && [ -f $P/svc/lib.sh ] && [ -f $P/bin/status.sh ] && [ -f $P/bin/uninstall.sh ] && [ -f $P/scripts/preun.sh ] && [ -f $P/app/NX4KOR.apk ] && [ -f $P/bin/busybox ] && [ -d $P/META-HMGAPI ] && [ ! -e $P/hooks.jar ] && [ ! -e $P/recipes ] && [ ! -e $P/files ] && [ ! -e $P/patches.json ] && [ ! -e $P/settings.json ] && [ ! -e $P/svc/ap.sh ] && [ ! -e $P/svc/hotspot.sh ] && [ ! -d $P/hmgapi ] && [ ! -d $P/patches ]'
   check "라이선스: 모드에 LICENSE·NOTICE.md·bin/busybox-LICENSE.txt, USB 맨 위에 LICENSE·NOTICE.md·BUSYBOX-LICENSE.txt(저장소와 같은 내용)" \
     'cmp -s $P/LICENSE $B/LICENSE && cmp -s $P/NOTICE.md $B/NOTICE.md && cmp -s $P/bin/busybox-LICENSE.txt $T/test-bb-LICENSE.txt && cmp -s $T/ux/LICENSE $B/LICENSE && cmp -s $T/ux/NOTICE.md $B/NOTICE.md && cmp -s $T/ux/BUSYBOX-LICENSE.txt $T/test-bb-LICENSE.txt'
   check "라이선스: HMG-API를 함께 넣으면 HMGAPI-SOURCE.txt에 판과 대응 소스(태그), README.txt에 이 묶음의 소스 커밋" \
@@ -832,53 +725,40 @@ PY'
   rm -rf $T/ux2; mkdir -p $T/ux2; (cd $T/ux2 && unzip -q $T/out-nobb/hmgapi-nx4-kor-$V-usb.zip 2>/dev/null)
   check "라이선스: NX4_BUSYBOX=none·HMG-API 없이 만들면 busybox·BUSYBOX-LICENSE.txt·HMGAPI-SOURCE.txt 없음, LICENSE·NOTICE.md는 있음" \
     '[ "$(cat $T/build.rc)" = 0 ] && grep -q "NX4_BUSYBOX=none" $T/build.out && [ ! -f $T/ux2/NX4/install/payload/bin/busybox ] && [ ! -f $T/ux2/BUSYBOX-LICENSE.txt ] && [ ! -f $T/ux2/NX4/install/payload/bin/busybox-LICENSE.txt ] && [ ! -f $T/ux2/HMGAPI-SOURCE.txt ] && [ -f $T/ux2/LICENSE ] && [ -f $T/ux2/NOTICE.md ]' || cat $T/build.out
-  # HMG-API 엔진(PC JVM)으로 설치: 가짜 헤드유닛
+  # HMG-API 엔진(PC JVM)으로 설치: 가짜 헤드유닛. 이 모드는 HMG-API 1.1.0-rc.8 이상을 요구한다(mod.json "hmgapi").
+  # 엔진은 자기 판(Engine.HMGAPI_VERSION)으로 그것을 보므로, HMGAPI_SRC가 그보다 낮으면 설치 시험을 할 수 없다
+  MV=$(sed -n 's/.*"hmgapi": *">=\([^"]*\)".*/\1/p' $PKG/mod.json)
+  HSV=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' $HS/core/runtime/java/hmgapi/engine/Engine.java)
   eng() { (HMGAPI_ROOT=$1 HMGAPI_HOST=1 HMGAPI_PRODUCT=$2 java -cp $T/eh hmgapi.engine.Engine install $T/out/hmgapi-nx4-kor-$V.zip) > $T/eng.out 2>&1; echo $? > $T/eng.rc; }
   for prod in NX4.KOR.0000.V039.001.260902 CVEV.USA.0000.V015 DEPEHEV.KOR.0000.V039.001.260902 NX4.KOR.0000.V040.001.261101; do
     ER=$T/er-$prod; mkdir -p $ER/system/etc/permissions $ER/data/hmgapi/mods $ER/data/hmgapi/settings
     printf 'ro.build.product=%s\n' $prod > $ER/system/build.prop
-    printf 'version 1.1.0-rc.4\n' > $ER/data/hmgapi/installed.txt
+    printf 'version %s\n' "$HSV" > $ER/data/hmgapi/installed.txt
   done
   ER=$T/er-NX4.KOR.0000.V039.001.260902; eng $ER NX4.KOR.0000.V039.001.260902
-  # hmgapid는 상대 경로를 /data/hmgapi/mods/<모드>/ 아래로 푼다(svc_start): sh /data/hmgapi/mods/nx4-kor/svc/ap.sh
-  check "HMG-API 엔진: NX4.KOR 260902에 설치됨(서명 확인), 서비스 ap(root, android, 다시 시작)·launch(manual)·앱이 등록됨, 무선 훅 파일이 모드 폴더에" \
-    '[ "$(cat $T/eng.rc)" = 0 ] && grep -q "installed nx4-kor $V (author key" $T/eng.out && grep -qx "nx4-kor ap root android yes script svc/ap.sh -" $ER/data/hmgapi/state/services.txt && grep -qx "nx4-kor launch root manual no script svc/launch.sh -" $ER/data/hmgapi/state/services.txt && grep -qx "io.github.jayparklab.nx4kor nx4-kor" $ER/data/hmgapi/state/apps.txt && [ -f $ER/data/hmgapi/mods/nx4-kor/hooks.jar ] && [ -f $ER/data/hmgapi/mods/nx4-kor/recipes/carplay-core-wifi.recipe ]' || cat $T/eng.out
-  # 순정 핫스팟 기능(mod.json "wifi": {"hotspot": true}): 한국 판처럼 순정 권한 파일이 없으면 HMG-API가 자기 파일을 이 모드 몫으로
-  # 넣고 featurexml.cfg에서 그 파일을 지우는 줄을 막는다. 계획이 이 모드 것뿐이어야 자동 설정(plan_only_mod)이 적용한다
-  mkdir -p $ER/system/onebin/nx4hev_kr
-  printf '%s\n' -/system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml -/system/etc/permissions/com.hkmc.software.wifihotspot.xml > $ER/system/onebin/nx4hev_kr/featurexml.cfg
-  engp() { (HMGAPI_ROOT=$ER HMGAPI_HOST=1 HMGAPI_PRODUCT=NX4.KOR.0000.V039.001.260902 HMGAPI_ONEBIN=nx4hev_kr java -cp $T/eh hmgapi.engine.Engine $1) > $T/engp.out 2>&1; echo $? > $T/engp.rc; }
-  # 참고: $1은 따옴표 없이 넘겨 "install <zip>"처럼 두 낱말도 받는다
+  if env PATH=$P0 BB=$T/bin/bb APP=$TP sh -c '. $APP/svc/lib.sh; ver_lt "$1" "$2"' x "$HSV" "$MV"; then
+    check "HMG-API 엔진($HSV): 최소 판($MV)보다 낮은 HMG-API는 이 모드를 거절함" '[ "$(cat $T/eng.rc)" != 0 ] && grep -q "needs HMG-API >=$MV" $T/eng.out' || cat $T/eng.out
+    bad "HMG-API 엔진 설치 시험: HMGAPI_SRC의 HMG-API($HSV)가 이 모드의 최소 판($MV)보다 낮아 설치·계획을 볼 수 없음. HMGAPI_SRC를 v$MV 이상으로 올려 주세요"
+  else
+  # hmgapid는 상대 경로를 /data/hmgapi/mods/<모드>/ 아래로 푼다(svc_start): sh /data/hmgapi/mods/nx4-kor/svc/launch.sh
+  check "HMG-API 엔진($HSV): NX4.KOR 260902에 설치됨(서명 확인), 서비스는 launch(root, manual) 하나, 앱이 등록됨, 훅·무선 파일 없음" \
+    '[ "$(cat $T/eng.rc)" = 0 ] && grep -q "installed nx4-kor $V (author key" $T/eng.out && [ "$(grep -c "^nx4-kor " $ER/data/hmgapi/state/services.txt)" = 1 ] && grep -q "^nx4-kor launch root manual " $ER/data/hmgapi/state/services.txt && grep -qx "io.github.jayparklab.nx4kor nx4-kor" $ER/data/hmgapi/state/apps.txt && [ ! -e $ER/data/hmgapi/mods/nx4-kor/hooks.jar ] && [ ! -e $ER/data/hmgapi/mods/nx4-kor/recipes ]' || { cat $T/eng.out; cat $ER/data/hmgapi/state/services.txt; }
+  engp() { (HMGAPI_ROOT=$ER HMGAPI_HOST=1 HMGAPI_PRODUCT=NX4.KOR.0000.V039.001.260902 java -cp $T/eh hmgapi.engine.Engine $1) > $T/engp.out 2>&1; echo $? > $T/engp.rc; }
+  # 참고: $1은 따옴표 없이 넘겨 "remove nx4-kor"처럼 두 낱말도 받는다
+  # 계획에는 지금 켜진 것의 설명 줄(app·service, HMG-API 기본 network  no cellular [nx4-kor] 등)만 나오고, 적용하면 할 것이 없다
   engp plan
-  check "HMG-API 엔진 계획: 순정 핫스팟 권한 파일이 없는 차에 HMG-API 파일을 이 모드 몫으로 넣음(featurexml.cfg도 이 모드 몫), 문제 없음" \
-    '[ "$(cat $T/engp.rc)" = 0 ] && grep -q "^change   /system/etc/permissions/com.hkmc.software.wifihotspot.xml \[nx4-kor\]" $T/engp.out && grep -q "^change   /system/onebin/nx4hev_kr/featurexml.cfg \[nx4-kor\]" $T/engp.out && ! grep -q "problem" $T/engp.out' || cat $T/engp.out
+  check "HMG-API 엔진 계획: 이 모드의 줄은 설명뿐(change·restore·setting 줄 없음), 문제 없음" \
+    '[ "$(cat $T/engp.rc)" = 0 ] && ! grep -E "\[nx4-kor\]" $T/engp.out | grep -qvE "^(app|service|network) " && grep -q "^app .*io.github.jayparklab.nx4kor.*\[nx4-kor\]" $T/engp.out && ! grep -qiE "problem|conflict|requires" $T/engp.out' || cat $T/engp.out
   engp apply
-  check "  적용하면 핫스팟 기능 파일이 생기고 featurexml.cfg의 그 줄이 막힘(#)" \
-    'grep -q "<feature name=\"com.hkmc.software.wifihotspot\" />" $ER/system/etc/permissions/com.hkmc.software.wifihotspot.xml && grep -qx "#-/system/etc/permissions/com.hkmc.software.wifihotspot.xml" $ER/system/onebin/nx4hev_kr/featurexml.cfg' || cat $T/engp.out
-  # 업데이트 길(PR #42 리뷰 4): 옛 방식(featurexml 줄 주석, wifi 요청 없음)으로 적용된 차에 이 판을 설치하면, 계획은 핫스팟 기능 파일
-  # 하나만 바뀌고 나머지는 same이어야 한다. restore·rebase가 나오면 이미 쓰는 차의 자동 설정이 "HMG-API 앱에서 적용"으로 멈춘다
-  ER=$T/er-upd; rm -rf $ER
-  mkdir -p $ER/system/etc/permissions $ER/data/hmgapi/mods $ER/data/hmgapi/settings $ER/system/onebin/nx4hev_kr
-  printf 'ro.build.product=NX4.KOR.0000.V039.001.260902\n' > $ER/system/build.prop
-  printf 'version 1.1.0-rc.4\n' > $ER/data/hmgapi/installed.txt
-  printf '%s\n' -/system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml -/system/etc/permissions/com.hkmc.software.wifihotspot.xml > $ER/system/onebin/nx4hev_kr/featurexml.cfg
-  engp "install $T/out/hmgapi-nx4-kor-$V.zip"
-  # 설치된 폴더를 옛 판(1.9.9)의 방식으로 되돌려 적용한다(서명은 설치할 때만 본다)
-  python3 -I - $ER/data/hmgapi/mods/nx4-kor <<'PY'
-import json, os, sys
-d = sys.argv[1]
-m = json.load(open(os.path.join(d, "mod.json"))); m.pop("wifi", None); m["version"] = "1.9.9"
-json.dump(m, open(os.path.join(d, "mod.json"), "w"), indent=2)
-p = json.load(open(os.path.join(d, "patches.json")))
-p["changes"].insert(0, {"type": "lines", "path": "/system/onebin/{onebin}/featurexml.cfg", "stock": "any", "part": "projection",
-                        "comment": ["-/system/etc/permissions/com.hkmc.software.wifihotspot.xml"]})
-json.dump(p, open(os.path.join(d, "patches.json"), "w"), indent=2)
-PY
-  engp apply; cp $T/engp.out $T/engp-old.out
-  engp "install $T/out/hmgapi-nx4-kor-$V.zip"; cp $T/engp.out $T/engp-upd.out
-  engp plan
-  check "HMG-API 엔진 업데이트 길: 옛 방식(featurexml 줄 주석)은 순정 파일이 없는 차에 핫스팟 기능 파일을 만들지 못했고, 이 판을 설치하면 계획은 그 파일 change 한 줄, featurexml.cfg 등은 same, restore·rebase·problem 없음" \
-    '[ ! -f $T/er-upd/system/etc/permissions/com.hkmc.software.wifihotspot.xml ] && grep -q "^done:" $T/engp-old.out && grep -q "^installed nx4-kor $V" $T/engp-upd.out && [ "$(grep -c "^change   " $T/engp.out)" = 1 ] && grep -q "^change   /system/etc/permissions/com.hkmc.software.wifihotspot.xml \[nx4-kor\]" $T/engp.out && grep -q "^same     /system/onebin/nx4hev_kr/featurexml.cfg \[nx4-kor\]" $T/engp.out && ! grep -qE "^(restore|rebase|problem)|problem\(s\)" $T/engp.out' || { cat $T/engp-old.out $T/engp-upd.out $T/engp.out; }
+  check "  적용하면 할 것이 없음(nothing to do): 이 모드는 시스템 파일·설정을 바꾸지 않음" '[ "$(cat $T/engp.rc)" = 0 ] && grep -qx "nothing to do" $T/engp.out' || cat $T/engp.out
+  engp "remove nx4-kor"
+  check "  engine remove만으로 앱·서비스 목록(state/apps.txt·services.txt)에서 빠짐: hmgapid가 내리므로 지울 때 적용하지 않음(preun.sh)" \
+    '[ "$(cat $T/engp.rc)" = 0 ] && ! grep -q "nx4-kor" $ER/data/hmgapi/state/services.txt && ! grep -q "io.github.jayparklab.nx4kor" $ER/data/hmgapi/state/apps.txt && [ ! -d $ER/data/hmgapi/mods/nx4-kor ]' || { cat $T/engp.out; cat $ER/data/hmgapi/state/services.txt $ER/data/hmgapi/state/apps.txt; }
+  for prod in CVEV.USA.0000.V015 DEPEHEV.KOR.0000.V039.001.260902 NX4.KOR.0000.V040.001.261101; do
+    ER=$T/er-$prod; eng $ER $prod
+    check "HMG-API 엔진: $prod 에는 설치하지 않음(NX4.KOR 260902 전용)" '[ "$(cat $T/eng.rc)" != 0 ] && grep -q "refused" $T/eng.out && ! grep -q "needs HMG-API" $T/eng.out && [ ! -d $ER/data/hmgapi/mods/nx4-kor ]' || cat $T/eng.out
+  done
+  fi
   # HMG-API가 모드를 설치할 때 보는 판 차례(Packages.check의 Version, 낮은 판은 --force 없이 거절): 베타 판이 정식보다 낮고 서로 차례대로
   cat > $T/VerChk.java <<'J'
 import hmgapi.engine.Version;
@@ -896,10 +776,6 @@ J
   check "HMG-API 판 차례(모드 설치가 보는 것): 2.0.3(꼬리 없는 v2.0.3-beta.1) < 2.0.4-beta.1 < 2.0.4-beta.2 < 2.0.4-beta.10 < 2.0.4 < 2.0.5-beta.1" 'grep -qx ok $T/verchk.out' || cat $T/verchk.out
   java -cp $T/eh VerChk 2.0.3-beta.2 2.0.3 > $T/verchk.out 2>&1
   check "  정식 2.0.3이 들어간 차에는 2.0.3-beta.2가 낮은 판(그래서 새 방식은 2.0.4-beta.1부터)" 'grep -qx ok $T/verchk.out' || cat $T/verchk.out
-  for prod in CVEV.USA.0000.V015 DEPEHEV.KOR.0000.V039.001.260902 NX4.KOR.0000.V040.001.261101; do
-    ER=$T/er-$prod; eng $ER $prod
-    check "HMG-API 엔진: $prod 에는 설치하지 않음(NX4.KOR 260902 전용)" '[ "$(cat $T/eng.rc)" != 0 ] && grep -q "refused" $T/eng.out && [ ! -d $ER/data/hmgapi/mods/nx4-kor ]' || cat $T/eng.out
-  done
 else
   echo "skip 빌드·HMG-API 엔진 시험(HMGAPI_SRC 없음)"
 fi

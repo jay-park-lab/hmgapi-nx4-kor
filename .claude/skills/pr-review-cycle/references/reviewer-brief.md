@@ -123,7 +123,7 @@ GitHub 작업은 `gh` 와 `gh api` 로 한다(github.com). 아래 `<R>` 은 `jay
    - HMG-API 모드: `mod/mod.json`(차종 제한 NX4·NX4HEV KOR 260902, `hmgapi` 최소 판, `conflicts`, 훅 지점),
      `patches.json`, 서비스 정의가 `docs/design.md` 와 맞는지
    - 상태 화면 앱(`app/`): Android API 19 에서 도는지(minSdk 19), 1920x720 화면, 앱과 root 가 주고받는 파일
-     (`/data/local/tmp/nx4-kor-*.txt`, `reboot.req`)의 형식이 `mod/bin/status.sh`·`mod/svc/hotspot.sh` 와 맞는지
+     (`/data/local/tmp/nx4-kor-*.txt`, `reboot.req`)의 형식이 `mod/bin/status.sh`·`mod/svc/lib.sh` 와 맞는지
    - 사용자에게 보이는 한국어 문구: 정확하고, 차주가 무엇을 해야 하는지 알 수 있는지
    - 시험: 바뀐 동작을 `tests/mod-test.sh`·`tests/ReportTest.java` 가 덮는지, 실패해야 할 때 실패하는지
    - 문서: `README.md`, `docs/`, `NOTICE.md` 가 실제 동작과 맞는지

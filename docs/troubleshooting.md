@@ -4,7 +4,7 @@ USB로 설치하다 멈추거나, 설치 뒤 상태 화면이 빨강·노랑일 
 
 > ⚠️ **아직 차에서 확인하지 않았습니다.** 아래는 다음 셋에서 모은 것입니다.
 > - 이 저장소의 설치기(`usb/troubleShooter`)
-> - 자동 설정(`mod/svc/hotspot.sh`)과 상태 판정(`mod/bin/status.sh`)
+> - 상태 판정(`mod/bin/status.sh`, 2.1.0: HMG-API + 공식 무선 모드 구조)과 지우기(`mod/bin/uninstall.sh`)
 > - HMG-API 1.1.0-rc.7의 문서(`wiki/Troubleshooting.md`, `wiki/Uninstalling.md`)와 설치기(`install/common/install.sh`)
 >
 > 차에서 다르게 동작하면 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적어 주세요.
@@ -27,7 +27,8 @@ USB로 설치하다 멈추거나, 설치 뒤 상태 화면이 빨강·노랑일 
 | USB `HMGAPI/install.log` | HMG-API 설치기가 한 일 | 아니오 |
 | USB `NX4/diag/<시각>/` | 누를 때 뜨는 확인 창에서 [모으기]를 고르면, 설치기가 아무것도 바꾸기 전에 모은 진단 기록. 아래 adb 줄의 기록(`logs/`), HMG-API Car Report와 상태, `/system/lib` 파일의 이름·md5, 내비 판 등입니다. 담는 것은 [`design.md`](design.md) "진단 기록" | 아니오 |
 | 상태 화면 | 오른쪽 칸의 판정·안내와 왼쪽 칸의 요약·상태표. 사진으로 남겨 두면 좋습니다. 앱 메뉴의 NX4 KOR 타일로 엽니다. 타일이 없으면 같은 USB로 Update OTA를 다시 누릅니다(다시 설치하지 않고 상태 화면만 엶) | 아니오 |
-| `/data/nx4-kor/logs/ap.log` | 이 모드 서비스의 기록 | 예 |
+| `/data/nx4-kor/logs/ap.log` | 상태 화면 감시자([지금 재부팅] 요청)의 기록 | 예 |
+| `/data/hmgapi/logs/hmgapi/wifi.log` | HMG-API가 무선 연결용 Wi-Fi(프로젝션 AP)를 띄운 기록(`projection AP: …` 줄) | 예 |
 | `/data/local/tmp/nx4-kor/` | map 만들기·확인·적용 출력(`map-car.txt`, `verify-map.txt`, `plan.txt`, `mod-apply.txt`) | 예 |
 | HMG-API 앱의 Logs 탭, "Record a problem"(HMG-API rc.6부터) | HMG-API 쪽 기록 | 아니오. 다만 앱을 열 수 있어야 합니다(아래 "HMG-API 앱을 열 수 없을 때") |
 
@@ -41,7 +42,7 @@ USB로 설치하다 멈추거나, 설치 뒤 상태 화면이 빨강·노랑일 
 | 확인 창 "진단 기록 모으기" | 정상 흐름. 상태 화면 앱이 있으면 누를 때마다 먼저 묻습니다 | 기록이 필요하면 [모으기], 아니면 [건너뛰기]. 60초 안에 고르지 않으면 건너뜁니다. 어느 쪽이든 설치기는 이어집니다 |
 | 진단 기록을 USB에 모으는 중입니다(1~2분). USB를 빼지 마세요 | [모으기]를 고름 | 다음 메시지가 나올 때까지 기다립니다 |
 | HMG-API를 먼저 설치합니다 | 정상 흐름(HMG-API가 없는 차) | 재부팅을 기다렸다가, 부팅이 끝나고 1~2분 뒤 같은 USB로 **한 번 더** 누릅니다 |
-| HMG-API를 …에서 …(으)로 먼저 올립니다 | 정상 흐름(HMG-API가 1.1.0-rc.4보다 낮은 차). 따로 설치한 무선 모드는 아직 지우지 않습니다 | 위와 같이 한 번 더 누릅니다 |
+| HMG-API를 …에서 …(으)로 먼저 올립니다 | 정상 흐름(HMG-API가 1.1.0-rc.8보다 낮은 차). 따로 설치한 무선 모드는 아직 지우지 않습니다 | 위와 같이 한 번 더 누릅니다 |
 | HMG-API가 응답하지 않습니다 | HMG-API가 아직 안 떴거나 멈춤 | 내비를 재부팅하고 **3분 넘게** 기다린 뒤 다시 누릅니다 |
 | HMG-API …에는 설치할 수 없습니다. … 이상으로 먼저 올려 주세요 | HMG-API가 낮은데 USB에 HMG-API가 없음 | HMG-API가 든 릴리스 USB 묶음(`v2.0.0-beta.3`부터)을 씁니다 |
 | HMG-API가 없습니다. HMG-API USB 설치(HMGAPI 폴더)를 먼저 해 주세요 | HMG-API가 없는데 USB에 HMG-API가 없음 | 위와 같습니다 |
@@ -53,23 +54,26 @@ HMG-API 설치 중 `HMGAPI/install.log`에 `isn't a known stock build`가 있으
 
 ## 설치 뒤 상태 화면이 빨강·노랑일 때
 
+판정 코드는 상태 화면 왼쪽 표의 맨 아래 "판정 코드" 줄에 있습니다. 판정 차례와 보는 것은 [`design.md`](design.md) "상태 화면".
+
 | 판정(문구 요지) | 할 일 |
 |---|---|
-| 설치 중입니다 | 기다립니다 |
-| 내비를 3분 후 재부팅해 주세요 / 무선 카플레이 기능이 아직 켜지지 않았습니다 / Wi-Fi를 켜는 중입니다 | 켠 지 3분이 지난 뒤 [지금 재부팅]을 누릅니다 |
-| HMG-API가 이 차의 map을 만들지 못해… | 3분 뒤 재부팅하면 다시 시도합니다 |
-| **이 차의 map을 확인하지 못해 무선 기능을 적용하지 않았습니다** | 확인에 한 번 실패하면 다시 시도하지 않습니다. 아래 "되돌리기" 1단계로 NX4 KOR를 지운 뒤 다시 설치하면 한 번 더 해 봅니다. 그래도 같으면 adb로 `verify-map.txt`가 필요합니다 |
-| 순정 핫스팟이 켜져 있어 이번에는 설정하지 않았습니다 | 순정 핫스팟을 끄고 재부팅합니다. 순정 무선 카플레이 트림에서 늘 이렇다면 [#20](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/20)에 적어 주세요 |
-| 따로 설치된 무선 모드(wireless-carplay-aa)가 있어… | 아래 "HMG-API 앱을 열 수 없을 때" |
-| HMG-API에 다른 모드의 바뀐 내용이 함께 있어… / 무선 기능 적용에 실패했습니다 / HMG-API가 적용을 거절했습니다 | 아래 "HMG-API 앱을 열 수 없을 때" |
-| HMG-API 앱에서 NX4 KOR가 꺼져 있습니다 / 'Wireless CarPlay'가 꺼져 있습니다 | 아래 "HMG-API 앱을 열 수 없을 때" |
-| HMG-API 훅이 꺼져 있습니다 / NX4 KOR의 훅을 켜지 못했습니다 | 3분 뒤 재부팅합니다. 같으면 이 차의 map에 우리 훅 지점이 없을 수 있습니다. 기록을 남겨 알려 주세요 |
-| **HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다** | 아래 "부팅 보호" |
-| 다른 Wi-Fi 패키지가 핫스팟을 쓰고 있어… | NEMESIS의 Korea Projection이나 다른 무선·핫스팟 패키지를 지우고 재부팅합니다([`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때") |
-| Wi-Fi 칩 전원을 켜려고 순정 핫스팟 기능을 켰습니다… | 3분 뒤 [지금 재부팅]을 누릅니다. 재부팅 뒤 Wi-Fi를 다시 봅니다. 결과는 `ap.log`의 "순정 핫스팟 기능을 켜 본 차: …" 줄과 USB 진단 기록(`features.txt`)에 남습니다. 칩이 여전히 없으면 무선 기능이 적용된 채라, 부팅마다 Wi-Fi를 한 번 켜고(유선 카플레이가 잠깐 끊길 수 있음) 상태 화면이 "Wi-Fi를 켜는 중입니다… (확인 n/3)"을 보입니다. 세 번째 부팅에 아래 줄의 판정이 나오면 NX4 KOR를 지웁니다 |
-| 이 차는 Wi-Fi 칩이 켜지지 않아… / Wi-Fi 부품이 없어… | 이 차에서는 무선 카플레이를 쓸 수 없습니다. 순정 핫스팟 기능을 켜 본 뒤에도 그렇다면 무선 기능이 적용된 채 남으니, 아래 "되돌리기" 1단계로 NX4 KOR를 지웁니다 |
-| 지원하지 않는 HMG-API 버전입니다 | HMG-API가 든 릴리스 USB로 다시 누릅니다 |
-| 연결됨·준비됨(시안 글자)인데 폰이 붙지 않음 | 오른쪽 칸 판정 아래의 노란 띠를 봅니다. USB를 뺐는지도 봅니다 |
+| 설치 중입니다 (`installing`) | 기다립니다 |
+| 내비를 3분 후 재부팅해 주세요 (`reboot`) / 무선 카플레이 기능이 아직 켜지지 않았습니다 (`nofeat`) / HMG-API가 무선 연결용 Wi-Fi를 띄우도록 설정되지 않았습니다 (`noproj`) | 켠 지 3분이 지난 뒤 [지금 재부팅]을 누릅니다. 재부팅 뒤에도 `nofeat`·`noproj`면 HMG-API 앱에서 변경 사항을 적용했는지 봅니다(아래 "HMG-API 앱을 열 수 없을 때") |
+| 설치기가 남긴 실패 문장 (`failed`) | 그 문장대로 합니다. USB의 `NX4/install.log`에 자세한 까닭이 있습니다 |
+| 공식 무선 모드(Wireless CarPlay + Android Auto)가 설치되어 있지 않습니다 (`nowireless`) / 공식 무선 모드 버전을 지원하지 않습니다 (`oldwireless`) | NX4 KOR USB 설치기로 다시 설치합니다(공식 모드를 넣음) |
+| HMG-API 앱에서 Wireless CarPlay + Android Auto가 꺼져 있습니다 (`wirelessoff`) / 'Wireless CarPlay'가 꺼져 있습니다 (`bridgeoff`) | HMG-API 앱에서 켜고 적용한 뒤 재부팅합니다(아래 "HMG-API 앱을 열 수 없을 때") |
+| HMG-API 훅이 꺼져 있습니다 (`hooksoff`) | 문구대로 합니다. map이 없으면(`none`) USB 설치기를 다시 실행하고, 그래도 같으면 USB 진단 기록을 남겨 알려 주세요 |
+| Wireless CarPlay + Android Auto가 다른 모드와 같은 훅을 써서 꺼졌습니다 / 그 훅을 켜지 못했습니다 (`wmhooksoff`) | 다른 모드와 겹치면 HMG-API 앱의 Mods에서 겹치는 모드를 끕니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)). 아니면 3분 뒤 재부팅하고, 같으면 Mods에서 이유를 봅니다. 이 차의 map에 공식 모드의 훅 지점이 없을 수 있습니다 |
+| **HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다** (`bootguard`) | 아래 "부팅 보호" |
+| 다른 Wi-Fi 패키지가 Wi-Fi를 쓰고 있어… (`otherwifi`) | NEMESIS의 Korea Projection이나 다른 무선·핫스팟 패키지를 지우고 재부팅합니다([`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때") |
+| 내비 Wi-Fi가 일반 핫스팟으로 켜져 있어… (`aphotspot`) | 순정 핫스팟을 끄고 재부팅합니다 |
+| 내비가 일반 Wi-Fi에 접속하는 중이라… (`wificlient`) | HMG-API 앱의 Home Wi-Fi를 쓰면 주차를 풀 때 돌아옵니다. 계속 그렇다면 Home Wi-Fi를 끕니다 |
+| 이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여… (`nowifipart`) | 이 차에서는 무선을 쓸 수 없습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로입니다. 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다. 결과를 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적어 주세요 |
+| 무선 연결용 Wi-Fi를 켜는 중입니다 (`apwait`) | 1~2분 뒤 화면을 다시 엽니다. 부팅 뒤 5분 동안은 Wi-Fi 부품이 없는 차도 이렇게 나옵니다 |
+| 무선 연결용 Wi-Fi가 지금 꺼져 있습니다 (`apoff`) / HMG-API가 무선 연결용 Wi-Fi를 켜지 못했습니다·켜지 않았습니다 (`apfail`) | 폰을 연결해 보고, 안 되면 3분 뒤 재부팅합니다. 같으면 adb로 `/data/hmgapi/logs/hmgapi/wifi.log`를 봅니다 |
+| 지원하지 않는 HMG-API 버전입니다 (`oldhmgapi`) / HMG-API가 없습니다 (`nohmgapi`) | HMG-API(1.1.0-rc.8 이상)가 든 릴리스 USB로 다시 누릅니다 |
+| 연결됨·준비됨(시안 글자)인데 폰이 붙지 않음 | USB를 뺐는지 봅니다. 폰의 Wi-Fi 설정에서 차 네트워크를 지우고 다시 연결해 봅니다 |
 
 ### HMG-API 앱을 열 수 없을 때
 
@@ -100,16 +104,17 @@ HMG-API는 훅 때문에 내비가 제대로 뜨지 못한다고 보면 스스�
 
 1. **NX4 KOR만 지우기**
    - 설치 USB의 `NX4` 폴더에 빈 파일 `UNINSTALL`을 만들고 Engineering Mode → USB Copy → DSP → Update OTA를 누릅니다.
-   - 다음을 되돌린 뒤 재부팅합니다: 이 모드의 핫스팟, Wi-Fi 설정 파일 잠금, 순정 AP 저장값, 무선 권한 파일.
-   - HMG-API를 먼저 지웠어도 됩니다. 그때는 남은 모드 폴더나 USB의 사본으로 되돌립니다. 자세한 것은 [README](../README.md) "삭제".
+   - 2.1.0의 NX4 KOR는 HMG-API에서 이 모드를 지우고(상태 화면 앱·서비스가 내려감) 작업 파일·기록 폴더를 지웁니다. 2.0.x의 백업 폴더(`/data/nx4-kor/backup`)가 남아 있으면 그것만 남기고 USB의 `NX4/install.log`에 "…2.0.x USB(v2.0.4-beta.1) 또는 NX4 KOR 2.1.0 이후 USB의 UNINSTALL로 되돌려 주세요"를 적습니다. 그때는 그 USB로 UNINSTALL을 한 번 더 합니다. 시스템 파일·Wi-Fi 설정은 바꾸지 않았으므로 되돌릴 것이 없습니다. 공식 무선 모드를 함께 지울지는 USB 설치기 작업([#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45))에서 정합니다.
+   - 2.0.x를 쓰던 차에 남은 것(이 모드의 핫스팟, Wi-Fi 설정 파일 잠금, 순정 AP 저장값, 무선 권한 파일)은 USB 설치기가 옛 판 자신의 삭제로 되돌립니다.
+   - HMG-API를 먼저 지웠어도 됩니다. 그때는 남은 모드 폴더나 USB의 사본으로 지웁니다. 자세한 것은 [README](../README.md) "삭제".
 2. **HMG-API까지 지우기**
-   - **NX4 KOR를 먼저 지운 뒤에** 합니다. HMG-API 삭제는 HMG-API를 통해 바꾼 것만 되돌리므로, 순서를 바꾸면 Wi-Fi 잠금이 남습니다.
+   - **NX4 KOR를 먼저 지운 뒤에** 합니다. HMG-API 삭제는 HMG-API를 통해 바꾼 것만 되돌리므로, 2.0.x를 쓰던 차에서 순서를 바꾸면 2.0.x의 Wi-Fi 잠금이 남습니다.
    - 이 저장소의 릴리스 USB로는 지울 수 없습니다. 맨 위 설치기가 NX4 KOR 것이라 `HMGAPI/UNINSTALL`을 읽지 않습니다.
    - HMG-API 릴리스의 `hmgapi-<판>-usb.zip`을 따로 풀고, `HMGAPI` 폴더에 빈 파일 `UNINSTALL`을 만들어 Update OTA를 누릅니다.
    - `UNINSTALL`은 모드 파일과 설정을 남기고 모드 앱을 꺼 두기만 합니다. 모두 지우려면 `UNINSTALL-PURGE`를 씁니다.
 3. **최후의 길: 순정 내비 업데이트**
    - 현대 내비게이션 업데이트로 순정 펌웨어를 다시 깔면 시스템 파일이 순정으로 돌아갑니다(HMG-API 문서 기준). HMG-API의 시스템 파일도 함께 사라집니다.
-   - `/data`에 있는 것(이 모드의 Wi-Fi 설정 파일 잠금, 기록 등)은 남습니다. 그 뒤에도 Wi-Fi가 이상하면, NX4 KOR 릴리스 USB로 1단계(`NX4/UNINSTALL`)를 한 번 돌립니다. HMG-API가 없어도 USB의 사본과 남은 기록으로 되돌립니다.
+   - `/data`에 있는 것(이 모드의 기록, 2.0.x를 쓰던 차는 그 판의 Wi-Fi 설정 파일 잠금 등)은 남습니다. 그 뒤에도 Wi-Fi가 이상하면, NX4 KOR 릴리스 USB로 1단계(`NX4/UNINSTALL`)를 한 번 돌립니다. HMG-API가 없어도 USB의 사본과 남은 기록으로 되돌립니다.
 
 ## 도움을 청할 때 남길 것
 
@@ -117,7 +122,7 @@ HMG-API는 훅 때문에 내비가 제대로 뜨지 못한다고 보면 스스�
 - USB의 `NX4/install.log`, `HMGAPI/install.log`
 - USB의 `NX4/diag/` 폴더. 없거나 설정이 끝난 뒤의 기록이 필요하면, 재부팅하고 같은 USB로 Update OTA를 한 번 더 눌러 확인 창에서 [모으기]를 고른 뒤 가져옵니다(같은 판이면 기록을 모은 뒤 상태 화면만 엽니다). 확인 창이 없는 예전 판에서 올리는 첫 설치 때는 묻지 않고 모으지도 않습니다.
   - 비밀번호가 든 Wi-Fi 설정 파일은 넣지 않고, Car Report는 HMG-API가 VIN·일련번호를 빼고 기록 줄을 가립니다. 그래도 공개 이슈에 올리기 전에 한 번 훑어봅니다.
-- adb가 있으면 `/data/nx4-kor/logs/ap.log`와 `/data/local/tmp/nx4-kor/`의 txt 파일(USB 진단 기록의 `logs/`에도 있음)
+- adb가 있으면 `/data/hmgapi/logs/hmgapi/wifi.log`, `/data/nx4-kor/logs/ap.log`, `/data/local/tmp/nx4-kor-status.txt`(USB 진단 기록의 `logs/`에도 일부 있음)
 - 몇 번째 Update OTA에서, 어떤 메시지가 떴는지
 - 내비 소프트웨어 판(`NX4.KOR.….260902`), 설치 전 HMG-API 판, 순정 무선 카플레이 트림인지
 
