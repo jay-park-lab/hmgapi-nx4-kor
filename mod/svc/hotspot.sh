@@ -2149,13 +2149,20 @@ mod_ver() {
 }
 # 계획($W/plan.txt)에 적용할 것이 없는가: 모든 줄이 "same …"(이미 그대로) 또는 "nothing changed"·"hook plan:"
 # 안내뿐일 때. 문제(problem)가 있거나 다른 줄이 하나라도 있으면 아니다(차주가 앱에서 보게 둔다).
-# app·service·usb 줄은 지금 켜져 있는 것의 설명이다(HMG-API 1.0.2부터 계획에 나옴): 변경으로 보지 않는다.
+# 아래 설명 줄은 지금 켜져 있는 것의 설명이라 적용할 것이 없어도 늘 나온다: 변경으로 보지 않는다.
+#   app·service·usb(HMG-API 1.0.2부터), event·vehicle·driving·panel·button(ModRuntime.describe),
+#   home Wi-Fi·wifi·network(HomeWifi·Network, rc.5~rc.7부터). rc.8 소스(engine/ModRuntime.java 464~483,
+#   HomeWifi.java 163~168, Network.java 527)에서 확인. 2.0.4-beta.1 차 기록에서 "home Wi-Fi  off"와
+#   "network  no cellular [nx4-kor]"를 변경으로 봐 다 적용된 뒤에도 부팅마다 "적용할 것 있음"이 됐다(#45).
+#   공식 무선 모드(projection 요청)를 쓰면 "wifi     the projection AP up from boot …" 줄도 늘 나온다.
 plan_nothing() {
   [ -s $W/plan.txt ] || return 1
   while IFS= read -r _l; do
     case "$_l" in
       "same     "*|"hook plan:"*|"note     "*|"") ;;
       "app      "*|"service  "*|"usb      "*) ;;
+      "event    "*|"vehicle  "*|"driving  "*|"panel    "*|"button   "*) ;;
+      "home Wi-Fi  "*|"wifi     "*|"network  "*) ;;
       # WARNING 줄(예: ADB TCP 스위치 경고)은 정보일 뿐이다
       "WARNING"*) ;;
       "nothing changed"*problem*) return 1 ;;
