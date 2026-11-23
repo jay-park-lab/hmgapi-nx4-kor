@@ -28,9 +28,11 @@ NX4 KOR 2.0.x는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 �
 > ⚠️ 차 확인은 일부만 됐습니다. 2026-11-23 NX4HEV 260902에서 2.0.2·2.0.4 베타로 다음이 동작했습니다([#23 기록](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23#issuecomment-7101713033)).
 > - USB 설치·업데이트, map 만들기·확인(훅 지점 393/393), 자동 설정, 상태 화면과 [지금 재부팅], 진단
 >
-> 다만 자동 설정은 HMG-API rc.7 계획의 새 설명 줄(`home Wi-Fi  off`, `network  … [<mod>]`)을 `plan_nothing`이 변경으로 봅니다. 그래서 다 적용된 뒤에도 부팅마다 "적용할 것 있음"으로 갑니다(2.1.0에서 고침, [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)).
+> 다만 2.0.4-beta.1까지의 자동 설정은 HMG-API rc.7 계획의 새 설명 줄(`home Wi-Fi  off`, `network  … [<mod>]`)을 `plan_nothing`이 변경으로 봅니다. 그래서 다 적용된 뒤에도 부팅마다 "적용할 것 있음"으로 갑니다.
 > - 칩이 없는 차는 Wi-Fi 깨우기 쪽으로 갑니다.
 > - 칩이 있는 차는 부팅마다 `engine apply`를 다시 돌리고 "설정을 마쳤습니다. 재부팅해 주세요"를 띄웁니다. 그 차의 `plan.txt`로 PC에서 재현했습니다.
+> - `develop`에서 고쳤습니다. `plan_nothing`이 rc.8까지의 설명 줄(`app`·`service`·`usb`, `event`·`vehicle`·`driving`·`panel`·`projection`·`button`, `home Wi-Fi`·`wifi`·`network`)을 변경으로 보지 않습니다. 그 차의 실제 `plan.txt`로 테스트합니다(`tests/mod-test.sh`, [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)).
+>   - USB 설치기(`usb/troubleShooter`)가 옛 무선 모드를 지운 뒤 읽는 계획에도 같은 문제가 있습니다. 2.1.0 설치기를 새로 짜면서 고칩니다(#45).
 >
 > 그 차는 Wi-Fi 부품이 없어 무선은 확인하지 못했습니다. 그 밖에는 PC 시험(`tests/mod-test.sh`)과 HMG-API 1.1.0-rc.4·rc.7 엔진(PC)에서만 확인했습니다. 아래 "차에서 확인할 것"을 먼저 봐 주세요.
 

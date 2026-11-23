@@ -802,6 +802,54 @@ printf 'same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_
 srun
 check "setup_hmgapi: 다음 부팅(적용됨) → map을 다시 만들거나 확인하지 않고 적용도 하지 않음, 설정 끝(app·service·usb 줄은 변경이 아님)" \
   '! grep -q "map-car" $T/calls && ! grep -q "verify-map" $T/calls && ! grep -q "engine apply" $T/calls && [ "$(st state)" = done ]' || { cat $T/s.out; cat $T/sprog; }
+# HMG-API 계획의 설명 줄(#45): 2.0.4-beta.1 차(NX4HEV, HMG-API rc.7)의 실제 plan.txt. "home Wi-Fi  off"·"network  …"를 변경으로 봐
+# 칩이 있는 차에서 부팅마다 다시 적용하고 재부팅을 안내했다(PR #46 리뷰 7에서 재현)
+cat > $T/plan.out <<'P'
+same     /system/etc/permissions/com.hkmc.software.connectivity.androidauto_wireless.xml [nx4-kor]
+same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml [nx4-kor]
+same     /system/etc/permissions/com.hkmc.software.wifihotspot.xml [nx4-kor]
+same     /system/lib/libleafiaaac.so [nx4-kor]
+same     /system/onebin/nx4hev_kr/featurexml.cfg [nx4-kor]
+same     setting prop/persist.iap2.iden.wireless = t [nx4-kor]
+same     setting prop/persist.ium.support = carplay [nx4-kor]
+same     setting prop/persist.sys.iap2.wifi = t [nx4-kor]
+app      io.github.jayparklab.nx4kor (app/NX4KOR.apk) [nx4-kor]
+service  nx4-kor/ap as root, at android, restarted if it stops [nx4-kor]
+service  nx4-kor/launch as root, at manual [nx4-kor]
+home Wi-Fi  off
+network  no cellular [nx4-kor]
+P
+: > $T/calls; srun
+check "setup_hmgapi: 차의 실제 계획(rc.7, home Wi-Fi·network 설명 줄)이 모두 same이면 칩이 보여도 다시 적용하지 않음, 설정 끝(재부팅 안내 없음)" \
+  '! grep -q "engine apply" $T/calls && ! grep -q "^svc wifi" $T/calls && [ "$(st state)" = done ] && ! grep -q "설정을 마쳤습니다" $T/sprog' || { cat $T/s.out; cat $T/sprog; }
+# rc.8의 나머지 설명 줄. 글자는 rc.8 코드가 내는 꼴 그대로(ModRuntime.java 464~486, Projection.java 121~125, HomeWifi.java 163~170,
+# Network.java 257·527). 공식 무선 모드의 projection AP 요청이 내는 wifi 줄과 방화벽 규칙(공식 rc.9 mod.json 첫 규칙) 줄 포함.
+# 줄 머리를 모은 표본이라 실제 한 계획은 아니다(예: "home Wi-Fi  on"과 "no cellular (home Wi-Fi is off)"는 함께 나오지 않음)
+cat > $T/plan.out <<'P'
+same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml [nx4-kor]
+app      io.github.jayparklab.nx4kor (app/NX4KOR.apk) [nx4-kor]
+event    park -> runs svc/park.sh as root (30 s at most); its apps and hooks hear it [nx4-kor]
+vehicle  reads speed, gear [nx4-kor]
+vehicle  may seat_heat (park only) [nx4-kor]
+driving  io.github.jayparklab.nx4kor/.StatusActivity closes while the car's driving restriction is on [nx4-kor]
+panel    "NX4" (io.github.jayparklab.nx4kor/.Widget) in the side panel [nx4-kor]
+projection Android Auto density 160 [wireless-carplay-aa]
+projection events to its apps [nx4-kor]
+network  firewall filter input: accept tcp port 40515 in hotspot to hotspot (IPv4, 1 rule) (when settings.aa_firewall) [wireless-carplay-aa]
+button   star short -> opens io.github.jayparklab.nx4kor/.StatusActivity [nx4-kor]
+home Wi-Fi  on: while the car is off, the hotspot off and the car's Wi-Fi client on the saved networks
+wifi     the projection AP up from boot, once each boot, unless a Wi-Fi client is on [wireless-carplay-aa]
+network  home Wi-Fi only (no cellular) [nx4-kor]
+network  no cellular (home Wi-Fi is off) [wireless-carplay-aa]
+P
+: > $T/calls; srun
+check "  rc.8 설명 줄(event·vehicle·driving·panel·projection·button·home Wi-Fi·wifi·network)도 변경이 아님 → 적용 없음, 설정 끝" \
+  '! grep -q "engine apply" $T/calls && [ "$(st state)" = done ]' || { cat $T/s.out; cat $T/sprog; }
+printf 'change   /system/etc/permissions/x.xml [nx4-kor]\n' >> $T/plan.out
+: > $T/calls; srun
+check "  설명 줄과 함께 진짜 변경(change) 줄이 있으면 그대로 적용함(설명 줄이 변경을 가리지 않음)" \
+  'grep -qx "hmgapid engine apply" $T/calls && [ "$(st state)" = reboot ]' || { cat $T/s.out; cat $T/sprog; }
+printf 'same     /system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml\nhook plan: 1 mod\napp      io.github.jayparklab.nx4kor [nx4-kor]\nservice  nx4-kor ap\nusb      none\n' > $T/plan.out
 echo 1.9.0 > $T/sbk/applied; : > $T/calls
 srun
 check "setup_hmgapi: 새 판인데 적용할 것이 없으면(훅 코드만 바뀜) 적용하지 않고 재부팅 안내, 판 기록을 바꿈" \
