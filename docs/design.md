@@ -31,7 +31,7 @@
 | `system` | `NX4`·`NX4HEV`, `KOR`, `260902`에만 설치됩니다 |
 | `hmgapi` | `>=1.1.0-rc.8`(공식 무선 모드 2.2.0-rc.9가 요구하는 판) |
 | `services` | `launch`(`svc/launch.sh`, root, 앱이 부를 때만) 하나 |
-| `apps`, `provides.launcher` | 상태 화면 앱(`app/NX4KOR.apk`)과 앱 메뉴 타일 |
+| `apps`, `provides.launcher` | 상태 화면 앱(`app/NX4KOR.apk`)과 앱 메뉴 타일. 타일 그림은 `icons/`의 순정 꼴 넷(낮·밤, 모드를 껐을 때의 회색 낮·밤)이고, 저장소의 `art/tile.svg`를 HMG-API `tools/mkicon.sh`로 만든 것입니다([#47](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/47)) |
 
 - **빠진 것:** 한국 포크 무선 모드 2.4.5(`hooks`·`parts`·`feature_flags`, `hooks.jar`, 레시피 5개, `files/libleafiaaac.so`, `patches.json`, `settings.json`, 저장소의 `wireless/`), `"wifi": {"hotspot": true}`, `conflicts: ["wireless-carplay-aa"]`, 서비스 `ap`(`svc/ap.sh` → `svc/hotspot.sh`의 순정 `hostapd`·`dnsmasq` 핫스팟, Wi-Fi 설정 잠금, 칩 깨우기, 자동 설정 `setup_hmgapi`)와 `scripts/post.sh`. 공식 모드와 겹치는 훅이 남지 않습니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)).
 - **`requires`로 공식 모드를 걸지 않습니다.** HMG-API는 요구한 모드가 없거나 꺼지면 이 모드의 앱·서비스까지 멈춥니다(rc.8 `docs/mod-reference.md` "Other mods", `engine/Engine.java` `visit`). 그러면 상태 화면이 그 사실을 알릴 수 없습니다. 대신 상태 화면이 공식 모드가 있는지·켜졌는지·판을 봅니다(아래 "상태 화면").
@@ -203,6 +203,11 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - 시스템 상태 줄(시각 등)이 앱 위를 덮는지. 결과 화면의 화면 안 닫기는 왼쪽 위 `<` 하나뿐이라, 덮으면 `<`가 가려집니다. 그때는 제목 줄 높이를 고칩니다(#28 "정할 것" 4).
   - 순정 설정 화면과 나란히 보고 색·글자 크기·줄 높이가 맞는지. 다르면 `Ui.java` 값을 고칩니다.
   - 재부팅 확인 창(Holo)의 모양, 버튼을 누를 때의 색, 주간·야간 밝기에서 띠와 시안 글자가 잘 보이는지.
+- **앱 메뉴 타일과 앱 아이콘이 맞게 보이는지**([#47](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/47)). 결과는 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적습니다.
+  - 낮·밤 테마에서 NX4 KOR 타일이 순정 타일 사이에 어울리는지(크기, 위치, 그라데이션).
+    - 크기가 순정과 다르면 화면 밀도도 함께 적습니다. HMG-API(rc.4 `HmgApi.icon()`)는 모드 그림을 밀도 보정 없이 99 px 그대로 쓰고, 순정 `hom_*_66`은 `drawable-hdpi` 자원이라 화면 밀도에 맞춰 바뀝니다. 그래서 밀도가 240이 아니면 크기가 다를 수 있습니다(코드를 읽고 추론).
+  - HMG-API 앱에서 NX4 KOR를 껐을 때 타일이 회색(꺼짐) 그림으로 바뀌는지, 낮·밤 모두.
+  - 설정 앱의 앱 목록에 NX4 KOR 앱 아이콘이 새 그림으로 보이는지.
 
 확인하다 설치가 막히거나 상태 화면이 빨강·노랑이면 [`troubleshooting.md`](troubleshooting.md)를 봅니다.
 

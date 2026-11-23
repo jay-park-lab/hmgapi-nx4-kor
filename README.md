@@ -151,7 +151,8 @@ NX4 KOR에는 설정이 없습니다. 무선 기능의 설정은 HMG-API 앱의 
 
 | 위치 | 내용 |
 |---|---|
-| `mod/` | HMG-API 모드 그대로: `mod.json`, 서비스·공용 함수(`svc/`), 상태·삭제(`bin/`), 삭제 전 정리(`scripts/`) |
+| `mod/` | HMG-API 모드 그대로: `mod.json`, 서비스·공용 함수(`svc/`), 상태·삭제(`bin/`), 삭제 전 정리(`scripts/`), 앱 메뉴 타일 그림(`icons/`) |
+| `art/` | 앱 메뉴 타일 모양의 원본(`tile.svg`). `mod/icons/`의 그림 넷은 이것을 HMG-API `tools/mkicon.sh`로 만든 것입니다 |
 | `app/` | 상태 화면 앱 소스 |
 | `usb/` | USB 설치기(`troubleShooter`)와 USB 안내(`README.txt`) |
 | `scripts/` | `build-app.sh`(상태 화면 앱), `build.sh`(서명한 모드 zip과 USB 묶음) |
@@ -185,10 +186,18 @@ java -cp out/engine-host hmgapi.engine.Signing keygen <NX4_MOD_KEY에 적은 경
 #    단 mod/bin/busybox가 있으면 그것을 확인 없이 먼저 씁니다. 예전에 둔 것이 있으면 지우고 만듭니다(docs/release.md "busybox")
 #    선택: .env.local에 HMGAPI_USB_ZIP(hmgapi-버전-usb.zip)
 sh scripts/build.sh
+
+# 앱 메뉴 타일 그림을 바꿀 때만(ImageMagick 필요): art/tile.svg → mod/icons/의 순정 꼴 그림 넷.
+# 상태 화면 앱 아이콘도 같은 그림(낮·밤)으로 둡니다(tests/mod-test.sh가 같은지 봅니다).
+# 지금 그림은 HMG-API rc.4 mkicon.sh와 ImageMagick 7.1.2(librsvg 없음, 내장 SVG 렌더러)로 만들었습니다.
+# ImageMagick 판이 다르거나 librsvg가 있으면 모양을 바꾸지 않아도 PNG가 조금 달라질 수 있으니, 모양을 바꿀 때만 다시 만듭니다
+sh <HMGAPI_SRC에 적은 HMG-API 소스>/tools/mkicon.sh art/tile.svg mod/icons
+cp mod/icons/icon.png app/res/drawable-hdpi/ic_launcher.png
+cp mod/icons/icon_night.png app/res/drawable-night-hdpi/ic_launcher.png
 ```
 
 **PC 시험**
-- `sh tests/mod-test.sh`: `mod.json`(뺀 것 포함), 서비스 래퍼, 삭제 전 정리, 상태 판정(공식 무선 모드·훅·프로젝션 AP·Wi-Fi 부품), [지금 재부팅] 요청, USB 설치기, 지우기(HMG-API를 먼저 지운 경우 포함), 상태 화면 앱의 `ReportTest`, 정적 검사. `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치·계획·지우기, 차종 제한(NX4.KOR 260902만)까지 봅니다. 이 모드는 HMG-API 1.1.0-rc.8 이상을 요구하므로 `HMGAPI_SRC`도 v1.1.0-rc.8 이상이어야 합니다(낮으면 엔진이 설치를 거절하고 테스트가 실패로 알림).
+- `sh tests/mod-test.sh`: `mod.json`(뺀 것 포함), 앱 메뉴 타일 그림과 앱 아이콘, 서비스 래퍼, 삭제 전 정리, 상태 판정(공식 무선 모드·훅·프로젝션 AP·Wi-Fi 부품), [지금 재부팅] 요청, USB 설치기, 지우기(HMG-API를 먼저 지운 경우 포함), 상태 화면 앱의 `ReportTest`, 정적 검사. `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치·계획·지우기, 차종 제한(NX4.KOR 260902만)까지 봅니다. 이 모드는 HMG-API 1.1.0-rc.8 이상을 요구하므로 `HMGAPI_SRC`도 v1.1.0-rc.8 이상이어야 합니다(낮으면 엔진이 설치를 거절하고 테스트가 실패로 알림).
 - 에뮬레이터: 상태 화면 앱을 1920x720 에뮬레이터에 띄워 상태별 화면과 [지금 재부팅] 흐름을 봅니다. 준비와 순서는 [`docs/emulator-test.md`](docs/emulator-test.md).
 
 ## 라이선스
