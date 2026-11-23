@@ -28,7 +28,7 @@ argument-hint: "[PR 번호 | PR URL]"
     `develop` 에도 합친다(`hotfix/main-readme` 는 규칙 13: `main` 에만 합침).
   - `main`·`develop` 에 직접 커밋·푸시하지 않는다.
   - 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는
-    `release/`·`hotfix/` 에서만 바꾼다.
+    `release/`·`hotfix/` 에서만 바꾼다. 베타는 판에도 꼬리를 붙이고(`<판>-beta.<n>`), 정식으로 낼 때 뗀다(규칙 4).
   - 합치기는 merge commit 만(`gh pr merge --merge`). squash·rebase 합치기를 쓰지 않는다.
   - PR 을 연 뒤에는 강제 푸시하지 않는다. 뒤처지면 rebase 가 아니라 base 를 merge 해서 맞춘다.
 - GitHub 작업(PR 생성·조회·리뷰·답글)은 `gh` 와 `gh api` 로 한다. 저장소는
@@ -254,7 +254,9 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
    - `develop` 으로 되돌려 합치기: `gh pr create --base develop --head <브랜치>`. 내용이 이미 리뷰된 것이라
      리뷰어는 띄우지 않고, 충돌이 있으면 3 처럼 푼다. 합치기는 위와 같이 `--merge`.
    - `hotfix/` 는 진행 중인 `release/` 에 합치지 않는다(`docs/git-flow.md` 규칙 12). 그 `release/` 에 고침이 필요하면
-     `develop` 에서 다음 판으로 다시 자른다.
+     `develop` 에 합친 뒤 `release/<판>` 에 `origin/develop` 을 합치고 판을 다음 베타(`<판>-beta.<n+1>`)로 올린다(규칙 4).
+   - `release/` 를 `main` 에 합치기 전에 판이 정식(`<판>`, 꼬리 없음)인지 본다. 베타 판(`<판>-beta.<n>`)이면 합치지 말고
+     알린다(정식 태그 `v<판>` 의 release 워크플로가 판이 다르다고 멈춘다).
    - 태그를 올리면 release 워크플로가 `production` 승인을 기다린 뒤 배포 묶음을 만들어 GitHub 릴리스에 올린다
      ([`docs/release.md`](../../../docs/release.md)). 승인은 사용자가 Actions 화면에서 한다. 대신 승인하거나
      승인 여부를 짐작해 말하지 않는다.

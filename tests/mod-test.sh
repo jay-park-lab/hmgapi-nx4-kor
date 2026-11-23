@@ -273,7 +273,29 @@ for VSH in $KSHS; do
     '[ "$(vcase vlt 1.0.2 1.1.0-rc.3)$(vcase vlt 1.1.0-rc.3 1.1.0-rc.4)$(vcase vlt 1.1.0-rc.4 1.1.0-rc.10)$(vcase vlt 1.1.0-rc.10 1.1.0)$(vcase vlt 1.1.0-beta.9 1.1.0-rc.1)" = 00000 ] && [ "$(vcase vlt 1.1.0-rc.4 1.1.0-rc.4)$(vcase vlt 1.1.0 1.1.0-rc.10)$(vcase vlt 1.2.0-beta.1 1.1.0-rc.4)$(vcase vlt 1.1 1.1.0)" = 1111 ] && [ "$(vcase vlt 1.1.0-dev 1.1.0-rc)" = 2 ]'
   check "USB 설치기 판 비교($(basename $VSH)): 최소 판에 꼬리가 없으면 그 판의 rc도 채움(1.1.0-rc.1은 >=1.1.0), 꼬리가 있으면 꼬리까지 봄" \
     '[ "$(vcase hmg_meets 1.1.0-rc.1 1.1.0)$(vcase hmg_meets 1.1.0-rc.4 1.1.0-rc.4)$(vcase hmg_meets 1.1.0 1.1.0-rc.4)" = 000 ] && [ "$(vcase hmg_meets 1.0.9 1.1.0)$(vcase hmg_meets 1.1.0-rc.3 1.1.0-rc.4)" = 11 ]'
+  # 이 모드의 베타 판(git-flow 규칙 4): 2.0.2 < 2.0.3-beta.1 < 2.0.3-beta.2 < 2.0.3-beta.10 < 2.0.3, 정식 뒤의 같은 판 베타는 낮음
+  check "USB 설치기 판 비교($(basename $VSH)): 이 모드의 베타 판 차례 2.0.2 < 2.0.3-beta.1 < 2.0.3-beta.2 < 2.0.3-beta.10 < 2.0.3, 2.0.3-beta.2는 2.0.3보다 낮음" \
+    '[ "$(vcase vlt 2.0.2 2.0.3-beta.1)$(vcase vlt 2.0.3-beta.1 2.0.3-beta.2)$(vcase vlt 2.0.3-beta.2 2.0.3-beta.10)$(vcase vlt 2.0.3-beta.10 2.0.3)" = 0000 ] && [ "$(vcase vlt 2.0.3 2.0.3-beta.2)" = 1 ]'
 done
+# release.yml "태그와 판 번호 확인"(그 step의 run 줄을 그대로 꺼내 돌림): 태그에서 v를 뗀 판이 mod.json·versionName과 같아야 함.
+# 베타는 -beta.<n>까지 같아야 한다(git-flow 규칙 4). git은 흉내(커밋이 origin/release/2.0.3에 있음)
+RV=$T/relver; rm -rf $RV; mkdir -p $RV/mod $RV/app $RV/bin
+awk '/id: ver$/ { f = 1 } f && /run: \|$/ { r = 1; next } r && !/^          / && !/^$/ { exit } r { sub(/^          /, ""); print }' $B/.github/workflows/release.yml > $RV/ver.sh
+printf '#!/bin/sh\ncase "$1" in rev-parse) echo 0123abc ;; branch) echo "  origin/release/2.0.3" ;; merge-base) exit 0 ;; esac\n' > $RV/bin/git; chmod +x $RV/bin/git
+rvrun() {
+  printf '{\n  "id": "nx4-kor",\n  "version": "%s"\n}\n' "$2" > $RV/mod/mod.json
+  printf '<manifest\n    android:versionCode="42"\n    android:versionName="%s">\n' "$2" > $RV/app/AndroidManifest.xml
+  : > $RV/out; (cd $RV && env PATH=$RV/bin:$P0 TAG=$1 GITHUB_OUTPUT=$RV/out sh ver.sh) > $RV/run.out 2>&1; echo $? > $RV/rc
+}
+rvrun v2.0.3-beta.2 2.0.3-beta.2
+check "release.yml 판 확인: 베타 태그 v2.0.3-beta.2와 파일 판 2.0.3-beta.2 → 통과(version=2.0.3-beta.2, prerelease=true)" \
+  '[ -s $RV/ver.sh ] && [ "$(cat $RV/rc)" = 0 ] && grep -qx "version=2.0.3-beta.2" $RV/out && grep -qx "prerelease=true" $RV/out' || cat $RV/run.out $RV/ver.sh
+rvrun v2.0.3-beta.2 2.0.3
+check "  베타 태그인데 파일 판에 꼬리가 없으면(예전 방식 2.0.3) 멈춤" '[ "$(cat $RV/rc)" != 0 ] && grep -q "mod/mod.json version(2.0.3)이 다릅니다" $RV/run.out' || cat $RV/run.out
+rvrun v2.0.3 2.0.3
+check "  정식 태그 v2.0.3과 파일 판 2.0.3 → 통과(prerelease=false)" '[ "$(cat $RV/rc)" = 0 ] && grep -qx "version=2.0.3" $RV/out && grep -qx "prerelease=false" $RV/out' || cat $RV/run.out
+rvrun v2.0.3 2.0.3-beta.2
+check "  정식 태그인데 파일 판이 베타면 멈춤(꼬리를 떼고 합쳐야 함)" '[ "$(cat $RV/rc)" != 0 ] && grep -q "다릅니다" $RV/run.out' || cat $RV/run.out
 # HMG-API가 모드의 최소 판(mod.json "hmgapi")보다 낮으면: 따로 설치된 무선 모드를 지우기 전에, 스틱의 HMG-API 설치기로 올리거나 멈춤
 NEEDV=$(sed -n 's/.*"hmgapi": *">=\([^"]*\)".*/\1/p' $PKG/mod.json)
 mkdir -p $HD/mods/wireless-carplay-aa; echo '{"id": "wireless-carplay-aa"}' > $HD/mods/wireless-carplay-aa/mod.json
@@ -778,6 +800,21 @@ PY
   engp plan
   check "HMG-API 엔진 업데이트 길: 옛 방식(featurexml 줄 주석)은 순정 파일이 없는 차에 핫스팟 기능 파일을 만들지 못했고, 이 판을 설치하면 계획은 그 파일 change 한 줄, featurexml.cfg 등은 same, restore·rebase·problem 없음" \
     '[ ! -f $T/er-upd/system/etc/permissions/com.hkmc.software.wifihotspot.xml ] && grep -q "^done:" $T/engp-old.out && grep -q "^installed nx4-kor $V" $T/engp-upd.out && [ "$(grep -c "^change   " $T/engp.out)" = 1 ] && grep -q "^change   /system/etc/permissions/com.hkmc.software.wifihotspot.xml \[nx4-kor\]" $T/engp.out && grep -q "^same     /system/onebin/nx4hev_kr/featurexml.cfg \[nx4-kor\]" $T/engp.out && ! grep -qE "^(restore|rebase|problem)|problem\(s\)" $T/engp.out' || { cat $T/engp-old.out $T/engp-upd.out $T/engp.out; }
+  # HMG-API가 모드를 설치할 때 보는 판 차례(Packages.check의 Version, 낮은 판은 --force 없이 거절): 베타 판이 정식보다 낮고 서로 차례대로
+  cat > $T/VerChk.java <<'J'
+import hmgapi.engine.Version;
+public class VerChk {
+    public static void main(String[] a) {
+        for (int i = 0; i + 1 < a.length; i++) {
+            if (new Version(a[i]).compareTo(new Version(a[i + 1])) >= 0) { System.out.println("not lower: " + a[i] + " " + a[i + 1]); System.exit(1); }
+        }
+        System.out.println("ok");
+    }
+}
+J
+  javac --release 8 -Xlint:-options -nowarn -cp $T/eh -d $T/eh $T/VerChk.java 2>/dev/null
+  java -cp $T/eh VerChk 2.0.2 2.0.3-beta.1 2.0.3-beta.2 2.0.3-beta.10 2.0.3 2.0.4-beta.1 > $T/verchk.out 2>&1
+  check "HMG-API 판 차례(모드 설치가 보는 것): 2.0.2 < 2.0.3-beta.1 < 2.0.3-beta.2 < 2.0.3-beta.10 < 2.0.3 < 2.0.4-beta.1" 'grep -qx ok $T/verchk.out' || cat $T/verchk.out
   for prod in CVEV.USA.0000.V015 DEPEHEV.KOR.0000.V039.001.260902 NX4.KOR.0000.V040.001.261101; do
     ER=$T/er-$prod; eng $ER $prod
     check "HMG-API 엔진: $prod 에는 설치하지 않음(NX4.KOR 260902 전용)" '[ "$(cat $T/eng.rc)" != 0 ] && grep -q "refused" $T/eng.out && [ ! -d $ER/data/hmgapi/mods/nx4-kor ]' || cat $T/eng.out
