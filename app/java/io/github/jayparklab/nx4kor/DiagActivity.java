@@ -10,10 +10,12 @@ import java.io.File;
 
 /**
  * 진단 기록을 모을지 묻는 확인 창. USB 설치기(usb/troubleShooter ask_diag)가 아무것도 바꾸기 전에
- * {@code am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id <id> --ei wait <초>}로 연다.
+ * {@code am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id <id> --ei wait <초> --el until <시각>}으로 연다.
  * 답은 앱 폴더의 diag.ans에 "<id> <답>" 한 줄로 쓴다(root인 설치기가 읽음, Report.diagLine).
  * 열리면 shown, [모으기]는 yes, [건너뛰기]·뒤로는 no, wait초 안에 고르지 않으면 timeout을 쓰고 닫는다.
- * 화면은 투명해서 확인 창만 DSP OTA 화면 위에 보인다. id가 없으면(설치기가 연 것이 아님) 아무것도 쓰지 않고 닫는다.
+ * 화면은 투명해서 확인 창만 DSP OTA 화면 위에 보인다. 자기 task로 열려(매니페스트 taskAffinity="") 앱의 상태 화면 위에 얹히지 않는다.
+ * id가 없거나(설치기가 연 것이 아님) until(설치기가 창을 기다리는 마지막 시각, 1970년부터 초)이 지난 뒤 열렸으면
+ * (설치기는 이미 넘어감) 아무것도 쓰지 않고 닫는다.
  * 버튼은 익명 클래스 대신 이 화면이 직접 받는다(JDK 21 + d8 8.2가 익명 클래스에서 멈춤, StatusActivity와 같음).
  */
 public class DiagActivity extends Activity
@@ -31,7 +33,8 @@ public class DiagActivity extends Activity
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         id = getIntent().getStringExtra("id");
-        if (id == null || id.trim().isEmpty()) {
+        if (id == null || id.trim().isEmpty()
+                || Report.diagLate(System.currentTimeMillis() / 1000, getIntent().getLongExtra("until", 0))) {
             finish();
             return;
         }

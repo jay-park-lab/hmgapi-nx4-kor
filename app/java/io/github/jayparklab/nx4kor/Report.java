@@ -231,6 +231,14 @@ final class Report {
         return (id == null ? "" : id.trim()) + " " + word + "\n";
     }
 
+    /**
+     * 창이 너무 늦게 열렸는가. 설치기는 창이 뜨기를 정한 시각(until, 1970년부터 초)까지만 기다리고 넘어가므로, 그 뒤에 열린
+     * 창은 아무도 답을 읽지 않는다. 그때는 아무것도 쓰지 않고 닫는다. until이 없으면(0 이하) 늦지 않은 것으로 본다
+     */
+    static boolean diagLate(long nowSec, long untilSec) {
+        return untilSec > 0 && nowSec > untilSec;
+    }
+
     // --- [지금 재부팅] ---
     // 앱은 일반 앱 권한이라 직접 재부팅하지 못한다. 앱 폴더에 reboot.req만 쓰고, root 감시자(status.sh --watch, 화면을 연 뒤
     // 10분 동안 돎)가 받아 재부팅한다. 받지 않으면 이유(code)를 RBRES 파일에 남긴다.

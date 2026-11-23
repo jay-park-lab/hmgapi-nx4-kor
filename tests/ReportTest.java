@@ -218,6 +218,9 @@ public class ReportTest {
         check("  확인 창 문구: 1~2분·USB를 빼지 말 것·건너뛰어도 설치는 이어짐·기다리는 초, 버튼 [모으기]·[건너뛰기]",
             Report.diagAsk(60).contains("1~2분") && Report.diagAsk(60).contains("USB를 빼지 마세요") && Report.diagAsk(60).contains("설치는 그대로 이어집니다")
             && Report.diagAsk(45).contains("45초 안에 고르지 않으면 건너뜁니다") && "모으기".equals(Report.DIAG_YES) && "건너뛰기".equals(Report.DIAG_NO));
+        check("  설치기가 창을 기다리는 시각(until)이 지난 뒤 열린 창은 늦음(쓰지 않고 닫음), 그 시각까지·until 없음은 늦지 않음",
+            Report.diagLate(1700000016L, 1700000015L) && !Report.diagLate(1700000015L, 1700000015L)
+            && !Report.diagLate(1700000010L, 1700000015L) && !Report.diagLate(1700000016L, 0L));
 
         // --- [지금 재부팅] ---
         check("재부팅 요청 파일 내용은 '요청 id(부팅 뒤 밀리초) boot_id 부팅 뒤 초' 한 줄뿐(hotspot.sh req_peek과 같은 꼴)",

@@ -71,8 +71,10 @@ Engineering Mode → USB Copy → DSP → Update OTA가 `ota_package.tar`의 `tr
 - 기록: 스틱의 `NX4/install.log`에 이어 씁니다. 시작할 때 스틱의 앞 기록을 내비 쪽 기록(`/data/local/tmp/nx4-kor-usb.log`)으로 옮겨 두고, 끝날 때 그 전체를 스틱에 씁니다. 그래서 여러 번 눌러도 앞의 시도가 남고(빈 줄로 나뉨), 한 번 누른 기록은 한 번만 들어갑니다. 비우려면 스틱에서 그 파일을 지웁니다.
 - 진단 기록(`diag`): 공식 무선 모드를 이 차에서 시험하기 전에 알아 둘 것([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38))을 adb 없이 가져오려고 둡니다.
   - **먼저 화면에서 묻습니다**(`ask_diag`). Car Report가 map 만들기와 같은 분석(MapProbe)을 돌려 1~2분 걸리기 때문입니다(PR #41 리뷰 1).
-    - 스틱에 `NX4` 폴더가 있으면 지우기·설치·같은 판 어느 갈래든, **아무것도 바꾸기 전에** 상태 화면 앱의 확인 창을 엽니다(`am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id <id> --ei wait 60`).
+    - 스틱에 `NX4` 폴더가 있으면 지우기·설치·같은 판 어느 갈래든, **아무것도 바꾸기 전에** 상태 화면 앱의 확인 창을 엽니다(`am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id <id> --ei wait 60 --el until <지금+15초>`).
     - 확인 창은 앱 개인 폴더의 `files/diag.ans`에 `<id> <답>` 한 줄을 씁니다. 열리면 `shown`, [모으기]는 `yes`, [건너뛰기]·뒤로는 `no`, 60초 안에 고르지 않으면 `timeout`을 쓰고 스스로 닫힙니다. 설치기는 자기가 준 id의 답만 믿습니다.
+    - `until`은 설치기가 창이 뜨기를 기다리는 마지막 시각입니다. 그 뒤에 늦게 열린 창은 설치기가 이미 넘어가 아무도 답을 읽지 않으므로, 아무것도 쓰지 않고 바로 닫힙니다(PR #41 리뷰 6).
+    - 확인 창은 자기 task로 열립니다(매니페스트 `taskAffinity=""`). 이번 부팅에 상태 화면을 열었어도 그 위에 얹히지 않고, 창 뒤에 DSP OTA 화면이 보입니다(PR #41 리뷰 7).
     - **[모으기]를 고른 때만** 스틱의 `NX4/diag/<시각>/`에 새로 모읍니다. 그 밖에는 모으지 않고 `install.log`에 까닭만 적은 뒤 설치기가 그대로 이어집니다.
       - 상태 화면 앱이 없음(HMG-API가 앱을 설치하기 전, 첫 설치)
       - 확인 창이 없는 예전 판 앱(`am start`가 Error를 냄), 또는 창이 15초 안에 뜨지 않음

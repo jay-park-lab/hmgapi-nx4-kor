@@ -205,7 +205,7 @@ $ADB shell input tap 1600 672; shot rb-hint
 
 ```sh
 ANS=/data/data/io.github.jayparklab.nx4kor/files/diag.ans
-ask() { $ADB shell rm -f $ANS; $ADB shell am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id $1 --ei wait $2; sleep 3; }
+ask() { $ADB shell rm -f $ANS; $ADB shell am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id $1 --ei wait $2 ${3:+--el until $3}; sleep 3; }
 
 # 1. 창이 뜨면 "<id> shown", [모으기] → "<id> yes", 창이 닫힘
 ask 1001 60; shot diag-ask; $ADB shell cat $ANS
@@ -221,6 +221,16 @@ ask 1004 5; sleep 5; $ADB shell cat $ANS
 # 4. id 없이 열면 아무것도 쓰지 않고 바로 닫힘(답 파일 없음)
 $ADB shell am force-stop io.github.jayparklab.nx4kor
 $ADB shell rm -f $ANS; $ADB shell am start -W -n io.github.jayparklab.nx4kor/.DiagActivity; $ADB shell cat $ANS
+
+# 5. until(설치기가 창을 기다리는 마지막 시각)이 지난 뒤 열리면 쓰지 않고 바로 닫힘. 아직이면 평소대로 뜸
+ask 1005 60 $(( $($ADB shell date +%s | tr -d '\r') - 1 )); $ADB shell cat $ANS
+ask 1006 60 $(( $($ADB shell date +%s | tr -d '\r') + 15 )); $ADB shell cat $ANS; $ADB shell input keyevent 4
+
+# 6. 상태 화면을 연 뒤 홈으로 나간 상태에서 열어도, 창 뒤에 상태 화면이 아니라 그 전 화면(런처)이 보임(자기 task)
+$ADB shell am start -n io.github.jayparklab.nx4kor/.StatusActivity; sleep 2; $ADB shell input keyevent 3; sleep 1
+ask 1007 60; shot diag-own-task
+$ADB shell input tap 1112 596; sleep 2
+$ADB shell dumpsys activity activities | grep mResumedActivity   # 런처
 ```
 
 ## 끝난 뒤
@@ -260,4 +270,6 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
   - [모으기]는 `yes`, [건너뛰기]·뒤로는 `no`
   - 5초 동안 고르지 않으면 `timeout`. 모두 창이 닫힘
 - id 없이 열면 답 파일을 쓰지 않고 바로 닫힘
+- `until`이 지난 뒤 열면 답 파일을 쓰지 않고 바로 닫힘. 아직이면 평소대로 `shown`(PR #41 리뷰 6)
+- 상태 화면을 연 뒤 홈으로 나가 상태 화면 task가 뒤에 있어도, 창 뒤에 런처가 보이고 [건너뛰기] 뒤에도 런처가 앞에 옴(자기 task, PR #41 리뷰 7)
 - 이 앱의 크래시 없음

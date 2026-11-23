@@ -291,11 +291,14 @@ for hv in $NEEDV 1.1.0-rc.10 1.1.0 1.2.0-beta.1; do
   rm -rf $HD/mods/nx4-kor
 done
 rm -f $HD/installed.txt
+T0=$(date +%s)
 ts $U
+T1=$(date +%s)
 check "USB 설치기: 새로 설치 → engine install, 앱이 깔리면 상태 화면을 엶, 재부팅하지 않음, 기록을 스틱에" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^hmgapid engine install .*/data/local/tmp/nx4-kor-usb/nx4-kor.zip" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && ! grep -q "service-stop" $T/calls && [ -f $HD/mods/nx4-kor/mod.json ] && grep -q "설치됨: $V" $K/install.log && [ ! -d $R/data/local/tmp/nx4-kor-usb ]'
-check "USB 설치기 진단 기록: 확인 창(DiagActivity, id·기다릴 초)을 먼저 띄우고 [모으기]면 아무것도 바꾸기 전에 모음(engine report가 engine install보다 먼저), 결과 안내가 마지막" \
-  'grep -q "^am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id [0-9][0-9]* --ei wait 1$" $T/calls && [ "$(grep -n "DiagActivity" $T/calls | cut -d: -f1)" -lt "$(grep -n "^hmgapid engine report" $T/calls | cut -d: -f1)" ] && [ "$(grep -n "^hmgapid engine report" $T/calls | cut -d: -f1)" -lt "$(grep -n "^hmgapid engine install" $T/calls | cut -d: -f1)" ] && [ "$(grep -n "진단 기록을 USB에 모으는 중입니다(1~2분)" $T/ts.out | cut -d: -f1)" -lt "$(grep -n "설치하는 중" $T/ts.out | cut -d: -f1)" ] && tail -n 1 $T/ts.out | grep -q "설치됨. 상태 화면에서" && grep -q "\[모으기\]를 고름" $K/install.log'
+DUNTIL=$(sed -n 's/^am start -n .*DiagActivity .* --el until \([0-9][0-9]*\)$/\1/p' $T/calls)
+check "USB 설치기 진단 기록: 확인 창(DiagActivity, id·기다릴 초·창을 기다리는 마지막 시각 until=시작+NX4_DIAG_SHOWN)을 먼저 띄우고 [모으기]면 아무것도 바꾸기 전에 모음(engine report가 engine install보다 먼저), 결과 안내가 마지막" \
+  'grep -q "^am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id [0-9][0-9]* --ei wait 1 --el until [0-9][0-9]*$" $T/calls && [ -n "$DUNTIL" ] && [ "$DUNTIL" -ge $((T0 + 1)) ] && [ "$DUNTIL" -le $((T1 + 1)) ] && [ "$(grep -n "DiagActivity" $T/calls | cut -d: -f1)" -lt "$(grep -n "^hmgapid engine report" $T/calls | cut -d: -f1)" ] && [ "$(grep -n "^hmgapid engine report" $T/calls | cut -d: -f1)" -lt "$(grep -n "^hmgapid engine install" $T/calls | cut -d: -f1)" ] && [ "$(grep -n "진단 기록을 USB에 모으는 중입니다(1~2분)" $T/ts.out | cut -d: -f1)" -lt "$(grep -n "설치하는 중" $T/ts.out | cut -d: -f1)" ] && tail -n 1 $T/ts.out | grep -q "설치됨. 상태 화면에서" && grep -q "\[모으기\]를 고름" $K/install.log'
 cp $K/install.log $T/first.log; FIRSTN=$(($(wc -l < $T/first.log)))
 KEEPLOG=1; ts $U; KEEPLOG=
 check "USB 설치기: 같은 판이 있으면 다시 설치하지 않고 상태 화면만 엶" '[ "$(cat $T/ts.rc)" = 0 ] && ! grep -q "engine install" $T/calls && grep -q "^am start" $T/calls && grep -q "이미 설치되어" $T/ts.out'

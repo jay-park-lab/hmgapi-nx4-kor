@@ -197,14 +197,17 @@ diag_ans() {
   [ "$_a" = "$1" ] && echo "$_w"
 }
 # 진단을 돌릴지 화면에서 묻는다. [모으기]면 0. 앱이 없거나, 창이 NX4_DIAG_SHOWN초(기본 15) 안에 뜨지 않거나(확인 창이 없는
-# 예전 판 앱), [건너뛰기]·뒤로, 고르지 않음(창이 NX4_DIAG_WAIT초 뒤 스스로 닫힘, 기본 60)이면 1
+# 예전 판 앱. 그 뒤에 늦게 뜬 창은 until을 보고 스스로 닫힘), [건너뛰기]·뒤로, 고르지 않음(창이 NX4_DIAG_WAIT초 뒤 스스로
+# 닫힘, 기본 60)이면 1
 ask_diag() {
   if ! app_installed; then log "진단 기록: 상태 화면 앱이 없어 묻지 못함(모으지 않음)"; return 1; fi
   _id=$(date +%s)$$
   _wait=${NX4_DIAG_WAIT:-60}
   _shown=${NX4_DIAG_SHOWN:-15}
   rm -f $DIAG_ANS
-  _o=$(am start -n $APP_ID/.DiagActivity --es id $_id --ei wait $_wait 2>&1)
+  # until: 창이 뜨기를 기다리는 마지막 시각. 그 뒤에 늦게 열린 창은 아무도 답을 읽지 않으므로 앱이 쓰지 않고 바로 닫는다
+  _until=$(( $(date +%s) + _shown ))
+  _o=$(am start -n $APP_ID/.DiagActivity --es id $_id --ei wait $_wait --el until $_until 2>&1)
   case "$_o" in
     *rror*) log "진단 기록: 확인 창을 열지 못함(예전 판 앱일 수 있음, 모으지 않음): $_o"; return 1 ;;
   esac
