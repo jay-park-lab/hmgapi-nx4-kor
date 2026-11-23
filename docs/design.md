@@ -41,6 +41,7 @@ NX4 KOR는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 내비 2
 - 앱이 열릴 때 `hmgapid service-start launch`를 부르고(hmgapid는 이 모드의 앱일 때만 받음), 상태 파일이 새로 쓰이면 다시 그립니다.
 - 판정(`verdict`·`verdict_lv`·`verdict_msg`)은 `bin/status.sh`의 `st_verdict` 한 곳에서 정하고 앱은 그대로 보입니다.
 - [지금 재부팅]은 앱 개인 폴더의 `reboot.req`를 `status.sh --watch`(화면을 연 뒤 10분)가 받습니다. 설치 중, 설치 마무리 중, `/system`을 바꾸는 작업 중, HMG-API 부팅 보호에 걸릴 때는 거절합니다.
+- 진단 기록 확인 창(`DiagActivity`)은 USB 설치기가 엽니다(아래 "진단 기록"). 투명 화면 위에 확인 창만 보이고, 답을 앱 개인 폴더의 `diag.ans`에 씁니다.
 - **모양**은 투싼 NX4 순정 내비(표준형 5세대 와이드)의 타입1(어두운 화면)에 맞춥니다([#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)).
   - 색·글자 크기·여백은 `app/java/.../Ui.java` 한 곳에 둡니다. 값은 현대 국내형 Gen5W 웹 매뉴얼 그림에서 잰 근사값입니다. 크기는 1920x720 기준 px로 적고 화면 폭에 맞춰 늘이거나 줄입니다.
   - 결과 화면(본보기: 순정 설정 상세):
@@ -69,8 +70,14 @@ Engineering Mode → USB Copy → DSP → Update OTA가 `ota_package.tar`의 `tr
 - `NX4/UNINSTALL`: `bin/uninstall.sh` → `scripts/preun.sh`(핫스팟 멈춤 → HMG-API에서 이 모드를 빼고 적용 → 무선 권한 파일·Wi-Fi 잠금·순정 AP 저장값 되돌리기 → `$BK` 지우기) → 재부팅. HMG-API를 먼저 지웠어도 남은 모드 폴더나 스틱의 사본으로 되돌립니다. 이때 `/system`은 DSP OTA 프로세스에서 순정 `mount`로 엽니다.
 - 기록: 스틱의 `NX4/install.log`에 이어 씁니다. 시작할 때 스틱의 앞 기록을 내비 쪽 기록(`/data/local/tmp/nx4-kor-usb.log`)으로 옮겨 두고, 끝날 때 그 전체를 스틱에 씁니다. 그래서 여러 번 눌러도 앞의 시도가 남고(빈 줄로 나뉨), 한 번 누른 기록은 한 번만 들어갑니다. 비우려면 스틱에서 그 파일을 지웁니다.
 - 진단 기록(`diag`): 공식 무선 모드를 이 차에서 시험하기 전에 알아 둘 것([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38))을 adb 없이 가져오려고 둡니다.
-  - 누를 때마다 스틱의 `NX4/diag/<시각>/`에 새로 모읍니다. 스틱에 `NX4` 폴더가 있으면 지우기·설치·같은 판 어느 갈래든, **아무것도 바꾸기 전에** 모읍니다.
-    - 첫 설치 때는 순정 상태가 담깁니다. 설정이 끝나고 재부팅한 뒤 같은 USB로 한 번 더 누르면 적용된 상태가 담깁니다.
+  - **먼저 화면에서 묻습니다**(`ask_diag`). Car Report가 map 만들기와 같은 분석(MapProbe)을 돌려 1~2분 걸리기 때문입니다(PR #41 리뷰 1).
+    - 스틱에 `NX4` 폴더가 있으면 지우기·설치·같은 판 어느 갈래든, **아무것도 바꾸기 전에** 상태 화면 앱의 확인 창을 엽니다(`am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id <id> --ei wait 60`).
+    - 확인 창은 앱 개인 폴더의 `files/diag.ans`에 `<id> <답>` 한 줄을 씁니다. 열리면 `shown`, [모으기]는 `yes`, [건너뛰기]·뒤로는 `no`, 60초 안에 고르지 않으면 `timeout`을 쓰고 스스로 닫힙니다. 설치기는 자기가 준 id의 답만 믿습니다.
+    - **[모으기]를 고른 때만** 스틱의 `NX4/diag/<시각>/`에 새로 모읍니다. 그 밖에는 모으지 않고 `install.log`에 까닭만 적은 뒤 설치기가 그대로 이어집니다.
+      - 상태 화면 앱이 없음(HMG-API가 앱을 설치하기 전, 첫 설치)
+      - 확인 창이 없는 예전 판 앱(`am start`가 Error를 냄), 또는 창이 15초 안에 뜨지 않음
+      - [건너뛰기]·뒤로, 고르지 않음, 답이 오지 않음(최대 60초 + 30초)
+    - 그래서 확인 창이 없는 예전 판(2.0.1-beta.1까지)에서 올리는 첫 Update OTA에서는 모으지 않습니다. 설치·설정이 끝나고 재부팅한 뒤 같은 USB로 한 번 더 누르면(같은 판: 상태 화면만 엶) 확인 창이 뜨고, 적용된 뒤의 상태가 담깁니다. 순정 md5는 `hmgapi-status.txt`에 있습니다.
     - 결과 안내(토스트)는 모은 뒤에 나오므로 마지막 문구가 가려지지 않습니다.
   - 담는 것:
 
@@ -125,7 +132,11 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - **HMG-API가 NX4에서 map을 만들고(`map-car --write`) 확인(`verify-map`)을 통과하는지.** 실패하면 무선 기능을 적용하지 않습니다(`/data/local/tmp/nx4-kor/map-car.txt`, `verify-map.txt`).
 - **무선 훅 36개 지점이 모두 NX4 map에 있는지.** 하나라도 없으면 HMG-API가 이 모드의 훅을 끄고 앱 메뉴 타일도 없어집니다(HMG-API 로그 `mods: nx4-kor not loaded: …`).
 - **네이티브 레시피가 NX4 라이브러리에 맞는지**(`libCarPlayCore.so` 등). 맞지 않는 레시피는 아무것도 쓰지 않습니다. USB 진단 기록의 `system-lib-md5.txt`(순정 상태일 때)나 `hmgapi-status.txt`의 순정 md5로 레시피의 기대 md5와 견줍니다.
-- **USB 진단 기록이 모이는지.** Update OTA마다 `NX4/diag/<시각>/`가 생기고 `system-lib-md5.txt`에 md5가 있는지(`info.txt`의 `md5_busybox`가 무엇인지), `car-report.txt`가 HMG-API의 "usage:"가 아니라 보고서인지(`engine report`가 없는 HMG-API 판이면 빠짐), 모으는 데 얼마나 걸리는지 봅니다.
+- **USB 진단 기록이 모이는지.**
+  - 진단 확인 창이 DSP OTA 화면 위에 뜨는지, [모으기]·[건너뛰기]가 눌리는지(`install.log`의 "진단 기록: …" 줄).
+  - [모으기] 뒤 `NX4/diag/<시각>/`가 생기고 `system-lib-md5.txt`에 md5가 있는지(`info.txt`의 `md5_busybox`가 무엇인지).
+  - `car-report.txt`가 HMG-API의 "usage:"가 아니라 보고서인지(`engine report`가 없는 HMG-API 판이면 빠짐).
+  - 모으는 데 얼마나 걸리는지. Car Report는 map 만들기와 같은 분석이라 1~2분을 어림합니다.
 - **DSP OTA 뒤 재부팅하지 않고 끝내도 되는지.** OTA 화면이 이상하게 남으면 상태 화면의 [지금 재부팅]이나 RESET을 쓰세요.
 - **DSP OTA 화면 위로 상태 화면이 열리는지**(`am start`). 안 열리면 재부팅 뒤 같은 USB로 Update OTA를 다시 누릅니다.
 - HMG-API 설치기가 NX4의 `app_process`를 아는지(모르면 `HMGAPI/FORCE`).

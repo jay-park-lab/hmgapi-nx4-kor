@@ -13,7 +13,9 @@ Android 에뮬레이터에서 NX4 KOR 상태 화면 앱(`io.github.jayparklab.nx
 | `nx4-kor-watch.txt` | `mod/bin/status.sh --watch` (재부팅 요청 감시자) | `tests/emu/watch.sh on` |
 | `nx4-kor-reboot-result.txt` | `mod/bin/status.sh --watch` | `tests/emu/watch.sh answer <code>` |
 
-앱이 쓰는 파일은 앱 폴더의 `files/reboot.req` 하나입니다(`<요청 id> <boot_id> <부팅 뒤 초>` 한 줄).
+앱이 쓰는 파일은 앱 폴더의 두 개입니다.
+- `files/reboot.req`: [지금 재부팅] 요청(`<요청 id> <boot_id> <부팅 뒤 초>` 한 줄)
+- `files/diag.ans`: 진단 기록 확인 창의 답(`<id> <답>` 한 줄). 차에서는 USB 설치기가 읽습니다(아래 "진단 기록 확인 창")
 
 ## 준비 (처음 한 번)
 
@@ -194,6 +196,33 @@ sh tests/emu/watch.sh off
 $ADB shell input tap 1600 672; shot rb-hint
 ```
 
+## 진단 기록 확인 창
+
+차에서는 USB 설치기(`usb/troubleShooter` `ask_diag`)가 root로 `DiagActivity`를 열고 `files/diag.ans`를 읽습니다([`design.md`](design.md) "진단 기록"). 여기서는 adb로 같은 명령을 내고 답 파일을 읽습니다.
+
+- 확인 창의 [모으기]는 (808, 596), [건너뛰기]는 (1112, 596)입니다.
+- 창 뒤는 투명해서 그 아래 화면(차에서는 DSP OTA 화면)이 그대로 보입니다.
+
+```sh
+ANS=/data/data/io.github.jayparklab.nx4kor/files/diag.ans
+ask() { $ADB shell rm -f $ANS; $ADB shell am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id $1 --ei wait $2; sleep 3; }
+
+# 1. 창이 뜨면 "<id> shown", [모으기] → "<id> yes", 창이 닫힘
+ask 1001 60; shot diag-ask; $ADB shell cat $ANS
+$ADB shell input tap 808 596; sleep 2; $ADB shell cat $ANS
+
+# 2. [건너뛰기] → "no", 뒤로(keyevent 4) → "no"
+ask 1002 60; $ADB shell input tap 1112 596; sleep 2; $ADB shell cat $ANS
+ask 1003 60; $ADB shell input keyevent 4; sleep 2; $ADB shell cat $ANS
+
+# 3. 고르지 않음(wait 5초) → "timeout", 창이 스스로 닫힘
+ask 1004 5; sleep 5; $ADB shell cat $ANS
+
+# 4. id 없이 열면 아무것도 쓰지 않고 바로 닫힘(답 파일 없음)
+$ADB shell am force-stop io.github.jayparklab.nx4kor
+$ADB shell rm -f $ANS; $ADB shell am start -W -n io.github.jayparklab.nx4kor/.DiagActivity; $ADB shell cat $ANS
+```
+
 ## 끝난 뒤
 
 ```sh
@@ -211,6 +240,7 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
   - 에뮬레이터 맨 위의 Android 상태 줄(시각·배터리)이 차에서 어떻게 보일지는 이 시험이 보지 않습니다.
 - 순정 화면과 얼마나 같은지. 색·크기는 매뉴얼 그림에서 잰 근사값입니다([#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)).
 - 차의 실제 재부팅. 이 시험의 `watch.sh`는 감시자의 답만 흉내 냅니다.
+- 진단 확인 창이 DSP OTA 화면 위에 뜨는지, USB 설치기가 답을 기다리는 흐름. 설치기 쪽은 `tests/mod-test.sh`가 가짜 `am`으로 봅니다.
 
 ## 마지막 결과
 
@@ -221,3 +251,13 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
 - 오른쪽 칸이 넘칠 때(`rb-hint`): 버튼 안내 띠가 알림 띠와 틈을 두고 따로 보이고, 넘친 알림 띠의 아래 끝이 흐려짐(PR #34 리뷰 1을 고친 뒤 다시 봄).
 - `logcat`에 이 앱의 크래시 없음. 에뮬레이터가 켜질 때 시스템의 `BatteryService`가 남긴 크래시 한 건은 앱과 관계없음.
 - 사소한 점: 확인 창이 떠 있는 동안 그 뒤에 직전 안내(예: 감시자 없음)가 남아 보임. [재부팅]을 누르면 바로 바뀜.
+
+진단 기록 확인 창은 2026-11-23, PR #41 브랜치의 앱(시험 키), 같은 에뮬레이터에서 봤습니다.
+
+- 투명 화면 위에 확인 창("진단 기록 모으기", 본문, [모으기]·[건너뛰기])만 보임
+- 답 파일:
+  - 창이 뜨면 `<id> shown`
+  - [모으기]는 `yes`, [건너뛰기]·뒤로는 `no`
+  - 5초 동안 고르지 않으면 `timeout`. 모두 창이 닫힘
+- id 없이 열면 답 파일을 쓰지 않고 바로 닫힘
+- 이 앱의 크래시 없음

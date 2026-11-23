@@ -134,9 +134,26 @@ echo "pm \$*" >> $T/calls
 [ "\$1" = path ] && [ -f $T/app-ready ] && echo "package:/data/app/io.github.jayparklab.nx4kor-1.apk"
 exit 0
 E
+# 진단 기록 확인 창(DiagActivity): $T/diag.reply가 앱의 답. 없으면 확인 창이 없는 예전 판 앱(am이 Error를 냄).
+# yes·no·timeout은 그 답을, silent는 창만 뜨고(shown) 답이 없음, noshow는 창이 뜨지 않음, wrongid는 다른 id의 yes를 쓴다
 cat > $T/bin/am <<E
 #!/bin/sh
 echo "am \$*" >> $T/calls
+case "\$*" in
+  *DiagActivity*)
+    id=; prev=
+    for a in "\$@"; do [ "\$prev" = id ] && id=\$a; prev=\$a; done
+    r=\$(cat $T/diag.reply 2>/dev/null)
+    [ -n "\$r" ] || { echo "Error: Activity class {io.github.jayparklab.nx4kor/io.github.jayparklab.nx4kor.DiagActivity} does not exist."; exit 0; }
+    A=$T/root/data/data/io.github.jayparklab.nx4kor/files
+    mkdir -p \$A
+    case "\$r" in
+      noshow) ;;
+      silent) echo "\$id shown" > \$A/diag.ans ;;
+      wrongid) echo "0\$id yes" > \$A/diag.ans ;;
+      *) echo "\$id \$r" > \$A/diag.ans ;;
+    esac ;;
+esac
 exit 0
 E
 cat > $T/bin/getprop <<E
@@ -221,8 +238,10 @@ mkdir -p $R/data/local/tmp $K/install/payload
 cp -R $F/. $K/install/payload/
 (cd $K/install/payload && zip -q -r $K/install/hmgapi-nx4-kor.zip .)
 # 설치기는 스틱의 NX4/install.log에 이어 쓴다. 시험마다 그 회의 기록만 보도록 지우고 돌린다(KEEPLOG=1이면 남김)
-ts() { : > $T/calls; [ -n "$KEEPLOG" ] || rm -f $K/install.log; (env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/bin/hmgapid NX4_USB_DIRS="$1" NX4_APP_WAIT=4 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
-# 진단 기록(diag)은 누를 때마다 읽기만 하는 engine status·report를 부른다. "엔진을 부르지 않음"은 그 둘을 빼고 본다
+ts() { : > $T/calls; [ -n "$KEEPLOG" ] || rm -f $K/install.log; (env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/bin/hmgapid NX4_USB_DIRS="$1" NX4_APP_WAIT=4 NX4_DIAG_WAIT=1 NX4_DIAG_SHOWN=1 sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
+# 진단 기록 확인 창에는 [모으기]로 답한다(아래 확인 창 시험에서만 바꿈). 앱이 있는지는 $T/app-ready(가짜 pm)
+echo yes > $T/diag.reply
+# 진단 기록(diag)은 읽기만 하는 engine status·report를 부른다. "엔진을 부르지 않음"은 그 둘을 빼고 본다
 engcalls() { grep -v -E "^hmgapid engine (status|report)$" $T/calls | grep -q "engine"; }
 # 진단 기록 폴더(NX4/diag/<시각>) 하나: 시험 전에 rm -rf $K/diag 해 두고 그 회의 것만 본다
 dg() { echo $K/diag/*; }
@@ -230,11 +249,12 @@ rm -rf $HD/mods/nx4-kor $R/data/nx4-kor
 ts $T/nostick
 check "USB 설치기: NX4 폴더가 없으면 아무것도 하지 않음" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "NX4 폴더가 없습니다" $T/ts.out && [ ! -s $T/calls ]'
 mv $HD $T/hd.away
-rm -rf $K/diag
+rm -rf $K/diag; : > $T/app-ready
 ts $U
 check "USB 설치기: HMG-API가 없으면 멈춤(설치 안 함)" '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "HMG-API가 없습니다" $T/ts.out && ! grep -q "engine install" $T/calls'
-check "USB 설치기 진단 기록: HMG-API가 없어도 모으고(info·/system/lib), HMG-API 명령(engine status·report)은 부르지 않음" \
+check "USB 설치기 진단 기록: HMG-API가 없어도 [모으기]면 모으고(info·/system/lib), HMG-API 명령(engine status·report)은 부르지 않음" \
   '[ -f $(dg)/info.txt ] && [ -f $(dg)/system-lib-md5.txt ] && [ ! -f $(dg)/car-report.txt ] && ! grep -q "engine" $T/calls && grep -q "HMG-API가 응답하지 않아" $K/install.log'
+rm -f $T/app-ready
 mkdir -p $K/hmgapi $U/HMGAPI/install/payload; echo "# hmg-api" > $K/hmgapi/troubleShooter
 ts $U
 check "USB 설치기: HMG-API가 없고 같은 스틱에 HMG-API 설치기가 있으면 그것으로 넘김" '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "HMG-API 설치기로 넘김" $T/ts.out'
@@ -274,8 +294,8 @@ rm -f $HD/installed.txt
 ts $U
 check "USB 설치기: 새로 설치 → engine install, 앱이 깔리면 상태 화면을 엶, 재부팅하지 않음, 기록을 스틱에" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^hmgapid engine install .*/data/local/tmp/nx4-kor-usb/nx4-kor.zip" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && ! grep -q "service-stop" $T/calls && [ -f $HD/mods/nx4-kor/mod.json ] && grep -q "설치됨: $V" $K/install.log && [ ! -d $R/data/local/tmp/nx4-kor-usb ]'
-check "USB 설치기 진단 기록: 아무것도 바꾸기 전에 모음(engine status·report가 engine install보다 먼저), 결과 안내가 마지막" \
-  '[ "$(grep -n "^hmgapid engine report" $T/calls | cut -d: -f1)" -lt "$(grep -n "^hmgapid engine install" $T/calls | cut -d: -f1)" ] && [ "$(grep -n "진단 기록을 USB에" $T/ts.out | cut -d: -f1)" -lt "$(grep -n "설치하는 중" $T/ts.out | cut -d: -f1)" ] && tail -n 1 $T/ts.out | grep -q "설치됨. 상태 화면에서"'
+check "USB 설치기 진단 기록: 확인 창(DiagActivity, id·기다릴 초)을 먼저 띄우고 [모으기]면 아무것도 바꾸기 전에 모음(engine report가 engine install보다 먼저), 결과 안내가 마지막" \
+  'grep -q "^am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id [0-9][0-9]* --ei wait 1$" $T/calls && [ "$(grep -n "DiagActivity" $T/calls | cut -d: -f1)" -lt "$(grep -n "^hmgapid engine report" $T/calls | cut -d: -f1)" ] && [ "$(grep -n "^hmgapid engine report" $T/calls | cut -d: -f1)" -lt "$(grep -n "^hmgapid engine install" $T/calls | cut -d: -f1)" ] && [ "$(grep -n "진단 기록을 USB에 모으는 중입니다(1~2분)" $T/ts.out | cut -d: -f1)" -lt "$(grep -n "설치하는 중" $T/ts.out | cut -d: -f1)" ] && tail -n 1 $T/ts.out | grep -q "설치됨. 상태 화면에서" && grep -q "\[모으기\]를 고름" $K/install.log'
 cp $K/install.log $T/first.log; FIRSTN=$(($(wc -l < $T/first.log)))
 KEEPLOG=1; ts $U; KEEPLOG=
 check "USB 설치기: 같은 판이 있으면 다시 설치하지 않고 상태 화면만 엶" '[ "$(cat $T/ts.rc)" = 0 ] && ! grep -q "engine install" $T/calls && grep -q "^am start" $T/calls && grep -q "이미 설치되어" $T/ts.out'
@@ -309,6 +329,25 @@ rm -rf $K/diag $K/install/payload/bin/busybox
 ts $U
 check "USB 설치기 진단 기록: md5를 셀 busybox가 없으면 그렇다고 적고(이름·크기는 ls -lR) 설치기는 그대로 끝남" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "md5_busybox: none" $(dg)/info.txt && grep -q "busybox가 없음" $(dg)/system-lib-md5.txt && grep -q "libCarPlayCore.so" $(dg)/system-lib-ls.txt && grep -q "busybox가 없어" $K/install.log'
+# 확인 창에서 모으지 않는 경우: 진단 폴더를 만들지 않고 HMG-API 명령도 부르지 않으며, 설치기는 그대로 이어짐(같은 판: 상태 화면)
+dno() { rm -rf $K/diag; ts $U; [ "$(cat $T/ts.rc)" = 0 ] && [ ! -d $K/diag ] && ! grep -q "engine report" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && grep -q "이미 설치되어" $T/ts.out && grep -q "$1" $K/install.log; }
+echo no > $T/diag.reply
+check "USB 설치기 진단 기록: [건너뛰기]·뒤로면 모으지 않고 설치기는 이어짐" 'dno "\[건너뛰기\]를 고름"'
+echo timeout > $T/diag.reply
+check "USB 설치기 진단 기록: 창이 스스로 닫히면(고르지 않음) 모으지 않음" 'dno "고르지 않아 건너뜀"'
+echo silent > $T/diag.reply
+check "USB 설치기 진단 기록: 창은 떴지만 답이 오지 않으면 기다림(NX4_DIAG_WAIT + 2×NX4_DIAG_SHOWN초) 뒤 모으지 않음" 'dno "답이 없어 건너뜀"'
+echo noshow > $T/diag.reply
+check "USB 설치기 진단 기록: 창이 NX4_DIAG_SHOWN초 안에 뜨지 않으면 모으지 않음" 'dno "확인 창이 뜨지 않음"'
+echo wrongid > $T/diag.reply
+check "USB 설치기 진단 기록: 다른 id(지난 시도)의 [모으기]는 믿지 않음" 'dno "확인 창이 뜨지 않음"'
+rm -f $T/diag.reply
+check "USB 설치기 진단 기록: 확인 창이 없는 예전 판 앱이면(am start가 Error) 기다리지 않고 모으지 않음" 'dno "확인 창을 열지 못함"'
+echo yes > $T/diag.reply; rm -f $T/app-ready
+rm -rf $K/diag; ts $U
+check "USB 설치기 진단 기록: 상태 화면 앱이 없으면 묻지 못해 모으지 않음(확인 창을 띄우지 않음)" \
+  '[ ! -d $K/diag ] && ! grep -q "DiagActivity" $T/calls && grep -q "앱이 없어 묻지 못함" $K/install.log'
+: > $T/app-ready
 rm -rf $R/system $R/data/misc $R/data/nx4-kor $R/data/local/tmp/nx4-kor $R/data/local/tmp/nx4-kor-status.txt $HD/logs $HD/install.log $HD/public
 : > $K/REINSTALL; : > $T/ap-running; rm -f $T/stublog
 ts $U

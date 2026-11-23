@@ -209,6 +209,28 @@ final class Report {
         return "fail".equals(get("state")) ? 2 : 1;
     }
 
+    // --- 진단 기록 확인 창(DiagActivity) ---
+    // USB 설치기(usb/troubleShooter ask_diag)가 아무것도 바꾸기 전에 연다. 답은 앱 폴더의 diag.ans에 diagLine 한 줄로 쓴다.
+    static final String DIAG_TITLE = "진단 기록 모으기";
+    static final String DIAG_YES = "모으기";
+    static final String DIAG_NO = "건너뛰기";
+
+    /** 확인 창 본문. waitSec초 안에 고르지 않으면 건너뛴다(창이 스스로 닫힘) */
+    static String diagAsk(int waitSec) {
+        return "USB에 진단 기록을 모을까요?\n\n"
+            + "문제를 살피는 데 쓸 기록(내비 라이브러리 이름·md5, HMG-API Car Report, NX4 KOR 기록)을 USB의 NX4/diag 폴더에 모읍니다. "
+            + "1~2분쯤 걸리고, 그동안 USB를 빼지 마세요. 차의 설정은 바꾸지 않고 Wi-Fi 비밀번호는 넣지 않습니다.\n\n"
+            + "건너뛰어도 설치는 그대로 이어집니다. " + waitSec + "초 안에 고르지 않으면 건너뜁니다.";
+    }
+
+    /**
+     * 답 파일(diag.ans) 내용: "<id> <답>" 한 줄. id는 설치기가 준 값, 답은 shown(창이 열림)·yes·no·timeout.
+     * 설치기(diag_ans)는 첫 칸이 자기가 준 id일 때만 둘째 칸을 믿는다(지난 시도의 답을 쓰지 않게).
+     */
+    static String diagLine(String id, String word) {
+        return (id == null ? "" : id.trim()) + " " + word + "\n";
+    }
+
     // --- [지금 재부팅] ---
     // 앱은 일반 앱 권한이라 직접 재부팅하지 못한다. 앱 폴더에 reboot.req만 쓰고, root 감시자(status.sh --watch, 화면을 연 뒤
     // 10분 동안 돎)가 받아 재부팅한다. 받지 않으면 이유(code)를 RBRES 파일에 남긴다.
