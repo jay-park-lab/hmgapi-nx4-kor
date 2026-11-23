@@ -1,0 +1,10 @@
+<!-- NX4 KOR 앱 메뉴 타일 모양(#47): 폰, 무선 파형, 확인 배지. Codex CLI로 그린 시안 D.
+     mod/icons/의 그림 넷은 이 파일을 HMG-API tools/mkicon.sh로 만든 것이다(README "만들기"). -->
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="96" height="96" viewBox="0 0 96 96">
+  <path d="M33 88 H19 A9 9 0 0 1 10 79 V17 A9 9 0 0 1 19 8 H45 A9 9 0 0 1 54 17 V35" fill="none" stroke="#000" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <g fill="none" stroke="#000" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M66.5 20.3 A17 17 0 0 1 75 35"/>
+    <path d="M73 9 A30 30 0 0 1 88 35"/>
+  </g>
+  <path fill="#000" fill-rule="evenodd" d="M92 68 A24 24 0 1 1 44 68 A24 24 0 1 1 92 68 Z M54.525 69.475 A3.5 3.5 0 0 1 59.475 64.525 L64 69.05 L75.525 57.525 A3.5 3.5 0 0 1 80.475 62.475 L66.475 76.475 A3.5 3.5 0 0 1 61.525 76.475 Z"/>
+</svg>

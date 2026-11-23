@@ -74,6 +74,22 @@ PY'
 check "hotspot.sh: 모드 id·HMG-API 최소 판이 mod.json과 같음, env.sh의 NX4_MOD_ID도 같음" \
   'grep -q "^MOD_ID=\${NX4_MOD_ID:-nx4-kor}$" $PKG/svc/hotspot.sh && grep -q "^HMG_MIN=1.1.0-rc.4$" $PKG/svc/hotspot.sh && grep -q "^NX4_MOD_ID=nx4-kor$" $PKG/svc/env.sh'
 check "launch 서비스 이름 = 앱이 부르는 이름" 'grep -q "\"service-start\", \"launch\"" $B/app/java/io/github/jayparklab/nx4kor/StatusActivity.java'
+# 앱 메뉴 타일 그림(#47): HMG-API tools/mkicon.sh가 만드는 순정 꼴(99x99 투명 타일) 넷. 원본 모양은 art/tile.svg
+check "mod.json: 앱 메뉴 타일에 낮·밤·꺼짐(낮·밤) 그림 넷(icons/), 모두 모드 안의 99x99 투명 PNG(RGBA, 꺼짐은 투명 팔레트일 수 있음)" 'python3 - "$PKG" <<PY
+import json, os, struct, sys
+d = sys.argv[1]
+t = json.load(open(os.path.join(d, "mod.json")))["provides"]["launcher"][0]
+want = {"icon": "icons/icon.png", "icon_night": "icons/icon_night.png",
+        "icon_disabled": "icons/icon_disabled.png", "icon_disabled_night": "icons/icon_disabled_night.png"}
+assert {k: t.get(k) for k in want} == want, t
+for f in want.values():
+    b = open(os.path.join(d, f), "rb").read()
+    assert b[1:4] == b"PNG" and b[12:16] == b"IHDR", f
+    w, h, depth, ctype = struct.unpack(">IIBB", b[16:26])
+    assert (w, h, depth) == (99, 99, 8) and (ctype == 6 or (ctype == 3 and b"tRNS" in b)), (f, w, h, depth, ctype)
+PY'
+check "상태 화면 앱 아이콘(android:icon) = 앱 메뉴 타일의 낮·밤 그림" \
+  'grep -q "android:icon=\"@drawable/ic_launcher\"" $B/app/AndroidManifest.xml && cmp -s $B/app/res/drawable-hdpi/ic_launcher.png $PKG/icons/icon.png && cmp -s $B/app/res/drawable-night-hdpi/ic_launcher.png $PKG/icons/icon_night.png'
 # HMG-API USB 묶음 안의 파일 이름 NEMESIS.data(빌드가 빼는 파일)는 그대로 둔다
 check "NEMESIS·다른 차·제보 흔적 없음(모드·USB·빌드 스크립트)" \
   '! grep -rnE "NEMESIS|nemesis|KP_[A-Z]|korea\.projection|korea-projection|KoreaProjection|CARS_OK|CARS_TRY|CARS_SEEN|req_tick|report\.req|carreport|wireless\.projection|제보|QR" $PKG $B/usb $B/scripts --include=*.sh --include=troubleShooter --include=*.json --include=*.txt | grep -v "NEMESIS\.data"'
@@ -795,6 +811,12 @@ if [ -n "$HMGAPI_SRC" ]; then
     'cmp -s $P/LICENSE $B/LICENSE && cmp -s $P/NOTICE.md $B/NOTICE.md && cmp -s $P/bin/busybox-LICENSE.txt $T/test-bb-LICENSE.txt && cmp -s $T/ux/LICENSE $B/LICENSE && cmp -s $T/ux/NOTICE.md $B/NOTICE.md && cmp -s $T/ux/BUSYBOX-LICENSE.txt $T/test-bb-LICENSE.txt'
   check "라이선스: HMG-API를 함께 넣으면 HMGAPI-SOURCE.txt에 판과 대응 소스(태그), README.txt에 이 묶음의 소스 커밋" \
     'grep -q "^HMG-API 1.1.0:" $T/ux/HMGAPI-SOURCE.txt && grep -q "https://github.com/Open-HMG/HMG-API/tree/v1.1.0" $T/ux/HMGAPI-SOURCE.txt && grep -q "AGPL-3.0" $T/ux/HMGAPI-SOURCE.txt && grep -q "https://github.com/jay-park-lab/hmgapi-nx4-kor (이 묶음: [0-9a-f]\{7,\}" $T/ux/README.txt && ! grep -q "@SOURCE_REV@" $T/ux/README.txt'
+  check "모드 zip: 앱 메뉴 타일 그림 넷(icons/)이 저장소의 mod/icons 그대로 들어감" 'python3 - $T/out/hmgapi-nx4-kor-$V.zip $PKG/icons <<PY
+import os, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+for n in ("icon.png", "icon_night.png", "icon_disabled.png", "icon_disabled_night.png"):
+    assert z.read("icons/" + n) == open(os.path.join(sys.argv[2], n), "rb").read(), n
+PY'
   # NX4_BUSYBOX로 준 파일이 없으면 busybox 없이 만들지 않고 멈춘다
   bld env NX4_BUSYBOX=$T/nobb OUT=$T/out-missing
   check "빌드: NX4_BUSYBOX로 준 파일이 없으면 만들지 않음" '[ "$(cat $T/build.rc)" != 0 ] && grep -q "busybox가 없습니다" $T/build.out && [ ! -f $T/out-missing/hmgapi-nx4-kor-$V-usb.zip ]'
