@@ -1929,9 +1929,11 @@ hotspot_first() {
   return 0
 }
 # 부품 없음 판정이 굳은 것인가: 기록이 있고, 핫스팟 기능을 켜 본 뒤(wifi.hotspot)이거나 기능이 이미 켜져 있던 차.
-# 굳은 차는 부팅마다 설정 진행("설치 중")을 다시 보이지 않고 바로 판정을 보인다(main, fix_perms)
+# 굳은 차는 부팅마다 설정 진행("설치 중")을 다시 보이지 않고 바로 판정을 보인다(main, fix_perms).
+# 지금 칩이 보이면 굳은 것이 아니다: wake_wifi가 기록을 지우고 적용하며, status.sh의 nopart 판정도 칩이 안 보일 때만이다
 nopart_final() {
   [ -f $BK/wifi.nopart ] || return 1
+  wifi_chip_seen && return 1
   [ -f $BK/wifi.hotspot ] && return 0
   hotspot_feat_on
 }
@@ -2309,6 +2311,7 @@ setup_hmgapi() {
   # 새 판): 칩 확인 중·칩 실패처럼 그대로인 상태를 부팅마다 다시 알리지 않는다(실패는 생길 때 한 번 알린다)
   if [ $_fail = 0 ] && [ $_restart = 1 ] && [ $_wstop = 1 ]; then pnotice "NX4 KOR: $LAST_MSG"
   elif [ $_fail = 0 ] && [ $_restart = 1 ] && [ $_wchk = 1 ]; then pnotice "NX4 KOR: $WIFI_CHECK_MSG"
+  elif [ $_fail = 0 ] && [ $_hsp = 1 ]; then pnotice "NX4 KOR: $HOTSPOT_ON_MSG"
   elif [ $_fail = 0 ] && [ $_restart = 1 ]; then pnotice "NX4 KOR: 무선 카플레이 설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요."
   elif [ $_fail = 0 ] && [ $_newver = 1 ]; then pnotice "NX4 KOR: 새 판($_mv)을 쓰려면 내비를 3분 후 재부팅해 주세요."
   fi

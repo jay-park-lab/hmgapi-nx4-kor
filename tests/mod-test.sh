@@ -524,6 +524,8 @@ HSF=feature:com.hkmc.software.wifihotspot
 sreset; rm -f $T/wifiseen $T/features; srun
 check "setup_hmgapi: 칩이 안 보이고 순정 핫스팟 기능이 꺼져 있으면 Wi-Fi를 깨우지 않고 먼저 적용, wifi.hotspot 기록, 재부팅 안내(기능을 켰다)" \
   'grep -qx "hmgapid engine apply" $T/calls && ! grep -q "^svc wifi" $T/calls && [ -f $T/sbk/wifi.hotspot ] && [ "$(cat $T/sbk/applied)" = "$V" ] && [ "$(st state)" = reboot ] && grep -q "순정 핫스팟 기능을 켰습니다" $T/sprog' || { cat $T/s.out; cat $T/sprog; }
+check "  ap.log 안내 줄도 진행 기록과 같은 문장(핫스팟 기능을 켰다, '설정을 마쳤습니다' 아님)" \
+  'grep -q "안내(진행 기록에 남김): Wi-Fi 칩 전원을 켜려고 순정 핫스팟 기능을 켰습니다" $T/s.out && ! grep -q "안내(진행 기록에 남김): 무선 카플레이 설정을 마쳤습니다" $T/s.out' || cat $T/s.out
 sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.nopart; srun
 check "setup_hmgapi: 기능이 꺼진 채 남은 지난 판의 부품 없음 기록(wifi.nopart)은 지우고 같은 길로 적용" \
   '[ ! -f $T/sbk/wifi.nopart ] && grep -qx "hmgapid engine apply" $T/calls && [ -f $T/sbk/wifi.hotspot ] && grep -q "부품 없음 기록을 지움" $T/s.out' || cat $T/s.out
@@ -541,9 +543,12 @@ echo $HSF > $T/features; : > $T/wifiseen; srun
 check "  기능이 켜지고 칩이 보이면 그렇게 남김" 'grep -q "지금 기능 켜짐, Wi-Fi 칩 보임" $T/s.out' || cat $T/s.out
 # 서비스가 시작할 때의 진행 기록(prog_start): 부품 없음이 굳은 차는 2분씩 "설치 중"을 보이지 않고 판정을 바로
 psrun() { rm -f $T/sprog; (env PATH=$P0 HOTSPOT_LIB=1 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog BOOT_ID=$T/bootid UPTIME=$T/uptime \
-  sh -c ". $TP/svc/hotspot.sh; prog_start") > $T/ps.out 2>&1; }
-sreset; rm -f $T/features; : > $T/sbk/wifi.nopart; : > $T/sbk/wifi.hotspot; psrun
+  WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio sh -c ". $TP/svc/hotspot.sh; prog_start") > $T/ps.out 2>&1; }
+sreset; rm -f $T/features $T/wifiseen; : > $T/sbk/wifi.nopart; : > $T/sbk/wifi.hotspot; psrun
 check "prog_start: 핫스팟 기능을 켜 본 뒤의 부품 없음 → 시작하자마자 실패(부품 없음), '설치 중' 아님" '[ "$(st state)" = fail ] && grep -q "Wi-Fi 부품이 없어" $T/sprog' || cat $T/ps.out
+: > $T/wifiseen; psrun
+check "  기록이 있어도 지금 칩이 보이면 굳은 것이 아님 → 설치 시작(run, 설정이 기록을 지우고 적용)" '[ "$(st state)" = run ]' || cat $T/ps.out
+rm -f $T/wifiseen
 rm -f $T/sbk/wifi.hotspot; psrun
 check "  기능이 꺼진 채 남은 부품 없음(켜 본 적 없음) → 설치 시작(run, 설정이 기능을 켜 봄)" '[ "$(st state)" = run ] && [ "$(st pct)" = 3 ]'
 echo $HSF > $T/features; psrun
@@ -559,6 +564,9 @@ check "fix_perms: 핫스팟 기능을 켜 본 뒤 부품 없음이 굳은 차는
 sreset; rm -f $T/wifiseen $T/features; : > $T/sbk/wifi.nopart; fprun
 check "  기능이 꺼진 채 남은 부품 없음은 진행을 쓰며 핫스팟 기능을 켜러 적용(재부팅 안내)" \
   '[ "$(st state)" = reboot ] && grep -q "순정 핫스팟 기능을 켰습니다" $T/sprog && grep -qx "hmgapid engine apply" $T/calls' || cat $T/fp.out
+sreset; rm -f $T/features; : > $T/sbk/wifi.nopart; : > $T/sbk/wifi.hotspot; fprun
+check "  부품 없음 기록이 있어도 칩이 다시 보인 부팅은 진행을 쓰며 기록을 지우고 적용(재부팅 안내, '부품 없음' 아님)" \
+  '[ ! -f $T/sbk/wifi.nopart ] && grep -qx "hmgapid engine apply" $T/calls && [ "$(st state)" = reboot ] && grep -q "설정을 마쳤습니다" $T/sprog' || cat $T/fp.out
 # 뒤의 status.sh 시험은 "설치 중"(run)이 아닌 진행 기록을 전제한다
 rm -f $T/features $T/sprog; : > $T/wifiseen
 # status.sh: 판정 몇 가지(상태 파일)
@@ -710,12 +718,37 @@ if [ -n "$HMGAPI_SRC" ]; then
   mkdir -p $ER/system/onebin/nx4hev_kr
   printf '%s\n' -/system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml -/system/etc/permissions/com.hkmc.software.wifihotspot.xml > $ER/system/onebin/nx4hev_kr/featurexml.cfg
   engp() { (HMGAPI_ROOT=$ER HMGAPI_HOST=1 HMGAPI_PRODUCT=NX4.KOR.0000.V039.001.260902 HMGAPI_ONEBIN=nx4hev_kr java -cp $T/eh hmgapi.engine.Engine $1) > $T/engp.out 2>&1; echo $? > $T/engp.rc; }
+  # 참고: $1은 따옴표 없이 넘겨 "install <zip>"처럼 두 낱말도 받는다
   engp plan
   check "HMG-API 엔진 계획: 순정 핫스팟 권한 파일이 없는 차에 HMG-API 파일을 이 모드 몫으로 넣음(featurexml.cfg도 이 모드 몫), 문제 없음" \
     '[ "$(cat $T/engp.rc)" = 0 ] && grep -q "^change   /system/etc/permissions/com.hkmc.software.wifihotspot.xml \[nx4-kor\]" $T/engp.out && grep -q "^change   /system/onebin/nx4hev_kr/featurexml.cfg \[nx4-kor\]" $T/engp.out && ! grep -q "problem" $T/engp.out' || cat $T/engp.out
   engp apply
   check "  적용하면 핫스팟 기능 파일이 생기고 featurexml.cfg의 그 줄이 막힘(#)" \
     'grep -q "<feature name=\"com.hkmc.software.wifihotspot\" />" $ER/system/etc/permissions/com.hkmc.software.wifihotspot.xml && grep -qx "#-/system/etc/permissions/com.hkmc.software.wifihotspot.xml" $ER/system/onebin/nx4hev_kr/featurexml.cfg' || cat $T/engp.out
+  # 업데이트 길(PR #42 리뷰 4): 옛 방식(featurexml 줄 주석, wifi 요청 없음)으로 적용된 차에 이 판을 설치하면, 계획은 핫스팟 기능 파일
+  # 하나만 바뀌고 나머지는 same이어야 한다. restore·rebase가 나오면 이미 쓰는 차의 자동 설정이 "HMG-API 앱에서 적용"으로 멈춘다
+  ER=$T/er-upd; rm -rf $ER
+  mkdir -p $ER/system/etc/permissions $ER/data/hmgapi/mods $ER/data/hmgapi/settings $ER/system/onebin/nx4hev_kr
+  printf 'ro.build.product=NX4.KOR.0000.V039.001.260902\n' > $ER/system/build.prop
+  printf 'version 1.1.0-rc.4\n' > $ER/data/hmgapi/installed.txt
+  printf '%s\n' -/system/etc/permissions/com.hkmc.software.connectivity.carplay_wireless.xml -/system/etc/permissions/com.hkmc.software.wifihotspot.xml > $ER/system/onebin/nx4hev_kr/featurexml.cfg
+  engp "install $T/out/hmgapi-nx4-kor-$V.zip"
+  # 설치된 폴더를 옛 판(1.9.9)의 방식으로 되돌려 적용한다(서명은 설치할 때만 본다)
+  python3 -I - $ER/data/hmgapi/mods/nx4-kor <<'PY'
+import json, os, sys
+d = sys.argv[1]
+m = json.load(open(os.path.join(d, "mod.json"))); m.pop("wifi", None); m["version"] = "1.9.9"
+json.dump(m, open(os.path.join(d, "mod.json"), "w"), indent=2)
+p = json.load(open(os.path.join(d, "patches.json")))
+p["changes"].insert(0, {"type": "lines", "path": "/system/onebin/{onebin}/featurexml.cfg", "stock": "any", "part": "projection",
+                        "comment": ["-/system/etc/permissions/com.hkmc.software.wifihotspot.xml"]})
+json.dump(p, open(os.path.join(d, "patches.json"), "w"), indent=2)
+PY
+  engp apply; cp $T/engp.out $T/engp-old.out
+  engp "install $T/out/hmgapi-nx4-kor-$V.zip"; cp $T/engp.out $T/engp-upd.out
+  engp plan
+  check "HMG-API 엔진 업데이트 길: 옛 방식(featurexml 줄 주석)은 순정 파일이 없는 차에 핫스팟 기능 파일을 만들지 못했고, 이 판을 설치하면 계획은 그 파일 change 한 줄, featurexml.cfg 등은 same, restore·rebase·problem 없음" \
+    '[ ! -f $T/er-upd/system/etc/permissions/com.hkmc.software.wifihotspot.xml ] && grep -q "^done:" $T/engp-old.out && grep -q "^installed nx4-kor $V" $T/engp-upd.out && [ "$(grep -c "^change   " $T/engp.out)" = 1 ] && grep -q "^change   /system/etc/permissions/com.hkmc.software.wifihotspot.xml \[nx4-kor\]" $T/engp.out && grep -q "^same     /system/onebin/nx4hev_kr/featurexml.cfg \[nx4-kor\]" $T/engp.out && ! grep -qE "^(restore|rebase|problem)|problem\(s\)" $T/engp.out' || { cat $T/engp-old.out $T/engp-upd.out $T/engp.out; }
   for prod in CVEV.USA.0000.V015 DEPEHEV.KOR.0000.V039.001.260902 NX4.KOR.0000.V040.001.261101; do
     ER=$T/er-$prod; eng $ER $prod
     check "HMG-API 엔진: $prod 에는 설치하지 않음(NX4.KOR 260902 전용)" '[ "$(cat $T/eng.rc)" != 0 ] && grep -q "refused" $T/eng.out && [ ! -d $ER/data/hmgapi/mods/nx4-kor ]' || cat $T/eng.out
