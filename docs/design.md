@@ -43,7 +43,7 @@ NX4 KOR 2.0.x는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 �
 | `hmgapi` | `>=1.1.0-rc.4` |
 | `conflicts` | `wireless-carplay-aa`(따로 설치하는 무선 모드)와 함께 돌지 않습니다. 같은 훅을 겁니다 |
 | `services` | `ap`(`svc/ap.sh`, root, Android가 켜진 뒤 시작, 다시 시작), `launch`(`svc/launch.sh`, root, 앱이 부를 때만) |
-| `apps`, `provides.launcher` | 상태 화면 앱(`app/NX4KOR.apk`)과 앱 메뉴 타일 |
+| `apps`, `provides.launcher` | 상태 화면 앱(`app/NX4KOR.apk`)과 앱 메뉴 타일. 타일 그림은 `icons/`의 순정 꼴 넷(낮·밤, 모드를 껐을 때의 회색 낮·밤)이고, 저장소의 `art/tile.svg`를 HMG-API `tools/mkicon.sh`로 만든 것입니다([#47](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/47)) |
 | `hooks`, `parts`, `feature_flags` | 무선 카플레이·안드로이드 오토 훅(`hooks.jar`, 진입 `hmgapi.mods.wireless.Wireless`, 지점 36개, 네이티브 레시피 5개). 2.4.5와 같습니다 |
 | `patches.json`, `files/`, `settings.json` | 순정 핫스팟 권한 줄 주석, 무선 카플레이 속성, AAC 라이브러리, 차주 설정 10개 |
 
