@@ -26,18 +26,18 @@ import java.io.InputStream;
 public class StatusActivity extends Activity implements View.OnClickListener, Runnable, android.content.DialogInterface.OnClickListener {
     /** bin/status.sh가 쓰는 파일 (644, 비밀값 없음) */
     static final String STATUS = "/data/local/tmp/nx4-kor-status.txt";
-    /** svc/hotspot.sh가 쓰는 설치 진행 기록 (644, 비밀값 없음) */
+    /** USB 설치기가 쓰는 설치 진행 기록 (644, 비밀값 없음, 형식은 svc/lib.sh PROG) */
     static final String PROG = "/data/local/tmp/nx4-kor-progress.txt";
     static final String BOOT_ID = "/proc/sys/kernel/random/boot_id";
-    /** svc/hotspot.sh notice가 쓰는 알림 기록(644, 토스트 대신). 이번 부팅의 줄만 보인다 */
+    /** 알림 기록(644, 토스트 대신). 이번 부팅의 줄만 보인다 */
     static final String NOTICE = "/data/local/tmp/nx4-kor-notice.txt";
-    /** svc/hotspot.sh hint_write가 쓰는 상태 안내(644, 코드와 시각뿐). 이번 부팅의 것만 보인다 */
+    /** 2.0.x 서비스(svc/hotspot.sh hint_write)가 쓰던 상태 안내(644, 코드와 시각뿐). 2.1.0에는 쓰는 곳이 없다. 이번 부팅의 것만 보인다 */
     static final String HINT = "/data/local/tmp/nx4-kor-hint.txt";
     /** 알림을 보여 주는 시간(초): 그보다 오래된 안내는 지난 단계의 것이다 */
     static final long NOTICE_SHOW = 1800;
     /** 설치가 끝난 뒤 status.sh가 상태 파일을 다시 쓰기를 기다리는 최대 시간(초). 넘으면 있는 대로 보인다. */
     static final int AFTER_WAIT = 25;
-    /** [지금 재부팅] 요청 파일 이름(앱 개인 폴더). root 쪽(hotspot.sh RBREQ)과 같아야 한다. 앱을 지우면 폴더째 지워진다 */
+    /** [지금 재부팅] 요청 파일 이름(앱 개인 폴더). root 쪽(svc/lib.sh RBREQ)과 같아야 한다. 앱을 지우면 폴더째 지워진다 */
     static final String RB_NAME = "reboot.req";
     /** root 감시자가 재부팅 요청을 받지 않았거나 명령이 돌아왔을 때 남기는 결과(id·boot·code, 644) */
     static final String RBRES = "/data/local/tmp/nx4-kor-reboot-result.txt";

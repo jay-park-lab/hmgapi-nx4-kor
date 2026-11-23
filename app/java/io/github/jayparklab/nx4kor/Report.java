@@ -31,15 +31,15 @@ final class Report {
 
     /**
      * busybox를 실행하지 못한 내비인가. 그때 status.sh는 짧은 상태 파일(support=nobb, product, platform, pkgver, made)만 쓰고
-     * 무선 설정은 하지 않는다.
+     * 판정은 하지 않는다.
      */
     boolean nobb() { return "nobb".equals(v.get("support")); }
 
-    /** mod.json "hmgapi"와 같은 최소 버전 (바꾸면 mod.json·svc/hotspot.sh HMG_MIN·README도 함께 고친다) */
-    static final String MIN_HMGAPI = "1.1.0-rc.4";
+    /** mod.json "hmgapi"와 같은 최소 버전 (바꾸면 mod.json·svc/lib.sh HMG_MIN·README도 함께 고친다) */
+    static final String MIN_HMGAPI = "1.1.0-rc.8";
 
-    /** 순정이 카플레이 AP를 직접 띄운 차(ap_mode=stock). 이때 우리 핫스팟·DHCP가 꺼져 있는 것이 정상이다 */
-    boolean stockAp() { return "stock".equals(get("ap_mode")); }
+    /** 공식 무선 모드(wireless-carplay-aa)의 최소 버전 (svc/lib.sh WM_MIN과 같게) */
+    static final String MIN_WIRELESS = "2.2.0-rc.9";
 
     static final String NO_STATUS = "상태를 읽지 못했습니다. 잠시 뒤 화면을 닫았다가 다시 열어 주세요.";
     static final String NOBB_MSG = "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함). 무선 설정은 하지 않았습니다.";
@@ -82,7 +82,7 @@ final class Report {
         }
     }
 
-    // --- 설치 진행 기록(서비스가 쓰는 /data/local/tmp/nx4-kor-progress.txt) ---
+    // --- 설치 진행 기록(USB 설치기가 쓰는 /data/local/tmp/nx4-kor-progress.txt) ---
     // 이 Report를 진행 기록 파일로 만들었을 때 쓴다. boot는 지금 부팅 id(/proc/sys/kernel/random/boot_id):
     // 지난 부팅의 기록은 무시한다(재부팅 전 "진행 중"이 남아 있어도 막대를 보이지 않게).
 
@@ -256,7 +256,7 @@ final class Report {
 
     /**
      * 요청 파일(reboot.req) 내용: "<요청 id> <boot_id> <부팅 뒤 초>" 한 줄. id는 부팅 뒤 밀리초(숫자만), 부팅 뒤 초는 root가
-     * 오래된 요청을 버리는 데 쓴다(svc/hotspot.sh req_peek). 다른 값(이름·주소)은 넣지 않는다.
+     * 오래된 요청을 버리는 데 쓴다(svc/lib.sh req_peek). 다른 값(이름·주소)은 넣지 않는다.
      */
     static String rbLine(long elapsedMs, String boot) {
         return elapsedMs + " " + (boot == null ? "" : boot.trim()) + " " + (elapsedMs / 1000) + "\n";
@@ -361,7 +361,7 @@ final class Report {
     static final long RB_WAIT = 80;
 
     /**
-     * 알림 기록(svc/hotspot.sh notice, 토스트 대신). 한 줄에 "<시각(초)> <부팅 id> <문구>".
+     * 알림 기록(/data/local/tmp/nx4-kor-notice.txt, 토스트 대신. 2.0.x 서비스가 쓰던 것과 같은 꼴). 한 줄에 "<시각(초)> <부팅 id> <문구>".
      * 이번 부팅의 줄만, 새것부터 최대 max개. 돌려주는 값은 {시각(초), 문구}.
      * now·maxAge(초)를 주면 그보다 오래된 줄은 뺀다(지난 단계의 안내가 계속 남아 오해하지 않게).
      */
@@ -410,8 +410,8 @@ final class Report {
     static final long HINT_SHOW = 600;
 
     /**
-     * 서비스(svc/hotspot.sh hint_write)가 30초마다 정하는 상태 안내(/data/local/tmp/nx4-kor-hint.txt, key=value).
-     * 이번 부팅의 것만 보인다. 돌려주는 값은 {수준(0 좋음·1 확인 필요), 문구, 시각(초, 문구 옆에 HH:MM로 붙일 때만, 아니면 "")}.
+     * 2.0.x 서비스(svc/hotspot.sh hint_write)가 30초마다 정하던 상태 안내(/data/local/tmp/nx4-kor-hint.txt, key=value).
+     * 2.1.0에는 이 파일을 쓰는 곳이 없어(우리 핫스팟이 없음) 보통 빈 목록이다. 이번 부팅의 것만 보인다. 돌려주는 값은 {수준(0 좋음·1 확인 필요), 문구, 시각(초, 문구 옆에 HH:MM로 붙일 때만, 아니면 "")}.
      * 확인이 필요한 것(설정 바뀜·아이폰·AA 안내)을 먼저 둔다. 문구는 내비 화면에서 읽기 좋게 한두 문장.
      */
     static List<String[]> hints(String text, String boot, long now) {
@@ -457,31 +457,56 @@ final class Report {
     }
 
     /**
-     * have가 need보다 낮은가: 0 아니요(같거나 높음), 1 낮음, 2 숫자로 읽지 못함.
-     * svc/hotspot.sh ver_lt와 같게 major.minor.patch 숫자만 비교하고 "-태그"는 무시한다("1.1.0-rc.4"는 1.1.0). 빈 값도 2.
+     * have가 need보다 낮은가: 0 아니요(같거나 높음), 1 낮음, 2 읽지 못함(빈 값, 숫자가 아님, 모르는 꼬리).
+     * svc/lib.sh ver_lt·USB 설치기 vlt와 같은 규칙(HMG-API Version, semver)이다. major.minor.patch 다음 "-" 꼬리까지 본다:
+     * 1.1.0-rc.4 < 1.1.0-rc.8 < 1.1.0-rc.10 < 1.1.0, alpha < beta < rc, 꼬리 없는 판이 같은 숫자의 꼬리 있는 판보다 높다.
+     * "+빌드"는 보지 않는다.
      */
     static int older(String have, String need) {
-        int[] a = nums(have), b = nums(need);
-        if (a == null || b == null) return 2;
+        if (have == null || need == null) return 2;
+        String x = have.trim(), y = need.trim();
+        if (x.isEmpty() || y.isEmpty()) return 2;
+        int p = x.indexOf('+'); if (p >= 0) x = x.substring(0, p);
+        p = y.indexOf('+'); if (p >= 0) y = y.substring(0, p);
+        String xt = "", yt = "";
+        p = x.indexOf('-'); if (p >= 0) { xt = x.substring(p + 1); x = x.substring(0, p); }
+        p = y.indexOf('-'); if (p >= 0) { yt = y.substring(p + 1); y = y.substring(0, p); }
+        String[] a = x.split("\\.", -1), b = y.split("\\.", -1);
         for (int i = 0; i < 3; i++) {
-            int x = i < a.length ? a[i] : 0, y = i < b.length ? b[i] : 0;
-            if (x != y) return x < y ? 1 : 0;
+            String sa = i < a.length ? a[i] : "", sb = i < b.length ? b[i] : "";
+            if (!sa.matches("\\d*") || !sb.matches("\\d*")) return 2;
+            long na, nb;
+            try {
+                na = sa.isEmpty() ? 0 : Long.parseLong(sa);
+                nb = sb.isEmpty() ? 0 : Long.parseLong(sb);
+            } catch (NumberFormatException e) {
+                return 2;
+            }
+            if (na != nb) return na < nb ? 1 : 0;
         }
-        return 0;
+        if (xt.equals(yt) || xt.isEmpty()) return 0;
+        if (yt.isEmpty()) return 1;
+        String[] ta = xt.split("\\.", -1), tb = yt.split("\\.", -1);
+        for (int i = 0; i < ta.length && i < tb.length; i++) {
+            if (ta[i].equals(tb[i])) continue;
+            boolean da = ta[i].matches("\\d+"), db = tb[i].matches("\\d+");
+            if (da && db) {
+                try { return Long.parseLong(ta[i]) < Long.parseLong(tb[i]) ? 1 : 0; } catch (NumberFormatException e) { return 2; }
+            }
+            if (da) return 1;
+            if (db) return 0;
+            int ra = rank(ta[i]), rb = rank(tb[i]);
+            if (ra < 0 || rb < 0) return 2;
+            return ra < rb ? 1 : 0;
+        }
+        return ta.length < tb.length ? 1 : 0;
     }
 
-    private static int[] nums(String s) {
-        if (s == null) return null;
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^\\s*(\\d+(?:\\.\\d+)*)").matcher(s);
-        if (!m.find()) return null;
-        String[] p = m.group(1).split("\\.");
-        int[] r = new int[p.length];
-        try {
-            for (int i = 0; i < p.length; i++) r[i] = Integer.parseInt(p[i]);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-        return r;
+    private static int rank(String w) {
+        if ("alpha".equals(w)) return 1;
+        if ("beta".equals(w)) return 2;
+        if ("rc".equals(w)) return 3;
+        return -1;
     }
 
     /** 버전 칸: 값 옆에 필요 조건을 붙인다 */
@@ -493,12 +518,32 @@ final class Report {
         return have;
     }
 
-    /** NX4 KOR 모드 칸(HMG-API 앱에서 켜고 끔): 꺼짐 / 켜짐(무선 카플레이 설정 꺼짐) / 켜짐(훅이 안 켜짐) / 켜짐 */
-    private String modCell() {
-        if ("no".equals(get("mod_on"))) return "꺼짐 (켜야 함)";
-        if ("off".equals(get("bridge"))) return "켜짐, Wireless CarPlay 설정 꺼짐";
-        if ("off".equals(get("mod_hooks"))) return "켜짐, 훅이 안 켜짐";
-        return yes("mod_on") ? "켜짐" : yn("mod_on");
+    /**
+     * 공식 무선 모드 칸(wireless-carplay-aa, HMG-API 앱에서 켜고 끔): 없음 / 판(지원 안 함) / 판, 꺼짐 /
+     * 판, 훅이 안 켜짐 / 판, Wireless CarPlay 설정 꺼짐 / 판, 켜짐
+     */
+    private String wmCell() {
+        if (!yes("wm")) return "no".equals(get("wm")) ? "없음 (설치 필요)" : "-";
+        String v = get("wm_ver");
+        String head = v.isEmpty() ? "판 모름" : older(v, MIN_WIRELESS) == 1 ? v + " (지원 안 함, " + MIN_WIRELESS + " 이상 필요)" : v;
+        if ("no".equals(get("wm_on"))) return head + ", 꺼짐 (켜야 함)";
+        if ("off".equals(get("wm_hooks"))) return head + ", 훅이 안 켜짐";
+        if ("off".equals(get("bridge"))) return head + ", Wireless CarPlay 설정 꺼짐";
+        return head + ", 켜짐";
+    }
+
+    /** 무선 연결용 Wi-Fi 칸(HMG-API가 띄우는 프로젝션 AP) */
+    private String apCell() {
+        if (yes("ap")) {
+            String m = get("ap_mode");
+            if ("hotspot".equals(m)) return "켜짐 (일반 핫스팟)";
+            if ("projection".equals(m)) return "켜짐";
+            return "켜짐 (" + (m.isEmpty() ? "?" : m) + ")";
+        }
+        if ("no".equals(get("proj"))) return "꺼짐 (HMG-API에 요청 없음)";
+        if (yes("ap_boot")) return "꺼짐 (이번 부팅에 켰다가 꺼짐)";
+        if (yes("ap_fail")) return "꺼짐 (켜지 못함, 다시 시도 중)";
+        return get("ap").isEmpty() ? "-" : "꺼짐";
     }
 
     /** 화면 표: {제목, 값}. 필요한 것(버전·모드·훅)을 위에 둔다 */
@@ -516,21 +561,16 @@ final class Report {
         out.add(new String[] { "지원 차종", yn("tested") });
         out.add(new String[] { "NX4 KOR", get("pkgver") });
         out.add(new String[] { "HMG-API", ver(hmgapiVer(), MIN_HMGAPI) });
-        out.add(new String[] { "NX4 KOR 모드", modCell() });
-        out.add(new String[] { "무선 기능 적용", yn("applied") });
-        // 따로 설치된 예전 무선 모드(wireless-carplay-aa)가 있는 차만 한 줄
-        if (yes("oldmod")) out.add(new String[] { "예전 무선 모드", "있음 (지워야 함)" });
+        out.add(new String[] { "공식 무선 모드", wmCell() });
         String h = get("hooks");
         out.add(new String[] { "HMG-API 훅", "on".equals(h) ? "켜짐" : "off".equals(h) ? "꺼짐 (" + (get("hookmap").isEmpty() ? "?" : get("hookmap")) + ", 마지막 부팅 기록)" : "-" });
         out.add(new String[] { "무선 카플레이 기능", yn("feat_carplay") });
         out.add(new String[] { "무선 안드로이드 오토 기능", yn("feat_aa") });
+        out.add(new String[] { "순정 핫스팟 기능 (Wi-Fi 칩 전원)", yn("feat_hotspot") });
+        out.add(new String[] { "Wi-Fi 칩", yes("chip") ? "보임" : "no".equals(get("chip")) ? "안 보임" : "-" });
         out.add(new String[] { "Wi-Fi 장치", yn("wlan0") });
-        String am = get("ap_mode");
-        if (!am.isEmpty())
-            out.add(new String[] { "무선 카플레이 Wi-Fi", "stock".equals(am) ? "내비 순정 Wi-Fi" : "ours".equals(am) ? "NX4 KOR 핫스팟" : "없음" });
-        out.add(new String[] { "핫스팟 (hostapd)", yn("our_ap") + (stockAp() ? " (순정 Wi-Fi를 쓰므로 꺼 둠)" : "") });
-        out.add(new String[] { "IP 나눠 주기 (DHCP)", yn("our_dhcp") });
-        out.add(new String[] { "순정 핫스팟", yn("other_ap") });
+        out.add(new String[] { "무선 연결용 Wi-Fi (HMG-API)", apCell() });
+        if (yes("other_ap")) out.add(new String[] { "다른 패키지의 Wi-Fi", "있음 (지워야 함)" });
         out.add(new String[] { "카플레이 연결", get("cp_conn").isEmpty() ? "-" : get("cp_conn") + "개" });
         if (!get("verdict").isEmpty()) out.add(new String[] { "판정 코드", get("verdict") });
         return out;

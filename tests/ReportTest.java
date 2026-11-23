@@ -12,17 +12,17 @@ public class ReportTest {
         if (!ok) fails++;
     }
 
-    /** bin/status.sh status_kv가 쓰는 키(준비됨 상태) */
+    /** bin/status.sh status_kv가 쓰는 키(준비됨 상태, 2.1.0: HMG-API + 공식 무선 모드 + 이 모드) */
     static final String GOOD =
         "product=NX4.KOR.0000.V039.001.260902\n" +
         "targetdir=/system/onebin/nx4_kr\n" +
-        "pkgver=2.0.0\ntested=yes\nhmgapi=version 1.1.0-rc.4 build 180185d 2026-11-04\n" +
-        "applied=yes\noldmod=no\nmod_hooks=on\nmod_on=yes\nbridge=on\nhooks=on\nhookmap=mapped\n" +
-        "feat_carplay=yes\nfeat_aa=yes\nfeat_wifi=no\nwlan0=yes\n" +
-        "softap_strings=4\nssid_len=8\npass_len=12\nour_ap=yes\nour_dhcp=yes\nother_ap=no\nstock_ssid=none\nap_mode=ours\n" +
-        "stock_seen=no\nwpa=no\ncp_conn=0\nstate=done\nnowlan=no\nmade=2026-11-19 06:00\n" +
+        "pkgver=2.0.0\ntested=yes\nhmgapi=version 1.1.0-rc.8 build 180185d 2026-11-21\n" +
+        "wm=yes\nwm_ver=2.2.0-rc.9\nwm_on=yes\nwm_hooks=on\nbridge=on\nhooks=on\nhookmap=mapped\n" +
+        "feat_carplay=yes\nfeat_aa=yes\nfeat_hotspot=yes\nfeat_wifi=no\nchip=yes\nwlan0=yes\n" +
+        "proj=yes\nap_boot=yes\nap_fail=no\nap=yes\nap_mode=projection\nother_ap=no\nwpa=no\n" +
+        "cp_conn=0\nstate=done\nmade=2026-11-23 06:00\n" +
         "verdict=ready\nverdict_lv=0\nverdict_msg=무선 카플레이·안드로이드 오토 준비됨.\nverdict_end=no\n" +
-        "s1=설치: 끝남\ns2=무선 Wi-Fi: 켜짐\ns3=폰 연결: 지금 연결된 폰 없음\n";
+        "s1=설치: 끝남\ns2=무선 Wi-Fi: 켜짐(HMG-API)\ns3=폰 연결: 지금 연결된 폰 없음\n";
 
     static String row(Report r, String title) {
         for (String[] x : r.rows()) if (x[0].equals(title)) return x[1];
@@ -46,87 +46,103 @@ public class ReportTest {
 
     public static void main(String[] a) throws Exception {
         Report r = Report.parse(GOOD);
-        check("상태 파일 해석", "NX4.KOR.0000.V039.001.260902".equals(r.get("product")) && r.yes("our_ap"));
+        check("상태 파일 해석", "NX4.KOR.0000.V039.001.260902".equals(r.get("product")) && r.yes("ap"));
 
         // --- 판정: status.sh(st_verdict)가 정한 문구·수준을 그대로 ---
         check("판정 문구·수준은 상태 파일 값 그대로(준비됨 → 수준 0)", r.verdict().equals("무선 카플레이·안드로이드 오토 준비됨.") && r.level() == 0);
-        String V3 = GOOD.replace("verdict=ready", "verdict=nochip").replace("verdict_lv=0", "verdict_lv=2")
-            .replace("verdict_msg=무선 카플레이·안드로이드 오토 준비됨.", "verdict_msg=이 차는 Wi-Fi 칩이 켜지지 않아 지원하기 어렵습니다.")
+        String V3 = GOOD.replace("verdict=ready", "verdict=nocar").replace("verdict_lv=0", "verdict_lv=2")
+            .replace("verdict_msg=무선 카플레이·안드로이드 오토 준비됨.", "verdict_msg=지원하지 않는 차입니다(투싼 NX4 한국 내수 260902 전용). 아무것도 바꾸지 않았습니다.")
             .replace("verdict_end=no", "verdict_end=yes").replace("s1=설치: 끝남", "s1=설치: 안 됨(오른쪽 안내를 보세요)")
-            .replace("s2=무선 Wi-Fi: 켜짐", "s2=무선 Wi-Fi: 칩이 켜지지 않음");
+            .replace("s2=무선 Wi-Fi: 켜짐(HMG-API)", "s2=무선 Wi-Fi: 꺼짐");
         Report v3 = Report.parse(V3);
-        check("  nochip → 그 문구, 빨강", v3.verdict().startsWith("이 차는 Wi-Fi 칩이 켜지지 않아") && v3.level() == 2);
+        check("  nocar → 그 문구, 빨강", v3.verdict().startsWith("지원하지 않는 차입니다") && v3.level() == 2);
         check("  수준 값이 깨졌으면 1(확인 필요), 범위 밖은 0~2로", Report.parse(V3.replace("verdict_lv=2", "verdict_lv=x")).level() == 1
             && Report.parse(V3.replace("verdict_lv=2", "verdict_lv=9")).level() == 2 && Report.parse(V3.replace("verdict_lv=2", "verdict_lv=-3")).level() == 0);
         Report nov = Report.parse(GOOD.replace("verdict_msg=무선 카플레이·안드로이드 오토 준비됨.", "verdict_msg="));
         check("  판정 문구가 비었으면 '상태를 읽는 중' 안내, 노랑(verdict_lv를 믿지 않음)", nov.verdict().equals(Report.NO_VERDICT)
             && Report.NO_VERDICT.equals("상태를 읽는 중입니다. 잠시 뒤 화면을 다시 열어 주세요.") && nov.level() == 1);
         check("파일 없음 → '상태를 읽지 못했습니다', 빨강", Report.parse(null).verdict().startsWith("상태를 읽지 못했습니다") && Report.parse(null).level() == 2);
-        // 새 판정 코드도 앱은 따로 판정하지 않고 그대로 보인다
+        // 판정 코드(2.1.0)도 앱은 따로 판정하지 않고 그대로 보인다
         String[][] codes = { { "bootguard", "2" }, { "installing", "1" }, { "nocar", "2" }, { "nohmgapi", "2" }, { "oldhmgapi", "2" },
-            { "oldmod", "2" }, { "otherwifi", "2" }, { "reboot", "1" }, { "hmgrefuse", "2" }, { "modoff", "2" }, { "hooksoff", "1" },
-            { "modhooksoff", "2" }, { "wifioff", "1" }, { "apoff", "1" }, { "connected", "0" } };
+            { "reboot", "1" }, { "failed", "2" }, { "nowireless", "2" }, { "wirelessoff", "2" }, { "oldwireless", "2" }, { "hooksoff", "1" },
+            { "wmhooksoff", "2" }, { "bridgeoff", "2" }, { "nofeat", "2" }, { "noproj", "2" }, { "connected", "0" }, { "otherwifi", "2" },
+            { "aphotspot", "1" }, { "ready", "0" }, { "wificlient", "1" }, { "nowifipart", "1" }, { "apoff", "1" }, { "apfail", "1" }, { "apwait", "1" } };
         boolean allSame = true;
         for (String[] c : codes) {
             Report x = Report.parse(GOOD.replace("verdict=ready", "verdict=" + c[0]).replace("verdict_lv=0", "verdict_lv=" + c[1])
                 .replace("verdict_msg=무선 카플레이·안드로이드 오토 준비됨.", "verdict_msg=문구 " + c[0]));
             if (!x.verdict().equals("문구 " + c[0]) || x.level() != Integer.parseInt(c[1]) || !c[0].equals(row(x, "판정 코드"))) allSame = false;
         }
-        check("  판정 코드(bootguard·installing·nocar·…·connected)마다 문구·수준·표의 판정 코드가 상태 파일 그대로", allSame);
+        check("  판정 코드(bootguard·installing·nocar·…·nowifipart·apwait)마다 문구·수준·표의 판정 코드가 상태 파일 그대로", allSame);
         check("'안 됨'으로 끝나면(verdict_end=yes) 지우는 법 한 줄, 아니면 없음", Report.UNINSTALL_HINT.equals(v3.endHint())
             && Report.UNINSTALL_HINT.equals("지우려면 USB의 NX4 폴더에 UNINSTALL 파일을 넣고 Engineering Mode의 Update OTA를 다시 실행한 뒤 재부팅하세요. 유선 카플레이는 그대로입니다.")
             && "".equals(r.endHint()));
-        check("요약 3줄(설치·무선 Wi-Fi·폰 연결), 없으면 빈 목록", v3.summary().size() == 3 && v3.summary().get(1).equals("무선 Wi-Fi: 칩이 켜지지 않음")
+        check("요약 3줄(설치·무선 Wi-Fi·폰 연결), 없으면 빈 목록", v3.summary().size() == 3 && v3.summary().get(1).equals("무선 Wi-Fi: 꺼짐")
             && r.summary().get(2).equals("폰 연결: 지금 연결된 폰 없음") && Report.parse("product=x\n").summary().isEmpty());
 
-        // --- 없어진 키(mod, modver, mod_pending, mod_pin, mod_foreign, wp, first, usb)는 읽지 않는다 ---
-        Report extra = Report.parse(GOOD + "mod=no\nmodver=2.2.0\nmod_pending=yes\nmod_pin=2.4.1\nmod_foreign=yes\nwp=yes\nfirst=먼저 할 일: x\nusb=saved\n");
+        // --- 없어진 키(2.0.x 우리 핫스팟·합친 무선 모드, 그 전의 mod·modver 등)는 읽지 않는다 ---
+        Report extra = Report.parse(GOOD + "mod=no\nmodver=2.2.0\nmod_pending=yes\nmod_pin=2.4.1\nmod_foreign=yes\nwp=yes\nfirst=먼저 할 일: x\nusb=saved\n"
+            + "applied=no\noldmod=yes\nmod_on=no\nmod_hooks=off\nour_ap=no\nour_dhcp=no\nstock_ssid=carplay\nstock_seen=yes\nnowlan=yes\n");
         boolean sameRows = extra.rows().size() == r.rows().size();
         for (int i = 0; sameRows && i < r.rows().size(); i++)
             sameRows = r.rows().get(i)[0].equals(extra.rows().get(i)[0]) && r.rows().get(i)[1].equals(extra.rows().get(i)[1]);
         check("없어진 키가 남아 있어도 판정·색·표가 같음", sameRows && extra.verdict().equals(r.verdict()) && extra.level() == r.level()
-            && row(extra, "무선 모드 고정") == null && row(extra, "wireless.projection") == null);
-        check("  없어진 기능의 멤버가 없음(링크·요청·USB·먼저 할 일·다른 판 모드)", !hasMember("issueUrl") && !hasMember("fit") && !hasMember("enc")
+            && row(extra, "무선 모드 고정") == null && row(extra, "wireless.projection") == null && row(extra, "예전 무선 모드") == null
+            && row(extra, "NX4 KOR 모드") == null && row(extra, "핫스팟 (hostapd)") == null && row(extra, "IP 나눠 주기 (DHCP)") == null);
+        check("  없어진 기능의 멤버가 없음(링크·요청·USB·먼저 할 일·다른 판 모드·우리 핫스팟)", !hasMember("issueUrl") && !hasMember("fit") && !hasMember("enc")
             && !hasMember("qrBlocked") && !hasMember("reqLine") && !hasMember("reqParse") && !hasMember("reqBlock") && !hasMember("reqPhase")
             && !hasMember("usbMounted") && !hasMember("rbBusy") && !hasMember("RB_BUSY") && !hasMember("firstTodo") && !hasMember("foreign")
-            && !hasMember("MAX_URL") && !hasMember("ISSUES") && !hasMember("hooksOffAdvice"));
+            && !hasMember("MAX_URL") && !hasMember("ISSUES") && !hasMember("hooksOffAdvice") && !hasMember("stockAp") && !hasMember("modCell"));
 
         // --- 상태표 ---
-        check("표는 16줄, 예/아니요로 표시, 'NX4 KOR' 줄은 pkgver", r.rows().size() == 16 && "예".equals(row(r, "지원 차종"))
-            && "2.0.0".equals(row(r, "NX4 KOR")) && "예".equals(row(r, "무선 기능 적용")));
+        check("표는 14줄, 예/아니요로 표시, 'NX4 KOR' 줄은 pkgver", r.rows().size() == 14 && "예".equals(row(r, "지원 차종"))
+            && "2.0.0".equals(row(r, "NX4 KOR")) && "예".equals(row(r, "무선 카플레이 기능")) && "예".equals(row(r, "순정 핫스팟 기능 (Wi-Fi 칩 전원)")));
         check("  판정 코드 줄(verdict), 카플레이 연결 수", "ready".equals(row(r, "판정 코드")) && "0개".equals(row(r, "카플레이 연결"))
             && "-".equals(row(Report.parse(GOOD.replace("cp_conn=0\n", "")), "카플레이 연결")));
-        check("정상이면 HMG-API 칸은 버전만 (1.1.0-rc.4)", "1.1.0-rc.4".equals(row(r, "HMG-API")) && Report.MIN_HMGAPI.equals("1.1.0-rc.4"));
-        Report old = Report.parse(GOOD.replace("version 1.1.0-rc.4 build", "version 1.0.2 build"));
-        check("  HMG-API 1.0.2 → '지원 안 함, 1.1.0-rc.4 이상 필요'", "1.0.2 (지원 안 함, 1.1.0-rc.4 이상 필요)".equals(row(old, "HMG-API")));
-        check("  버전 비교는 major.minor.patch 숫자만, '-태그'는 무시(셸 ver_lt와 같음)", Report.older("1.1.0-rc.4", "1.1.0-rc.4") == 0
-            && Report.older("1.1.0-rc.3", "1.1.0-rc.4") == 0 && Report.older("1.1.0", "1.1.0-rc.4") == 0 && Report.older("1.1.1", "1.1.0-rc.4") == 0
-            && Report.older("1.0.9", "1.1.0-rc.4") == 1 && Report.older("1.0.10", "1.0.2") == 0 && Report.older("1.0.1", "1.0.10") == 1
-            && Report.older("1.1", "1.1.0-rc.4") == 0 && Report.older("1.1.0.9", "1.1.0") == 0);
-        check("  1.1.0-rc.3·1.2.0은 지원(버전만 보임)", "1.1.0-rc.3".equals(row(Report.parse(GOOD.replace("1.1.0-rc.4 build", "1.1.0-rc.3 build")), "HMG-API"))
-            && "1.2.0".equals(row(Report.parse(GOOD.replace("1.1.0-rc.4 build", "1.2.0 build")), "HMG-API")));
-        Report none = Report.parse(GOOD.replace("hmgapi=version 1.1.0-rc.4 build 180185d 2026-11-04\n", ""));
-        check("  HMG-API 없음 → '없음 (1.1.0-rc.4 이상 필요)'", "없음 (1.1.0-rc.4 이상 필요)".equals(row(none, "HMG-API")));
-        Report odd = Report.parse(GOOD.replace("version 1.1.0-rc.4 build", "version dev build"));
-        check("  숫자가 아닌 버전 → '버전 확인 안 됨'(멈추지 않음)", row(odd, "HMG-API").contains("버전 확인 안 됨") && Report.older("dev", "1.1.0") == 2);
-        check("NX4 KOR 모드 칸: 정상 '켜짐', 꺼짐 '꺼짐 (켜야 함)', Wireless CarPlay 설정 꺼짐, 훅이 안 켜짐",
-            "켜짐".equals(row(r, "NX4 KOR 모드")) && "꺼짐 (켜야 함)".equals(row(Report.parse(GOOD.replace("mod_on=yes", "mod_on=no")), "NX4 KOR 모드"))
-            && row(Report.parse(GOOD.replace("bridge=on", "bridge=off")), "NX4 KOR 모드").contains("Wireless CarPlay 설정 꺼짐")
-            && "켜짐, 훅이 안 켜짐".equals(row(Report.parse(GOOD.replace("mod_hooks=on", "mod_hooks=off")), "NX4 KOR 모드")));
-        Report om = Report.parse(GOOD.replace("oldmod=no", "oldmod=yes"));
-        check("예전 무선 모드가 있는 차만 '예전 무선 모드: 있음 (지워야 함)' 줄", "있음 (지워야 함)".equals(row(om, "예전 무선 모드"))
-            && om.rows().size() == 17 && row(r, "예전 무선 모드") == null);
+        check("정상이면 HMG-API 칸은 버전만 (1.1.0-rc.8), 최소 판은 rc.8·공식 모드 2.2.0-rc.9", "1.1.0-rc.8".equals(row(r, "HMG-API"))
+            && Report.MIN_HMGAPI.equals("1.1.0-rc.8") && Report.MIN_WIRELESS.equals("2.2.0-rc.9"));
+        Report old = Report.parse(GOOD.replace("version 1.1.0-rc.8 build", "version 1.0.2 build"));
+        check("  HMG-API 1.0.2 → '지원 안 함, 1.1.0-rc.8 이상 필요'", "1.0.2 (지원 안 함, 1.1.0-rc.8 이상 필요)".equals(row(old, "HMG-API")));
+        check("  HMG-API 1.1.0-rc.7(2.0.x가 받던 판) → 지원 안 함(rc 꼬리까지 비교)",
+            "1.1.0-rc.7 (지원 안 함, 1.1.0-rc.8 이상 필요)".equals(row(Report.parse(GOOD.replace("version 1.1.0-rc.8 build", "version 1.1.0-rc.7 build")), "HMG-API")));
+        check("  판 비교는 HMG-API Version·셸 ver_lt와 같음: rc.4 < rc.8 < rc.10 < 정식, beta < rc, 꼬리 없는 최소 판",
+            Report.older("1.1.0-rc.4", "1.1.0-rc.8") == 1 && Report.older("1.1.0-rc.8", "1.1.0-rc.8") == 0 && Report.older("1.1.0-rc.10", "1.1.0-rc.8") == 0
+            && Report.older("1.1.0", "1.1.0-rc.8") == 0 && Report.older("1.1.0-rc.8", "1.1.0") == 1 && Report.older("1.1.0-beta.9", "1.1.0-rc.1") == 1
+            && Report.older("1.2.0-beta.1", "1.1.0-rc.8") == 0 && Report.older("1.1.1", "1.1.0-rc.8") == 0 && Report.older("1.0.9", "1.1.0-rc.8") == 1
+            && Report.older("1.0.10", "1.0.2") == 0 && Report.older("1.0.1", "1.0.10") == 1 && Report.older("1.1", "1.1.0") == 0
+            && Report.older("2.2.0-rc.5", "2.2.0-rc.9") == 1 && Report.older("2.2.0", "2.2.0-rc.9") == 0 && Report.older("1.1.0-rc", "1.1.0-rc.1") == 1
+            && Report.older("1.1.0-rc.8+abc", "1.1.0-rc.8") == 0);
+        check("  1.1.0-rc.9·1.2.0은 지원(버전만 보임)", "1.1.0-rc.9".equals(row(Report.parse(GOOD.replace("1.1.0-rc.8 build", "1.1.0-rc.9 build")), "HMG-API"))
+            && "1.2.0".equals(row(Report.parse(GOOD.replace("1.1.0-rc.8 build", "1.2.0 build")), "HMG-API")));
+        Report none = Report.parse(GOOD.replace("hmgapi=version 1.1.0-rc.8 build 180185d 2026-11-21\n", ""));
+        check("  HMG-API 없음 → '없음 (1.1.0-rc.8 이상 필요)'", "없음 (1.1.0-rc.8 이상 필요)".equals(row(none, "HMG-API")));
+        Report odd = Report.parse(GOOD.replace("version 1.1.0-rc.8 build", "version dev build"));
+        check("  숫자가 아닌 버전·모르는 꼬리 → '버전 확인 안 됨'(멈추지 않음)", row(odd, "HMG-API").contains("버전 확인 안 됨") && Report.older("dev", "1.1.0") == 2
+            && Report.older("1.1.0-dev", "1.1.0-rc.8") == 2 && Report.older("", "1.1.0") == 2 && Report.older(null, "1.1.0") == 2);
+        check("공식 무선 모드 칸: 정상 '판, 켜짐', 없음, 꺼짐, 낮은 판, 훅이 안 켜짐, Wireless CarPlay 설정 꺼짐",
+            "2.2.0-rc.9, 켜짐".equals(row(r, "공식 무선 모드"))
+            && "없음 (설치 필요)".equals(row(Report.parse(GOOD.replace("wm=yes", "wm=no")), "공식 무선 모드"))
+            && "2.2.0-rc.9, 꺼짐 (켜야 함)".equals(row(Report.parse(GOOD.replace("wm_on=yes", "wm_on=no")), "공식 무선 모드"))
+            && "2.2.0-rc.5 (지원 안 함, 2.2.0-rc.9 이상 필요), 켜짐".equals(row(Report.parse(GOOD.replace("wm_ver=2.2.0-rc.9", "wm_ver=2.2.0-rc.5")), "공식 무선 모드"))
+            && "2.2.0-rc.9, 훅이 안 켜짐".equals(row(Report.parse(GOOD.replace("wm_hooks=on", "wm_hooks=off")), "공식 무선 모드"))
+            && row(Report.parse(GOOD.replace("bridge=on", "bridge=off")), "공식 무선 모드").contains("Wireless CarPlay 설정 꺼짐")
+            && "-".equals(row(Report.parse(GOOD.replace("wm=yes\n", "")), "공식 무선 모드")));
         Report hoff = Report.parse(GOOD.replace("hooks=on", "hooks=off").replace("hookmap=mapped", "hookmap=mismatch"));
         check("훅 칸: 꺼짐이면 map 상태와 '마지막 부팅 기록', 기록 없음 '-'", row(hoff, "HMG-API 훅").startsWith("꺼짐 (mismatch")
             && "-".equals(row(Report.parse(GOOD.replace("hooks=on\n", "hooks=\n")), "HMG-API 훅")) && "켜짐".equals(row(r, "HMG-API 훅")));
-        String STOCK = GOOD.replace("our_ap=yes", "our_ap=no").replace("our_dhcp=yes", "our_dhcp=no").replace("other_ap=no", "other_ap=yes")
-            .replace("stock_ssid=none", "stock_ssid=carplay").replace("ap_mode=ours", "ap_mode=stock");
-        Report st = Report.parse(STOCK);
-        check("순정 카플레이 AP: '무선 카플레이 Wi-Fi: 내비 순정 Wi-Fi'와 핫스팟 칸 설명", "내비 순정 Wi-Fi".equals(row(st, "무선 카플레이 Wi-Fi"))
-            && row(st, "핫스팟 (hostapd)").startsWith("아니요 (순정 Wi-Fi를 쓰므로"));
-        check("  ap_mode=ours → 'NX4 KOR 핫스팟', none → '없음', 키 없음 → 줄 없음", "NX4 KOR 핫스팟".equals(row(r, "무선 카플레이 Wi-Fi"))
-            && "없음".equals(row(Report.parse(GOOD.replace("ap_mode=ours", "ap_mode=none")), "무선 카플레이 Wi-Fi"))
-            && row(Report.parse(GOOD.replace("ap_mode=ours\n", "")), "무선 카플레이 Wi-Fi") == null);
+        check("무선 연결용 Wi-Fi 칸: 켜짐, 일반 핫스팟, 요청 없음, 켰다가 꺼짐, 못 켬(다시 시도), 꺼짐",
+            "켜짐".equals(row(r, "무선 연결용 Wi-Fi (HMG-API)"))
+            && "켜짐 (일반 핫스팟)".equals(row(Report.parse(GOOD.replace("ap_mode=projection", "ap_mode=hotspot")), "무선 연결용 Wi-Fi (HMG-API)"))
+            && "켜짐 (unknown)".equals(row(Report.parse(GOOD.replace("ap_mode=projection", "ap_mode=unknown")), "무선 연결용 Wi-Fi (HMG-API)"))
+            && "꺼짐 (HMG-API에 요청 없음)".equals(row(Report.parse(GOOD.replace("ap=yes", "ap=no").replace("proj=yes", "proj=no")), "무선 연결용 Wi-Fi (HMG-API)"))
+            && "꺼짐 (이번 부팅에 켰다가 꺼짐)".equals(row(Report.parse(GOOD.replace("ap=yes", "ap=no")), "무선 연결용 Wi-Fi (HMG-API)"))
+            && "꺼짐 (켜지 못함, 다시 시도 중)".equals(row(Report.parse(GOOD.replace("ap=yes", "ap=no").replace("ap_boot=yes", "ap_boot=no").replace("ap_fail=no", "ap_fail=yes")), "무선 연결용 Wi-Fi (HMG-API)"))
+            && "꺼짐".equals(row(Report.parse(GOOD.replace("ap=yes", "ap=no").replace("ap_boot=yes", "ap_boot=no")), "무선 연결용 Wi-Fi (HMG-API)")));
+        check("Wi-Fi 칩 칸: 보임·안 보임, 다른 패키지의 Wi-Fi가 있는 차만 한 줄", "보임".equals(row(r, "Wi-Fi 칩"))
+            && "안 보임".equals(row(Report.parse(GOOD.replace("chip=yes", "chip=no")), "Wi-Fi 칩")) && row(r, "다른 패키지의 Wi-Fi") == null
+            && "있음 (지워야 함)".equals(row(Report.parse(GOOD.replace("other_ap=no", "other_ap=yes")), "다른 패키지의 Wi-Fi")));
+        String STOCK = GOOD.replace("ap=yes\nap_mode=projection", "ap=no\nap_mode=none").replace("chip=yes", "chip=no").replace("wlan0=yes", "wlan0=no")
+            .replace("ap_boot=yes", "ap_boot=no").replace("ap_fail=no", "ap_fail=yes").replace("verdict=ready", "verdict=nowifipart");
 
         // --- busybox를 실행하지 못한 내비: status.sh가 짧은 상태 파일만 쓴다 ---
         String NB = "support=nobb\nproduct=NX4.KOR.0000.V039.001.260902\nplatform=tcc803x\npkgver=2.0.0\nmade=11-19 03:00\n";
@@ -223,7 +239,7 @@ public class ReportTest {
             && !Report.diagLate(1700000010L, 1700000015L) && !Report.diagLate(1700000016L, 0L));
 
         // --- [지금 재부팅] ---
-        check("재부팅 요청 파일 내용은 '요청 id(부팅 뒤 밀리초) boot_id 부팅 뒤 초' 한 줄뿐(hotspot.sh req_peek과 같은 꼴)",
+        check("재부팅 요청 파일 내용은 '요청 id(부팅 뒤 밀리초) boot_id 부팅 뒤 초' 한 줄뿐(svc/lib.sh req_peek과 같은 꼴)",
             "123456789 boot-A 123456\n".equals(Report.rbLine(123456789L, " boot-A\n")));
         long[] rq = Report.rbParse("123456789 boot-A 123456\n", "boot-A\n");
         check("  요청 파일 읽기: 이번 부팅만, 다른 부팅·깨진 값·두 칸이면 null", rq != null && rq[0] == 123456789L && rq[1] == 123456789L
@@ -289,7 +305,7 @@ public class ReportTest {
         }
         check("Report의 문구 상수에 옛 이름·없어진 기능 낱말이 없음" + (bad == null ? "" : ": " + bad), bad == null);
         String[] samples = { GOOD, V3, NB, STOCK, "", GOOD.replace("verdict_msg=무선 카플레이·안드로이드 오토 준비됨.", "verdict_msg="),
-            GOOD.replace("oldmod=no", "oldmod=yes").replace("hooks=on", "hooks=off") };
+            GOOD.replace("wm=yes", "wm=no").replace("hooks=on", "hooks=off"), GOOD.replace("other_ap=no", "other_ap=yes") };
         String badOut = null;
         for (String s : samples) {
             Report x = Report.parse(s);

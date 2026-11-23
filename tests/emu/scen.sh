@@ -1,8 +1,9 @@
 #!/bin/sh
 # 에뮬레이터에 NX4 KOR 상태 화면용 가짜 상태 파일을 넣는다(시나리오 하나). adb root가 되어 있어야 한다.
 #   sh tests/emu/scen.sh <시나리오>
-#   시나리오: ready | connected | installing | reboot | mapfail | oldmod | nocar | nobb | hint
-# 차에서는 bin/status.sh(상태), svc/hotspot.sh(진행·알림·힌트)가 쓰는 파일이다. 방법은 docs/emulator-test.md.
+#   시나리오: ready | connected | installing | reboot | failed | nowireless | nowifipart | nocar | nobb | hint
+# 차에서는 bin/status.sh(상태), USB 설치기(진행·알림)가 쓰는 파일이다. 힌트는 2.0.x 서비스가 쓰던 것(2.1.0에는 쓰는 곳 없음, 앱은 그대로 읽음).
+# 방법은 docs/emulator-test.md.
 B=$(cd "$(dirname "$0")/../.." && pwd)
 . "$B/scripts/local-env.sh"
 nx4_env "$B"
@@ -21,70 +22,75 @@ product=NX4.KOR.0000.V039.001.260902
 targetdir=/system/onebin/nx4_kr
 pkgver=2.0.0
 tested=yes
-hmgapi=version 1.1.0-rc.4 build 2026-11-17
-applied=yes
-oldmod=no
-mod_hooks=on
-mod_on=yes
+hmgapi=version 1.1.0-rc.8 build 2026-11-21
+wm=yes
+wm_ver=2.2.0-rc.9
+wm_on=yes
+wm_hooks=on
 bridge=on
 hooks=on
 hookmap=verified
 feat_carplay=yes
 feat_aa=yes
+feat_hotspot=yes
 feat_wifi=yes
+chip=yes
 wlan0=yes
-softap_strings=4
-ssid_len=12
-pass_len=10
-our_ap=yes
-our_dhcp=yes
+proj=yes
+ap_boot=yes
+ap_fail=no
+ap=yes
+ap_mode=projection
 other_ap=no
-stock_ssid=none
-ap_mode=ours
-stock_seen=no
 wpa=no
-nowlan=no
 made=$(date '+%Y-%m-%d %H:%M')
 E
 }
+# 무선 연결용 Wi-Fi(프로젝션 AP)가 꺼진 꼴
+noap() { sed -e 's/^ap=yes/ap=no/' -e 's/^ap_mode=projection/ap_mode=none/'; }
 verdict() { printf 'verdict=%s\nverdict_lv=%s\nverdict_msg=%s\nverdict_end=%s\ns1=%s\ns2=%s\ns3=%s\n' "$@"; }
 prog() { printf 'pct=%s\nstate=%s\nstage=%s\nstart=%s\nt=%s\nboot=%s\nstep=%s\nust=%s\nut=%s\n' "$1" "$2" "$3" $((NOW-120)) $NOW "$BOOT" "$4" $((UP-120)) $UP; }
 : > $D/notice; : > $D/hint
 case $S in
   ready)
-    { base; echo "cp_conn=0"; echo "state=done"; verdict ready 0 "무선 카플레이·안드로이드 오토 준비됨." no "설치: 끝남" "무선 Wi-Fi: 켜짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+    { base; echo "cp_conn=0"; echo "state=done"; verdict ready 0 "무선 카플레이·안드로이드 오토 준비됨." no "설치: 끝남" "무선 Wi-Fi: 켜짐(HMG-API)" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 done "무선 카플레이·안드로이드 오토 준비됨." "" > $D/prog ;;
   connected)
-    { base; echo "cp_conn=1"; echo "state=done"; verdict connected 0 "무선 카플레이 연결됨, 안드로이드 오토 준비됨" no "설치: 끝남" "무선 Wi-Fi: 켜짐" "폰 연결: 카플레이 1대 연결됨"; } > $D/status
+    { base; echo "cp_conn=1"; echo "state=done"; verdict connected 0 "무선 카플레이 연결됨" no "설치: 끝남" "무선 Wi-Fi: 켜짐(HMG-API)" "폰 연결: 카플레이 1대 연결됨"; } > $D/status
     prog 100 done "무선 카플레이·안드로이드 오토 준비됨." "" > $D/prog ;;
   installing)
-    { base | sed -e 's/^applied=yes/applied=no/' -e 's/^our_ap=yes/our_ap=no/' -e 's/^our_dhcp=yes/our_dhcp=no/' -e 's/^ap_mode=ours/ap_mode=none/' -e 's/^hooks=on/hooks=off/' -e 's/^hookmap=verified/hookmap=none/'; echo "cp_conn=0"; echo "state=run"
+    { base | noap | sed -e 's/^hooks=on/hooks=off/' -e 's/^hookmap=verified/hookmap=none/'; echo "cp_conn=0"; echo "state=run"
       verdict installing 1 "설치 중입니다. 끝날 때까지 기다려 주세요." no "설치: 진행 중" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 55 run "map을 확인하는 중입니다" 3/5 > $D/prog ;;
   reboot)
-    { base | sed -e 's/^our_ap=yes/our_ap=no/' -e 's/^our_dhcp=yes/our_dhcp=no/' -e 's/^ap_mode=ours/ap_mode=none/'; echo "cp_conn=0"; echo "state=reboot"
+    { base | noap; echo "cp_conn=0"; echo "state=reboot"
       verdict reboot 1 "내비를 3분 후 재부팅해 주세요." no "설치: 재부팅 필요" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 reboot "무선 카플레이 설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요." "" > $D/prog ;;
-  mapfail)
-    M="이 차의 map을 확인하지 못해 무선 기능을 적용하지 않았습니다. NX4 KOR를 지우고 다시 설치해도 같으면 기록(/data/nx4-kor/logs/ap.log)을 확인해 주세요."
-    { base | sed -e 's/^applied=yes/applied=no/' -e 's/^our_ap=yes/our_ap=no/' -e 's/^our_dhcp=yes/our_dhcp=no/' -e 's/^ap_mode=ours/ap_mode=none/' -e 's/^hooks=on/hooks=off/' -e 's/^hookmap=verified/hookmap=mismatch/'; echo "cp_conn=0"; echo "state=fail"
-      verdict mapfail 2 "$M" no "설치: 안 됨(오른쪽 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+  failed)
+    M="이 차의 map을 확인하지 못했습니다. USB의 NX4/install.log를 확인해 주세요."
+    { base | noap | sed -e 's/^hooks=on/hooks=off/' -e 's/^hookmap=verified/hookmap=mismatch/'; echo "cp_conn=0"; echo "state=fail"
+      verdict failed 2 "$M" no "설치: 안 됨(오른쪽 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 fail "$M" "" > $D/prog ;;
-  oldmod)
-    M="따로 설치된 무선 모드(wireless-carplay-aa)가 있어 무선 기능을 적용하지 않았습니다. HMG-API 앱에서 그 모드를 지우고 변경 사항을 적용한 뒤 내비를 재부팅해 주세요."
-    { base | sed -e 's/^applied=yes/applied=no/' -e 's/^oldmod=no/oldmod=yes/' -e 's/^our_ap=yes/our_ap=no/' -e 's/^our_dhcp=yes/our_dhcp=no/' -e 's/^ap_mode=ours/ap_mode=none/'; echo "cp_conn=0"; echo "state=fail"
-      verdict oldmod 2 "$M" no "설치: 안 됨(오른쪽 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
-    prog 100 fail "$M" "" > $D/prog ;;
+  nowireless)
+    M="공식 무선 모드(Wireless CarPlay + Android Auto)가 설치되어 있지 않습니다. NX4 KOR USB 설치기로 다시 설치해 주세요."
+    { base | noap | sed -e 's/^wm=yes/wm=no/' -e 's/^wm_ver=.*/wm_ver=/' -e 's/^wm_on=yes/wm_on=no/' -e 's/^wm_hooks=on/wm_hooks=/'; echo "cp_conn=0"; echo "state=done"
+      verdict nowireless 2 "$M" no "설치: 안 됨(오른쪽 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+    prog 100 done "설치를 마쳤습니다." "" > $D/prog ;;
+  nowifipart)
+    M="이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 무선 카플레이·안드로이드 오토를 쓸 수 없습니다. 유선 연결과 계기판 길안내는 그대로 쓸 수 있습니다."
+    { base | noap | sed -e 's/^chip=yes/chip=no/' -e 's/^wlan0=yes/wlan0=no/' -e 's/^ap_boot=yes/ap_boot=no/' -e 's/^ap_fail=no/ap_fail=yes/'; echo "cp_conn=0"; echo "state=done"
+      verdict nowifipart 1 "$M" no "설치: 끝남" "무선 Wi-Fi: 부품 없음(USB 동글 필요)" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+    prog 100 done "설치를 마쳤습니다." "" > $D/prog ;;
   nocar)
     M="지원하지 않는 차입니다(투싼 NX4 한국 내수 260902 전용). 아무것도 바꾸지 않았습니다."
-    { base | sed -e 's/^product=.*/product=DEPEHEV.KOR.0000.V039.001.260902/' -e 's/^tested=yes/tested=no/' -e 's/^applied=yes/applied=no/' -e 's/^our_ap=yes/our_ap=no/' -e 's/^our_dhcp=yes/our_dhcp=no/' -e 's/^ap_mode=ours/ap_mode=none/'; echo "cp_conn=0"; echo "state=fail"
+    { base | noap | sed -e 's/^product=.*/product=DEPEHEV.KOR.0000.V039.001.260902/' -e 's/^tested=yes/tested=no/'; echo "cp_conn=0"; echo "state=fail"
       verdict nocar 2 "$M" yes "설치: 안 됨(오른쪽 안내를 보세요)" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 fail "$M" "" > $D/prog ;;
   nobb)
     printf 'support=nobb\nproduct=NX4.KOR.0000.V039.001.260902\nplatform=tcc803x\npkgver=2.0.0\nmade=%s\n' "$(date '+%m-%d %H:%M')" > $D/status
     : > $D/prog ;;
   hint)
-    { base; echo "cp_conn=0"; echo "state=done"; verdict ready 0 "무선 카플레이·안드로이드 오토 준비됨." no "설치: 끝남" "무선 Wi-Fi: 켜짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+    { base; echo "cp_conn=0"; echo "state=done"; verdict ready 0 "무선 카플레이·안드로이드 오토 준비됨." no "설치: 끝남" "무선 Wi-Fi: 켜짐(HMG-API)" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 done "무선 카플레이·안드로이드 오토 준비됨." "" > $D/prog
     printf 'boot=%s\niph=wifi\niph_t=%s\naa=cpwait\naa_t=%s\n' "$BOOT" $NOW $NOW > $D/hint
     printf '%s %s %s\n' $NOW "$BOOT" "무선 카플레이 설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요." > $D/notice ;;
