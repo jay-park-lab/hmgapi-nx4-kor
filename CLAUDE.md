@@ -36,7 +36,7 @@
   - 파일을 고치는 일을 시작할 때 메인 체크아웃에서 브랜치를 바꾸지 않습니다.
   - `git fetch origin`, `git worktree add --no-track -b feature/<주제> .claude/worktrees/<주제> origin/develop` 순서로 워크트리를 만듭니다. 그다음 `EnterWorktree`의 `path`로 들어가 그 안에서 고칩니다. `EnterWorktree`의 `name`으로 만들지 않습니다(`main`에서 규칙에 맞지 않는 브랜치를 만듦).
   - **새 작업 브랜치(와 그 워크트리)는 늘 `origin/develop`에서 시작합니다**(`feature/`·`release/` 모두, [`docs/git-flow.md`](docs/git-flow.md) 규칙 12).
-    - 새 작업의 예외는 배포한 `main`을 고치는 `hotfix/`(`origin/main`)뿐입니다.
+    - 새 작업의 예외는 배포한 `main`을 고치는 `hotfix/`(`origin/main`)뿐입니다. `main`의 README 안내만 넣는 `hotfix/main-readme`도 `origin/main`에서 시작합니다(판 번호·태그 없이 `main`에만 합침, 규칙 13).
     - 이미 있는 브랜치를 이어서 고칠 때(열린 PR의 리뷰 반영 등)는 새 작업이 아니므로 그 브랜치에서 워크트리를 엽니다(아래 줄).
     - `release/<판>`에서 시작하는 `feature/`는 만들지 않습니다. 고침은 develop에 합치고, 그 고침이 든 묶음이 필요하면 develop에서 `release/`를 다음 판으로 다시 자릅니다.
   - 메인 체크아웃은 `develop`에 두고 고치지 않습니다. 읽기만 하는 일은 메인 체크아웃에서 해도 됩니다.

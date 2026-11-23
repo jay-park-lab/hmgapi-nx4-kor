@@ -134,7 +134,8 @@ gh secret list --env production
   - 그래서 1.1.0 전에 쓰던 시험판이 지워지면 아래 "HMG-API가 릴리스를 지우면"대로 그때 가장 새 시험판으로 옮깁니다. 지금까지 HMG-API가 지운 것은 시험판(rc.4, rc.5)뿐이고, 정식판 1.0.2는 남아 있습니다.
 - **HMG-API가 릴리스를 지우면:** HMG-API는 새 시험판을 내면서 예전 시험판 릴리스를 지웁니다. 2026-11-20에 rc.4 릴리스가 지워져, `v2.0.0-beta.2` 실행이 "HMG-API USB 묶음" step의 다운로드(404)에서 멈췄습니다. 키를 꺼내기 전이라 키는 쓰이지 않았고, 릴리스도 만들지 않았습니다.
   - 고치려면 그때 있는 판으로 `HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`을 함께 옮깁니다. 바꿀 곳 목록은 [#14](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/14)에 있습니다.
-  - 그 소스로 `tests/mod-test.sh`를 통과시킨 뒤 다음 번호의 태그를 답니다. 같은 태그는 다시 쓸 수 없습니다. 태그 push로 도는 워크플로는 그 태그 커밋의 `release.yml`을 쓰기 때문입니다.
+  - 이 고침도 `develop`에서 시작한 `feature/`로 `develop`에 합칩니다(`git-flow.md` 규칙 12). 그 소스로 `tests/mod-test.sh`를 통과시킨 뒤, `develop`에서 `release/`를 다음 판으로 다시 잘라 `v<다음 판>-beta.1`을 답니다. 지난 `release/`에는 고쳐 넣지 않습니다.
+  - 같은 태그는 다시 쓸 수 없습니다. 태그 push로 도는 워크플로는 그 태그 커밋의 `release.yml`을 쓰기 때문입니다.
   - 받을 수 있는지는 태그를 달기 전에 `curl -sSI -o /dev/null -w '%{http_code}\n' <HMGAPI_USB_URL>`로 봅니다. 200이나 302면 됩니다.
   - 정식판 직전에 지워지면 차에서 확인하지 않은 판으로 옮겨야 합니다. 그래도 사본은 두지 않기로 했습니다(위 "어느 HMG-API 판을 쓰나").
 
