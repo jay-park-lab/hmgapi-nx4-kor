@@ -44,7 +44,7 @@
   - 이미 있는 브랜치(열린 PR의 리뷰 반영 등)를 고칠 때도 메인 체크아웃에서 `git switch` 하지 않고 그 브랜치의 워크트리에서 고칩니다. 없으면 만듭니다. 그 워크트리가 내가 만들었거나 지금 쓰던 것이 아니면 다른 세션이 쓰고 있을 수 있으니 들어가기 전에 사용자에게 묻습니다(`docs/git-flow.md` "워크트리").
   - 데스크톱 앱이 처음부터 워크트리로 연 세션이면 그 안에서 `git fetch origin`, `git switch --no-track -c feature/<주제> origin/develop` 순서로 작업 브랜치를 만듭니다. 앱은 워크트리를 GitHub 기본 브랜치(`main`)에서 만들지만, 작업은 이렇게 `origin/develop`에서 시작합니다.
 - `main`·`develop`에 직접 커밋·푸시하지 않습니다. PR의 `--base`는 `feature/` → `develop`, `release/`·`hotfix/` → `main`과 `develop`입니다.
-- 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는 `release/`·`hotfix/`에서만 바꿉니다. 베타는 판에도 꼬리를 붙이고(`2.0.3-beta.2`, 태그 `v2.0.3-beta.2`), 정식으로 낼 때 떼어 냅니다. `versionCode`는 묶음마다 1 올립니다.
+- 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는 `release/`·`hotfix/`에서만 바꿉니다. 베타는 판에도 꼬리를 붙이고(`2.0.4-beta.2`, 태그 `v2.0.4-beta.2`, 2.0.4-beta.1부터), 정식으로 낼 때 떼어 냅니다. `versionCode`는 묶음마다 1 올립니다.
 - 커밋·푸시·PR·태그는 사용자가 시킬 때만 합니다.
 - 로컬 `develop`·`main`·`release/*`를 `git fetch origin <브랜치>:<브랜치>`로 옮기지 않습니다(다른 트리에 열린 브랜치면 그 트리가 어긋남). 메인 체크아웃의 `develop`은 메인 체크아웃에서 `git pull --ff-only`로 맞춥니다.
 

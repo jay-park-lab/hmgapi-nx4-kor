@@ -236,6 +236,10 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
    - 쌓인 PR 이면 base PR 이 먼저 합쳐졌는지 본다. 안 됐으면 base PR 부터 이 6 단계를 진행한다.
    - `docs/git-flow.md` 규칙 8 의 합치기 전 확인을 채웠는지 본다. `release/`·`hotfix/` 는 빌드·HMG-API 엔진
      시험까지 통과해야 하고, `docs/design.md` "차에서 확인할 것" 중 해당 항목의 확인 여부를 함께 적는다.
+   - `release/`·`hotfix/` 를 `main` 에 합치는 PR 이면 head 의 판이 정식(`<판>`, 꼬리 없음)인지 본다
+     (`git show <head SHA>:mod/mod.json`, `git show <head SHA>:app/AndroidManifest.xml` 의 `versionName`). 베타 판
+     (`<판>-beta.<n>`)이면 합치지 말고 알린다. 꼬리를 떼고 `versionCode` 를 올린 커밋이 먼저다(규칙 4). 베타 판으로 합치면
+     정식 태그 `v<판>` 의 release 워크플로가 판이 다르다고 멈춘다.
 2. `AskUserQuestion` — "PR #<번호> 를 merge commit 으로 합칠까요?" 선택지는 **합치기 (권장)** / **아직**.
    미룬 지적이 있거나, 엔진 시험을 건너뛰었거나, 차에서 확인하지 않았으면 질문에 그 사실을 함께 적는다.
    합치기 선택지 설명에 "합친 뒤 7 단계대로 워크트리에서 나와(`ExitWorktree`) 워크트리와 브랜치를 지웁니다" 를 적는다.
@@ -255,8 +259,6 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
      리뷰어는 띄우지 않고, 충돌이 있으면 3 처럼 푼다. 합치기는 위와 같이 `--merge`.
    - `hotfix/` 는 진행 중인 `release/` 에 합치지 않는다(`docs/git-flow.md` 규칙 12). 그 `release/` 에 고침이 필요하면
      `develop` 에 합친 뒤 `release/<판>` 에 `origin/develop` 을 합치고 판을 다음 베타(`<판>-beta.<n+1>`)로 올린다(규칙 4).
-   - `release/` 를 `main` 에 합치기 전에 판이 정식(`<판>`, 꼬리 없음)인지 본다. 베타 판(`<판>-beta.<n>`)이면 합치지 말고
-     알린다(정식 태그 `v<판>` 의 release 워크플로가 판이 다르다고 멈춘다).
    - 태그를 올리면 release 워크플로가 `production` 승인을 기다린 뒤 배포 묶음을 만들어 GitHub 릴리스에 올린다
      ([`docs/release.md`](../../../docs/release.md)). 승인은 사용자가 Actions 화면에서 한다. 대신 승인하거나
      승인 여부를 짐작해 말하지 않는다.

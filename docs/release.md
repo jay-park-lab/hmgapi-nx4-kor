@@ -6,7 +6,7 @@
 
 1. 태그를 올립니다(`git-flow.md`의 릴리스·핫픽스 흐름). `-beta.<n>` 태그는 시험판(prerelease)이 됩니다.
 2. `check` job(배포 키 없음, 승인 전)이 돕니다. 하나라도 실패하면 승인을 묻지 않고 끝납니다.
-   - 태그의 판(`v`를 뗀 것)이 `mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`과 같은지 봅니다. 베타는 `-beta.<n>`까지 같아야 합니다(`v2.0.3-beta.2` ↔ `2.0.3-beta.2`, `git-flow.md` 규칙 4). 2.0.3-beta.1까지는 꼬리를 빼고 비교했습니다.
+   - 태그의 판(`v`를 뗀 것)이 `mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`과 같은지 봅니다. 베타는 `-beta.<n>`까지 같아야 합니다(`v2.0.4-beta.2` ↔ `2.0.4-beta.2`, `git-flow.md` 규칙 4). 숫자에 앞자리 0이 있는 태그(`v2.0.4-beta.02`)는 받지 않습니다. 2.0.3-beta.1까지는 꼬리를 빼고 비교했습니다.
    - 정식 태그의 커밋이 `main`에 있는지, 베타 태그의 커밋이 `release/` 브랜치나 `main`에 있는지 봅니다.
    - 같은 태그의 릴리스가 이미 있는지 봅니다(아래 "같은 태그로 다시 만들지 않습니다").
    - JDK 21(Temurin), HMG-API `v1.1.0-rc.7`(커밋 `5732e26`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
@@ -36,7 +36,7 @@ PC에서 `.env.local`의 키로 `sh scripts/build.sh`를 돌려 만드는 길도
 
 묶음은 같은 커밋·같은 키로 만들어도 매번 다릅니다. HMG-API의 서명(ECDSA)이 만들 때마다 달라 모드 zip이 바뀌고, 그것을 담은 USB 묶음도 바뀝니다. 그래서 같은 태그로 다시 만들면, 이미 받은 사람의 파일이나 릴리스 글의 SHA-256과 맞지 않게 됩니다.
 
-- 릴리스가 이미 있으면 `check`와 `publish`가 멈춥니다. 고쳐야 하면 `develop`에서 고친 뒤 `release/<판>`에 `develop`을 합치고 판을 다음 베타로 올려 `v<판>-beta.<n+1>`을 답니다(`git-flow.md` 규칙 4·12. 예: `v2.0.3-beta.1` 다음이 `v2.0.3-beta.2`). 정식이면 `hotfix/`의 다음 판입니다.
+- 릴리스가 이미 있으면 `check`와 `publish`가 멈춥니다. 고쳐야 하면 `develop`에서 고친 뒤 `release/<판>`에 `develop`을 합치고 판을 다음 베타로 올려 `v<판>-beta.<n+1>`을 답니다(`git-flow.md` 규칙 4·12. 예: `v2.0.4-beta.1` 다음이 `v2.0.4-beta.2`). 정식이면 `hotfix/`의 다음 판입니다.
 - 올리다 실패해 파일이 빠진 릴리스가 남았으면, 그 릴리스를 GitHub에서 지운 뒤(태그는 두고) 실패한 실행을 다시 돌립니다.
 
 ## 키와 값
