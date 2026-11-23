@@ -586,6 +586,32 @@ printf 'version 1.1.0-rc.4\n' > $T/sinst
 sreset; stsh FAKE_PROD=DEPEHEV.KOR.0000.V039.001.260902
 check "status.sh: NX4가 아니면 verdict=nocar, verdict_end=yes" '[ "$(sv verdict)" = nocar ] && [ "$(sv verdict_end)" = yes ] && [ "$(sv tested)" = no ]'
 check "status.sh: 상태 파일과 한 줄 요약에 NEMESIS·Korea Projection·제보 문구 없음" '! grep -qE "NEMESIS|Korea Projection|제보|QR" $T/status.txt $T/st.out'
+# 무선 기능이 적용된 뒤 wlan0이 세 부팅 안 생긴 차(이번 부팅 nowlan 기록 있음). 칩 실패(nowlanfail)는 근거가 있을 때만.
+# 핫스팟 기능을 먼저 켠 차는 켜기 전(2.0.2 때, 기능 꺼짐)의 근거(wifi.modver=3, nochip-wifi.txt)를 치우고 켠 뒤의 기록으로만 판정
+nlreset() {
+  sreset; : > $T/iap2; rm -f $T/wifiseen; mkdir -p $T/sw
+  echo feature:com.hkmc.software.connectivity.carplay_wireless > $T/features
+  cat $T/bootid > $T/sw/nowlan; echo "3 x" > $T/sbk/nowlan.boots
+  printf '# wlan0 없음 기록\n판정 근거: 순정 module_version=%s (3이면 …)\n## 커널 (Wi-Fi 드라이버, 마지막 60줄)\n' "$1" > $T/sw/nowlan-wifi.txt
+}
+hfrun() { (env PATH=$P0 HOTSPOT_LIB=1 BB=$T/bin/bb APP=$TP W=$T/sw BK=$T/sbk HMGDATA=$SH PROG=$T/sprog BOOT_ID=$T/bootid UPTIME=$T/uptime \
+  WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio sh -c ". $TP/svc/hotspot.sh; hotspot_first; echo rc=\$?") > $T/hf.out 2>&1; }
+nlreset 없음; stsh
+check "status.sh: 적용 뒤 wlan0이 세 부팅 안 생기고 칩 실패 근거가 없으면 verdict=nowlanrepeat(끝이 아님)" \
+  '[ "$(sv verdict)" = nowlanrepeat ] && [ "$(sv verdict_end)" = no ]' || cat $T/st.out $T/status.txt
+nlreset 없음; echo 3 > $T/sbk/wifi.modver; echo "[ 9.1] dhd: failed to power up DHD" > $T/sbk/nochip-wifi.txt; cp $T/sbk/nochip-wifi.txt $T/sw/nochip-wifi.txt; stsh
+check "  핫스팟 기능이 꺼진 채 모은 옛 근거(wifi.modver=3, nochip-wifi.txt)가 남아 있으면 nowlanfail(리뷰 5가 짚은 판정)" \
+  '[ "$(sv verdict)" = nowlanfail ]' || cat $T/st.out
+hfrun; stsh
+check "  hotspot_first가 옛 근거를 치우면(nochip-wifi.pre-hotspot.txt로 이름만 바꿈, wifi.modver 지움) nowlanrepeat" \
+  'grep -qx rc=0 $T/hf.out && [ "$(sv verdict)" = nowlanrepeat ] && [ ! -f $T/sbk/wifi.modver ] && [ ! -f $T/sbk/nochip-wifi.txt ] && [ ! -f $T/sw/nochip-wifi.txt ] \
+   && grep -q "failed to power up DHD" $T/sbk/nochip-wifi.pre-hotspot.txt && grep -q "failed to power up DHD" $T/sw/nochip-wifi.pre-hotspot.txt && grep -q "판정에 쓰지 않음" $T/hf.out' || cat $T/hf.out $T/st.out
+nlreset 3; stsh
+check "  켠 뒤의 기록(이번 부팅 nowlan-wifi.txt)에 순정 module_version=3이면 nowlanfail, verdict_end=yes" \
+  '[ "$(sv verdict)" = nowlanfail ] && [ "$(sv verdict_end)" = yes ]' || cat $T/st.out
+nlreset 31; stsh
+check "  module_version 줄은 3 그대로일 때만 근거(31 등은 아님)" '[ "$(sv verdict)" = nowlanrepeat ]' || cat $T/st.out
+rm -f $T/features $T/iap2; : > $T/wifiseen
 
 # status.sh --watch: 상태 화면의 [지금 재부팅] 요청(앱 개인 폴더의 reboot.req)을 받는 감시자
 RW=$T/rw; rm -rf $RW; mkdir -p $RW/w $RW/bk $RW/proc

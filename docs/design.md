@@ -43,10 +43,15 @@ NX4 KOR는 투싼 NX4(가솔린 `NX4`, 하이브리드 `NX4HEV`, 한국 내비 2
        - Korea Projection 이슈 [#125](https://github.com/StopDragon/korea-projection/issues/125)를 보면, 같은 판(NX4HEV V039 260902, tcc803x)에서 무선이 되는 차도 순정 핫스팟 기능이 꺼져 있었습니다. 그 차는 Wi-Fi를 켜자 칩이 바로 보였습니다.
        - 같은 판에서 "부품 없음"인 차(2021년 7월 NX4HEV, 투싼 가솔린 여럿, #126)도 있습니다. 원본은 생산 시기·사양 차이로 보고, 1.8.0에서 USB Wi-Fi 동글을 시험 중입니다.
      - 적용하면 `$BK/wifi.hotspot`을 남기고 "Wi-Fi 칩 전원을 켜려고 순정 핫스팟 기능을 켰습니다. 내비를 3분 후 재부팅해 주세요"를 보입니다. 기능이 꺼진 채 지난 판이 남긴 부품 없음 기록(`wifi.nopart`)은 근거가 모자라 지웁니다.
+     - 같은 때 모은 칩 근거도 켠 뒤의 판정에 쓰지 않습니다(`pre_hotspot_evidence`, PR #42 리뷰 5).
+       - 순정 Wi-Fi 기록 `nochip-wifi.txt`(`$BK`와 `$W`)는 `nochip-wifi.pre-hotspot.txt`로 이름만 바꿔 진단용으로 남깁니다. `$W` 사본은 USB 진단 기록의 `logs/`에 들어갑니다.
+       - 순정 `module_version` 기록(`$BK/wifi.modver`)은 지웁니다.
+       - 그대로 두면 켠 뒤에 무슨 일이 있었든 세 번째 부팅 판정이 이 옛 근거로 `nowlanfail`이 됩니다.
      - 재부팅 뒤에는 부팅마다 `ap.log`에 "순정 핫스팟 기능을 켜 본 차: 지금 기능 켜짐|꺼짐, Wi-Fi 칩 보임|안보임"을 남깁니다. 칩이 보이면 핫스팟이 그대로 켜지고, 안 보이면 핫스팟 쪽의 Wi-Fi 장치 판정(`nowlan` 등)으로 갑니다.
      - **켜 본 뒤에도 칩이 없으면** 무선 기능은 적용된 채 남습니다. 예전에는 칩이 없는 차에 적용하지 않았으므로, 이 갈래에서 처음 생기는 상태입니다(PR #42 리뷰 2).
        - 적용돼 설정이 끝난 차(`setup_done`)가 되므로, 서비스가 부팅마다 핫스팟을 띄우려고 Wi-Fi를 한 번 켭니다(`take_wlan0`의 `svc wifi enable`). Wi-Fi를 켜면 USB·블루투스가 다시 시작돼 유선 카플레이가 잠깐 끊길 수 있습니다. 칩 깨우기(`wake_wifi`)는 이것을 몇 번으로 막아 두었지만, 여기서는 지울 때까지 부팅마다 합니다.
-       - 상태 화면은 wlan0이 안 생기는 부팅을 셉니다. 두 부팅 동안은 "Wi-Fi를 켜는 중입니다… (확인 n/3)"(`wifioff`)이고, 세 번째 부팅부터 칩 실패 근거(커널의 `failed to power up DHD`, 순정 `module_version=3`)가 있으면 "이 차는 Wi-Fi 칩이 켜지지 않아…"(`nowlanfail`, 지우는 법)로 끝납니다. 그래서 최종 판정까지 재부팅을 세 번 합니다.
+       - 상태 화면은 wlan0이 안 생기는 부팅을 셉니다. 두 부팅 동안은 "Wi-Fi를 켜는 중입니다… (확인 n/3)"(`wifioff`)이고, 세 번째 부팅부터 칩 실패 근거(커널의 `failed to power up DHD`, 순정 `module_version=3`)가 있으면 "이 차는 Wi-Fi 칩이 켜지지 않아…"(`nowlanfail`, 지우는 법)로 끝납니다. 근거가 없으면 "Wi-Fi 장치가 계속 켜지지 않습니다"(`nowlanrepeat`)에 머뭅니다. 그래서 최종 판정까지 재부팅을 세 번 합니다.
+       - 이 근거는 켠 뒤의 기록에서 나옵니다. 부팅마다 wlan0이 없으면 `wlan_fail`이 순정 Wi-Fi 기록을 `$W/nowlan-wifi.txt`에 남기고, 그 안의 "판정 근거: 순정 module_version=…" 줄과 커널 줄을 `chip_fail_evidence`가 봅니다. 시험 결과도 이 파일(진단 기록 `logs/nowlan-wifi.txt`)로 봅니다.
        - 무선 iAP2 속성(`persist.sys.iap2.wifi=t`, `persist.iap2.iden.wireless=t`)과 무선 기능 파일이 Wi-Fi 없는 차에 켜진 채 남습니다. 유선 카플레이에 영향이 있는지는 차에서만 알 수 있습니다.
        - 그때는 USB `NX4/UNINSTALL`로 지웁니다. 부팅마다 Wi-Fi를 켜는 것을 코드로 줄일지는 차 결과를 보고 정합니다.
      - `"wifi": {"hotspot": true}`는 이 갈래만이 아니라 모드를 적용하는 모든 NX4에서 순정 핫스팟 기능을 켭니다. 칩이 있는 차에서는 순정 핫스팟 메뉴가 생기거나 순정이 AP를 띄울 수 있고, 그때 우리 핫스팟은 비켜 줍니다(`ap_yield`).

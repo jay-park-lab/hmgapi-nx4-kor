@@ -59,12 +59,15 @@ STOCK_GRACE=${STOCK_GRACE:-90}
 # 순정 무선 카플레이가 있는 트림(순정이 카플레이 AP를 띄움)은 순정 AP를 쓴다(stock_ap_mode).
 CARS='NX4.KOR.*.260902 NX4HEV.KOR.*.260902'
 # Wi-Fi 칩 실패의 근거가 남아 있는가. 순정 Wi-Fi 기록(nowlan·nochip 기록, $BK 사본)에
-# 커널 칩 실패 줄(si_attach failed, SDIO -84, failed to power up DHD)이 있거나 순정 module_version 기록이 3이면 0.
+# 커널 칩 실패 줄(si_attach failed, SDIO -84, failed to power up DHD)이 있거나 순정 module_version이 3이면 0.
+# module_version은 $BK 기록(wifi.modver, 칩 깨우기 때 남김)과 nowlan·nochip 기록의 "판정 근거" 줄(wifi_record)로 본다.
+# 핫스팟 기능을 먼저 켠 차는 켜기 전의 근거를 치우므로(pre_hotspot_evidence) 켠 뒤의 기록만 남는다.
 # "-84"(EILSEQ)는 Wi-Fi와 상관없는 mmc(eMMC·SD) 줄에도, 신호 세기(rssi -84)에도 나온다.
 # 오류 꼴(ERR=-84, error -84, err -84)이고 Wi-Fi 줄(dhd·bcmdhd·sdio·wlan·bcm)일 때만 근거로 본다.
 # 펌웨어를 칩에 올리지 못함(dhd_bus_start: failed to download firmware)도 칩 실패 근거다.
 chip_fail_evidence() {
   [ "$(cat $BK/wifi.modver 2>/dev/null)" = 3 ] && return 0
+  $BB grep -q '^판정 근거: 순정 module_version=3 ' $NOWLAN_LOG $NOCHIP_LOG 2>/dev/null && return 0
   $BB grep -q -E 'si_attach failed|failed to power up DHD|failed to download firmware' $NOWLAN_LOG $NOCHIP_LOG $BK/nochip-wifi.txt 2>/dev/null && return 0
   $BB cat $NOWLAN_LOG $NOCHIP_LOG $BK/nochip-wifi.txt 2>/dev/null | $BB grep -i -E '(err|error)[ =:]*-84' | $BB grep -q -i -E 'dhd|sdio|wlan|bcm'
 }
@@ -1917,7 +1920,8 @@ feature:$HOTSPOT_FEAT
 }
 # 핫스팟 기능을 먼저 켜 볼 차인가: 칩이 안 보이고, 순정 핫스팟 기능이 꺼져 있고, 아직 켜 본 적이 없다($BK/wifi.hotspot 없음).
 # 그런 차는 칩 깨우기·부품 없음 판정보다 이 모드의 적용(핫스팟 기능을 켬)을 먼저 하고, 칩은 재부팅 뒤에 본다.
-# 기능이 꺼진 채 지난 판이 남긴 부품 없음 기록(wifi.nopart)은 근거가 모자라므로 지운다(근거 기록 nochip-wifi.txt는 둔다)
+# 기능이 꺼진 채 지난 판이 남긴 부품 없음 기록(wifi.nopart)은 근거가 모자라므로 지운다. 같은 때 모은 칩 근거도
+# 켠 뒤의 판정에 쓰지 않는다(pre_hotspot_evidence)
 hotspot_first() {
   wifi_chip_seen && return 1
   [ -f $BK/wifi.hotspot ] && return 1
@@ -1926,6 +1930,19 @@ hotspot_first() {
     rm -f $BK/wifi.nopart
     log "부품 없음 기록을 지움: 순정 핫스팟 기능이 꺼진 채 판정한 것(기능을 켜고 재부팅한 뒤 다시 봄)"
   fi
+  pre_hotspot_evidence
+  return 0
+}
+# 핫스팟 기능이 꺼진 채 모은 칩 근거(순정 module_version 기록 wifi.modver, 순정 Wi-Fi 기록 nochip-wifi.txt)를 치운다.
+# 그대로 두면 켠 뒤 wlan0이 세 부팅 안 생길 때 상태 화면 판정(status.sh chip_fail_evidence)이 이 옛 근거로 "칩 실패"가 된다.
+# 기록은 이름을 바꿔(nochip-wifi.pre-hotspot.txt) 진단용으로만 남기고($W 사본은 진단 기록 logs/에 들어감), module_version 기록은 지운다.
+# 켠 뒤의 판정은 그 뒤에 남는 기록(wlan_fail의 nowlan-wifi.txt, 그 안의 module_version 줄)으로 한다
+pre_hotspot_evidence() {
+  [ -f $BK/wifi.modver ] || [ -f $BK/nochip-wifi.txt ] || [ -f $NOCHIP_LOG ] || return 0
+  [ -f $BK/nochip-wifi.txt ] && $BB mv -f $BK/nochip-wifi.txt $BK/nochip-wifi.pre-hotspot.txt
+  [ -f $NOCHIP_LOG ] && $BB mv -f $NOCHIP_LOG ${NOCHIP_LOG%.txt}.pre-hotspot.txt
+  rm -f $BK/wifi.modver
+  log "핫스팟 기능을 켜기 전의 Wi-Fi 칩 근거는 판정에 쓰지 않음(기록은 nochip-wifi.pre-hotspot.txt로 남김, module_version 기록은 지움)"
   return 0
 }
 # 부품 없음 판정이 굳은 것인가: 기록이 있고, 핫스팟 기능을 켜 본 뒤(wifi.hotspot)이거나 기능이 이미 켜져 있던 차.
