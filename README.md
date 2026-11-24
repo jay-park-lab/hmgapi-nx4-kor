@@ -156,7 +156,7 @@ NX4 KOR에는 설정이 없습니다. 무선 기능의 설정은 HMG-API 앱의 
 **공식 무선 모드도 지우려면** `UNINSTALL` 대신 `UNINSTALL-ALL`을 만듭니다. NX4 KOR를 지운 뒤 공식 무선 모드도 HMG-API에서 지우고, 계획이 되돌리기뿐이면 적용합니다. 공식 무선 모드만 남은 차에서도 됩니다. HMG-API와 map은 남깁니다.
 
 주의할 점:
-- **HMG-API 앱에서 모드만 지우거나 HMG-API를 먼저 지운 경우:** 2.1.0 이후는 상태 화면 앱·서비스가 HMG-API와 함께 내려갑니다. HMG-API 앱에서 모드만 지우면 기록 파일만 남고(`engine remove`가 모드 폴더를 지움), HMG-API를 먼저 지우면 모드 폴더와 기록 파일이 남습니다. 2.0.x는 Wi-Fi 설정 파일 잠금·순정 핫스팟 저장값·권한 파일이 그대로 남습니다(HMG-API 삭제는 HMG-API를 통해 바꾼 것만 되돌림). 어느 쪽이든 USB `UNINSTALL`을 하면 됩니다. HMG-API가 없어도 남은 모드 폴더나 USB의 사본으로 되돌리고, 남은 모드 폴더와 상태 화면 앱도 지웁니다.
+- **HMG-API 앱에서 모드만 지우거나 HMG-API를 먼저 지운 경우:** 2.1.0 이후는 상태 화면 앱·서비스가 HMG-API와 함께 내려갑니다. HMG-API 앱에서 모드만 지우면 기록 파일만 남습니다(`engine remove`가 모드 폴더를 지움). HMG-API를 먼저 지우면 일반 삭제(`HMGAPI/UNINSTALL`)는 모드 폴더, 꺼 둔 상태 화면 앱, 기록 파일을 남기고, `HMGAPI/UNINSTALL-PURGE`는 기록 파일만 남깁니다. 2.0.x는 Wi-Fi 설정 파일 잠금·순정 핫스팟 저장값·권한 파일이 그대로 남습니다(HMG-API 삭제는 HMG-API를 통해 바꾼 것만 되돌림). 어느 쪽이든 USB `UNINSTALL`을 하면 됩니다. HMG-API가 없어도 남은 모드 폴더나 USB의 사본으로 되돌리고, 남은 모드 폴더와 상태 화면 앱도 지웁니다.
   - 2.0.x를 HMG-API 앱에서 지운 차(모드 폴더 없이 `/data/nx4-kor/backup`만 남음)나 2.0.x 위에 2.1.0 이후를 넣은 차(2.1.0을 지운 뒤 `backup`이 남음)는 USB의 `NX4/legacy-2.0`(2.0.x의 되돌리기 스크립트)으로 되돌립니다. 그 폴더가 없는 USB면 설치기가 기록을 지우지 않고 멈추거나 남겼다고 알리니, 2.0.x 릴리스 USB(`v2.0.4-beta.1`)의 `NX4/UNINSTALL`을 씁니다.
 - 둘 다 지울 때는 **NX4 KOR를 먼저, HMG-API를 나중에** 지우세요.
 - HMG-API 일반 삭제(`HMGAPI/UNINSTALL`)는 모드 파일·설정을 남기고 모드 앱을 꺼 두기만 합니다. 모두 지우려면 `HMGAPI/UNINSTALL-PURGE`를 씁니다.
