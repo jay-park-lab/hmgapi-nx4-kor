@@ -500,7 +500,9 @@ echo "wpa_passphrase=SECRETPW" > $R/data/misc/wifi/softap.conf; echo SECRETPW > 
 mkdir -p $R/system/etc/permissions $R/system/onebin/nx4hev_kr; : > $R/system/etc/permissions/com.hkmc.software.wifi.module.xml
 echo "-/system/etc/permissions/com.hkmc.software.wifihotspot.xml" > $R/system/onebin/nx4hev_kr/featurexml.cfg
 echo "feature:com.hkmc.software.wifi.module" > $T/features
-rm -rf $K/diag
+# 이 회는 진단 기록만 본다. backup이 있어 설치기가 2.0.x 되돌리기 길을 타지 않게 legacy-2.0을 치워(가드에서 아무것도 바꾸지 않고 멈춤)
+# 진단 기록에 백업 폴더가 들어가지 않는지만 본다(PR #52 리뷰 10). 끝나면 backup을 지운다
+rm -rf $K/diag; legoff
 ts $U
 check "USB 설치기 진단 기록: 순정 기능(pm list features), /system/etc/permissions 목록, onebin마다 featurexml.cfg 사본" \
   'grep -qx "feature:com.hkmc.software.wifi.module" $(dg)/features.txt && grep -q "com.hkmc.software.wifi.module.xml" $(dg)/permissions-ls.txt && grep -q "wifihotspot.xml" $(dg)/featurexml-nx4hev_kr.cfg' || ls $(dg)
@@ -510,7 +512,8 @@ check "USB 설치기 진단 기록: NX4/diag/<시각>/에 /system/lib 아래 모
   '[ "$(ls $K/diag | wc -l)" -eq 1 ] && grep -q "^$CORE5  .*/system/lib/libCarPlayCore.so$" $(dg)/system-lib-md5.txt && grep -q "^$CORE5  .*/system/lib/liblink.so$" $(dg)/system-lib-md5.txt && grep -q "  .*/system/lib/hw/gralloc.so$" $(dg)/system-lib-md5.txt && [ "$(wc -l < $(dg)/system-lib-md5.txt)" -eq 3 ] && grep -q "liblink.so -> libCarPlayCore.so" $(dg)/system-lib-ls.txt' || cat $(dg)/system-lib-md5.txt
 check "USB 설치기 진단 기록: info.txt(판·공식 무선 모드 판·getprop·내비 busybox 유무·wifi_ap_on), HMG-API 상태·Car Report 복사, 이 모드와 HMG-API 기록" \
   'grep -qx "installed_mod: $V" $(dg)/info.txt && grep -qx "usb_mod: $V" $(dg)/info.txt && grep -qx "installed_wireless: $WV" $(dg)/info.txt && grep -qx "usb_wireless: $WV" $(dg)/info.txt && grep -q "^ro.build.product: NX4.KOR" $(dg)/info.txt && grep -qx "system_busybox: yes" $(dg)/info.txt && grep -qx "md5_busybox: $R/system/bin/busybox" $(dg)/info.txt && grep -qx "wifi_ap_on: 1" $(dg)/info.txt && grep -qx "hmgapid engine status" $T/calls && [ -f $(dg)/hmgapi-status.txt ] && grep -q "^saved: " $(dg)/car-report.txt && [ -f $(dg)/car-report-test.json ] && [ -f $(dg)/car-report-test.md ] && grep -qx aplog $(dg)/logs/ap.log && grep -qx svclog $(dg)/logs/service/ap.log && grep -qx hmgapi-install $(dg)/logs/hmgapi-install.log && grep -qx mapcar $(dg)/logs/map-car.txt && grep -qx status $(dg)/logs/nx4-kor-status.txt && grep -q "진단 기록을 모음: NX4/diag/" $K/install.log' || cat $(dg)/info.txt
-check "USB 설치기 진단 기록: 비밀번호가 든 파일(softap.conf, 백업 폴더)은 넣지 않음" '! grep -rq SECRETPW $K/diag'
+check "USB 설치기 진단 기록: 비밀번호가 든 파일(softap.conf, 백업 폴더)은 넣지 않음(이 회는 설치기가 아무것도 바꾸지 않음)" '! grep -rq SECRETPW $K/diag && ! engcalls'
+legon; rm -rf $R/data/nx4-kor/backup
 # md5를 셀 busybox: 내비에 없으면 설치된 모드의 것, 그것도 없으면 스틱의 것을 /data로 복사해 쓰고 지움. 모두 없으면 그렇다고 적음
 rm $R/system/bin/busybox; cp $T/bin/bb $HD/mods/nx4-kor/bin/busybox
 ts $U
@@ -723,7 +726,15 @@ printf '#!/bin/sh\necho "new-uninstall NX4_APP=$NX4_APP $*" >> %s/stublog\nrm -r
 mkdir -p $R/data/nx4-kor/backup $R/data/nx4-kor/logs; rm -f $T/stublog; pset plan-oldgone
 ts $U
 check "USB 설치기: UNINSTALL에서 2.1.0의 uninstall.sh가 2.0.x 기록(backup)을 남기면 스틱의 legacy-2.0으로 마저 되돌림(되돌리기 줄 적용)" \
-  '[ "$(cat $T/ts.rc)" = 0 ] && [ "$(grep -n "^new-uninstall" $T/stublog | cut -d: -f1)" -lt "$(grep -n "^legacy-uninstall NX4_APP=$R/data/local/tmp/nx4-kor-usb/old " $T/stublog | cut -d: -f1)" ] && grep -qx "hmgapid engine apply" $T/calls && [ ! -d $R/data/nx4-kor ] && [ ! -d $HD/mods/nx4-kor ] && grep -q "지웠습니다" $T/ts.out' || { cat $T/ts.out; cat $T/stublog; }
+  '[ "$(cat $T/ts.rc)" = 0 ] && [ "$(grep -n "^new-uninstall" $T/stublog | cut -d: -f1)" -lt "$(grep -n "^legacy-uninstall NX4_APP=$R/data/local/tmp/nx4-kor-usb/old " $T/stublog | cut -d: -f1)" ] && grep -qx "hmgapid engine apply" $T/calls && [ ! -d $R/data/nx4-kor ] && [ ! -d $HD/mods/nx4-kor ] && grep -q "지웠습니다" $T/ts.out && ! grep -q "되돌리지 못해 남겼습니다" $T/ts.out' || { cat $T/ts.out; cat $T/stublog; }
+# 같은 차인데 스틱에 legacy-2.0이 없으면: nx4-kor는 지우고 2.0.x 기록은 남겼다고 화면(토스트)에도 알린다(#50 리뷰 9)
+cp -R $F $HD/mods/nx4-kor; modset $HD/mods/nx4-kor/mod.json conflicts=-
+printf '#!/bin/sh\necho "new-uninstall NX4_APP=$NX4_APP $*" >> %s/stublog\nrm -rf $HMGDATA/mods/nx4-kor\nfor f in $NX4_ROOT/*; do [ "$f" = "$NX4_ROOT/backup" ] || rm -rf "$f"; done\nexit 0\n' $T > $HD/mods/nx4-kor/bin/uninstall.sh
+mkdir -p $R/data/nx4-kor/backup $R/data/nx4-kor/logs; rm -f $T/stublog; legoff
+ts $U
+check "  같은 차인데 스틱에 legacy-2.0이 없으면 nx4-kor는 지우고, 남긴 2.0.x 기록(backup)을 토스트로 알림(2.0.x USB로 안내)" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^new-uninstall" $T/stublog && ! grep -q "^legacy-uninstall" $T/stublog && [ -d $R/data/nx4-kor/backup ] && grep -q "NX4 KOR 모드를 지웠습니다. 재부팅합니다. 옛 NX4 KOR 2.0.x의 기록(/data/nx4-kor/backup)은 이 USB로 되돌리지 못해 남겼습니다" $T/ts.out' || { cat $T/ts.out; cat $T/stublog; }
+legon; rm -rf $R/data/nx4-kor
 # 모드는 HMG-API 앱에서 먼저 지웠고 기록만 남은 경우: 2.0.x 기록이면 멈춤, 2.1.0 이후의 기록이면 스틱의 사본(/data로 복사)으로 정리
 mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog; legoff
 ts $U

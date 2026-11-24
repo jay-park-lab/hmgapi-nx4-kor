@@ -51,7 +51,8 @@ HMG-API 1.1.0-rc.8 이상이 필요합니다.
   HMG-API, 공식 무선 모드, 이 차의 map은 남깁니다.
   공식 무선 모드도 지우려면 UNINSTALL 대신 UNINSTALL-ALL을 만듭니다(HMG-API와 map은 남김).
   HMG-API 앱에서 모드를 먼저 지웠거나 HMG-API를 먼저 지웠더라도 이렇게 하면 됩니다.
-  옛 NX4 KOR 2.0.x를 HMG-API 앱에서 먼저 지운 차는 2.0.x가 남긴 설정(Wi-Fi 잠금 등)을 NX4/legacy-2.0으로 되돌립니다.
+  옛 NX4 KOR 2.0.x를 HMG-API 앱에서 먼저 지운 차나 2.0.x 위에 2.1.0을 넣은 차는 2.0.x가 남긴 설정(Wi-Fi 잠금 등)을
+  NX4/legacy-2.0으로 되돌립니다.
   둘 다 지울 때는 NX4 KOR를 먼저, HMG-API를 나중에 지우는 것을 권합니다.
 
 같은 판을 다시 설치: NX4 폴더에 빈 파일 REINSTALL을 만듭니다(NX4 KOR와 같은 판의 공식 무선 모드를 다시 설치).

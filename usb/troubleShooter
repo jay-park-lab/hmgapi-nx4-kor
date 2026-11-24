@@ -9,10 +9,12 @@
 #   NX4/install/payload/                같은 모드를 푼 것(판 확인, 모드가 이미 지워졌을 때의 되돌리기)
 #   NX4/wireless/wireless-carplay-aa.zip  공식 무선 모드(공식 릴리스 그대로, scripts/fetch-wireless.sh)
 #   NX4/wireless/mod.json               그 zip의 mod.json(판·HMG-API 최소 판을 zip을 풀지 않고 읽는다)
-#   NX4/legacy-2.0/                     옛 2.0.x의 되돌리기 스크립트(태그 v2.0.4-beta.1에서 그대로, scripts/build.sh). 2.0.x를
-#                                       HMG-API 앱에서 지워 기록(/data/nx4-kor/backup)만 남은 차를 되돌린다(old_revert)
+#   NX4/legacy-2.0/                     옛 2.0.x의 되돌리기 스크립트(태그 v2.0.4-beta.1에서 그대로, scripts/build.sh). 2.0.x의
+#                                       기록(/data/nx4-kor/backup)이 남은 차를 되돌린다(old_revert): 2.0.x를 HMG-API 앱에서 지운 차,
+#                                       2.0.x 위에 2.1.0 이후를 adb·HMG-API 앱으로 넣은 차(2.1.0의 uninstall.sh는 이 기록을 남긴다)
 #   NX4/UNINSTALL                       있으면 nx4-kor를 지운다(되돌리고 재부팅). HMG-API·공식 무선 모드·map은 남긴다.
-#                                       모드 폴더 없이 2.0.x의 기록만 남았으면 NX4/legacy-2.0으로 되돌린다(없으면 멈추고 2.0.x USB로 안내)
+#                                       2.0.x의 기록이 남으면(모드 폴더 없이, 또는 2.1.0을 지운 뒤) NX4/legacy-2.0으로 되돌린다.
+#                                       legacy-2.0이 없는 스틱이면 기록을 남기고 2.0.x USB로 안내한다
 #   NX4/UNINSTALL-ALL                   UNINSTALL과 같고, 공식 무선 모드도 지우고 적용한다(HMG-API·map은 남김)
 #   NX4/REINSTALL                       있으면 같은 판도 다시 설치한다(nx4-kor, 공식 무선 모드)
 #   NX4/hmgapi/troubleShooter           HMG-API USB 묶음을 같은 스틱에 함께 풀어 둔 경우의 HMG-API 설치기.
@@ -635,10 +637,13 @@ if [ -f $K/UNINSTALL ] || [ -f $K/UNINSTALL-ALL ]; then
     fi
   fi
   rm -rf $STAGE
+  # 2.1.0의 uninstall.sh가 남긴 2.0.x 기록을 이 스틱(legacy-2.0 없음)으로 되돌리지 못했으면 화면에도 알린다
+  KEPT=
+  [ $rc = 0 ] && [ -d $NX4_ROOT/backup ] && KEPT=" 옛 NX4 KOR 2.0.x의 기록(/data/nx4-kor/backup)은 이 USB로 되돌리지 못해 남겼습니다. 2.0.x 릴리스 USB(v2.0.4-beta.1)의 NX4/UNINSTALL로 되돌려 주세요."
   if [ $rc = 0 ]; then
-    if [ -n "$WDEL" ] && [ -z "$SRC" ]; then toast "공식 무선 모드를 지웠습니다(NX4 KOR는 없었습니다). 재부팅합니다."
-    elif [ -n "$WDEL" ]; then toast "NX4 KOR와 공식 무선 모드를 지웠습니다. 재부팅합니다."
-    else toast "NX4 KOR 모드를 지웠습니다. 재부팅합니다."; fi
+    if [ -n "$WDEL" ] && [ -z "$SRC" ]; then toast "공식 무선 모드를 지웠습니다(NX4 KOR는 없었습니다). 재부팅합니다.$KEPT"
+    elif [ -n "$WDEL" ]; then toast "NX4 KOR와 공식 무선 모드를 지웠습니다. 재부팅합니다.$KEPT"
+    else toast "NX4 KOR 모드를 지웠습니다. 재부팅합니다.$KEPT"; fi
   else toast "NX4 KOR 지우기 실패: ${MSG:-USB의 NX4/install.log를 보세요.}"; fi
   finish $rc reboot
 fi
