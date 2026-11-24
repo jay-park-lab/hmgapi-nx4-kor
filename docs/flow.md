@@ -47,7 +47,7 @@ flowchart LR
 
 ### 시작 전 확인
 
-이 그림의 멈춤은 모두 아무것도 바꾸지 않고, 진행 기록도 쓰지 않습니다. 차례는 설치기(`usb/troubleShooter`)가 도는 차례입니다. 스틱 확인이 HMG-API 확인보다 먼저입니다.
+이 그림의 멈춤은 모두 아무것도 바꾸지 않고, 진행 기록도 쓰지 않습니다. 차례는 설치기(`usb/troubleShooter`)가 도는 차례입니다(스틱 확인, Korea Projection 패키지 확인, HMG-API 확인 순). Korea Projection 패키지는 HMG-API 설치기로 넘기기(HMG-API를 설치·업데이트하고 재부팅) 전에 봅니다.
 
 ```mermaid
 flowchart TD
@@ -56,7 +56,9 @@ flowchart TD
   UN -->|"예"| DEL["아래 5절 지우기로"]
   UN -->|"아니요"| S0{"0. 스틱 확인<br/>묶음(install·wireless)이 있고<br/>nx4-kor가 2.1.0 꼴?"}
   S0 -->|"아니요<br/>(묶음 없음, 2.0.x 꼴)"| STOP0["멈춤: 2.1.0 이후의<br/>USB 묶음을 써 주세요"]
-  S0 -->|"예"| H{"HMG-API가 있나?"}
+  S0 -->|"예"| KPKG{"NEMESIS의 Korea Projection 패키지<br/>(/data/nemesis/apps/korea.projection)가 있나?"}
+  KPKG -->|"예"| STOPK["멈춤: NEMESIS에서 Korea Projection을 지우고<br/>내비를 재부팅한 뒤 다시(KORPROJ_MSG)"]
+  KPKG -->|"아니요"| H{"HMG-API가 있나?"}
   H -->|"없음 +<br/>스틱에 HMG-API 묶음 있음"| HU["스틱의 HMG-API 설치기로 넘김<br/>→ 재부팅 → Update OTA 한 번 더"]
   H -->|"없음 +<br/>스틱에도 없음"| STOP1["멈춤: HMG-API를 먼저<br/>설치하거나 올려 주세요"]
   H -->|"있지만<br/>응답 없음"| STOP2["멈춤: 재부팅하고 다시"]
@@ -74,6 +76,7 @@ flowchart TD
   P1 -->|"괜찮음"| GO(["아래 바꾸는 단계로"])
 ```
 
+- Korea Projection 패키지 확인은 그 패키지 폴더만 봅니다. 다른 NEMESIS 패키지는 막지 않고, 지우기(5절)도 막지 않습니다([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). 이 멈춤은 같은 판의 상태 화면 열기보다 앞이라 상태 화면을 열지 않습니다.
 - HMG-API의 판을 읽지 못하거나 비교할 수 없으면 기록만 하고 지나갑니다. 엔진이 설치할 때 다시 봅니다.
 - 설치된 nx4-kor가 2.0.x 자체면 아래 2단계에서 그 판의 것으로 되돌립니다. 그래서 `legacy-2.0` 멈춤(`OLDLEFT_MSG`)에 걸리지 않습니다.
 - "같은 판"은 `NX4/REINSTALL`이 없고 2.0.x 기록도 없을 때입니다.
