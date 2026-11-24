@@ -12,7 +12,7 @@
 | 무선 카플레이·AA 훅, 계기판·HUD 길안내 | 공식 무선 모드. 한국 맞춤(`tbt_fit`, `aa_name_hold`, `star_popup_skip`, 한국어 UTF-8 AA 레시피)이 필요하면 공식 모드에 기여 | 한국 포크 2.4.5를 이 모드에 합쳐 씀(2.1.0에서 뺌, 아래 "2.1.0 모드 구성") |
 | 프로젝션 AP, 순정 핫스팟 기능 | HMG-API(`"wifi": {"projection": true}`) | `svc/hotspot.sh`가 순정 `hostapd`·`dnsmasq`로 직접 띄움 |
 | HMG-API 설치·업데이트, 공식 모드 설치, NX4 map, 진단, 되돌리기(옛 NX4 KOR 2.0.x 정리 포함, 2.0.x는 `conflicts: ["wireless-carplay-aa"]`라 공식 모드와 함께 설 수 없음) | 이 저장소의 USB 설치기 | 설치기와 `setup_hmgapi` |
-| 설치 진행·판정 화면 | 이 저장소의 상태 화면 앱(지금 UI 유지, 지우기 버튼 [#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)). 판정은 새 구조에 맞춤 | 같은 앱 |
+| 설치 진행·판정 화면 | 이 저장소의 상태 화면 앱(지금 UI 유지, 지우기 버튼은 두지 않음 [#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)). 판정은 새 구조에 맞춤 | 같은 앱 |
 | USB Wi-Fi 동글 | 이 저장소(나중에) | 없음 |
 
 - 공식 모드가 `replace`하는 훅 지점은 이 저장소의 추가 모드가 다시 걸 수 없습니다. 같은 지점을 `replace`하는 모드 둘은 함께 켜지지 않습니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)).
@@ -160,7 +160,9 @@
   - 2.1.0 이후의 `uninstall.sh`는 2.0.x의 기록(`/data/nx4-kor/backup`)을 되돌리지 못해 그 폴더만 남깁니다(2.0.x 위에 adb·HMG-API 앱으로 2.1.0을 넣은 차, PR #50). 그러면 설치기가 스틱의 `NX4/legacy-2.0`으로 마저 되돌립니다.
   - 모드 폴더 없이 2.0.x의 기록(`/data/nx4-kor/backup`)만 남았으면 스틱의 `NX4/legacy-2.0`으로 되돌립니다(위 2와 같음). HMG-API도 없으면 계획·적용 없이 그 사본의 `uninstall.sh`만 돌립니다. `legacy-2.0`이 없는 스틱이면 지우지 않고 멈춥니다.
 - `NX4/UNINSTALL-ALL`: 위와 같고, 그 뒤 공식 무선 모드도 `engine remove`하고 계획이 되돌리기뿐이면 적용합니다. 공식 무선 모드만 남은 차에서도 됩니다(그때 결과 문구는 "공식 무선 모드를 지웠습니다"). 계획에 다른 변경이 있으면 적용하지 않고 "HMG-API 앱에서 변경 사항을 적용해 주세요(무선 모드 삭제)"로 알립니다. HMG-API와 map은 남깁니다(2026-11-23 사용자 결정).
-- 상태 화면의 지우기 버튼([#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44))은 아직 없습니다.
+- 상태 화면에는 지우기 버튼을 두지 않습니다(2026-11-24 사용자 결정, [#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)).
+  - 2.1.0의 nx4-kor는 시스템 파일·Wi-Fi 설정을 바꾸지 않습니다. 그래서 HMG-API 앱에서 지워도 HMG-API가 앱·서비스·타일을 내리고, 기록 파일(`/data/nx4-kor`, `/data/local/tmp/nx4-kor*`)만 남습니다. 남은 기록은 `NX4/UNINSTALL`로 지웁니다.
+  - 그래서 앱이 자기 자신을 지우는 흐름(감시자가 지우기 스크립트를 임시 폴더로 옮겨 돌림)은 만들지 않습니다.
 - 기록: 스틱의 `NX4/install.log`에 이어 씁니다. 시작할 때 스틱의 앞 기록을 내비 쪽 기록(`/data/local/tmp/nx4-kor-usb.log`)으로 옮겨 두고, 끝날 때 그 전체를 스틱에 씁니다. 그래서 여러 번 눌러도 앞의 시도가 남고(빈 줄로 나뉨), 한 번 누른 기록은 한 번만 들어갑니다. 비우려면 스틱에서 그 파일을 지웁니다.
 - 진단 기록(`diag`): 공식 무선 모드를 이 차에서 시험하기 전에 알아 둘 것([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38))을 adb 없이 가져오려고 둡니다.
   - **먼저 화면에서 묻습니다**(`ask_diag`). Car Report가 map 만들기와 같은 분석(MapProbe)을 돌려 1~2분 걸리기 때문입니다(PR #41 리뷰 1).

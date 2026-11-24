@@ -15,7 +15,7 @@
 | 무선 카플레이·안드로이드 오토 훅, 계기판·HUD 길안내 | 공식 무선 모드. 한국 계기판 맞춤이 필요하면 공식 모드에 기여합니다(같은 훅 지점을 `replace`하는 모드 둘은 함께 켜지지 않음, [#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)) |
 | 핫스팟(프로젝션 AP), 순정 핫스팟 기능 | HMG-API(공식 모드가 `"wifi": {"projection": true}`로 요청) |
 | HMG-API 설치·업데이트, 공식 모드 설치, NX4 map 만들기·확인, 진단, 되돌리기(옛 NX4 KOR 2.0.x 정리 포함. 2.0.x는 공식 모드와 함께 설 수 없음, `conflicts`) | 이 저장소의 USB 설치기 |
-| 설치 진행·판정 화면 | 이 저장소의 상태 화면 앱. 지금 UI를 그대로 두고, 지우기 버튼을 더합니다([#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)) |
+| 설치 진행·판정 화면 | 이 저장소의 상태 화면 앱. 지금 UI를 그대로 둡니다(지우기 버튼은 두지 않음, [#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)) |
 | USB Wi-Fi 동글 | 이 저장소(나중에). Wi-Fi 부품이 없는 차를 위한 길 |
 
 - 뺀 것: 한국 포크 무선 모드 2.4.5(`hooks.jar`·레시피·`libleafiaaac.so`·`patches.json`·`settings.json`과 저장소의 `wireless/`), 순정 칩용 핫스팟 서비스(서비스 `ap`, `svc/hotspot.sh`의 핫스팟·칩 깨우기·Wi-Fi 잠금·자동 설정). `nx4-kor` 모드에는 상태 화면 앱과 그 서비스만 남았습니다(아래 "무엇을 하나").
@@ -160,7 +160,7 @@ NX4 KOR에는 설정이 없습니다. 무선 기능의 설정은 HMG-API 앱의 
   - 2.0.x를 HMG-API 앱에서 지운 차(모드 폴더 없이 `/data/nx4-kor/backup`만 남음)나 2.0.x 위에 2.1.0 이후를 넣은 차(2.1.0을 지운 뒤 `backup`이 남음)는 USB의 `NX4/legacy-2.0`(2.0.x의 되돌리기 스크립트)으로 되돌립니다. 그 폴더가 없는 USB면 설치기가 기록을 지우지 않고 멈추거나 남겼다고 알리니, 2.0.x 릴리스 USB(`v2.0.4-beta.1`)의 `NX4/UNINSTALL`을 씁니다.
 - 둘 다 지울 때는 **NX4 KOR를 먼저, HMG-API를 나중에** 지우세요.
 - HMG-API 일반 삭제(`HMGAPI/UNINSTALL`)는 모드 파일·설정을 남기고 모드 앱을 꺼 두기만 합니다. 모두 지우려면 `HMGAPI/UNINSTALL-PURGE`를 씁니다.
-- 상태 화면의 지우기 버튼([#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44))은 아직 없습니다.
+- 상태 화면에는 지우기 버튼을 두지 않습니다([#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)). 2.1.0 이후는 HMG-API 앱에서 모드를 지워도 기록 파일(`/data/nx4-kor`, `/data/local/tmp/nx4-kor*`)만 남고, 그것도 USB `UNINSTALL`로 지울 수 있기 때문입니다.
 - 삭제할 때 Wi-Fi를 껐다 켜지 않습니다. 껐다 켜면 Wi-Fi·블루투스 모듈이 다시 시작되어 블루투스 카플레이가 재부팅 전까지 되지 않습니다(원본에서 니로로 확인). 재부팅하면 일반 Wi-Fi가 원래대로 돌아옵니다.
 
 ## 만들기와 시험
