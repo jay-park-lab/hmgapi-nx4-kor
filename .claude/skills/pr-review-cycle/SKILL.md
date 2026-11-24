@@ -257,7 +257,9 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
      `gh pr merge` 는 `--admin` 을 붙이라며 멈춘다.
    - 그때는 **2 에서 사용자가 합치기를 고른 경우에만** `gh pr merge <PR> --merge --admin` 으로 합친다(사용자 예외로 넘김,
      PR #56 2026-11-24). `--admin` 이어도 merge commit 이고, `--squash`·`--rebase` 는 여전히 쓰지 않는다.
-   - `BLOCKED` 의 까닭이 승인이 아니면(충돌은 3, 그 밖은 사용자에게 알림) `--admin` 으로 넘기지 않는다.
+   - `--admin` 을 쓰는 것은 `gh pr view <PR> --json mergeable,mergeStateStatus,reviewDecision` 이 `MERGEABLE`·`BLOCKED`·
+     `REVIEW_REQUIRED` 이고 막는 것이 승인뿐일 때만이다. 그 밖의 까닭이면 `--admin` 으로 넘기지 않는다(충돌은 `CONFLICTING`·`DIRTY` 로
+     나오고 `--admin` 으로도 넘지 못하므로 3 으로 푼다. 그 밖은 사용자에게 알린다).
    - `develop` ruleset 의 승인 수를 0 으로 바꾸면 `--admin` 은 필요 없다.
 5. `gh pr view <PR> --json state,mergeCommit` 로 합쳐졌는지 확인한다.
 6. **`release/`·`hotfix/` 만** (`hotfix/main-readme` 는 빼고: 규칙 13대로 태그·`develop` 되돌려 합치기 없이 바로 7 단계로)

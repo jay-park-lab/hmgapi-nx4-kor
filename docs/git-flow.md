@@ -33,7 +33,7 @@
 5. **PR은 merge commit으로 합칩니다.** squash와 rebase 합치기는 쓰지 않습니다. 작업 브랜치 단위의 이력이 `main`·`develop`에 그대로 남아야 합니다.
    - 명령은 `gh pr merge <PR> --merge`입니다. `develop` ruleset이 승인 1을 요구해(아래 "강제 장치"), `develop`으로 가는 PR은 `gh pr view <PR> --json mergeStateStatus,reviewDecision`이 `BLOCKED`, `REVIEW_REQUIRED`입니다. 혼자 쓰는 저장소라 자기 PR은 승인할 수 없습니다.
    - 그때는 **사용자가 합치기를 고른 경우에만** `gh pr merge <PR> --merge --admin`으로 사용자 예외를 써서 합칩니다(GitHub 화면에서는 bypass 체크). PR #56을 이렇게 합쳤습니다(2026-11-24). `--admin`을 붙여도 merge commit이고, squash·rebase는 여전히 쓰지 않습니다.
-   - `BLOCKED`의 까닭이 승인이 아니면(충돌 등) `--admin`으로 넘기지 않고 그 까닭부터 풉니다.
+   - `--admin`은 `gh pr view <PR> --json mergeable,mergeStateStatus,reviewDecision`이 `MERGEABLE`·`BLOCKED`·`REVIEW_REQUIRED`이고 막는 것이 승인뿐일 때만 씁니다. 그 밖의 까닭이면 넘기지 않고 그 까닭부터 풉니다(충돌은 `CONFLICTING`·`DIRTY`로 나오고 `--admin`으로도 넘지 못함).
    - `develop` ruleset의 승인 수를 0으로 바꾸면 `--admin`은 필요 없습니다.
 6. **태그**
    - `release/`·`hotfix/`를 `main`에 합치면, 그 merge commit에 주석 태그 `v<판>`을 답니다(예: `v2.1.0`).
