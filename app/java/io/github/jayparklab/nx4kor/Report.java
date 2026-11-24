@@ -310,8 +310,7 @@ final class Report {
      * 2분을 버티지 못한 시작이 재부팅을 넘어 6번 이어지면 다음 시작의 훅을 끈다. status.sh take_rbreq).
      * 시간이 지나면 풀리므로 이어진 거절 세기(rbStuckCode)에 넣지 않는다
      */
-    static final String RB_GUARD = "내비가 켜지고 2분이 지나기 전에 재부팅되거나 꺼지는 일이 6번 이어지면 HMG-API가 무선 기능을 끕니다. "
-        + "지금 그 횟수에 가까우니 내비가 켜지고 3~5분 뒤에 다시 눌러 주세요.";
+    static final String RB_GUARD = "켜지고 2분 안의 재부팅이 6번 이어지면 HMG-API가 무선 기능을 끕니다. 3~5분 뒤에 다시 눌러 주세요.";
 
     /**
      * 같은 이유(설치 중·바깥 /system 작업)로 이어진 거절이 처음 거절부터 이만큼(초) 지나도 계속되면 RESET 안내로 넘긴다.

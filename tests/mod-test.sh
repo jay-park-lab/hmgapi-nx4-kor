@@ -958,7 +958,7 @@ HK=$T/shook
 gset() { rm -f $HK/starts $HK/boot; [ -n "$1" ] && printf %s "$1" > $HK/starts; [ -n "$2" ] && echo "$2" > $HK/boot; return 0; }
 zl() { printf '%s\n' "$@" > $T/sdmesg; }
 ZL="hmgapid, exec /system/bin/app_process.hmgapi-stock"
-GMSG1="HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). 내비를 재부팅하고 3분 넘게 켜 두세요."
+GMSG1="HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). 내비를 재부팅하고 3분 넘게 켜 두세요. 또 생기면 마지막으로 넣거나 바꾼 모드를 HMG-API 앱에서 꺼 주세요."
 GMSG2="HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다. HMG-API를 지우지 말고 HMG-API USB로 다시 설치(업데이트)한 뒤 재부팅하고, 3분 넘게 켜 두세요."
 # gv 1|2: 판정이 bootguard이고 그 수준·문구
 gv() { [ "$(sv verdict)" = bootguard ] && [ "$(sv verdict_lv)" = $1 ] && if [ $1 = 1 ]; then [ "$(sv verdict_msg)" = "$GMSG1" ]; else [ "$(sv verdict_msg)" = "$GMSG2" ]; fi; }
@@ -1042,12 +1042,17 @@ rgset 3 "test-boot-id 1"; c0=$(rbn); rbreq 5008 test-boot-id 95; _r3=$(rbn)
 rgset 2 "test-boot-id 1"; rbreq 5009 test-boot-id 95
 check "  rc.4 규칙에서 거절하던 starts=3·2는 받음" '[ "$_r3" = $((c0+1)) ] && [ "$(rbn)" = $((c0+2)) ]'
 rgset 7 "test-boot-id 1"; c0=$(rbn); rbreq 5010 test-boot-id 95
-check "  starts=7(이번 시작이 이미 꺼짐)이면 막지 않음" '[ "$(rbn)" = $((c0+1)) ]'
+check "  starts=7이고 이번 부팅에 센 기록이 있으면(파일로 보아 이번 시작이 이미 꺼짐) 막지 않음" '[ "$(rbn)" = $((c0+1)) ]'
 rgset 6 "test-boot-id 4"; c0=$(rbn); rbreq 5011 test-boot-id 95
 check "  커널 줄이 없어도 파일로 보아 이번 시작이 이미 꺼졌으면(이번 부팅 4번째) starts=6이어도 막지 않음" '[ "$(rbn)" = $((c0+1)) ]'
 rgset 6 "other-boot 2"; c0=$(rbn); rbreq 5012 test-boot-id 95; _rob=$(rbn)
 rgset 6; rbreq 5013 test-boot-id 95
 check "  hook/boot가 다른 부팅 것이거나 없어도 starts=6이면 거절(다음 시작은 starts만 봄)" '[ "$_rob" = $c0 ] && [ "$(rbn)" = $c0 ] && grep -qx "id=5013" $RW/rbres && grep -qx "code=guard" $RW/rbres'
+# 거절의 위쪽 끝(PR #55 리뷰 4): starts 7 이상이면 다음 시작은 거절하든 말든 꺼지므로 막지 않는다. 파일로 보아 이번 시작이 꺼졌다고
+# 볼 수 없는 꼴(hook/boot가 다른 부팅 것·없음, 커널 줄 없음)로 두어, 위쪽 끝만으로 결과가 갈리게 한다
+rgset 7 "other-boot 2"; c0=$(rbn); rbreq 5019 test-boot-id 95; _ro7=$(rbn)
+rgset 7; rbreq 5020 test-boot-id 95
+check "  hook/boot가 다른 부팅 것이거나 없고 starts=7이면 막지 않음(거절은 5·6까지)" '[ "$_ro7" = $((c0+1)) ] && [ "$(rbn)" = $((c0+2)) ] && grep -qx "id=5020" $RW/rbres && grep -qx "code=cmd" $RW/rbres'
 rgset 6 "test-boot-id 1"; : > $RW/hook/disable; c0=$(rbn); rbreq 5014 test-boot-id 95; rm -f $RW/hook/disable; _rdis=$(rbn)
 rm -f $RW/inst; rbreq 5015 test-boot-id 95; printf 'version 1.1.0-rc.8\n' > $RW/inst
 check "  hook/disable이 있거나 HMG-API가 설치돼 있지 않으면 막지 않음" '[ "$_rdis" = $((c0+1)) ] && [ "$(rbn)" = $((c0+2)) ]'
