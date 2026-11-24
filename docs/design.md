@@ -161,7 +161,8 @@
   - 모드 폴더 없이 2.0.x의 기록(`/data/nx4-kor/backup`)만 남았으면 스틱의 `NX4/legacy-2.0`으로 되돌립니다(위 2와 같음). HMG-API도 없으면 계획·적용 없이 그 사본의 `uninstall.sh`만 돌립니다. `legacy-2.0`이 없는 스틱이면 지우지 않고 멈춥니다.
 - `NX4/UNINSTALL-ALL`: 위와 같고, 그 뒤 공식 무선 모드도 `engine remove`하고 계획이 되돌리기뿐이면 적용합니다. 공식 무선 모드만 남은 차에서도 됩니다(그때 결과 문구는 "공식 무선 모드를 지웠습니다"). 계획에 다른 변경이 있으면 적용하지 않고 "HMG-API 앱에서 변경 사항을 적용해 주세요(무선 모드 삭제)"로 알립니다. HMG-API와 map은 남깁니다(2026-11-23 사용자 결정).
 - 상태 화면에는 지우기 버튼을 두지 않습니다(2026-11-24 사용자 결정, [#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)).
-  - 2.1.0의 nx4-kor는 시스템 파일·Wi-Fi 설정을 바꾸지 않습니다. 그래서 HMG-API 앱에서 지워도 HMG-API가 앱·서비스·타일을 내리고, 기록 파일(`/data/nx4-kor`, `/data/local/tmp/nx4-kor*`)만 남습니다. 남은 기록은 `NX4/UNINSTALL`로 지웁니다.
+  - 2.1.0의 nx4-kor는 시스템 파일·Wi-Fi 설정을 바꾸지 않습니다. 그래서 HMG-API 앱에서 지워도 HMG-API가 앱·서비스·타일을 내리고, 기록 파일(`/data/nx4-kor`, `/data/local/tmp/nx4-kor*`)만 남습니다.
+  - 남은 기록은 `NX4/UNINSTALL`로 정리합니다. 설치기 자신의 기록(`nx4-kor-usb.log`, 차에서는 `nx4-kor-ota-finish.sh`도)은 남깁니다. `/data/nx4-kor` 없이 `/data/local/tmp/nx4-kor*`만 남은 차에서는 "설치되어 있지 않습니다"로 끝나고 지우지 않습니다(설치기는 모드 폴더, 2.0.x 기록, `/data/nx4-kor` 중 하나가 있어야 지움). 남은 것은 해가 없는 작은 파일입니다.
   - 그래서 앱이 자기 자신을 지우는 흐름(감시자가 지우기 스크립트를 임시 폴더로 옮겨 돌림)은 만들지 않습니다.
 - 기록: 스틱의 `NX4/install.log`에 이어 씁니다. 시작할 때 스틱의 앞 기록을 내비 쪽 기록(`/data/local/tmp/nx4-kor-usb.log`)으로 옮겨 두고, 끝날 때 그 전체를 스틱에 씁니다. 그래서 여러 번 눌러도 앞의 시도가 남고(빈 줄로 나뉨), 한 번 누른 기록은 한 번만 들어갑니다. 비우려면 스틱에서 그 파일을 지웁니다.
 - 진단 기록(`diag`): 공식 무선 모드를 이 차에서 시험하기 전에 알아 둘 것([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38))을 adb 없이 가져오려고 둡니다.
