@@ -29,7 +29,8 @@ argument-hint: "[PR 번호 | PR URL]"
   - `main`·`develop` 에 직접 커밋·푸시하지 않는다.
   - 판 번호(`mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`·`versionCode`)는
     `release/`·`hotfix/` 에서만 바꾼다. 베타는 판에도 꼬리를 붙이고(`<판>-beta.<n>`), 정식으로 낼 때 뗀다(규칙 4).
-  - 합치기는 merge commit 만(`gh pr merge --merge`). squash·rebase 합치기를 쓰지 않는다.
+  - 합치기는 merge commit 만(`gh pr merge --merge`). squash·rebase 합치기를 쓰지 않는다. `develop` ruleset 승인 1 때문에
+    `BLOCKED`(`REVIEW_REQUIRED`)이면 사용자가 합치기를 고른 경우에만 `--admin` 을 붙인다(6 단계 4, 규칙 5).
   - PR 을 연 뒤에는 강제 푸시하지 않는다. 뒤처지면 rebase 가 아니라 base 를 merge 해서 맞춘다.
 - GitHub 작업(PR 생성·조회·리뷰·답글)은 `gh` 와 `gh api` 로 한다. 저장소는
   `jay-park-lab/hmgapi-nx4-kor` 다. 아래 `<R>` 은 이 값이다(`gh repo view --json nameWithOwner -q .nameWithOwner`).
@@ -231,7 +232,7 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
 ## 6. 머지 여부 확인과 머지
 
 1. **머지 전 확인**
-   - `gh pr view <PR> --json mergeable,mergeStateStatus,headRefOid,baseRefName`
+   - `gh pr view <PR> --json mergeable,mergeStateStatus,reviewDecision,headRefOid,baseRefName`
    - `gh pr checks <PR>` 를 한 번 본다. 검사가 없거나 진행 중이면 5 단계 1 의 로컬 검증 결과를 근거로 알린다.
    - 쌓인 PR 이면 base PR 이 먼저 합쳐졌는지 본다. 안 됐으면 base PR 부터 이 6 단계를 진행한다.
    - `docs/git-flow.md` 규칙 8 의 합치기 전 확인을 채웠는지 본다. `release/`·`hotfix/` 는 빌드·HMG-API 엔진
@@ -251,12 +252,22 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
    - `git fetch origin`
    - `git merge origin/<base>` 로 풀고 커밋·푸시한다. 푼 내용을 PR 코멘트로 남기고 재리뷰한다(5 단계 5).
 4. **합치기** — `gh pr merge <PR> --merge`. `--squash`·`--rebase` 를 쓰지 않는다. 브랜치 삭제는 7 단계에서 한다.
+   - `develop` ruleset 이 승인 1 을 요구해(`docs/git-flow.md` 규칙 5·"강제 장치"), `develop` 으로 가는 PR 은 1 의
+     `mergeStateStatus` 가 `BLOCKED`, `reviewDecision` 이 `REVIEW_REQUIRED` 다(자기 PR 은 승인할 수 없음). 그대로 부르면
+     `gh pr merge` 는 `--admin` 을 붙이라며 멈춘다.
+   - 그때는 **2 에서 사용자가 합치기를 고른 경우에만** `gh pr merge <PR> --merge --admin` 으로 합친다(사용자 예외로 넘김,
+     PR #56 2026-11-24). `--admin` 이어도 merge commit 이고, `--squash`·`--rebase` 는 여전히 쓰지 않는다.
+   - `--admin` 을 쓰는 것은 `gh pr view <PR> --json mergeable,mergeStateStatus,reviewDecision` 이 `MERGEABLE`·`BLOCKED`·
+     `REVIEW_REQUIRED` 이고 막는 것이 승인뿐일 때만이다. 그 밖의 까닭이면 `--admin` 으로 넘기지 않는다(충돌은 `CONFLICTING`·`DIRTY` 로
+     나오고 `--admin` 으로도 넘지 못하므로 3 으로 푼다. 그 밖은 사용자에게 알린다).
+   - `develop` ruleset 의 승인 수를 0 으로 바꾸면 `--admin` 은 필요 없다.
 5. `gh pr view <PR> --json state,mergeCommit` 로 합쳐졌는지 확인한다.
 6. **`release/`·`hotfix/` 만** (`hotfix/main-readme` 는 빼고: 규칙 13대로 태그·`develop` 되돌려 합치기 없이 바로 7 단계로)
    - 태그: `git fetch origin`, `git tag -a v<판> -m "NX4 KOR <판>" <merge commit>`, `git push origin v<판>`.
      로컬 `main` 으로 바꾸거나 옮기지 않는다. 태그는 지우거나 옮기지 않는다.
    - `develop` 으로 되돌려 합치기: `gh pr create --base develop --head <브랜치>`. 내용이 이미 리뷰된 것이라
-     리뷰어는 띄우지 않고, 충돌이 있으면 3 처럼 푼다. 합치기는 위와 같이 `--merge`.
+     리뷰어는 띄우지 않고, 충돌이 있으면 3 처럼 푼다. 합치기는 위 4 와 같이 `--merge` 다. `BLOCKED`(`REVIEW_REQUIRED`)이면
+     2 에서 되돌려 합치기까지 고른 경우에만 `--admin` 을 붙인다.
    - `hotfix/` 는 진행 중인 `release/` 에 합치지 않는다(`docs/git-flow.md` 규칙 12). 그 `release/` 에 고침이 필요하면
      `develop` 에 합친 뒤 `release/<판>` 에 `origin/develop` 을 합치고 판을 다음 베타(`<판>-beta.<n+1>`)로 올린다(규칙 4).
    - 태그를 올리면 release 워크플로가 `production` 승인을 기다린 뒤 배포 묶음을 만들어 GitHub 릴리스에 올린다
