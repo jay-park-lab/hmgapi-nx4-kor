@@ -101,11 +101,12 @@ $ADB install -r mod/app/NX4KOR.apk
 - `adb root`: 시험 파일을 `/data/local/tmp`에 넣고, 앱 폴더의 `reboot.req`를 읽으려면 root가 필요합니다.
 - `setenforce 0`: Android 7은 adb로 넣은 `/data/local/tmp` 파일을 앱이 SELinux 때문에 읽지 못합니다. 그래서 에뮬레이터에서는 SELinux를 끕니다. **차에서 앱이 이 파일을 읽을 수 있는지는 이 시험이 보지 않습니다.**
 - 부팅할 때마다 `adb root`와 `setenforce 0`을 다시 합니다.
+- `adb install -r`이 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`로 실패하면 AVD에 다른 키로 서명한 앱이 남아 있는 것입니다. `$ADB uninstall io.github.jayparklab.nx4kor`로 지운 뒤 다시 설치합니다(앱 폴더의 테스트 파일도 함께 지워짐).
 
 ## 상태 화면 시나리오
 
 ```sh
-for s in ready connected installing reboot failed nowireless nowifipart nocar nobb hint; do
+for s in ready connected installing reboot failed nowireless nowifipart nocar nobb hint bootguard bootguard2; do
   sh tests/emu/shot.sh $s
 done
 ```
@@ -132,6 +133,8 @@ done
 | `nocar` | 다른 차 `product`, `verdict_end=yes` | 빨간 띠 "지원하지 않는 차입니다 …"와 그 아래 회색 지우는 방법 안내 |
 | `nobb` | 짧은 상태 파일(`support=nobb`) | 노란 띠 "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함) …", 왼쪽 칸은 요약 없이 짧은 표, **[지금 재부팅] 없음** |
 | `hint` | `ready`와 같고 힌트(`iph=wifi`, `aa=cpwait`)·알림 | 시안 판정 아래 노란 띠 두 개(아이폰 Wi-Fi 다시 연결, 안드로이드 오토는 카플레이 연결 중이라 대기), 연노랑 띠 "알림 HH:MM …", 맨 아래 [지금 재부팅] |
+| `bootguard` | `verdict=bootguard`(수준 1, HMG-API 부팅 보호), `hooks=off`, `wm_hooks=off`, 무선 연결용 Wi-Fi 꺼짐 | 노란 띠 "HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). …"(5줄), 맨 아래 [지금 재부팅]. 왼쪽 칸 설치 "HMG-API 훅 꺼짐(부팅 보호)", 무선 Wi-Fi "꺼짐", 표의 공식 무선 모드 "2.2.0-rc.9, 훅이 안 켜짐", HMG-API 훅 "꺼짐 (verified, 마지막 부팅 기록)" |
+| `bootguard2` | `bootguard`와 같고 수준 2 | 빨간 띠 "HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다. …"(5줄), 왼쪽 칸은 `bootguard`와 같음 |
 
 각 파일의 키는 `mod/bin/status.sh`(`status_kv`, `st_verdict`)와 `app/java/.../Report.java`를 따릅니다. 판정 코드를 더하거나 문구를 바꾸면 `scen.sh`에도 같은 경우를 넣습니다.
 
@@ -147,7 +150,7 @@ done
 |---|---|---|
 | `install`, `fix`, `sysw` | 설정을 마무리하는 중입니다. 잠시 뒤 다시 눌러 주세요. | 노랑 |
 | `old`, `bad` | 재부팅 요청을 받지 못했습니다. 다시 눌러 주세요. | 노랑 |
-| `guard` | 켜지고 2분 안의 재부팅이 6번 이어지면 HMG-API가 무선 기능을 끕니다. 3~5분 뒤에 다시 눌러 주세요. | 노랑 |
+| `guard` | HMG-API는 켜지고 2분 안의 재부팅이 6번 이어지면 무선 기능을 끕니다.<br>3~5분 뒤에 다시 눌러 주세요. | 노랑 |
 | `cmd`, 그 밖의 값, 80초 동안 답 없음 | 재부팅하지 못했습니다. RESET 버튼으로 재부팅해 주세요. | 빨강 |
 
 `install`·`fix`·`sysw` 거절이 처음 거절부터 900초(`RB_STUCK_SECS`) 넘게 이어지면 빨간 RESET 안내로 바꿉니다(`ReportTest`가 봄).
@@ -249,6 +252,7 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
 - 차의 Android와의 차이(에뮬레이터는 Android 7.0): 글꼴, 화면 밀도, 위젯 모양, SELinux와 파일 권한(차에서 앱이 `/data/local/tmp` 파일을 읽을 수 있는지).
   - 화면 크기는 밀도가 아니라 화면 폭에 맞춰 늘이거나 줄이므로(`Ui.px`) 밀도가 달라도 배치는 같습니다.
   - 에뮬레이터 맨 위의 Android 상태 줄(시각·배터리)이 차에서 어떻게 보일지는 이 시험이 보지 않습니다.
+  - 줄 나누기: 에뮬레이터(Android 7)는 한글을 띄어쓰기뿐 아니라 글자 사이에서도 줄을 바꿉니다(예: "눌 / 러 주세요"). 차(Android 4.4로 추정)는 줄 나누기가 다를 수 있으므로, 띠 문구가 어디서 끊기는지는 차에서 확인합니다.
 - 순정 화면과 얼마나 같은지. 색·크기는 매뉴얼 그림에서 잰 근사값입니다([#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)).
 - 차의 실제 재부팅. 이 시험의 `watch.sh`는 감시자의 답만 흉내 냅니다.
 - 진단 확인 창이 DSP OTA 화면 위에 뜨는지, USB 설치기가 답을 기다리는 흐름. 설치기 쪽은 `tests/mod-test.sh`가 가짜 `am`으로 봅니다.
