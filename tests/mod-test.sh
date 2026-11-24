@@ -836,7 +836,7 @@ SH=$T/sh
 stsh() {
   (env PATH=$P0 BB=$T/bin/bb APP=$TP W=$T/sw HMGDATA=$SH PROG=$T/sprog BOOT_ID=$T/bootid UPTIME=$T/suptime \
      WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio SYSNET=$T/sysnet PROCNET=$T/procnet PROC=$T/sproc STATUS=$T/status.txt SRC=$T/softap.conf \
-     HMGINST=$T/sinst HMGLOG=$T/shlog HOOKSTARTS=$T/sstarts NX4_DMESG=$T/sdmesg RPT_SYNC=1 "$@" sh $TP/bin/status.sh) > $T/st.out 2>&1
+     HMGINST=$T/sinst HMGLOG=$T/shlog HOOKSTARTS=$T/shook/starts NX4_DMESG=$T/sdmesg RPT_SYNC=1 "$@" sh $TP/bin/status.sh) > $T/st.out 2>&1
 }
 sv() { sed -n "s/^$1=//p" $T/status.txt; }
 # 순정 AP 설정(softap.conf 형식 3: int, writeUTF 문자열 S1 일반 핫스팟 SSID, S2 카플레이 SSID, S3, S4 비밀번호)
@@ -850,8 +850,8 @@ PY
 # 준비된 차: HMG-API rc.8(훅 켜짐, map 확인됨), 공식 모드 2.2.0-rc.9가 켜지고 훅이 켜짐, 무선 기능·순정 핫스팟 기능 켜짐,
 # 프로젝션 AP 요청이 있고 이번 부팅에 떠서 netd(99)가 띄운 hostapd(1234)가 카플레이 SSID(S2)로 돎, Wi-Fi 칩을 본 기록
 streset() {
-  rm -rf $SH $T/sw $T/sproc $T/sysnet $T/procnet $T/shlog $T/sprog $T/status.txt $T/ps.out $T/wifiseen $T/sstarts
-  mkdir -p $SH/mods/wireless-carplay-aa $SH/state $SH/wifi $SH/settings $T/sw $T/sproc/1234 $T/sproc/99 $T/sysnet/wlan0 $T/procnet $T/shlog
+  rm -rf $SH $T/sw $T/sproc $T/sysnet $T/procnet $T/shlog $T/sprog $T/status.txt $T/ps.out $T/wifiseen $T/shook
+  mkdir -p $SH/mods/wireless-carplay-aa $SH/state $SH/wifi $SH/settings $T/sw $T/sproc/1234 $T/sproc/99 $T/sysnet/wlan0 $T/procnet $T/shlog $T/shook
   printf '{\n  "id": "wireless-carplay-aa",\n  "version": "2.2.0-rc.9"\n}\n' > $SH/mods/wireless-carplay-aa/mod.json
   printf 'version 1.1.0-rc.8\nbuild x\n' > $T/sinst
   printf '%s\n' feature:com.hkmc.software.connectivity.carplay_wireless feature:com.hkmc.software.connectivity.androidauto_wireless \
@@ -949,6 +949,58 @@ streset; noap; echo other-boot > $SH/wifi/ap.boot; stsh
 check "status.sh: 지난 부팅의 기록뿐이고 부팅 뒤 5분 전이면 verdict=apwait(켜는 중)" '[ "$(sv verdict)" = apwait ] && [ "$(sv ap_boot)" = no ] && [ "$(sv s2)" = "무선 Wi-Fi: 켜는 중" ]' || cat $T/status.txt
 echo "400.00 50.00" > $T/suptime; stsh
 check "  부팅 뒤 5분이 지나도 기록이 없으면 verdict=apfail(켜지 않았음)" '[ "$(sv verdict)" = apfail ] && grep -q "켜지 않았습니다" $T/status.txt' || cat $T/status.txt
+# HMG-API 부팅 보호(#18, HMG-API rc.6 이후 zygote.c: 올리기 전 값으로 이번 부팅 횟수 ≥ 3이거나 starts ≥ 6이면 그 시작의 훅을 끔).
+# 파일 값은 이번 zygote 시작이 올린 뒤 값(hook/starts, hook/boot "<boot_id> <이번 부팅 횟수>"). 이번 부팅 커널 줄(NX4_DMESG)이
+# 있으면 그것을 따르고, 없으면 파일로 본다. 다음 시작(재부팅)은 이번 부팅 횟수가 0부터라 starts < 6이면 재부팅만 안내(노랑),
+# 아니면 다시 설치(빨강)
+HK=$T/shook
+# gset <starts, 빈 값이면 파일 없음> [hook/boot 내용, 없으면 파일 없음]. starts는 zygote처럼 줄바꿈 없이 쓴다
+gset() { rm -f $HK/starts $HK/boot; [ -n "$1" ] && printf %s "$1" > $HK/starts; [ -n "$2" ] && echo "$2" > $HK/boot; return 0; }
+zl() { printf '%s\n' "$@" > $T/sdmesg; }
+ZL="hmgapid, exec /system/bin/app_process.hmgapi-stock"
+GMSG1="HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). 내비를 재부팅하고 3분 넘게 켜 두세요."
+GMSG2="HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다. HMG-API를 지우지 말고 HMG-API USB로 다시 설치(업데이트)한 뒤 재부팅하고, 3분 넘게 켜 두세요."
+# gv 1|2: 판정이 bootguard이고 그 수준·문구
+gv() { [ "$(sv verdict)" = bootguard ] && [ "$(sv verdict_lv)" = $1 ] && if [ $1 = 1 ]; then [ "$(sv verdict_msg)" = "$GMSG1" ]; else [ "$(sv verdict_msg)" = "$GMSG2" ]; fi; }
+streset; : > $HK/enable; zl "<6>[    9.812000] hmgapi-hook: zygote, hooks off (boot guard, starts=6, this boot 0), $ZL"; gset 7 "test-boot-id 1"; stsh
+check "status.sh 부팅 보호: 이번 부팅 커널 줄이 boot guard이고 starts=7(다음 재부팅도 꺼짐) → bootguard 빨강(지우지 말고 다시 설치), 요약 '훅 꺼짐(부팅 보호)'" \
+  'gv 2 && [ "$(sv s1)" = "설치: HMG-API 훅 꺼짐(부팅 보호)" ]' || cat $T/status.txt
+zl "<6>[    9.812000] hmgapi-hook: zygote, hooks off (boot guard, starts=3, this boot 3), $ZL"; gset 4 "test-boot-id 4"; stsh
+check "  한 부팅 안에서 3번 못 떠 꺼짐(this boot 3), starts=4 → 노랑 '이번 부팅에만 … 재부팅'(재부팅하면 이번 부팅 횟수 0부터, starts 4 < 6)" 'gv 1' || cat $T/status.txt
+gset 5 "test-boot-id 4"; stsh; _g5=$(sv verdict_lv); gset 6 "test-boot-id 4"; stsh
+check "  경계: starts=5면 노랑, 6이면 빨강(다음 시작이 starts 6으로 꺼짐)" '[ "$_g5" = 1 ] && gv 2' || cat $T/status.txt
+gset 0; stsh
+check "  그 사이 HMG-API를 다시 설치함(starts=0, hook/boot 지움) → 노랑 재부팅 안내" 'gv 1' || cat $T/status.txt
+gset; stsh
+check "  starts를 못 읽으면 빨강(다시 설치)" 'gv 2' || cat $T/status.txt
+zl "<6>[    9.812000] hmgapi-hook: zygote, hooks on, start 6 (this boot 1), $ZL"; gset 6 "test-boot-id 1"; stsh
+check "  커널 줄 'hooks on, start 6 (this boot 1)'이면 starts=6이어도 부팅 보호 아님(ready)" '[ "$(sv verdict)" = ready ]' || cat $T/status.txt
+zl "<6>[    9.812000] hmgapi-hook: zygote, hooks on, start 3 (this boot 3), $ZL" "<6>[  200.100000] hmgapi-hook: zygote, hooks off (boot guard, starts=3, this boot 3), $ZL"
+gset 4 "test-boot-id 4"; stsh; _gz1=$(sv verdict)
+zl "<6>[    9.812000] hmgapi-hook: zygote, hooks off (boot guard, starts=3, this boot 3), $ZL" "<6>[  300.100000] hmgapi-hook: zygote, hooks on, start 1 (this boot 1), $ZL"
+gset 1 "test-boot-id 1"; stsh
+check "  zygote가 같은 부팅에 다시 시작하면 마지막 줄을 따름(on → guard는 부팅 보호, guard → on은 아님)" '[ "$_gz1" = bootguard ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
+zl "<6>[    3.000000] hmgapi-hook: zygote, hooks off (disable file), $ZL"; gset 9 "test-boot-id 9"; stsh
+check "  커널 줄이 'hooks off (disable file)'이면 횟수가 높아도 부팅 보호 아님" '[ "$(sv verdict)" != bootguard ]' || cat $T/status.txt
+# 커널 줄이 없을 때(로그가 밀려남 등): 파일로 본다. 이번 시작이 꺼짐 = 이번 부팅 횟수 ≥ 4, 또는 이번 부팅에 센 기록이 있고 starts ≥ 7
+: > $T/sdmesg
+gset 4 "test-boot-id 4"; stsh
+check "status.sh 부팅 보호(커널 줄 없음): 이번 부팅 4번째 시작(hook/boot), starts=4 → bootguard 노랑" 'gv 1' || cat $T/status.txt
+gset 3 "test-boot-id 3"; stsh
+check "  이번 부팅 3번째 시작(올리기 전 2라 켜짐)이면 아님" '[ "$(sv verdict)" = ready ]' || cat $T/status.txt
+gset 7 "test-boot-id 1"; stsh
+check "  재부팅을 넘어 7번째(올리기 전 6)이고 이번 부팅 1번째 → bootguard 빨강" 'gv 2' || cat $T/status.txt
+gset 6 "test-boot-id 1"; stsh; _gf6=$(sv verdict); gset 5 "test-boot-id 2"; stsh
+check "  starts=6·5(올리기 전 5·4라 켜짐)면 아님(rc.4 규칙의 starts≥4로 보지 않음)" '[ "$_gf6" = ready ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
+gset 7 "other-boot 5"; stsh; _gfo=$(sv verdict); gset 7; stsh
+check "  hook/boot가 다른 부팅 것이거나 없으면(이번 부팅 zygote가 세지 않음·watcher가 지움) starts=7이 남아 있어도 아님" '[ "$_gfo" = ready ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
+gset 4 "test-boot-id 4"; stsh BOOT_ID=$T/nobootid; _gnb=$(sv verdict); _gnbl=$(sv verdict_lv); gset 3; stsh BOOT_ID=$T/nobootid
+check "  boot_id를 못 읽으면 zygote처럼 모든 시작을 한 부팅으로 셈: starts=4면 bootguard 빨강(다음 시작도 꺼짐), 3이면 아님" \
+  '[ "$_gnb" = bootguard ] && [ "$_gnbl" = 2 ] && [ "$(sv verdict)" != bootguard ]' || cat $T/status.txt
+gset 7 "test-boot-id 4"; : > $HK/disable; stsh; _gd=$(sv verdict); rm -f $HK/disable $HK/enable; stsh; _ge=$(sv verdict); : > $HK/enable
+rm -f $T/sinst; stsh
+check "  hook/disable이 있거나 hook/enable이 없으면(횟수가 멈춘 옛 값) 아님, HMG-API가 없으면 nohmgapi" '[ "$_gd" = ready ] && [ "$_ge" = ready ] && [ "$(sv verdict)" = nohmgapi ]' || cat $T/status.txt
+: > $T/sdmesg
 rm -f $T/ps.out $T/features
 
 # status.sh --watch: 상태 화면의 [지금 재부팅] 요청(앱 개인 폴더의 reboot.req)을 받는 감시자
@@ -957,7 +1009,7 @@ printf '#!/bin/sh\necho reboot >> %s/rbcalls\nexit 1\n' $RW > $T/bin/fakereboot;
 echo "100.00 50.00" > $RW/uptime; echo 200 > $RW/w/watch.until
 (env PATH=$P0 BB=$T/bin/bb APP=$TP W=$RW/w BK=$RW/bk PROG=$RW/prog NOTICE=$RW/notice BOOT_ID=$T/bootid UPTIME=$RW/uptime PROC=$RW/proc \
    NX4_RBREQ=$RW/reboot.req RBRES=$RW/rbres WATCHF=$RW/watchf NX4_REBOOT=$T/bin/fakereboot NX4_SYNC=true NX4_RB_WAIT=1 NX4_APLOG=$RW/ap.log \
-   HOOKSTARTS=$RW/nostarts HMGINST=$RW/noinst NX4_DMESG=$T/sdmesg sh $TP/bin/status.sh --watch) > $RW/watch.out 2>&1 &
+   HOOKSTARTS=$RW/hook/starts HMGINST=$RW/inst NX4_DMESG=$RW/dmesg sh $TP/bin/status.sh --watch) > $RW/watch.out 2>&1 &
 RWP=$!
 # 감시자가 결과 파일에 이 요청 id와 code를 쓸 때까지 기다린다(최대 약 10초)
 rbwait() { _k=0; until grep -qx "id=$1" $RW/rbres 2>/dev/null || [ $_k -ge 100 ]; do /bin/sleep 0.1; _k=$((_k+1)); done; }
@@ -972,6 +1024,45 @@ check "  40초보다 오래된 요청 → reboot 안 부름, code=old" '[ "$(gre
 printf 'pct=40\nstate=run\nstage=x\nt=1\nboot=test-boot-id\nut=95\n' > $RW/prog
 rbreq 5004 test-boot-id 95
 check "  설치가 진행 중(이번 부팅 run, 마지막 기록 5초 전) → reboot 안 부름, code=install" '[ "$(grep -c reboot $RW/rbcalls)" = 1 ] && grep -qx "code=install" $RW/rbres'
+# HMG-API 부팅 보호 거절(#18, HMG-API rc.6 이후). [지금 재부팅]은 새 커널 부팅이라 다음 zygote 시작의 이번 부팅 횟수는 0부터:
+# starts(올린 뒤 값)가 6이면 다음 시작에, 5면 그다음 시작에 훅이 꺼진다. 그래서 5·6만 거절(code=guard). 부팅 뒤 100초
+# (위 테스트까지는 HMG-API 설치 기록 $RW/inst가 없어 부팅 보호로는 막지 않았다)
+rm -f $RW/prog; printf 'version 1.1.0-rc.8\n' > $RW/inst; mkdir -p $RW/hook; : > $RW/hook/enable; : > $RW/dmesg
+rbn() { grep -c reboot $RW/rbcalls; }
+# rgset <starts> [hook/boot 내용, 없으면 파일 없음]. starts는 zygote처럼 줄바꿈 없이 쓴다
+rgset() { rm -f $RW/hook/starts $RW/hook/boot; printf %s "$1" > $RW/hook/starts; [ -n "$2" ] && echo "$2" > $RW/hook/boot; return 0; }
+rgset 6 "test-boot-id 1"; c0=$(rbn); rbreq 5005 test-boot-id 95
+check "status.sh --watch 부팅 보호: starts=6, 커널 줄 없음, 부팅 뒤 100초 → 거절(code=guard), reboot 안 부름, ap.log에 이유(300초 전)" \
+  '[ "$(rbn)" = $c0 ] && grep -qx "code=guard" $RW/rbres && grep -q "재부팅 요청 거절: 부팅 뒤 100초(HMG-API 시작 확인 시각 300초 전)이고 HMG-API 부팅 보호 횟수 starts=6(켜지고 2분 안의 재부팅이 6번 이어지면" $RW/ap.log' || cat $RW/ap.log
+rgset 5 "test-boot-id 1"; c0=$(rbn); rbreq 5006 test-boot-id 95
+check "  starts=5(그다음 시작에 꺼짐)도 거절" '[ "$(rbn)" = $c0 ] && grep -qx "id=5006" $RW/rbres && grep -qx "code=guard" $RW/rbres'
+rgset 4 "test-boot-id 1"; c0=$(rbn); rbreq 5007 test-boot-id 95
+check "  starts=4면 받음(다음 시작 5·그다음 6까지 켜짐)" '[ "$(rbn)" = $((c0+1)) ] && grep -qx "code=cmd" $RW/rbres'
+rgset 3 "test-boot-id 1"; c0=$(rbn); rbreq 5008 test-boot-id 95; _r3=$(rbn)
+rgset 2 "test-boot-id 1"; rbreq 5009 test-boot-id 95
+check "  rc.4 규칙에서 거절하던 starts=3·2는 받음" '[ "$_r3" = $((c0+1)) ] && [ "$(rbn)" = $((c0+2)) ]'
+rgset 7 "test-boot-id 1"; c0=$(rbn); rbreq 5010 test-boot-id 95
+check "  starts=7(이번 시작이 이미 꺼짐)이면 막지 않음" '[ "$(rbn)" = $((c0+1)) ]'
+rgset 6 "test-boot-id 4"; c0=$(rbn); rbreq 5011 test-boot-id 95
+check "  커널 줄이 없어도 파일로 보아 이번 시작이 이미 꺼졌으면(이번 부팅 4번째) starts=6이어도 막지 않음" '[ "$(rbn)" = $((c0+1)) ]'
+rgset 6 "other-boot 2"; c0=$(rbn); rbreq 5012 test-boot-id 95; _rob=$(rbn)
+rgset 6; rbreq 5013 test-boot-id 95
+check "  hook/boot가 다른 부팅 것이거나 없어도 starts=6이면 거절(다음 시작은 starts만 봄)" '[ "$_rob" = $c0 ] && [ "$(rbn)" = $c0 ] && grep -qx "id=5013" $RW/rbres && grep -qx "code=guard" $RW/rbres'
+rgset 6 "test-boot-id 1"; : > $RW/hook/disable; c0=$(rbn); rbreq 5014 test-boot-id 95; rm -f $RW/hook/disable; _rdis=$(rbn)
+rm -f $RW/inst; rbreq 5015 test-boot-id 95; printf 'version 1.1.0-rc.8\n' > $RW/inst
+check "  hook/disable이 있거나 HMG-API가 설치돼 있지 않으면 막지 않음" '[ "$_rdis" = $((c0+1)) ] && [ "$(rbn)" = $((c0+2)) ]'
+# 커널 줄이 있으면 그것을 따른다. watcher는 "hooks on" 줄 시각 + 120초에 돌므로 그 + 15초까지 막는다(10초면 145초)
+rgset 6 "test-boot-id 4"
+printf '%s\n' "<6>[   10.200000] hmgapi-hook: zygote, hooks off (boot guard, starts=5, this boot 3), hmgapid, exec /system/bin/app_process.hmgapi-stock" > $RW/dmesg
+c0=$(rbn); rbreq 5016 test-boot-id 95
+check "  이번 부팅 커널 줄이 boot guard(이미 꺼짐)면 starts=6이어도 막지 않음" '[ "$(rbn)" = $((c0+1)) ]'
+rgset 6 "test-boot-id 1"
+printf '%s\n' "<6>[   10.200000] hmgapi-hook: zygote, hooks on, start 6 (this boot 1), hmgapid, exec /system/bin/app_process.hmgapi-stock" > $RW/dmesg
+c0=$(rbn); rbreq 5017 test-boot-id 95
+check "  커널 줄 'hooks on'(10초)이고 starts=6이면 10+120+15=145초 전(부팅 뒤 100초)에는 거절" '[ "$(rbn)" = $c0 ] && grep -qx "code=guard" $RW/rbres && grep -q "시작 확인 시각 145초 전" $RW/ap.log'
+echo "150.00 50.00" > $RW/uptime; c0=$(rbn); rbreq 5018 test-boot-id 145
+check "  145초가 지나면(부팅 뒤 150초) starts=6이어도 막지 않음" '[ "$(rbn)" = $((c0+1)) ]'
+echo "100.00 50.00" > $RW/uptime; : > $RW/dmesg
 kill $RWP 2>/dev/null; wait $RWP 2>/dev/null
 check "  감시자가 끝 시각 파일(boot·until, 앱이 읽음)을 씀" 'grep -qx "boot=test-boot-id" $RW/watchf && grep -qx "until=200" $RW/watchf'
 

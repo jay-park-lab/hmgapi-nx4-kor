@@ -257,9 +257,11 @@ public class ReportTest {
             && Report.RB_FINISHING.equals(Report.rbAnswer(Report.parse("id=12345\nboot=boot-A\ncode=install\n"), "boot-A", 12345))
             && Report.RB_FINISHING.equals("설정을 마무리하는 중입니다. 잠시 뒤 다시 눌러 주세요."));
         Report gd = Report.parse("id=6\nboot=boot-A\ncode=guard\n");
-        check("guard → '3분 안에 재부팅을 반복하면 … 3~5분 뒤에 다시 눌러 주세요.', 이어져도 RESET 안내로 넘기지 않음",
+        check("guard → HMG-API rc.6 이후 규칙(2분 전 재부팅이 6번 이어지면 끔) 문구, '3~5분 뒤에 다시 눌러 주세요.', 이어져도 RESET 안내로 넘기지 않음",
             Report.RB_GUARD.equals(Report.rbAnswer(gd, "boot-A", 6)) && Report.RB_GUARD.equals(Report.rbAnswer(gd, "boot-A", 6, 0, 5000)) && !Report.rbStuckCode(gd)
-            && Report.RB_GUARD.equals("3분 안에 재부팅을 반복하면 HMG-API가 무선 기능을 끕니다. 내비가 켜지고 3~5분 뒤에 다시 눌러 주세요."));
+            && Report.RB_GUARD.equals("내비가 켜지고 2분이 지나기 전에 재부팅되거나 꺼지는 일이 6번 이어지면 HMG-API가 무선 기능을 끕니다. "
+                + "지금 그 횟수에 가까우니 내비가 켜지고 3~5분 뒤에 다시 눌러 주세요.")
+            && !Report.RB_GUARD.contains("3분 안에"));
         Report m2s = Report.parse("id=5\nboot=boot-A\ncode=sysw\n"), m2i = Report.parse("id=5\nboot=boot-A\ncode=install\n"),
             m2f = Report.parse("id=5\nboot=boot-A\ncode=fix\n");
         check("sysw → '마무리하는 중', install·sysw 거절이 처음 거절부터 900초 지나면 RESET 안내, 시작 기록 없음(-1)·fix는 그대로",

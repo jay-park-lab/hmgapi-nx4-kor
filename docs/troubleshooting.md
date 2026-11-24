@@ -77,7 +77,8 @@ HMG-API 설치 중 `HMGAPI/install.log`에 `isn't a known stock build`가 있으
 | HMG-API 앱에서 Wireless CarPlay + Android Auto가 꺼져 있습니다 (`wirelessoff`) / 'Wireless CarPlay'가 꺼져 있습니다 (`bridgeoff`) | HMG-API 앱에서 켜고 적용한 뒤 재부팅합니다(아래 "HMG-API 앱을 열 수 없을 때") |
 | HMG-API 훅이 꺼져 있습니다 (`hooksoff`) | 문구대로 합니다. map이 없으면(`none`) USB 설치기를 다시 실행하고, 그래도 같으면 USB 진단 기록을 남겨 알려 주세요 |
 | Wireless CarPlay + Android Auto가 다른 모드와 같은 훅을 써서 꺼졌습니다 / 그 훅을 켜지 못했습니다 (`wmhooksoff`) | 다른 모드와 겹치면 HMG-API 앱의 Mods에서 겹치는 모드를 끕니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)). 아니면 3분 뒤 재부팅하고, 같으면 Mods에서 이유를 봅니다. 이 차의 map에 공식 모드의 훅 지점이 없을 수 있습니다 |
-| **HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다** (`bootguard`) | 아래 "부팅 보호" |
+| HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호) (`bootguard`, 노랑) | 내비를 재부팅하고 3분 넘게 켜 둡니다. 아래 "부팅 보호" |
+| **HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다** (`bootguard`, 빨강) | 아래 "부팅 보호"대로 HMG-API를 다시 설치합니다 |
 | 다른 Wi-Fi 패키지가 Wi-Fi를 쓰고 있어… (`otherwifi`) | NEMESIS의 Korea Projection이나 다른 무선·핫스팟 패키지를 지우고 재부팅합니다([`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때") |
 | 내비 Wi-Fi가 일반 핫스팟으로 켜져 있어… (`aphotspot`) | 순정 핫스팟을 끄고 재부팅합니다 |
 | 내비가 일반 Wi-Fi에 접속하는 중이라… (`wificlient`) | HMG-API 앱의 Home Wi-Fi를 쓰면 주차를 풀 때 돌아옵니다. 계속 그렇다면 Home Wi-Fi를 끕니다 |
@@ -96,15 +97,21 @@ HMG-API 설치 중 `HMGAPI/install.log`에 `isn't a known stock build`가 있으
 ### 부팅 보호
 
 HMG-API는 훅 때문에 내비가 제대로 뜨지 못한다고 보면 스스로 훅을 끄고 정상으로 띄웁니다(HMG-API rc.6부터의 기준). 다음 둘 중 하나일 때입니다.
-- 한 번의 부팅 안에서 Android가 3번 못 뜸
-- 켠 지 2분 안에 꺼지기가 6번 이어짐
+- 한 번의 부팅 안에서 Android가 3번 못 뜸(`hook/boot`의 이번 부팅 횟수)
+- 켠 지 2분 안에 꺼지기(재부팅·시동 끄기 포함)가 6번 이어짐(`hook/starts`)
 
-훅이 꺼지면 무선 기능도 꺼집니다. 다시 켜려면:
+훅이 꺼지면 무선 기능도 꺼집니다. 재부팅은 새 부팅이라 "한 번의 부팅 안" 횟수는 0부터 다시 셉니다. 그래서 상태 화면은 다음 재부팅에 훅이 다시 켜지는지에 따라 둘로 알립니다.
+- 노랑 "이번 부팅에만 무선 기능을 껐습니다": `hook/starts`가 6보다 작아 재부팅만으로 다시 켜집니다. 아래 1을 한 뒤 3만 합니다.
+- 빨강 "재부팅이 너무 잦은 것으로 보고 …": 다음 부팅도 꺼집니다. 아래 1~3을 모두 합니다.
+
+다시 켜려면:
 
 1. 마지막으로 바꾼 것이 원인이면 먼저 되돌립니다(예: NX4 KOR를 지움).
 2. **HMG-API를 지우지 말고 다시 설치(업데이트)합니다.** HMG-API 설치기는 설치할 때 이 횟수를 지웁니다(`hook/starts`를 0으로, `hook/boot` 삭제).
    - 이 저장소의 릴리스 USB는 HMG-API가 없거나 낮을 때만 HMG-API 설치기를 돌립니다. 그래서 여기서는 HMG-API 릴리스의 `hmgapi-<판>-usb.zip`을 따로 풀어 Update OTA를 누릅니다.
 3. 재부팅하고 3분 넘게 켜 둡니다.
+
+상태 화면의 [지금 재부팅]도 이 횟수를 봅니다. `hook/starts`가 5·6이면(2분을 버티지 못한 시작이 이번 것까지 5·6번 이어짐) 다음이나 그다음 시작에 훅이 꺼지므로, 이번 시작이 2분을 넘길 때까지(켠 지 3~5분) 재부팅을 거절하고 "… 3~5분 뒤에 다시 눌러 주세요."를 보입니다.
 
 ## 내비가 재부팅을 반복하거나 화면이 이상할 때
 
