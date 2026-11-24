@@ -29,13 +29,26 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
     - 화면이 열릴 때 `hmgapid service-start launch`를 부르고, 상태 파일이 새로 쓰이면 다시 그립니다
 - **시험:** `tests/mod-test.sh`를 새로 넣었고 `tests/ReportTest.java`는 남은 기능에 맞췄습니다. 원본의 `tests/stub-test.sh`는 뺐습니다.
 - **문서:** `README.md`, `docs/design.md`, `usb/README.txt`
+- **2.1.0 USB 설치기(2026-11-23):** `usb/troubleShooter`가 HMG-API 쪽 일을 모두 맡습니다. 공식 무선 모드 설치(`--any-car`), 옛 2.0.x 되돌리기, 이 차의 map 만들기·확인, 계획 확인 뒤 적용입니다. `scripts/build.sh`는 공식 무선 모드 zip을 USB 묶음에 그대로 넣고(`scripts/fetch-wireless.sh`, 아래 "공식 무선 모드"), 옛 2.0.x의 되돌리기 스크립트를 이 저장소의 태그 `v2.0.4-beta.1`에서 그대로 꺼내 `NX4/legacy-2.0/`에 넣습니다.
 
 ## HMG-API (VysseCodes, AGPL-3.0)
 
 - https://github.com/Open-HMG/HMG-API (예전 주소 `VysseCodes/HMG-API`)
-- 2.1.0의 이 저장소에는 HMG-API나 그 무선 모드("Wireless CarPlay + Android Auto", https://github.com/Open-HMG/hmgapi-wireless-cp-aa)의 코드가 들어 있지 않습니다. 둘 다 따로 설치해 씁니다.
+- 2.1.0의 이 저장소(소스)에는 HMG-API나 그 무선 모드("Wireless CarPlay + Android Auto", https://github.com/Open-HMG/hmgapi-wireless-cp-aa)의 코드가 들어 있지 않습니다. 릴리스 USB 묶음에는 둘을 고치지 않고 함께 넣습니다(HMG-API는 `HMGAPI-SOURCE.txt`, 무선 모드는 아래 "공식 무선 모드").
   - 2.0.x에 합쳤던 무선 모드 2.4.5(Korea Projection이 HMG-API 무선 모드를 한국 차용으로 고친 판, 포크 `StopDragon/HMG-API`의 `korea-build` 브랜치)와 그 안의 HMG-Seogaemo(seogaemo, AGPL-3.0, https://github.com/seogaemo/hmg-seogaemo)에서 옮긴 계기판·HUD 회전 안내 코드는 2.1.0에서 뺐습니다. 그 판의 묶음과 대응 소스 안내는 2.0.x 베타 태그(`v2.0.4-beta.1` 등)의 `wireless/README.md`에 있습니다.
 - `scripts/build.sh`는 HMG-API의 `tools/mkmodpkg.sh`로 모드를 서명합니다. USB 설치기 `usb/troubleShooter`는 HMG-API USB 설치기와 같은 방식(DSP Update OTA)을 씁니다.
+
+## 공식 무선 모드 wireless-carplay-aa (VysseCodes, AGPL-3.0)
+
+- https://github.com/Open-HMG/hmgapi-wireless-cp-aa
+- 2.1.0부터 USB 묶음에 HMG-API의 공식 무선 모드(Wireless CarPlay + Android Auto)를 **고치지 않고** 그대로 넣습니다(`NX4/wireless/wireless-carplay-aa.zip`, 그 zip에서 꺼낸 `NX4/wireless/mod.json`).
+  - USB 설치기(`usb/troubleShooter`)가 투싼 NX4에 HMG-API의 "Install anyway"(`hmgapid engine install --any-car`)로 설치합니다. NX4가 공식 모드의 차 목록에 없기 때문입니다.
+- 파일: 릴리스 `v2.2.0-rc.9`의 `wireless-carplay-aa-2.2.0-rc.9.zip`(HMG-API 모드 zip, 작성자 서명 포함, 102,012바이트)
+  - 공식 모드 zip SHA-256 `1df29d9223357d60604e433c54ff4877753f7b35cdf77373eea9d2a99534ccb9`
+  - 이 저장소의 빌드는 이 파일을 그 릴리스에서 직접 받습니다(`scripts/fetch-wireless.sh`). SHA-256이 위 값과 같을 때만 넣고, 풀거나 고치지 않습니다.
+  - USB 맨 위 `WIRELESS-SOURCE.txt`에 넣은 판과 SHA-256, 대응 소스 위치를 적습니다.
+- 라이선스: GNU AGPL-3.0(이 저장소와 같음)
+- 대응 소스: https://github.com/Open-HMG/hmgapi-wireless-cp-aa/tree/v2.2.0-rc.9
 
 ## BusyBox (GPL-2.0)
 

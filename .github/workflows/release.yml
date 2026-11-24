@@ -20,14 +20,15 @@ concurrency:
 env:
   # CI에는 .env.local이 없다. 스크립트는 step의 환경 변수만 읽는다
   NX4_ENV_FILE: ''
-  # HMG-API v1.1.0-rc.7 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도)
-  HMGAPI_COMMIT: 5732e261f544ef780bc0e4a5f7400ccc1b98edaa
+  # HMG-API v1.1.0-rc.8 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도).
+  # 2.1.0의 USB 설치기와 공식 무선 모드 2.2.0-rc.9가 rc.8 이상을 요구한다(usb/troubleShooter HMG_MIN)
+  HMGAPI_COMMIT: 939484edfc7cbfe5d9f1f1bc3b321056dadb41a6
   # 같은 판의 HMG-API USB 묶음. USB 묶음에 함께 넣어, HMG-API가 없는 차는 그것부터 설치한다(scripts/build.sh).
   # 릴리스 파일은 바뀔 수 있으므로 SHA-256으로 고정한다. 판은 위 커밋의 판과 같아야 한다(build job이 확인).
   # HMG-API는 예전 시험판 릴리스를 지운다(rc.4가 지워져 v2.0.0-beta.2가 여기서 멈춤). 받지 못하면 그때 있는 판으로
   # 이 셋을 함께 옮긴다(docs/release.md "HMG-API를 USB 묶음에 함께", https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/14)
-  HMGAPI_USB_URL: https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0-rc.7/hmgapi-1.1.0-rc.7-usb.zip
-  HMGAPI_USB_SHA256: 10818e60932e8d0e45992c69deaafecbf8835ffb21cf197e7b4dbfcbae36e964
+  HMGAPI_USB_URL: https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0-rc.8/hmgapi-1.1.0-rc.8-usb.zip
+  HMGAPI_USB_SHA256: fd5e18c43b4cede7110ba1d195dece1563edc4cb7fcaafd648a9965c1e95766e
 
 jobs:
   check:
@@ -104,7 +105,7 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: HMG-API 소스 (v1.1.0-rc.7)
+      - name: HMG-API 소스 (v1.1.0-rc.8)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Open-HMG/HMG-API
@@ -143,11 +144,14 @@ jobs:
       app_cert: ${{ steps.cert.outputs.app_cert }}
       hmgapi: ${{ steps.hu.outputs.version }}
       hmgapi_need: ${{ steps.hu.outputs.need }}
+      wireless: ${{ steps.wl.outputs.version }}
     steps:
       - name: 저장소
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: nx4
+          # build.sh가 옛 2.0.x 되돌리기 스크립트를 태그(v2.0.4-beta.1)에서 꺼낸다(USB 묶음의 NX4/legacy-2.0)
+          fetch-depth: 0
           persist-credentials: false
 
       - name: JDK 21
@@ -177,13 +181,26 @@ jobs:
           done
           ls "$SDK/build-tools" "$SDK/platforms"
 
-      - name: HMG-API 소스 (v1.1.0-rc.7)
+      - name: HMG-API 소스 (v1.1.0-rc.8)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Open-HMG/HMG-API
           ref: ${{ env.HMGAPI_COMMIT }}
           path: hmgapi
           persist-credentials: false
+
+      # 공식 무선 모드 wireless-carplay-aa(AGPL-3.0)를 그 공식 릴리스에서 받아 USB 묶음에 고치지 않고 넣는다(USB 설치기가 --any-car로 설치).
+      # 키를 꺼내기 전에 받는다. 판은 scripts/fetch-wireless.sh에, SHA-256은 NOTICE.md에 고정했고 같을 때만 쓴다. 풀거나 실행하지 않는다
+      - name: 공식 무선 모드 (wireless-carplay-aa)
+        id: wl
+        run: |
+          set -eu
+          sh scripts/fetch-wireless.sh "$RUNNER_TEMP/wireless" > "$RUNNER_TEMP/fetch-wireless.out"
+          Z=$(tail -n 1 "$RUNNER_TEMP/fetch-wireless.out")
+          WV=$(unzip -p "$Z" mod.json | sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' | head -1)
+          [ -n "$WV" ] || { echo "::error::공식 무선 모드 zip의 mod.json에서 판을 읽지 못했습니다"; exit 1; }
+          echo "NX4_WIRELESS_ZIP=$Z" >> "$GITHUB_ENV"
+          echo "version=$WV" >> "$GITHUB_OUTPUT"
 
       # USB 묶음에 함께 넣는다. 키를 꺼내기 전에 받고, 고정한 SHA-256과 같고 판이 위 소스와 같을 때만 쓴다.
       # 이 job은 그 안의 것을 실행하지 않는다(build.sh가 풀어 USB 묶음에 옮겨 담기만 한다)
@@ -198,15 +215,22 @@ jobs:
           HV=$(unzip -p "$Z" HMGAPI/install/payload/VERSION | tr -d '\r\n') || HV=
           SV=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' "$GITHUB_WORKSPACE/hmgapi/core/runtime/java/hmgapi/engine/Engine.java")
           [ -n "$HV" ] && [ "$HV" = "$SV" ] || { echo "::error::HMG-API USB 묶음의 판($HV)이 HMGAPI_COMMIT의 판($SV)과 다릅니다"; exit 1; }
-          # 모드의 최소 판(mod.json "hmgapi")을 채워야 USB 설치기가 낮은 HMG-API를 이것으로 올릴 수 있다. 비교는 설치기의 것을 그대로 쓴다
-          NEED=$(sed -n 's/.*"hmgapi": *">=\([^"]*\)".*/\1/p' mod/mod.json | head -1)
-          [ -n "$NEED" ] || { echo "::error::mod/mod.json에서 hmgapi 최소 판(>=…)을 읽지 못했습니다"; exit 1; }
+          # USB 설치기의 최소 판(HMG_MIN)과 두 모드(mod.json, 공식 무선 모드)의 "hmgapi"를 모두 채워야 설치기가 낮은 HMG-API를 이것으로
+          # 올릴 수 있다. 비교는 설치기의 것을 그대로 쓰고, 릴리스 글의 최소 판은 그중 가장 높은 것
+          NEED=$(sed -n 's/^HMG_MIN=//p' usb/troubleShooter)
+          [ -n "$NEED" ] || { echo "::error::usb/troubleShooter에서 HMG_MIN을 읽지 못했습니다"; exit 1; }
           F=$(mktemp)
           sed -n '/^vlt() {/,/^}/p;/^hmg_meets() {/,/^}/p' usb/troubleShooter > "$F"
           # shellcheck disable=SC1090
           . "$F"
           rm -f "$F"
-          if ! hmg_meets "$HV" "$NEED"; then echo "::error::HMG-API USB 묶음의 판($HV)이 모드의 최소 판($NEED)보다 낮습니다"; exit 1; fi
+          MN=$(sed -n 's/.*"hmgapi": *">=\([^"]*\)".*/\1/p' mod/mod.json | head -1)
+          WN=$(unzip -p "$NX4_WIRELESS_ZIP" mod.json | sed -n 's/.*"hmgapi": *">=\([^"]*\)".*/\1/p' | head -1)
+          for n in "$NEED" "$MN" "$WN"; do
+            [ -n "$n" ] || continue
+            if ! hmg_meets "$HV" "$n"; then echo "::error::HMG-API USB 묶음의 판($HV)이 최소 판($n)보다 낮습니다(설치기 HMG_MIN, mod.json, 공식 무선 모드)"; exit 1; fi
+            if vlt "$NEED" "$n"; then NEED=$n; fi
+          done
           echo "HMGAPI_USB_ZIP=$Z" >> "$GITHUB_ENV"
           echo "version=$HV" >> "$GITHUB_OUTPUT"
           echo "need=$NEED" >> "$GITHUB_OUTPUT"
@@ -279,6 +303,7 @@ jobs:
         env:
           APP_CERT: ${{ steps.cert.outputs.app_cert }}
           HMGAPI_VER: ${{ steps.hu.outputs.version }}
+          WIRELESS_VER: ${{ steps.wl.outputs.version }}
           # build.sh(HMG-API tools/mkmodpkg.sh)가 컴파일해 둔 HMG-API 엔진
           EH: ${{ github.workspace }}/hmgapi/out/engine-host
         run: |
@@ -298,8 +323,20 @@ jobs:
           HV=$(tr -d '\r\n' < "$D/HMGAPI/install/payload/VERSION" 2>/dev/null) || HV=
           [ -f "$D/NX4/hmgapi/troubleShooter" ] && [ "$HV" = "$HMGAPI_VER" ] \
             || { echo "::error::USB 묶음에 HMG-API $HMGAPI_VER 설치기가 없습니다(NX4/hmgapi/troubleShooter, HMGAPI/install/payload)"; exit 1; }
-          # HMG-API 앱용 업데이트·공식 모드 묶음은 싣지 않는다(scripts/build.sh). wireless-carplay-aa는 이 모드와 함께 둘 수 없다
+          # HMG-API 앱용 업데이트·공식 모드 묶음은 싣지 않는다(scripts/build.sh). 공식 무선 모드는 고정한 판으로 NX4/wireless에
           [ ! -e "$D/HMGAPI/updates" ] || { echo "::error::USB 묶음에 HMGAPI/updates가 있습니다"; exit 1; }
+          # 공식 무선 모드: 받은 zip 그대로(NOTICE.md의 SHA-256), 설치기가 읽는 mod.json, 대응 소스 안내
+          WEXP=$(sed -n 's/.*공식 모드 zip SHA-256 `\([0-9a-f]\{64\}\)`.*/\1/p' NOTICE.md | head -1)
+          WGOT=$(sha256sum "$D/NX4/wireless/wireless-carplay-aa.zip" 2>/dev/null | cut -d' ' -f1) || WGOT=
+          [ -n "$WEXP" ] && [ "$WGOT" = "$WEXP" ] && [ -f "$D/NX4/wireless/mod.json" ] && [ -f "$D/WIRELESS-SOURCE.txt" ] \
+            || { echo "::error::USB 묶음의 공식 무선 모드(NX4/wireless, WIRELESS-SOURCE.txt)가 NOTICE.md의 SHA-256($WEXP)과 맞지 않거나 없습니다"; exit 1; }
+          # 옛 2.0.x 되돌리기 스크립트(태그에서 그대로): 2.0.x를 HMG-API 앱에서 지운 차를 되돌린다
+          for f in bin/uninstall.sh scripts/preun.sh svc/env.sh svc/hotspot.sh mod.json SOURCE; do
+            [ -s "$D/NX4/legacy-2.0/$f" ] || { echo "::error::USB 묶음에 옛 2.0.x 되돌리기 스크립트(NX4/legacy-2.0/$f)가 없습니다"; exit 1; }
+          done
+          # 묶음의 nx4-kor가 옛 2.0.x 꼴(공식 무선 모드와 충돌 선언)이면 2.1.0 설치기가 아무것도 하지 않고 멈춘다. 그런 묶음은 내지 않는다
+          python3 -c 'import json, sys; sys.exit("wireless-carplay-aa" in json.load(open(sys.argv[1])).get("conflicts", []))' "$D/NX4/install/payload/mod.json" \
+            || { echo "::error::USB 묶음의 nx4-kor(mod.json)가 공식 무선 모드와 충돌을 선언합니다(옛 2.0.x 꼴). nx4-kor 2.1.0이 합쳐진 뒤에 냅니다"; exit 1; }
           # busybox와 그 라이선스 안내가 모드와 USB 맨 위에 들어갔는지(build.sh는 NX4_BUSYBOX를 받으면 늘 넣는다)
           [ -f "$D/NX4/install/payload/bin/busybox" ] && [ -f "$D/NX4/install/payload/bin/busybox-LICENSE.txt" ] && [ -f "$D/BUSYBOX-LICENSE.txt" ] \
             || { echo "::error::USB 묶음에 busybox나 그 라이선스 안내가 없습니다"; exit 1; }
@@ -312,6 +349,7 @@ jobs:
             echo "- 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
             echo "- busybox: $BB"
             echo "- HMG-API: $HMGAPI_VER (USB 묶음에 함께)"
+            echo "- 공식 무선 모드: wireless-carplay-aa $WIRELESS_VER (USB 묶음에 함께, 고치지 않음)"
             echo '```'
             (cd out && sha256sum "hmgapi-nx4-kor-$V.zip" "hmgapi-nx4-kor-$V-usb.zip")
             echo '```'
@@ -359,6 +397,7 @@ jobs:
           APP_CERT: ${{ needs.build.outputs.app_cert }}
           HMGAPI_VER: ${{ needs.build.outputs.hmgapi }}
           NEED: ${{ needs.build.outputs.hmgapi_need }}
+          WIRELESS_VER: ${{ needs.build.outputs.wireless }}
           SRC: ${{ github.sha }}
         run: |
           set -eu
@@ -383,12 +422,13 @@ jobs:
             echo "| 파일 | 설치 |"
             echo "|---|---|"
             echo "| \`hmgapi-nx4-kor-$V.zip\` | HMG-API 모드(작성자 키로 서명). HMG-API 앱·adb·USB |"
-            echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음(HMG-API $HMGAPI_VER 포함). 빈 USB 맨 위에 풀고 Engineering Mode > USB Copy > DSP > Update OTA. HMG-API가 없거나 $NEED보다 낮은 차는 첫 번째에 HMG-API를 설치하고 재부팅하므로, 같은 USB로 한 번 더 누릅니다 |"
+            echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음(HMG-API $HMGAPI_VER, 공식 무선 모드 $WIRELESS_VER 포함). 빈 USB 맨 위에 풀고 Engineering Mode > USB Copy > DSP > Update OTA. HMG-API가 없거나 $NEED보다 낮은 차는 첫 번째에 HMG-API를 설치하고 재부팅하므로, 같은 USB로 한 번 더 누릅니다 |"
             echo
             echo "- 모드 UUID: \`$UUID\`"
             echo "- 상태 화면 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
             echo "- busybox: $BB"
             echo "- HMG-API: $NEED 이상 필요. USB 묶음에 $HMGAPI_VER를 함께 넣음(대응 소스 https://github.com/Open-HMG/HMG-API/tree/$HMGAPI_COMMIT, 태그 v$HMGAPI_VER)"
+            echo "- 공식 무선 모드: USB 묶음에 wireless-carplay-aa $WIRELESS_VER를 고치지 않고 넣음. USB 설치기가 NX4에 --any-car로 설치(대응 소스 https://github.com/Open-HMG/hmgapi-wireless-cp-aa/tree/v$WIRELESS_VER)"
             echo "- 소스 커밋: $SRC"
             echo
             echo '```'

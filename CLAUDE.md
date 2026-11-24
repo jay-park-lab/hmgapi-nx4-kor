@@ -4,7 +4,7 @@
 
 - **방향(2026-11-23 결정):** 2.1.0부터 "HMG-API + 공식 무선 모드(고치지 않음) + 이 저장소의 NX4 추가분(USB 설치기, 상태 화면 앱, 나중에 동글)"으로 다시 짭니다.
   - 근거와 역할 표는 [#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38)과 `docs/design.md` "2.1.0 새 구조", 할 일은 [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)(마일스톤 2.1.0)에 있습니다.
-  - 모드(`mod/`)와 상태 화면 판정은 2.1.0 구조로 바꿨습니다(한국 포크 무선 모드 2.4.5와 `svc/hotspot.sh`를 빼고 상태 화면 앱·`launch` 서비스·`svc/lib.sh`만 남김). USB 설치기(`usb/`, `scripts/build.sh`)는 아직 2.0.x 설치기이고 #45에서 바꿉니다. 2.0.x는 정식 없이 끝냅니다.
+  - 모드(`mod/`)와 상태 화면 판정은 2.1.0 구조로 바꿨습니다(한국 포크 무선 모드 2.4.5와 `svc/hotspot.sh`를 빼고 상태 화면 앱·`launch` 서비스·`svc/lib.sh`만 남김). USB 설치기(`usb/troubleShooter`, `scripts/build.sh`)도 2.1.0 구조로 바꿨습니다(HMG-API 쪽 일, 공식 무선 모드 설치, 옛 2.0.x 되돌리기, map·적용, PR #52). 2.0.x는 정식 없이 끝냅니다.
   - 2.0.x의 마지막 `release/2.0.4`(`v2.0.4-beta.1`)는 `main`에 합치지 않고 지웁니다.
 - 상태 화면 앱은 지금 UI를 그대로 둡니다(사용자 결정).
 
