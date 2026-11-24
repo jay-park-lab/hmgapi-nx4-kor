@@ -79,18 +79,47 @@ $_hh
 HKE
 }
 # --- HMG-API 부팅 보호(boot guard) 알리기(읽기만, 값을 되돌리거나 HMG-API 파일을 쓰지 않음) ---
-# 근거(HMG-API core/zygote/zygote.c): zygote가 시작할 때마다 /data/hmgapi/hook/starts를 1 올리고(bump_starts, 올리기 전 값을
-# 돌려줌) 그 값이 MAXSTARTS(3) 이상이면 그 시작의 훅을 모두 끄고 커널 로그에 "hmgapi-hook: zygote, hooks off (boot guard, starts=N)"을
-# 남긴다. 훅이 켜지면 "…, hooks on, start N"이고, GUARD_DELAY(120)초 뒤 zygote가 살아 있으면 watcher가 0으로 되돌린다.
-# 그래서 지금 읽은 값(올린 뒤 값)이 4 이상이면 이번 시작은 훅이 꺼진 것이다(3이면 아직 켜진 시작 3번째: 2분 안에 또 재부팅하면 꺼짐).
-# 0으로 되돌리는 것은 훅이 켜진 부팅의 watcher와 HMG-API 설치(install.sh: echo 0 > hook/starts)뿐이다.
+# 근거(HMG-API rc.6 이후 core/zygote/zygote.c. 2.1.0은 HMG-API 1.1.0-rc.8 이상만 받으므로 rc.4의 규칙은 두지 않는다):
+# zygote가 시작할 때마다(hook/enable이 있고 hook/disable이 없고 훅 라이브러리가 있을 때) bump_starts가 두 횟수를 1씩 올린다.
+#   hook/starts: 120초(GUARD_DELAY)를 버티지 못한 시작이 재부팅을 넘어 이어진 횟수
+#   hook/boot: "<boot_id> <이번 커널 부팅 안의 횟수>". 다른 부팅의 것이면 0부터 센다. boot_id가 없으면 이 파일을 쓰지 않고
+#     모든 시작을 한 부팅으로 센다(이번 부팅 횟수 = starts)
+# 올리기 전 값으로 이번 부팅 횟수 ≥ MAXSTARTS(3)이거나 starts ≥ MAXBOOTS(6)이면 그 시작의 훅을 모두 끄고 커널 로그에
+# "hmgapi-hook: zygote, hooks off (boot guard, starts=N, this boot M)"(올리기 전 값)을 남긴다. 켜면 "…, hooks on, start N (this boot M)"
+# (올린 뒤 값)이다. 훅이 켜진 시작이 120초를 버티면 watcher가 starts를 0으로 쓰고 hook/boot를 지운다(start_watcher. 훅이 꺼진
+# 시작에는 watcher가 없다). 그 밖에 되돌리는 것은 HMG-API 설치(install.sh: starts를 0으로, hook/boot 삭제)뿐이다.
+# 여기서 읽는 값은 이번 zygote 시작이 올린 뒤 값이다. 그래서
+#   - 이번 시작의 훅이 꺼짐: 이번 부팅 횟수 ≥ 4, 또는 이번 부팅에 센 기록이 있고(≥ 1) starts ≥ 7 (guard_files)
+#   - 다음 시작의 훅이 꺼짐: 다음 시작이 재부팅(새 커널 부팅)이면 이번 부팅 횟수는 0부터라 starts만 본다. starts ≥ 6
+#     (boot_id가 없으면 모든 시작이 한 부팅이라 starts ≥ 3) (G_NEXT)
+ZG_MAXSTARTS=3
+ZG_MAXBOOTS=6
 HOOKSTARTS=${HOOKSTARTS:-/data/hmgapi/hook/starts}
 # starts 값(숫자). 못 읽으면 빈 값
 hook_starts() { _hs=; { read _hs < $HOOKSTARTS; } 2>/dev/null; case "$_hs" in ''|*[!0-9]*) _hs= ;; esac; echo "$_hs"; }
-# zygote.c는 hook/enable이 있고 hook/disable이 없을 때만 훅을 켜고 starts를 올린다. 둘 중 하나라도 어긋나면 starts는
-# 멈춘 옛 값이라 판정·거절에 쓰지 않는다. HOOKDIR는 starts 파일이 있는 폴더(PC 시험은 HOOKSTARTS로 바꿈)
+# zygote.c는 hook/enable이 있고 hook/disable이 없을 때만 훅을 켜고 횟수를 올린다. 둘 중 하나라도 어긋나면 횟수는
+# 멈춘 옛 값이라 판정·거절에 쓰지 않는다. HOOKDIR는 starts 파일이 있는 폴더(PC 테스트는 HOOKSTARTS로 바꿈)
 HOOKDIR=${HOOKDIR:-${HOOKSTARTS%/*}}
 hook_armed() { [ -f $HOOKDIR/enable ] && [ ! -f $HOOKDIR/disable ]; }
+HOOKBOOT=${HOOKBOOT:-$HOOKDIR/boot}
+# 부팅 보호 횟수를 읽는다(모두 이번 시작이 올린 뒤 값). G_ST: starts(못 읽으면 빈 값). G_IB: 이번 부팅 횟수(hook/boot가 이번
+# 부팅 것이면 그 값, 다른 부팅 것·없음·깨짐이면 0. boot_id를 못 읽으면 zygote처럼 starts). G_NEXT: starts가 이 값 이상이면
+# 다음 시작(재부팅)의 훅도 꺼짐
+guard_read() {
+  G_ST=$(hook_starts); G_NEXT=$ZG_MAXBOOTS; G_IB=0
+  _gb=$(boot_id)
+  if [ -z "$_gb" ]; then G_IB=${G_ST:-0}; G_NEXT=$ZG_MAXSTARTS; return 0; fi
+  _gbi=; _gbn=; { read _gbi _gbn _gbx < $HOOKBOOT; } 2>/dev/null
+  if [ "$_gbi" = "$_gb" ]; then case "$_gbn" in ''|*[!0-9]*) ;; *) G_IB=$_gbn ;; esac; fi
+  return 0
+}
+# 파일로 본 "이번 시작은 부팅 보호로 훅이 꺼짐"(guard_read 뒤에 부름. 커널 로그에 이번 zygote 줄이 없을 때 쓴다).
+# hook/boot가 이번 부팅 것이 아니면(watcher·설치가 지웠거나, 이번 부팅 zygote가 세지 않음) starts는 지난 부팅까지의 값이라
+# 그것만으로 꺼졌다고 보지 않는다
+guard_files() {
+  [ "$G_IB" -ge $((ZG_MAXSTARTS + 1)) ] && return 0
+  [ "$G_IB" -ge 1 ] && [ -n "$G_ST" ] && [ "$G_ST" -ge $((ZG_MAXBOOTS + 1)) ]
+}
 # HMG-API 설치 판(installed.txt의 version). 설치돼 있지 않으면 빈 값
 hmg_ver() { $BB awk '$1 == "version" { print $2; exit }' ${HMGINST:-$HMGDATA/installed.txt} 2>/dev/null; }
 # 이번 부팅 zygote의 훅 줄(커널 로그)을 읽어 ZH(마지막 줄: on·guard·off·빈 값 = 이번 부팅 줄 없음)와 ZON(마지막 "hooks on" 줄의
@@ -136,13 +165,14 @@ st_collect() {
   K_PROJ=$(yesno proj_asked $WM_ID); K_APBOOT=$(yesno this_boot $HMGWIFI/ap.boot); K_APFAIL=$(yesno this_boot $HMGWIFI/ap.fail)
   K_UP=$(up_s); case "$K_UP" in ''|*[!0-9]*) K_UP= ;; esac
   # HMG-API 부팅 보호. HMG-API가 설치돼 있을 때만 본다(지운 차·disable로 끈 차는 starts가 남아도 아님).
-  # 이번 부팅 커널 로그에 zygote 줄이 있으면 그것을 따른다(마지막 줄: guard면 맞음, on·다른 off면 아님). 줄이 없을 때만 starts≥4를 쓴다
-  K_STARTS=$(hook_starts); zygote_info; K_ZHOOK=$ZH; K_GUARD=no
+  # 이번 부팅 커널 로그에 zygote 줄이 있으면 그것을 따른다(마지막 줄: guard면 맞음, on·다른 off면 아님). 줄이 없을 때만(로그가
+  # 밀려남 등) hook 파일로 본다(guard_files: 이번 부팅 횟수 ≥ 4, 또는 이번 부팅에 센 기록이 있고 starts ≥ 7)
+  guard_read; K_STARTS=$G_ST; K_GNEXT=$G_NEXT; zygote_info; K_ZHOOK=$ZH; K_GUARD=no
   if [ -n "$K_HMGV" ]; then
     case "$K_ZHOOK" in
       guard) K_GUARD=yes ;;
       on|off) ;;
-      *) hook_armed && [ -n "$K_STARTS" ] && [ "$K_STARTS" -ge 4 ] && K_GUARD=yes ;;
+      *) hook_armed && guard_files && K_GUARD=yes ;;
     esac
   fi
   # 이번 부팅의 설치 진행 기록(USB 설치기가 씀. 지난 부팅 것은 빈 값)
@@ -163,11 +193,16 @@ st_verdict() {
   _vconn=no; [ "${K_CP:-0}" != 0 ] && _vconn=yes
   _vs() { V_CODE=$1; V_LV=$2; V_MSG=$3; }
   # HMG-API 부팅 보호에 걸려 이번 부팅 훅이 꺼짐. 연결 중이 아니면 다른 판정보다 앞에(이것을 풀지 않으면 다른 것은 의미 없음).
-  # HMG-API를 지우면 모드가 바꾼 파일이 순정으로 돌아가 다시 적용해야 하므로, 지우지 말고 다시 설치(업데이트)하라고 쓴다.
-  # 이번 부팅은 부팅 보호로 시작했는데 지금 starts가 4보다 작으면(걸린 부팅에서는 4 이상이 남는다) 그 사이 HMG-API를
-  # 다시 설치해 0이 된 것이다. 같은 일을 또 시키지 않고 재부팅만 안내한다
-  if [ "$K_GUARD" = yes ] && [ "$_vconn" = no ] && [ "$K_ZHOOK" = guard ] && [ -n "$K_STARTS" ] && [ "$K_STARTS" -lt 4 ]; then
-    _vs bootguard 1 "HMG-API를 다시 설치한 것으로 보입니다. 내비를 재부팅하고 3분 넘게 켜 두세요."
+  # 다음 시작(재부팅, 새 커널 부팅)은 이번 부팅 횟수가 0부터라 starts만 본다. 지금 starts가 G_NEXT(6)보다 작으면 재부팅만으로
+  # 훅이 다시 켜진다(한 부팅 안에서 3번 못 떠 꺼진 경우, 그 사이 HMG-API를 다시 설치해 0이 된 경우). 그래서 재부팅만 안내한다(노랑).
+  # 한 부팅 안에서 3번 못 뜬 것은 훅·모드가 일으킨 크래시 반복일 수 있어(zygote.c 머리 주석) 원인이 그대로면 재부팅 뒤 되풀이되므로,
+  # 또 생기면 마지막으로 넣거나 바꾼 모드를 끄라고 덧붙인다(PR #55 리뷰 1).
+  # 6 이상이면 다음 시작도 꺼지므로 다시 설치(starts를 0으로)를 안내한다(빨강). 못 읽으면 다음 시작을 알 수 없어 같은 빨강으로 둔다:
+  # 파일이 없거나 숫자가 아니면 zygote.c readnum이 0으로 읽어 다음 시작은 켜지지만, 읽기만 막힌 경우(권한 등)에는 값이 6 이상일 수
+  # 있다. 다시 설치하면 어느 쪽이든 0으로 맞춘다(PR #55 리뷰 3). HMG-API를 지우면 모드가 바꾼 파일이
+  # 순정으로 돌아가 다시 적용해야 하므로, 지우지 말고 다시 설치(업데이트)하라고 쓴다
+  if [ "$K_GUARD" = yes ] && [ "$_vconn" = no ] && [ -n "$K_STARTS" ] && [ "$K_STARTS" -lt "$K_GNEXT" ]; then
+    _vs bootguard 1 "HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). 내비를 재부팅하고 3분 넘게 켜 두세요. 또 생기면 마지막으로 넣거나 바꾼 모드를 HMG-API 앱에서 꺼 주세요."
   elif [ "$K_GUARD" = yes ] && [ "$_vconn" = no ]; then
     _vs bootguard 2 "HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다. HMG-API를 지우지 말고 HMG-API USB로 다시 설치(업데이트)한 뒤 재부팅하고, 3분 넘게 켜 두세요."
   elif [ "$K_PST" = run ]; then _vs installing 1 "설치 중입니다. 끝날 때까지 기다려 주세요."
@@ -357,23 +392,27 @@ take_rbreq() {
          aplog "설치 진행 기록이 run인 채 $((_un - _put))초 그대로: 멈춘 기록으로 보고 설치 중으로는 막지 않음" ;;
     esac
   fi
-  # HMG-API watcher가 starts를 0으로 되돌리기 전에 다시 부팅하면 쌓여, 지금 값이 2·3이면 다음(또는 그다음) 시작에 훅이
-  # 꺼진다. 앱은 root 파일 starts를 읽을 수 없어 root가 거절한다(code=guard, 앱은 "2~5분 뒤에"). 4 이상(이미 꺼짐)·못 읽음이면 막지 않는다.
+  # HMG-API 부팅 보호(rc.6 이후 규칙, 위 "부팅 보호" 근거). [지금 재부팅]은 새 커널 부팅이라 다음 zygote 시작의 이번 부팅
+  # 횟수는 0부터다. 그래서 MAXBOOTS(6) 쪽 starts만 본다. watcher가 starts를 0으로 되돌리기 전에 다시 부팅하면 쌓여, 지금 값이
+  # 6이면 다음 시작에, 5면 그다음 시작에(또 2분 안에 재부팅하면) 훅이 꺼진다. 그래서 G_NEXT-1·G_NEXT(5·6)만 거절한다.
+  # 앱은 root 파일 starts를 읽을 수 없어 root가 거절한다(code=guard, 앱은 "3~5분 뒤에"). 4 이하·7 이상·못 읽음이면 막지 않는다.
+  # 요청은 이번 부팅 id가 있어야 받으므로(req_peek) 여기서는 boot_id가 늘 있다(G_NEXT=6).
   # watcher는 커널 부팅이 아니라 zygote 시작 뒤 GUARD_DELAY(120)초에 돈다(zygote.c start_watcher). 그래서 이번 부팅의
   # 마지막 "hooks on" 줄 커널 시각 + 120 + 여유 15초까지 막고, 그 줄이 없으면 부팅 뒤 300초까지 막는다(늘 끝이 있다). watcher가
-  # 돌아 starts가 0·1이 되면 바로 풀린다
+  # 돌아 starts가 0이 되면 바로 풀린다
   # 10장 확인 리뷰 1: HMG-API가 설치돼 있지 않거나(--purge 없이 지워 starts가 남은 차) 이번 부팅 zygote 줄이 off·guard(disable 파일,
-  # 이미 꺼짐)면 막지 않는다. 줄이 없으면 enable이 있고 disable이 없을 때만 본다(그래야 starts가 실제로 올라간다)
-  _gst=$(hook_starts); zygote_info; _garm=no
+  # 이미 꺼짐)면 막지 않는다. 줄이 없으면 enable이 있고 disable이 없고(그래야 starts가 실제로 올라간다), 파일로 보아 이번 시작이
+  # 이미 꺼진 것(guard_files)이 아닐 때만 본다
+  guard_read; _gst=$G_ST; zygote_info; _garm=no
   if [ -n "$(hmg_ver)" ]; then
     case "$ZH" in
       on) _garm=yes ;;
-      '') hook_armed && _garm=yes ;;
+      '') hook_armed && ! guard_files && _garm=yes ;;
     esac
   fi
   if [ -n "$ZON" ]; then _gend=$((ZON + ${NX4_GUARD_DELAY:-120} + 15)); else _gend=300; fi
-  if [ $_garm = yes ] && [ -n "$_gst" ] && [ "$_gst" -ge 2 ] && [ "$_gst" -le 3 ] && [ "$_un" -lt $_gend ]; then
-    aplog "재부팅 요청 거절: 부팅 뒤 ${_un}초(HMG-API 시작 확인 시각 ${_gend}초 전)이고 HMG-API 부팅 보호 횟수 starts=$_gst(3분 안에 재부팅을 반복하면 훅이 꺼짐)"
+  if [ $_garm = yes ] && [ -n "$_gst" ] && [ "$_gst" -ge $((G_NEXT - 1)) ] && [ "$_gst" -le $G_NEXT ] && [ "$_un" -lt $_gend ]; then
+    aplog "재부팅 요청 거절: 부팅 뒤 ${_un}초(HMG-API 시작 확인 시각 ${_gend}초 전)이고 HMG-API 부팅 보호 횟수 starts=$_gst(켜지고 2분 안의 재부팅이 ${G_NEXT}번 이어지면 다음 시작에 훅이 꺼짐)"
     rb_result guard
     return 1
   fi
