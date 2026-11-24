@@ -125,8 +125,8 @@ jobs:
           for i in 1 2 3; do
             rc=0; step=update
             sudo timeout 90 apt-get $A update -qq || rc=$?
-            if [ $rc = 0 ]; then step=download; sudo timeout 90 apt-get $A install -y -qq --download-only mksh || rc=$?; fi
-            if [ $rc = 0 ]; then step=install; sudo apt-get install -y -qq --no-download mksh || rc=$?; fi
+            if [ $rc = 0 ]; then step="install --download-only"; sudo timeout 90 apt-get $A install -y -qq --download-only mksh || rc=$?; fi
+            if [ $rc = 0 ]; then step="install --no-download"; sudo apt-get install -y -qq --no-download mksh || rc=$?; fi
             if [ $rc = 0 ]; then exit 0; fi
             if [ $rc = 124 ]; then why="90초 넘게 멈춤"; else why="종료 코드 $rc"; fi
             if [ $i -lt 3 ]; then
