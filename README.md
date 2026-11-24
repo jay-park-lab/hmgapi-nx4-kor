@@ -95,6 +95,7 @@
        └─ hmgapi               HMG-API 설치기
    ```
 2. 시동을 건 채 차를 세우고 USB를 꽂은 뒤 Engineering Mode → USB Copy → DSP → Update OTA를 누릅니다.
+   - **NEMESIS에 Korea Projection이 있는 차:** "NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다"가 나오고 아무것도 바꾸지 않습니다(HMG-API 설치 전에 멈춤). NEMESIS에서 Korea Projection을 지우고 재부팅한 뒤 다시 누릅니다. 아래 "알아 두실 점".
    - **HMG-API가 없는 차:** "NX4 KOR: HMG-API를 먼저 설치합니다"가 나오고 HMG-API가 설치된 뒤 재부팅됩니다. 부팅이 끝나고 1~2분 뒤 **같은 USB로 Update OTA를 한 번 더** 누릅니다.
    - **HMG-API가 1.1.0-rc.8보다 낮은 차:** "NX4 KOR: HMG-API를 …에서 …(으)로 먼저 올립니다"가 나오고 HMG-API가 업데이트된 뒤 재부팅됩니다. 위와 같이 한 번 더 누릅니다. USB에 HMG-API가 없으면 아무것도 바꾸지 않고 멈춥니다.
    - **HMG-API 1.1.0-rc.8 이상인 차:** 바로 아래 3으로 갑니다.
@@ -140,7 +141,7 @@ NX4 KOR에는 설정이 없습니다. 무선 기능의 설정은 HMG-API 앱의 
 ## 알아 두실 점
 
 - 설치 뒤 약 5분 동안 재부팅하지 마세요.
-- **NEMESIS로 Korea Projection이나 다른 무선·핫스팟 패키지를 설치해 두었다면 먼저 지우세요.** 함께 두면 HMG-API의 프로젝션 AP와 Wi-Fi를 다툽니다(상태 화면 `otherwifi`). 공식 무선 모드와 같은 훅을 `replace`로 거는 다른 HMG-API 모드와도 함께 켤 수 없습니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)). 자세한 것은 [`docs/design.md`](docs/design.md) "다른 패키지·모드와 함께 쓸 때".
+- **NEMESIS로 Korea Projection이나 다른 무선·핫스팟 패키지를 설치해 두었다면 먼저 지우세요.** 함께 두면 HMG-API의 프로젝션 AP와 Wi-Fi를 다툽니다(상태 화면 `otherwifi`). 그중 Korea Projection이 있으면 USB 설치기가 설치·업데이트를 하지 않고 멈춥니다("NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다", 아무것도 바꾸지 않음). NEMESIS에서 지운 뒤 다시 누릅니다. 다른 NEMESIS 패키지와 USB 지우기(`UNINSTALL`)는 막지 않습니다([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). 공식 무선 모드와 같은 훅을 `replace`로 거는 다른 HMG-API 모드와도 함께 켤 수 없습니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)). 자세한 것은 [`docs/design.md`](docs/design.md) "다른 패키지·모드와 함께 쓸 때".
 - 프로젝션 AP가 켜져 있는 동안에는 내비가 휴대폰 핫스팟(일반 Wi-Fi)에 붙을 수 없습니다. Wi-Fi 칩 하나가 AP 역할을 하기 때문입니다. HMG-API 앱의 "집 Wi-Fi"(Home Wi-Fi)를 켜면 주차한 동안만 HMG-API가 AP를 끄고 집 Wi-Fi에 붙습니다.
 - **계기판·HUD 길안내의 한계:** 공식 무선 모드가 폰의 지도 앱이 보내 주는 정보(다음 회전의 종류·방향·남은 거리·도로 이름)까지만 보내서 순정 내비와 똑같지 않습니다. 지하차도·고가차도 구분, 일부 갈림길·회전교차로 모양, 방면 표시는 다르거나 나오지 않을 수 있고, 지도 앱마다 보내는 정보가 다릅니다.
 - **map이 생기기 전(훅이 꺼진 동안)에는 HMG-API가 순정 OTA 업데이트를 막지 못합니다.** 펌웨어가 업데이트되면 HMG-API의 시스템 파일이 지워지니, 그때는 HMG-API부터 다시 설치합니다.
