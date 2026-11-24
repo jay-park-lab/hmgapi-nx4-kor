@@ -1,5 +1,7 @@
 # NX4 KOR 설계
 
+2.1.0의 처리 흐름(설치·업데이트, 재부팅 뒤 무선 연결, 상태 화면, 지우기)을 그림으로 줄인 것은 [`flow.md`](flow.md)에 있습니다. 이 문서의 흐름을 바꾸면 그 그림도 함께 고칩니다.
+
 ## 2.1.0 새 구조(계획)
 
 2026-11-23에 방향을 다시 정했습니다([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38), 할 일 [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45), 마일스톤 [2.1.0](https://github.com/jay-park-lab/hmgapi-nx4-kor/milestone/1)). 2.1.0은 다음 셋으로 됩니다.

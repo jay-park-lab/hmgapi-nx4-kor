@@ -175,6 +175,7 @@ NX4 KOR에는 설정이 없습니다. 무선 기능의 설정은 HMG-API 앱의 
 | `usb/` | USB 설치기(`troubleShooter`)와 USB 안내(`README.txt`) |
 | `scripts/` | `build-app.sh`(상태 화면 앱), `build.sh`(서명한 모드 zip과 USB 묶음) |
 | `docs/design.md` | 설계와 차에서 확인할 것 |
+| `docs/flow.md` | 설치부터 무선 연결·상태 화면·지우기까지의 처리 흐름 그림(mermaid) |
 | `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때 |
 | `docs/emulator-test.md` | 에뮬레이터에서 상태 화면 앱 시험 |
 | `docs/git-flow.md` | 브랜치 전략(Git Flow) |
