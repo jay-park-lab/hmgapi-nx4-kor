@@ -124,7 +124,7 @@ sequenceDiagram
   participant P as 휴대폰
 
   K->>H: 부팅, zygote 시작
-  H->>H: map 확인(state/map-check.json)과 부팅 보호(hook/starts) 확인
+  H->>H: map 확인(state/map-check.json)과 부팅 보호 확인<br/>(이번 부팅 3번, 재부팅을 넘어 6번: hook/boot, hook/starts)
   alt map이 맞고 부팅 보호에 걸리지 않음
     H->>W: 훅 올림(공식 무선 모드, 앱 메뉴 타일)
   else map 없음·맞지 않음·부팅 보호
