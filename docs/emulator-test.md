@@ -133,7 +133,7 @@ done
 | `nocar` | 다른 차 `product`, `verdict_end=yes` | 빨간 띠 "지원하지 않는 차입니다 …"와 그 아래 회색 지우는 방법 안내 |
 | `nobb` | 짧은 상태 파일(`support=nobb`) | 노란 띠 "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함) …", 왼쪽 칸은 요약 없이 짧은 표, **[지금 재부팅] 없음** |
 | `hint` | `ready`와 같고 힌트(`iph=wifi`, `aa=cpwait`)·알림 | 시안 판정 아래 노란 띠 두 개(아이폰 Wi-Fi 다시 연결, 안드로이드 오토는 카플레이 연결 중이라 대기), 연노랑 띠 "알림 HH:MM …", 맨 아래 [지금 재부팅] |
-| `bootguard` | `verdict=bootguard`(수준 1, HMG-API 부팅 보호), `hooks=off`, `wm_hooks=off`, 무선 연결용 Wi-Fi 꺼짐 | 노란 띠 "HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). …"(5줄), 맨 아래 [지금 재부팅]. 왼쪽 칸 설치 "HMG-API 훅 꺼짐(부팅 보호)", 무선 Wi-Fi "꺼짐", 표의 공식 무선 모드 "2.2.0-rc.9, 훅이 안 켜짐", HMG-API 훅 "꺼짐 (verified, 마지막 부팅 기록)" |
+| `bootguard` | `verdict=bootguard`(수준 1, HMG-API 부팅 보호), 무선 연결용 Wi-Fi 꺼짐. `hooks`·`wm_hooks`는 앞 시작의 기록 그대로 `on`(`scen.sh` `guard()` 주석, 차의 값은 [`design.md`](design.md) "차에서 확인할 것") | 노란 띠 "HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). …"(5줄), 맨 아래 [지금 재부팅]. 왼쪽 칸 설치 "HMG-API 훅 꺼짐(부팅 보호)", 무선 Wi-Fi "꺼짐". 표의 공식 무선 모드 "2.2.0-rc.9, 켜짐", HMG-API 훅 "켜짐"(판정과 엇갈림) |
 | `bootguard2` | `bootguard`와 같고 수준 2 | 빨간 띠 "HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다. …"(5줄), 왼쪽 칸은 `bootguard`와 같음 |
 
 각 파일의 키는 `mod/bin/status.sh`(`status_kv`, `st_verdict`)와 `app/java/.../Report.java`를 따릅니다. 판정 코드를 더하거나 문구를 바꾸면 `scen.sh`에도 같은 경우를 넣습니다.
@@ -150,7 +150,7 @@ done
 |---|---|---|
 | `install`, `fix`, `sysw` | 설정을 마무리하는 중입니다. 잠시 뒤 다시 눌러 주세요. | 노랑 |
 | `old`, `bad` | 재부팅 요청을 받지 못했습니다. 다시 눌러 주세요. | 노랑 |
-| `guard` | HMG-API는 켜지고 2분 안의 재부팅이 6번 이어지면 무선 기능을 끕니다.<br>3~5분 뒤에 다시 눌러 주세요. | 노랑 |
+| `guard` | HMG-API는 내비가 켜지고 2분 안의 재부팅이 6번 이어지면 무선 기능을 끕니다.<br>3~5분 뒤에 다시 눌러 주세요. | 노랑 |
 | `cmd`, 그 밖의 값, 80초 동안 답 없음 | 재부팅하지 못했습니다. RESET 버튼으로 재부팅해 주세요. | 빨강 |
 
 `install`·`fix`·`sysw` 거절이 처음 거절부터 900초(`RB_STUCK_SECS`) 넘게 이어지면 빨간 RESET 안내로 바꿉니다(`ReportTest`가 봄).

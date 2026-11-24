@@ -48,8 +48,12 @@ E
 }
 # 무선 연결용 Wi-Fi(프로젝션 AP)가 꺼진 꼴
 noap() { sed -e 's/^ap=yes/ap=no/' -e 's/^ap_mode=projection/ap_mode=none/'; }
-# HMG-API 부팅 보호로 이번 부팅 훅이 꺼진 꼴: HMG-API 훅·공식 모드 훅 꺼짐, 이번 부팅에 무선 연결용 Wi-Fi를 띄우지 않음
-guard() { noap | sed -e 's/^hooks=on/hooks=off/' -e 's/^wm_hooks=on/wm_hooks=off/' -e 's/^ap_boot=yes/ap_boot=no/'; }
+# HMG-API 부팅 보호로 이번 시작의 훅이 꺼진 꼴: 이번 부팅에 무선 연결용 Wi-Fi를 띄우지 않음(ap·ap_boot는 가정).
+# hooks·wm_hooks는 base 그대로(on) 둔다. status.sh(hmg_hooks_load)는 이 둘을 HMG-API 기록의 마지막 "hook map: …, hooks on|off"와
+# "mods: loaded <id>" 줄에서 읽는데, 이 줄은 훅 런타임이 쓰고 부팅 보호로 꺼진 시작에는 훅 런타임이 올라오지 않는다. 그래서 앞
+# 시작이 남긴 켜짐 기록이 그대로 남을 것으로 본다(HMG-API rc.8 소스로 추론, PR #58 리뷰 1). 판정("훅 꺼짐")과 자세히 표의 훅 줄
+# ("켜짐")이 엇갈려 보이는 것은 그 때문이다. 차의 값은 docs/design.md "차에서 확인할 것"
+guard() { noap | sed -e 's/^ap_boot=yes/ap_boot=no/'; }
 verdict() { printf 'verdict=%s\nverdict_lv=%s\nverdict_msg=%s\nverdict_end=%s\ns1=%s\ns2=%s\ns3=%s\n' "$@"; }
 prog() { printf 'pct=%s\nstate=%s\nstage=%s\nstart=%s\nt=%s\nboot=%s\nstep=%s\nust=%s\nut=%s\n' "$1" "$2" "$3" $((NOW-120)) $NOW "$BOOT" "$4" $((UP-120)) $UP; }
 : > $D/notice; : > $D/hint
