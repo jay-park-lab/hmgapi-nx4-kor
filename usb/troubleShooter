@@ -31,7 +31,7 @@
 #   4. nx4-kor: 같은 판이면 건너뜀(REINSTALL이면 다시), 아니면 예전 판 정리(bin/uninstall.sh --update) → engine install.
 #      그 뒤 상태 화면을 열어 아래 5·6의 진행을 보여 준다
 #   5. map: 이 차의 map(state/local-map.json)이 없으면 map-car --write로 만들고 verify-map으로 확인한다. 확인에 실패하면
-#      이번에 만든 map만 지운다(map-car --forget). 이미 있던 map은 확인만 하고 지우지 않는다(hotspot.sh setup_hmgapi와 같은 규칙)
+#      이번에 만든 map만 지운다(map-car --forget). 이미 있던 map은 확인만 하고 지우지 않는다(2.0.x hotspot.sh setup_hmgapi와 같은 규칙)
 #   6. 계획(engine plan)이 우리 두 모드(nx4-kor, wireless-carplay-aa)의 변경(과 이번에 지운 모드의 되돌리기)뿐이고 훅이 켜질 때만
 #      engine apply. 아니면 적용하지 않고 HMG-API 앱에서 적용하라고 안내한다
 #   무엇이 바뀌었으면 재부팅을 안내한다(상태 화면의 [지금 재부팅]). 설치기는 재부팅하지 않는다.
