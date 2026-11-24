@@ -90,7 +90,7 @@
   - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
   - 2.0.x 서비스가 쓰던 상태 안내 `/data/local/tmp/nx4-kor-hint.txt`(아이폰·AA 안내)는 2.1.0에 쓰는 곳이 없습니다. 앱은 그대로 읽지만 보통 아무것도 보이지 않습니다.
 - [지금 재부팅]은 앱 개인 폴더의 `reboot.req`를 `status.sh --watch`(화면을 연 뒤 10분)가 받습니다. 설치 중(진행 기록 `run`), `/system`을 바꾸는 작업 중(HMG-API 적용·remount 등), HMG-API 부팅 보호에 걸릴 때는 거절합니다.
-  - 부팅 보호 거절은 `hook/starts`가 5·6이고, 이번 시작의 watcher가 돌기 전("hooks on" 줄 시각 + 135초, 그 줄이 없으면 부팅 뒤 300초)일 때입니다. 재부팅은 새 커널 부팅이라 다음 시작의 이번 부팅 횟수는 0부터이고, `starts`가 6이면 다음 시작에, 5면 그다음 시작에 훅이 꺼지기 때문입니다. 이번 시작이 이미 꺼졌으면(커널 줄 guard, 또는 파일로 보아 꺼짐) 막지 않습니다. 앱은 "켜지고 2분 안의 재부팅이 6번 이어지면 HMG-API가 무선 기능을 끕니다. 3~5분 뒤에 다시 눌러 주세요."를 보입니다.
+  - 부팅 보호 거절은 `hook/starts`가 5·6이고, 이번 시작의 watcher가 돌기 전("hooks on" 줄 시각 + 135초, 그 줄이 없으면 부팅 뒤 300초)일 때입니다. 재부팅은 새 커널 부팅이라 다음 시작의 이번 부팅 횟수는 0부터이고, `starts`가 6이면 다음 시작에, 5면 그다음 시작에 훅이 꺼지기 때문입니다. 이번 시작이 이미 꺼졌으면(커널 줄 guard, 또는 파일로 보아 꺼짐) 막지 않습니다. 앱은 "HMG-API는 내비가 켜지고 2분 안의 재부팅이 6번 이어지면 무선 기능을 끕니다."와 그 아래 줄 "3~5분 뒤에 다시 눌러 주세요."를 보입니다.
 - 진단 기록 확인 창(`DiagActivity`)은 USB 설치기가 엽니다(아래 "진단 기록"). 투명 화면 위에 확인 창만 보이고, 답을 앱 개인 폴더의 `diag.ans`에 씁니다.
 - **모양**은 투싼 NX4 순정 내비(표준형 5세대 와이드)의 타입1(어두운 화면)에 맞춥니다([#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)).
   - 색·글자 크기·여백은 `app/java/.../Ui.java` 한 곳에 둡니다. 값은 현대 국내형 Gen5W 웹 매뉴얼 그림에서 잰 근사값입니다. 크기는 1920x720 기준 px로 적고 화면 폭에 맞춰 늘이거나 줄입니다.
@@ -265,6 +265,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - 순정 무선 카플레이가 있는 트림에서도 같은지
   - 이 갈래들은 `tests/mod-test.sh`가 가짜 `ps`·`/proc`·softap.conf로 봅니다. 실제 `hostapd`의 부모·설정 경로·SSID가 그 꼴인지는 차에서만 확인됩니다.
 - **HMG-API 부팅 보호의 기록이 rc.8 소스와 같은 꼴인지**([#18](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/18)). adb로 `dmesg`의 zygote 줄이 `hmgapi-hook: zygote, hooks on, start N (this boot M)`인지, `/data/hmgapi/hook/boot`가 `<boot_id> <횟수>`인지 봅니다. 상태 화면을 열 무렵 그 줄이 `dmesg`에 남아 있는지도 봅니다(없으면 상태 화면은 `hook/starts`·`hook/boot`로 판정합니다).
+- **부팅 보호 때 상태 화면 "자세히" 표의 훅 줄(HMG-API 훅, 공식 무선 모드의 훅)이 무엇으로 보이는지.** 판정은 "훅 꺼짐(부팅 보호)"이지만, `status.sh`(`hmg_hooks_load`)는 이 줄들을 HMG-API 기록의 마지막 `hook map: …, hooks on|off`·`mods: loaded …` 줄에서 읽습니다. 부팅 보호로 꺼진 시작에는 이 줄을 쓰는 훅 런타임이 올라오지 않아 앞 시작의 "켜짐"이 남을 것으로 봅니다(rc.8 소스로 추론, `tests/emu/scen.sh` `bootguard`도 그렇게 넣음). 상태 파일의 `hooks`·`wm_hooks`(함께 `ap`·`ap_boot`)를 적고, 엇갈림을 고칠지는 그 뒤에 정합니다.
 - **HMG-API rc.8에서 이 모드의 `launch` 서비스가 도는지.** rc.5부터 `hmgapid`는 모드 서비스를 실효 그룹 2950(`MOD_GID`)과 `ANDROID_DNS_MODE=local`로 돌립니다. 상태 화면을 열면 상태 파일이 새로 쓰이고(화면 아래 "확인 …" 시각이 바뀜), [지금 재부팅]이 받아지면 확인한 것으로 봅니다.
 - **상태 화면 모양이 차에서 맞게 보이는지**(#28 순정 5W 모양). 결과는 [#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)과 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적습니다.
   - 화면 아래 정보 줄의 화면 크기와 밀도. 크기는 화면 폭에 맞춰 늘이고 줄이므로 1920 폭이 아니면 글자가 함께 커지거나 작아집니다.

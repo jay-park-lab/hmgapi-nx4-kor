@@ -308,9 +308,11 @@ final class Report {
     /**
      * root가 HMG-API 부팅 보호를 부추기지 않으려고 거절함(부팅 직후이고 HMG-API 시작 횟수 starts가 5·6. HMG-API rc.6 이후는
      * 2분을 버티지 못한 시작이 재부팅을 넘어 6번 이어지면 다음 시작의 훅을 끈다. status.sh take_rbreq).
-     * 시간이 지나면 풀리므로 이어진 거절 세기(rbStuckCode)에 넣지 않는다
+     * 시간이 지나면 풀리므로 이어진 거절 세기(rbStuckCode)에 넣지 않는다.
+     * "HMG-API"를 문장 앞에 둔다: 버튼 위 띠(폭 560)에서 줄 끝에 오면 "HMG-" 뒤에서 끊긴다(Android는 '-' 뒤에서 줄을 바꿀 수 있음).
+     * 할 일(3~5분 뒤에 다시 누르기)은 새 줄로 따로 보인다
      */
-    static final String RB_GUARD = "켜지고 2분 안의 재부팅이 6번 이어지면 HMG-API가 무선 기능을 끕니다. 3~5분 뒤에 다시 눌러 주세요.";
+    static final String RB_GUARD = "HMG-API는 내비가 켜지고 2분 안의 재부팅이 6번 이어지면 무선 기능을 끕니다.\n3~5분 뒤에 다시 눌러 주세요.";
 
     /**
      * 같은 이유(설치 중·바깥 /system 작업)로 이어진 거절이 처음 거절부터 이만큼(초) 지나도 계속되면 RESET 안내로 넘긴다.
