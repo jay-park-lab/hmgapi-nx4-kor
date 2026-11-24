@@ -48,7 +48,7 @@ USB로 설치하다 멈추거나, 설치 뒤 상태 화면이 빨강·노랑일 
 | HMG-API가 없습니다. HMG-API USB 설치(HMGAPI 폴더)를 먼저 해 주세요 | HMG-API가 없는데 USB에 HMG-API가 없음 | 위와 같습니다 |
 | USB에서 복사하지 못했습니다 / USB에 NX4/install(…)이 없습니다 / USB에 NX4/wireless(…)가 없습니다 | USB 읽기 문제나 파일 빠짐(2.0.x 묶음에는 `NX4/wireless`가 없음) | 2.1.0 이후 묶음인지 보고, USB를 다시 포맷해 zip을 다시 풉니다 |
 | 이 USB의 NX4 KOR(…)는 옛 2.0.x 꼴(공식 무선 모드와 충돌)이라 이 설치기와 함께 쓸 수 없습니다 | 2.1.0 설치기에 2.0.x 모드가 든 묶음(직접 만든 묶음 등). 아무것도 바꾸지 않았습니다 | 2.1.0 이후의 릴리스 USB 묶음을 씁니다 |
-| NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다 | NEMESIS의 Korea Projection 패키지(`/data/nemesis/apps/korea.projection`)가 있음. 그 패키지의 `hostapd`가 HMG-API 프로젝션 AP와 Wi-Fi를 다툽니다. HMG-API를 설치·업데이트하기 전에 멈춰 아무것도 바꾸지 않았습니다 | NEMESIS에서 Korea Projection을 지우고 재부팅한 뒤 다시 누릅니다. 다른 NEMESIS 패키지와 `UNINSTALL`은 막지 않습니다([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)) |
+| NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다 | NEMESIS의 Korea Projection 패키지(`/data/nemesis/apps/korea.projection`)가 있음. 그 패키지의 `hostapd`가 HMG-API 프로젝션 AP와 Wi-Fi를 다툽니다. HMG-API를 설치·업데이트하기 전에 멈춰 아무것도 바꾸지 않았습니다 | NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤 다시 누릅니다. 재부팅 전에는 그 패키지 폴더나 Wi-Fi가 남아 있을 수 있습니다. 다른 NEMESIS 패키지와 `UNINSTALL`은 막지 않습니다([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)) |
 | HMG-API가 변경 사항 계획을 내지 못했습니다(끝나지 않은 적용 등) | `engine plan`이 계획을 내지 못함(끝나지 않은 적용·trial 등). 아무것도 바꾸지 않았습니다 | 내비를 재부팅하고 3분 넘게 기다린 뒤 다시 누릅니다. 같으면 `install.log`의 `--- engine plan (pre, 종료 코드 …)` 아래 줄을 남겨 알려 주세요 |
 | HMG-API에 다른 모드의 적용하지 않은 변경이 있습니다. HMG-API 앱에서 먼저 적용한 뒤 다시 해 주세요 | 시작 전 계획에 다른 모드의 변경이나, 앞서 지우고 적용하지 않은 모드의 되돌리기(`restore` 등)가 있음. 끝에서 적용할 수 없어 아무것도 바꾸지 않았습니다 | HMG-API 앱에서 변경 사항을 적용하고 재부팅한 뒤 다시 누릅니다. 앱을 열 수 없으면 아래 "HMG-API 앱을 열 수 없을 때" |
 | 옛 NX4 KOR(…)를 먼저 되돌리는 중 | 정상 흐름(2.0.x가 있는 차). 공식 무선 모드와 함께 쓸 수 없어 먼저 끝까지 되돌립니다 | 기다립니다 |

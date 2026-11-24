@@ -73,12 +73,15 @@ PY'
 check "상태 화면 앱 아이콘(android:icon) = 앱 메뉴 타일의 낮·밤 그림" \
   'grep -q "android:icon=\"@drawable/ic_launcher\"" $B/app/AndroidManifest.xml && cmp -s $B/app/res/drawable-hdpi/ic_launcher.png $PKG/icons/icon.png && cmp -s $B/app/res/drawable-night-hdpi/ic_launcher.png $PKG/icons/icon_night.png'
 # HMG-API USB 묶음 안의 파일 이름 NEMESIS.data(빌드가 빼는 파일)는 그대로 둔다.
-# USB 설치기의 Korea Projection 패키지 확인(#13)만 예외: NEMESIS·korea.projection은 설치기의 폴더 경로 한 줄(KORPROJ=)과,
-# 설치기 문구·스틱 README에서 "NEMESIS에서 Korea Projection을 먼저 지운 뒤"가 든 줄에서만 받는다. 다른 흔적(KP_*, wireless.projection,
-# 제보 등)은 그 줄에서도 잡는다(앞의 grep은 예외 없이 본다)
+# USB 설치기의 Korea Projection 패키지 확인(#13)만 예외: NEMESIS·korea.projection은 세 가지 줄에서만 받는다.
+#   설치기의 폴더 경로 한 줄(KORPROJ=…), 설치기의 문구 정의 한 줄(KORPROJ_MSG="…", 줄 전체가 아래 KORPROJ_TEXT와 같을 때만),
+#   스틱 README에서 "NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤"가 든 안내 줄.
+# 설치기의 다른 줄(문구를 주석으로 단 코드 줄 등)은 잡는다(PR #57 리뷰 3). 다른 흔적(KP_*, wireless.projection, 제보 등)은
+# 그 세 줄에서도 잡는다(앞의 grep은 예외 없이 본다)
+KORPROJ_TEXT="NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다. NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
 TRACE_IN="$PKG $B/usb $B/scripts --include=*.sh --include=troubleShooter --include=*.json --include=*.txt"
-check "NEMESIS·다른 차·제보 흔적 없음(모드·USB·빌드 스크립트. 설치기의 Korea Projection 패키지 확인 줄만 뺌, #13)" \
-  '! grep -rnE "KP_[A-Z]|korea-projection|KoreaProjection|CARS_OK|CARS_TRY|CARS_SEEN|req_tick|report\.req|carreport|wireless\.projection|제보|QR" $TRACE_IN && ! grep -rnE "NEMESIS|nemesis|korea\.projection" $TRACE_IN | grep -v "NEMESIS\.data" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+:KORPROJ=[$]ROOT/data/nemesis/apps/korea[.]projection$" | grep -vE "^[^:]*/usb/(troubleShooter|README[.]txt):[0-9]+:.*NEMESIS에서 Korea Projection을 먼저 지운 뒤"'
+check "NEMESIS·다른 차·제보 흔적 없음(모드·USB·빌드 스크립트. 설치기의 Korea Projection 패키지 확인 두 줄과 스틱 README 안내만 뺌, #13)" \
+  '! grep -rnE "KP_[A-Z]|korea-projection|KoreaProjection|CARS_OK|CARS_TRY|CARS_SEEN|req_tick|report\.req|carreport|wireless\.projection|제보|QR" $TRACE_IN && ! grep -rnE "NEMESIS|nemesis|korea\.projection" $TRACE_IN | grep -v "NEMESIS\.data" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+:KORPROJ=[$]ROOT/data/nemesis/apps/korea[.]projection$" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+:KORPROJ_MSG=\"$KORPROJ_TEXT\"$" | grep -vE "^[^:]*/usb/README[.]txt:[0-9]+:.*NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤"'
 # 정적 검사: 맨 위(함수 밖) 기본값 대입이 아래에서 정해지는 변수를 먼저 쓰지 않음, "> 파일 2>/dev/null" 순서가 없음
 python3 $B/tests/tools/defuse-check.py $PKG > $T/defuse.out 2>&1; DEFRC=$?
 check "정적 검사: 정의 전에 쓰는 변수·'> 파일 2>/dev/null' 순서가 모드 스크립트에 없음(tests/tools/defuse-check.py)" '[ $DEFRC = 0 ] && [ ! -s $T/defuse.out ]'
@@ -618,7 +621,7 @@ modset $K/install/payload/mod.json conflicts=-
 # 진단 기록 묻기 뒤, HMG-API 확인(HMG-API 설치기로 넘기기) 앞이라 같은 판이어도 상태 화면을 열지 않는다.
 # 다른 NEMESIS 패키지는 막지 않고, 지우기 갈래도 막지 않는다. 진단 기록은 [건너뛰기]로 두어 HMG-API 명령이 하나도 없는지 본다
 KPD=$R/data/nemesis/apps/korea.projection
-KPMSG="NX4 KOR: NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다. NEMESIS에서 Korea Projection을 먼저 지운 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
+KPMSG="NX4 KOR: $KORPROJ_TEXT"
 mkdir -p $KPD; echo no > $T/diag.reply; pset plan-new; cp $HD/mods/nx4-kor/mod.json $T/kp-nx4.json
 ts $U
 check "USB 설치기(#13): NEMESIS의 Korea Projection 패키지 폴더가 있으면 아무것도 바꾸지 않고 멈춤(종료 1, 안내 문구, 진단 기록은 먼저 물음, HMG-API 명령 없음, 같은 판이어도 상태 화면을 열지 않음, 진행 기록 없음)" \

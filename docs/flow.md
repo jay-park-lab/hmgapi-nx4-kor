@@ -57,7 +57,7 @@ flowchart TD
   UN -->|"아니요"| S0{"0. 스틱 확인<br/>묶음(install·wireless)이 있고<br/>nx4-kor가 2.1.0 꼴?"}
   S0 -->|"아니요<br/>(묶음 없음, 2.0.x 꼴)"| STOP0["멈춤: 2.1.0 이후의<br/>USB 묶음을 써 주세요"]
   S0 -->|"예"| KPKG{"NEMESIS의 Korea Projection 패키지<br/>(/data/nemesis/apps/korea.projection)가 있나?"}
-  KPKG -->|"예"| STOPK["멈춤: NEMESIS에서 Korea Projection을<br/>먼저 지워 주세요(KORPROJ_MSG)"]
+  KPKG -->|"예"| STOPK["멈춤: NEMESIS에서 Korea Projection을 지우고<br/>내비를 재부팅한 뒤 다시(KORPROJ_MSG)"]
   KPKG -->|"아니요"| H{"HMG-API가 있나?"}
   H -->|"없음 +<br/>스틱에 HMG-API 묶음 있음"| HU["스틱의 HMG-API 설치기로 넘김<br/>→ 재부팅 → Update OTA 한 번 더"]
   H -->|"없음 +<br/>스틱에도 없음"| STOP1["멈춤: HMG-API를 먼저<br/>설치하거나 올려 주세요"]

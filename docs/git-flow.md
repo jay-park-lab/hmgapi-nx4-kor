@@ -31,6 +31,10 @@
      - **새 방식은 2.0.4-beta.1부터입니다.** 2.0.3-beta.1까지는 파일의 판에 꼬리가 없었습니다(이미 공개한 `v2.0.3-beta.1`의 판은 `2.0.3`). 2.0.3의 베타를 꼬리 붙여 이어 가면, `v2.0.3-beta.1`을 넣은 차는 `2.0.3-beta.<n>`을 낮은 판이라 받지 못하고, 정식 `2.0.3`은 같은 판이라 건너뜁니다(PR #43 리뷰 2). 그래서 2.0.3은 정식으로 내지 않고 다음 판 2.0.4로 넘어갑니다.
      - 상태 화면(설치 중 제목 "NX4 KOR <판> 설치 중", 확인 줄)은 앱의 `versionName`을 그대로 보이므로, 차에서 어느 베타인지 바로 보입니다.
 5. **PR은 merge commit으로 합칩니다.** squash와 rebase 합치기는 쓰지 않습니다. 작업 브랜치 단위의 이력이 `main`·`develop`에 그대로 남아야 합니다.
+   - 명령은 `gh pr merge <PR> --merge`입니다. `develop` ruleset이 승인 1을 요구해(아래 "강제 장치"), `develop`으로 가는 PR은 `gh pr view <PR> --json mergeStateStatus,reviewDecision`이 `BLOCKED`, `REVIEW_REQUIRED`입니다. 혼자 쓰는 저장소라 자기 PR은 승인할 수 없습니다.
+   - 그때는 **사용자가 합치기를 고른 경우에만** `gh pr merge <PR> --merge --admin`으로 사용자 예외를 써서 합칩니다(GitHub 화면에서는 bypass 체크). PR #56을 이렇게 합쳤습니다(2026-11-24). `--admin`을 붙여도 merge commit이고, squash·rebase는 여전히 쓰지 않습니다.
+   - `BLOCKED`의 까닭이 승인이 아니면(충돌 등) `--admin`으로 넘기지 않고 그 까닭부터 풉니다.
+   - `develop` ruleset의 승인 수를 0으로 바꾸면 `--admin`은 필요 없습니다.
 6. **태그**
    - `release/`·`hotfix/`를 `main`에 합치면, 그 merge commit에 주석 태그 `v<판>`을 답니다(예: `v2.1.0`).
    - 차에서 확인하려고 배포 전에 묶음을 만들 때는 `release/` 브랜치에 `v<판>-beta.<n>` 태그를 답니다(예: `v2.1.0-beta.1`). 그 커밋의 파일 판은 태그에서 `v`만 뗀 것(`2.1.0-beta.1`)과 같아야 합니다(규칙 4, release 워크플로가 확인).
@@ -212,7 +216,7 @@ gh pr create --base develop --head hotfix/<판>
 | 장치 | 막는 것 | 상태 |
 |---|---|---|
 | `CLAUDE.md`의 브랜치 규칙 | Claude가 `main`·`develop`에서 작업, 메인 체크아웃에서 브랜치를 바꿔 작업(규칙 11), `origin/develop`이 아닌 곳에서 작업 시작(규칙 12, `hotfix/` 빼고), 이름이 틀린 브랜치, `feature/`에서 판 번호 바꾸기 | 적용됨 |
-| GitHub 브랜치 ruleset 두 개(`develop`, `main-protetion`) | `develop`: 직접 푸시·PR 없이 합치기(PR 필수, 승인 1), 강제 푸시, 브랜치 삭제. `main`: 강제 푸시, 브랜치 삭제. 둘 다 사용자(parkjoos)는 예외(`always`)라 막지 않습니다. Claude도 사용자 계정(`gh`)으로 푸시하므로 같은 예외를 받습니다 | 적용됨(2026-11-24 확인, 사용자가 켬, [#16](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/16)). `develop`은 `refs/heads/develop`, `main-protetion`은 기본 브랜치와 `refs/heads/main`이 대상입니다. 혼자 쓰는 저장소라 자기 PR은 승인할 수 없어, PR은 사용자 예외로 합칩니다. `main`에는 PR 필수가 없어 `main`에 직접 푸시하지 않는 것은 규칙 1로 지킵니다. 클래식 브랜치 보호는 쓰지 않습니다(ruleset과 규칙이 겹침). 아래 "처음 한 번" 3 |
+| GitHub 브랜치 ruleset 두 개(`develop`, `main-protetion`) | `develop`: 직접 푸시·PR 없이 합치기(PR 필수, 승인 1), 강제 푸시, 브랜치 삭제. `main`: 강제 푸시, 브랜치 삭제. 둘 다 사용자(parkjoos)는 예외(`always`)라 막지 않습니다. Claude도 사용자 계정(`gh`)으로 푸시하므로 같은 예외를 받습니다 | 적용됨(2026-11-24 확인, 사용자가 켬, [#16](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/16)). `develop`은 `refs/heads/develop`, `main-protetion`은 기본 브랜치와 `refs/heads/main`이 대상입니다. 혼자 쓰는 저장소라 자기 PR은 승인할 수 없어 `develop`으로 가는 PR은 `BLOCKED`(`REVIEW_REQUIRED`)입니다. 사용자가 합치기를 고른 경우에만 `gh pr merge <PR> --merge --admin`(사용자 예외, GitHub 화면은 bypass 체크)으로 합칩니다(규칙 5, PR #56 2026-11-24). `--admin`이어도 merge commit이고 squash·rebase는 쓰지 않습니다. 승인 수를 0으로 바꾸면 `--admin`은 필요 없습니다. `main`에는 PR 필수가 없어 `main`에 직접 푸시하지 않는 것은 규칙 1로 지킵니다. 클래식 브랜치 보호는 쓰지 않습니다(ruleset과 규칙이 겹침). 아래 "처음 한 번" 3 |
 | GitHub 저장소 설정 | 합친 브랜치 남기기 | 합친 브랜치 자동 삭제는 켜짐(2026-11-24 확인). squash·rebase 합치기는 그대로 허용합니다(2026-11-24 사용자 결정, [#16](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/16)). merge commit만 쓰는 것은 규칙 5와 `pr-review-cycle` 스킬로 지킵니다. 아래 "처음 한 번" 2 |
 | release 워크플로의 확인([`release.md`](release.md)) | 태그와 판 번호가 다른 묶음, `main`에 없는 정식 태그, 이미 낸 릴리스 다시 만들기, 커밋하지 않은 수정, `mod-test.sh` 실패, 다른 키로 서명한 앱·모드 | `develop`에 있음(#4, 2026-11-20). `v2.0.0-beta.1`(`release/2.0.0`의 `407ab2f`)에서 처음 돌았고, 태그 확인·PC 시험, 서명한 묶음 만들기(`production` 승인 뒤), GitHub 릴리스가 모두 성공했습니다(실행 `44652653040`, 2026-11-20 확인) |
 | GitHub `production` 환경(필수 리뷰어, 배포 ref `v*` 태그) | 승인 없이, 또는 `v*` 태그가 아닌 곳에서 배포 키를 쓰는 job | 적용됨(2026-11-20 확인): 필수 리뷰어 parkjoos(자기 승인 허용), 배포 ref는 `v*` 태그만, secret 세 개 있음. 관리자는 이 보호를 건너뛸 수 있습니다(`can_admins_bypass` 기본값). [`release.md`](release.md) "production 환경" |
@@ -236,7 +240,7 @@ gh pr create --base develop --head hotfix/<판>
    ```
 
 3. `main`과 `develop` 보호: 브랜치 ruleset 두 개를 GitHub 저장소 Settings → Rules → Rulesets에서 켭니다(2026-11-24 사용자가 켬, [#16](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/16)).
-   - `develop`: 대상 `refs/heads/develop`. 삭제 금지, 강제 푸시 금지, PR 필수(승인 1). 사용자 예외 `always`
+   - `develop`: 대상 `refs/heads/develop`. 삭제 금지, 강제 푸시 금지, PR 필수(승인 1). 사용자 예외 `always`. 승인 1이라 PR은 `--admin`으로 합칩니다(규칙 5). 승인 수를 0으로 바꾸면 필요 없습니다
    - `main-protetion`: 대상 기본 브랜치와 `refs/heads/main`. 삭제 금지, 강제 푸시 금지. 사용자 예외 `always`
    - 클래식 브랜치 보호(`branches/<브랜치>/protection`)는 쓰지 않습니다. ruleset과 함께 두면 규칙이 겹칩니다.
    - 지금 상태는 이렇게 봅니다(둘 다 `active`여야 함):

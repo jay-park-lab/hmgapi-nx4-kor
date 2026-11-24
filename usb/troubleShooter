@@ -98,8 +98,9 @@ OLDFAIL_MSG="옛 NX4 KOR를 되돌리지 못해 새로 설치하지 않았습니
 # 그것을 되돌리지 못하고 기록 폴더를 지우기만 하므로, 손대지 않고 2.0.x 판의 USB로 안내한다
 OLDLEFT_MSG="옛 NX4 KOR 2.0.x가 남긴 설정(Wi-Fi 잠금 등)이 있어 이 USB로는 되돌릴 수 없습니다. 2.0.x 릴리스 USB(v2.0.4-beta.1)의 NX4/UNINSTALL로 먼저 되돌린 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
 # 원본 Korea Projection 패키지(HMG-API 모드가 아닌 것)가 설치된 차(#13). 그 패키지의 hostapd가 HMG-API 프로젝션 AP와 Wi-Fi를 다툰다.
-# 설치·업데이트 갈래에서 아무것도 바꾸기 전에 멈추므로 진행 기록에는 쓰지 않는다(OLDLEFT_MSG와 같음)
-KORPROJ_MSG="NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다. NEMESIS에서 Korea Projection을 먼저 지운 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
+# 설치·업데이트 갈래에서 아무것도 바꾸기 전에 멈추므로 진행 기록에는 쓰지 않는다(OLDLEFT_MSG와 같음).
+# 지운 뒤 재부팅까지 안내한다: 패키지 폴더가 재부팅 때 없어지거나 그 hostapd가 재부팅 전까지 남는 차가 있을 수 있다(PR #57 리뷰 1)
+KORPROJ_MSG="NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다. NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
 
 log() { echo "$(date '+%m-%d %H:%M:%S') $1" >> $LOG; }
 toast() {
