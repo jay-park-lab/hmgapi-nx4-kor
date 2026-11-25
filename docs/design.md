@@ -90,7 +90,7 @@
   - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
   - 2.0.x 서비스가 쓰던 상태 안내 `/data/local/tmp/nx4-kor-hint.txt`(아이폰·AA 안내)는 2.1.0에 쓰는 곳이 없습니다. 앱은 그대로 읽지만 보통 아무것도 보이지 않습니다.
 - [지금 재부팅]은 앱 개인 폴더의 `reboot.req`를 `status.sh --watch`(화면을 연 뒤 10분)가 받습니다. 설치 중(진행 기록 `run`), `/system`을 바꾸는 작업 중(HMG-API 적용·remount 등), HMG-API 부팅 보호에 걸릴 때는 거절합니다.
-  - 부팅 보호 거절은 `hook/starts`가 5·6이고, 이번 시작의 watcher가 돌기 전("hooks on" 줄 시각 + 135초, 그 줄이 없으면 부팅 뒤 300초)일 때입니다. 재부팅은 새 커널 부팅이라 다음 시작의 이번 부팅 횟수는 0부터이고, `starts`가 6이면 다음 시작에, 5면 그다음 시작에 훅이 꺼지기 때문입니다. 이번 시작이 이미 꺼졌으면(커널 줄 guard, 또는 파일로 보아 꺼짐) 막지 않습니다. 앱은 "켜지고 2분 안의 재부팅이 6번 이어지면 HMG-API가 무선 기능을 끕니다. 3~5분 뒤에 다시 눌러 주세요."를 보입니다.
+  - 부팅 보호 거절은 `hook/starts`가 5·6이고, 이번 시작의 watcher가 돌기 전("hooks on" 줄 시각 + 135초, 그 줄이 없으면 부팅 뒤 300초)일 때입니다. 재부팅은 새 커널 부팅이라 다음 시작의 이번 부팅 횟수는 0부터이고, `starts`가 6이면 다음 시작에, 5면 그다음 시작에 훅이 꺼지기 때문입니다. 이번 시작이 이미 꺼졌으면(커널 줄 guard, 또는 파일로 보아 꺼짐) 막지 않습니다. 앱은 "HMG-API는 내비가 켜지고 2분 안의 재부팅이 6번 이어지면 무선 기능을 끕니다."와 그 아래 줄 "3~5분 뒤에 다시 눌러 주세요."를 보입니다.
 - 진단 기록 확인 창(`DiagActivity`)은 USB 설치기가 엽니다(아래 "진단 기록"). 투명 화면 위에 확인 창만 보이고, 답을 앱 개인 폴더의 `diag.ans`에 씁니다.
 - **모양**은 투싼 NX4 순정 내비(표준형 5세대 와이드)의 타입1(어두운 화면)에 맞춥니다([#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)).
   - 색·글자 크기·여백은 `app/java/.../Ui.java` 한 곳에 둡니다. 값은 현대 국내형 Gen5W 웹 매뉴얼 그림에서 잰 근사값입니다. 크기는 1920x720 기준 px로 적고 화면 폭에 맞춰 늘이거나 줄입니다.
@@ -127,6 +127,11 @@
 
 **설치·업데이트 순서**(같은 판도 같은 순서로 돌고, 이미 된 단계는 건너뜁니다)
 0. **스틱 확인**: 스틱의 nx4-kor(`payload/mod.json`)가 아직 옛 2.0.x 꼴(`conflicts`에 `wireless-carplay-aa`)이면 아무것도 바꾸지 않고 멈춥니다. HMG-API는 설치 때 `conflicts`를 보지 않아 설치는 되지만, 끝 계획이 conflict 문제로 막혀 2.0.x를 되돌린 뒤 아무것도 적용하지 못한 채 끝나기 때문입니다(PR #52 리뷰 2). 그래서 nx4-kor 2.1.0(PR #50)이 합쳐진 뒤에 만든 묶음만 씁니다. release 워크플로도 묶음의 `payload/mod.json`을 확인합니다.
+   - **Korea Projection 패키지**([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13), 2026-11-24 사용자 결정): NEMESIS의 Korea Projection 패키지 폴더(`/data/nemesis/apps/korea.projection`, KP 1.8.0 `NEMESIS.data`의 `id=korea.projection`)가 있으면 아무것도 바꾸지 않고 멈춥니다(`KORPROJ_MSG`: "NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다. NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤 다시 해 주세요."). 그 패키지의 `hostapd`가 HMG-API 프로젝션 AP와 Wi-Fi를 다투기 때문입니다.
+     - 재부팅까지 안내하는 것은 패키지 폴더가 재부팅 때 없어지거나 그 `hostapd`가 재부팅 전까지 남는 차가 있을 수 있어서입니다(PR #57 리뷰 1). 토스트, README, `usb/README.txt`, `docs/troubleshooting.md`의 안내가 모두 같은 뜻입니다.
+     - 그 패키지만 봅니다. NEMESIS 자체나 다른 NEMESIS 패키지(`wireless.projection` 등)는 막지 않습니다. 지우기(`UNINSTALL`·`UNINSTALL-ALL`)도 막지 않습니다.
+     - HMG-API에 든 한국 차 빌드 무선 모드(같은 id `wireless-carplay-aa`, 이름 "Korea Projection…")는 이것과 따로, 아래 3에서 공식판으로 바꿉니다.
+     - 차례: 진단 기록 묻기는 갈래를 가르기 전이라 이보다 먼저입니다. 스틱 확인 뒤, 위 "HMG-API 확인" 앞에서 봅니다. HMG-API가 없거나 낮으면 HMG-API 확인이 같은 스틱의 HMG-API 설치기로 넘겨 HMG-API를 설치·업데이트하고 재부팅하므로, 그 전에 멈춰야 아무것도 바꾸지 않습니다. 그래서 같은 판이어도 상태 화면은 열지 않고 토스트로만 알립니다.
    - 같은 판(다시 설치하지 않음)이고 상태 화면 앱이 있으면 여기서 상태 화면을 먼저 엽니다. 아래 단계에서 멈춰도 화면이 열립니다.
 1. **시작 전 계획**(`engine plan`): 다음이면 아무것도 바꾸지 않고 멈춥니다. 끝에서 적용할 수 없기 때문입니다.
    - 다른 모드의 적용하지 않은 변경(`change`·`update`·`setting`·`bind`)이나 HMG-API 밖에서 바뀐 파일(`rebase`)
@@ -154,10 +159,10 @@
 **진행 기록**: `/data/local/tmp/nx4-kor-progress.txt`를 2.0.x 서비스(`hotspot.sh` `prog`)와 같은 꼴로 씁니다. 상태 화면 앱(`Report.java`)이 그대로 읽어 막대를 보입니다.
 - 줄 차례: `pct`, `state`(`run`·`done`·`reboot`·`fail`), `stage`(한국어 문구), `start`, `t`, `boot`(이번 부팅 id), `step`(진행 중일 때 `<단계>/6`), `ust`, `ut`. 644로 씁니다.
 - 단계: 1 시작, 2 옛 판 정리, 3 공식 무선 모드, 4 NX4 KOR, 5 map 만들기·확인, 6 적용. 건너뛰는 단계가 있습니다.
-- 무엇을 바꾸기 시작한 뒤(시작 전 계획 확인 뒤)에만 씁니다. 그 전에 멈추면(HMG-API 없음·낮음, 다른 모드의 변경) 쓰지 않습니다.
+- 무엇을 바꾸기 시작한 뒤(시작 전 계획 확인 뒤)에만 씁니다. 그 전에 멈추면(Korea Projection 패키지, HMG-API 없음·낮음, 다른 모드의 변경) 쓰지 않습니다.
 - 끝의 `stage` 문구는 설치기 머리말의 `*_MSG` 값입니다. 상태 판정(`bin/status.sh`)이 이 문장으로 판정 코드를 가르므로 바꾸면 함께 봅니다. `OTHERPLAN_MSG`·`APPLYFAIL_MSG`·`DONE_REBOOT_MSG`·`DONE_MSG`는 2.0.x 서비스와 같은 문장입니다.
 
-**같은 판**: 상태 화면을 맨 앞(위 0)에서 엽니다. 그래서 뒤 단계에서 멈춰도 화면이 열리고, 타일이 없을 때 상태 화면을 여는 길로도 씁니다(HMG-API가 없거나 응답하지 않으면 그 전에 멈춥니다). nx4-kor는 다시 설치하지 않고, 공식 무선 모드는 스틱보다 낮을 때만 올리며, map은 없을 때만 만듭니다. 그다음 map 확인과 계획을 봅니다.
+**같은 판**: 상태 화면을 맨 앞(위 0)에서 엽니다. 그래서 뒤 단계에서 멈춰도 화면이 열리고, 타일이 없을 때 상태 화면을 여는 길로도 씁니다(Korea Projection 패키지가 있거나 HMG-API가 없거나 응답하지 않으면 그 전에 멈춥니다). nx4-kor는 다시 설치하지 않고, 공식 무선 모드는 스틱보다 낮을 때만 올리며, map은 없을 때만 만듭니다. 그다음 map 확인과 계획을 봅니다.
 
 **지우기**
 - `NX4/UNINSTALL`: nx4-kor만 지웁니다. HMG-API, 공식 무선 모드, 이 차의 map은 남깁니다.
@@ -225,7 +230,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 
 | 함께 있는 것 | 일어나는 일 | 상태 화면 |
 |---|---|---|
-| NEMESIS로 설치한 무선·핫스팟 패키지(Korea Projection, 무선 패키지 등) | 그 패키지의 `hostapd`가 HMG-API 프로젝션 AP와 Wi-Fi를 다툽니다 | 순정(netd)이 띄운 것이 아닌 `hostapd`가 돌고 연결이 없으면 `otherwifi`(그 패키지를 지우고 재부팅). 설치기가 막을지는 [#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13) |
+| NEMESIS로 설치한 무선·핫스팟 패키지(Korea Projection, 무선 패키지 등) | 그 패키지의 `hostapd`가 HMG-API 프로젝션 AP와 Wi-Fi를 다툽니다. 그중 Korea Projection(`/data/nemesis/apps/korea.projection`)이 있으면 USB 설치기가 설치·업데이트를 하지 않고 멈춥니다(위 "설치·업데이트 순서" 0, [#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13) 2026-11-24 사용자 결정). 다른 NEMESIS 패키지와 지우기는 막지 않습니다 | 순정(netd)이 띄운 것이 아닌 `hostapd`가 돌고 연결이 없으면 `otherwifi`(그 패키지를 지우고 재부팅) |
 | 공식 무선 모드와 같은 훅 지점에 `replace` 훅을 거는 다른 HMG-API 모드(한국 계기판 맞춤 등) | HMG-API는 모드를 id 순서(`requires`로 이어진 모드가 먼저, 그다음 id 이름순)로 올리고, 같은 지점을 `replace`하는 뒤쪽 모드의 훅을 통째로 끕니다(계획 `hooks <id> won't load: conflict: …`, HMG-API 로그 `mods: <id> not loaded: conflict: …`). `wireless-carplay-aa`보다 id가 앞인 모드와 겹치면 공식 모드가 꺼집니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)) | 공식 모드가 꺼진 쪽이면 `wmhooksoff`(HMG-API 앱의 Mods에서 겹치는 모드를 끔). 한국 맞춤은 공식 모드에 기여하는 길로 갑니다(#38) |
 | 공식 무선 모드를 꺼 두거나 지움 | 무선 카플레이·안드로이드 오토와 계기판 길안내가 없습니다. 이 모드는 `requires`로 걸지 않아 상태 화면은 그대로 열립니다 | `wirelessoff`, `nowireless` |
 | HMG-API의 "집 Wi-Fi"(HMG-API 앱 설정 > Home Wi-Fi, 기본 꺼짐) | 차를 끈 지 30초 뒤나 주차하면 HMG-API가 프로젝션 AP를 끄고 내비의 Wi-Fi 클라이언트로 집 Wi-Fi에 붙고, 차가 켜지면 되돌립니다(rc.8 `engine/HomeWifi.java`). 둘 다 HMG-API가 하므로 2.0.x처럼 Wi-Fi 설정 잠금과 부딪히지 않습니다 | 클라이언트가 도는 동안 `wificlient` |
@@ -244,6 +249,8 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - **DSP OTA 뒤 재부팅하지 않고 끝내도 되는지.** OTA 화면이 이상하게 남으면 상태 화면의 [지금 재부팅]이나 RESET을 쓰세요.
 - **DSP OTA 화면 위로 상태 화면이 열리는지**(`am start`). 안 열리면 재부팅 뒤 같은 USB로 Update OTA를 다시 누릅니다.
 - HMG-API 설치기가 NX4의 `app_process`를 아는지(모르면 `HMGAPI/FORCE`).
+- **Korea Projection이 설치된 차에서 USB 설치가 실제로 멈추는지**([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). Update OTA를 누르면 토스트 "NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다…"로 멈추고, 아무것도 바뀌지 않는지(HMG-API 설치·업데이트 없음, 진행 기록 없음) 봅니다. USB의 `NX4/install.log`에 `원본 Korea Projection 패키지가 있음(…)`이 남아야 합니다. 설치기가 그 폴더를 보지 못하면(경로가 다르거나 DSP OTA 프로세스에서 접근이 막힘) 조용히 지나가 예전처럼 설치합니다.
+- **NEMESIS에서 Korea Projection을 지우고 재부팅하면 `/data/nemesis/apps/korea.projection` 폴더가 없어지는지**([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). 지운 직후(재부팅 전)에도 없어지는지 함께 봅니다. USB 설치기는 그 폴더만 보고 멈추므로, 재부팅한 뒤에도 폴더가 남으면 계속 "NEMESIS에 Korea Projection이 설치되어 있어…"로 멈춥니다.
 - **Wi-Fi 부품이 없는 차에서 상태 화면이 "부품 없음"을 보이는지**(2026-11-23 NX4HEV 260902, 2.0.4-beta.1에서 순정 핫스팟 기능을 켜도 칩이 올라오지 않음, #38).
   - 공식 모드를 적용하고 재부팅한 뒤 HMG-API 기록 `/data/hmgapi/logs/hmgapi/wifi.log`에 `projection AP: not up yet, trying again (…)`이 남고, 상태 화면이 `nowifipart`(노랑, "Wi-Fi 부품이 없는 것으로 보여…")인지. 표의 "Wi-Fi 칩"이 "안 보임", "순정 핫스팟 기능"이 "예"인지
   - 부팅 뒤 5분 동안은 `apwait`("켜는 중")이고 그 뒤 `nowifipart`로 바뀌는지(첫 시도 실패로 `ap.fail`이 먼저 생겨도 5분 전에는 "부품 없음"이 나오지 않아야 함)
@@ -258,6 +265,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - 순정 무선 카플레이가 있는 트림에서도 같은지
   - 이 갈래들은 `tests/mod-test.sh`가 가짜 `ps`·`/proc`·softap.conf로 봅니다. 실제 `hostapd`의 부모·설정 경로·SSID가 그 꼴인지는 차에서만 확인됩니다.
 - **HMG-API 부팅 보호의 기록이 rc.8 소스와 같은 꼴인지**([#18](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/18)). adb로 `dmesg`의 zygote 줄이 `hmgapi-hook: zygote, hooks on, start N (this boot M)`인지, `/data/hmgapi/hook/boot`가 `<boot_id> <횟수>`인지 봅니다. 상태 화면을 열 무렵 그 줄이 `dmesg`에 남아 있는지도 봅니다(없으면 상태 화면은 `hook/starts`·`hook/boot`로 판정합니다).
+- **부팅 보호 때 상태 화면 "자세히" 표의 훅 줄(HMG-API 훅, 공식 무선 모드의 훅)이 무엇으로 보이는지.** 판정은 "훅 꺼짐(부팅 보호)"이지만, `status.sh`(`hmg_hooks_load`)는 이 줄들을 HMG-API 기록의 마지막 `hook map: …, hooks on|off`·`mods: loaded …` 줄에서 읽습니다. 부팅 보호로 꺼진 시작에는 이 줄을 쓰는 훅 런타임이 올라오지 않아 앞 시작의 "켜짐"이 남을 것으로 봅니다(rc.8 소스로 추론, `tests/emu/scen.sh` `bootguard`도 그렇게 넣음). 상태 파일의 `hooks`·`wm_hooks`(함께 `ap`·`ap_boot`)를 적고, 엇갈림을 고칠지는 그 뒤에 정합니다.
 - **HMG-API rc.8에서 이 모드의 `launch` 서비스가 도는지.** rc.5부터 `hmgapid`는 모드 서비스를 실효 그룹 2950(`MOD_GID`)과 `ANDROID_DNS_MODE=local`로 돌립니다. 상태 화면을 열면 상태 파일이 새로 쓰이고(화면 아래 "확인 …" 시각이 바뀜), [지금 재부팅]이 받아지면 확인한 것으로 봅니다.
 - **상태 화면 모양이 차에서 맞게 보이는지**(#28 순정 5W 모양). 결과는 [#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)과 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적습니다.
   - 화면 아래 정보 줄의 화면 크기와 밀도. 크기는 화면 폭에 맞춰 늘이고 줄이므로 1920 폭이 아니면 글자가 함께 커지거나 작아집니다.

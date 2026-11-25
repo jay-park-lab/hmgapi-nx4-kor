@@ -25,6 +25,8 @@ HMG-API 1.1.0-rc.8 이상이 필요합니다.
 
 설치·업데이트
   1. 시동을 걸고(차를 세운 상태) USB를 꽂습니다.
+     Korea Projection을 설치해 두었다면 NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤 합니다.
+     함께 있으면 Wi-Fi를 다퉈 설치기가 아무것도 바꾸지 않고 멈춥니다(지우기는 막지 않습니다).
   2. Engineering Mode > USB Copy > DSP > Update OTA를 누릅니다.
      "HMG-API를 먼저 설치합니다" 또는 "HMG-API를 …(으)로 먼저 올립니다"가 나오면 재부팅을 기다렸다가 한 번 더 누릅니다.
   3. 설치기가 차례로 합니다(OTA 화면의 오류 684는 정상입니다).
