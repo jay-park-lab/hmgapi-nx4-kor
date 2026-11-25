@@ -1,5 +1,18 @@
+# PC의 저장소 밖 경로(형식은 .env.example)
+/.env.local
+
+# 서명 키는 저장소 밖에 둔다(docs/release.md). 잘못 들어온 키도 git에 넣지 않는다
+*.keystore
+*.key
+
 # 빌드 결과(scripts/build.sh, scripts/build-app.sh)
 /out/
 /mod/app/
 /mod/bin/busybox
 /mod/bin/busybox-LICENSE.txt
+
+# Claude Code 작업 공간(세션마다 만드는 git worktree)
+/.claude/worktrees/
+
+# 브라우저 도구(Playwright MCP)가 실행한 폴더에 남기는 기록
+/.playwright-mcp/

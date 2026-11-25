@@ -1,19 +1,27 @@
 #!/bin/sh
-# NX4 KOR 상태 화면 앱(APK, 패키지 io.github.jayparklab.nx4kor)을 만든다 → mod/app/NX4KOR.apk
+# NX4 KOR 관리 앱(APK, 패키지 io.github.jayparklab.nx4kor)을 만든다 → mod/app/NX4KOR.apk
 # 필요한 것: JDK, Android SDK build-tools(aapt2, d8, zipalign, apksigner)와 android-19 플랫폼.
-#   SDK=~/.local/share/android-sdk (기본값), 그 아래 build-tools/<버전>/, platforms/<이름>/android.jar
-# 서명 키: ~/.local/share/hmgapi-nx4-kor/keys/ (저장소 밖, 공개하지 않는다). 없으면 처음에 만든다.
-#   업데이트하려면 같은 키로 서명해야 하므로 이 폴더는 따로 백업한다.
+# 경로는 명령 앞에 주거나 .env.local에 적는다(.env.example, scripts/local-env.sh):
+#   ANDROID_HOME   Android SDK. 그 아래 build-tools/<버전>/, platforms/<이름>/android.jar
+#                  JDK 21이면 build-tools 37 이상(34의 d8은 이 앱의 안쪽 클래스에서 멈춘다)
+#   NX4_APP_KEYS   서명 키 폴더(release.keystore, pass. 저장소 밖, 공개하지 않는다). 키가 없으면 처음에 만든다.
+#                  업데이트하려면 같은 키로 서명해야 하므로 이 폴더는 따로 백업한다.
 set -e
 B=$(cd "$(dirname "$0")/.." && pwd)
+. "$B/scripts/local-env.sh"
+nx4_env "$B"
+nx4_need ANDROID_HOME "Android SDK 위치"
+nx4_need NX4_APP_KEYS "관리 앱 서명 키 폴더"
 SRC=$B/app
 OUTAPK=$B/mod/app/NX4KOR.apk
-SDK=${SDK:-$HOME/.local/share/android-sdk}
+SDK=$ANDROID_HOME
+[ -d "$SDK/build-tools" ] || { echo "ANDROID_HOME에 build-tools가 없습니다: $SDK" >&2; exit 1; }
+ls "$SDK"/platforms/*/android.jar >/dev/null 2>&1 || { echo "ANDROID_HOME에 platforms(android-19)가 없습니다: $SDK" >&2; exit 1; }
 # 가장 높은 버전 (이름순이면 9.0.0이 34.0.0보다 뒤에 온다)
 BT=$(ls -d "$SDK"/build-tools/*/ | sort -t/ -k1 -V | tail -n 1)
 JAR=$(ls "$SDK"/platforms/*/android.jar | head -n 1)
-KEYS=${KEYS:-$HOME/.local/share/hmgapi-nx4-kor/keys}
-W=$(mktemp -d /tmp/nx4-kor-app.XXXXXX)
+KEYS=$NX4_APP_KEYS
+W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
 
 if [ ! -f "$KEYS/release.keystore" ]; then

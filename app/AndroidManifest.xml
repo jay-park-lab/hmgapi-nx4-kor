@@ -1,16 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="io.github.jayparklab.nx4kor"
-    android:versionCode="38"
-    android:versionName="2.0.0">
+    android:versionCode="46"
+    android:versionName="2.1.0">
 
     <uses-sdk android:minSdkVersion="19" android:targetSdkVersion="19" />
 
     <!-- 이 헤드유닛의 activity manager는 finish()에서도 GET_TASKS를 확인한다 (HMG-API에서 확인된 점) -->
     <uses-permission android:name="android.permission.GET_TASKS" />
 
+    <!-- 앱 아이콘(설정 앱·pm에 보임)은 앱 메뉴 타일 그림과 같다: res/drawable-*/ic_launcher.png = mod/icons/icon*.png (#47) -->
     <application
         android:label="@string/app_name"
+        android:icon="@drawable/ic_launcher"
         android:allowBackup="false"
         android:theme="@android:style/Theme.Holo.NoActionBar">
         <!-- 런처 아이콘 없음: HMG-API 앱의 모드 실행 항목(mod.json provides.launcher)으로 연다 -->
@@ -19,6 +21,16 @@
             android:label="@string/app_name"
             android:exported="true"
             android:launchMode="singleTask"
+            android:screenOrientation="landscape" />
+        <!-- 진단 기록을 모을지 묻는 확인 창. USB 설치기(root)가 연다. 투명 화면 위에 확인 창만 보인다.
+             taskAffinity="": 관리 앱 화면(StatusActivity)의 task에 얹히지 않고 자기 task로 열려, 창 뒤에 DSP OTA 화면이 보인다 -->
+        <activity
+            android:name=".DiagActivity"
+            android:label="@string/app_name"
+            android:exported="true"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:screenOrientation="landscape" />
     </application>
 </manifest>

@@ -1,15 +1,14 @@
 {
   "id": "nx4-kor",
   "name": "NX4 KOR: Tucson NX4 (Korea)",
-  "version": "2.0.0",
-  "hmgapi": ">=1.1.0-rc.4",
+  "version": "2.1.0",
+  "hmgapi": ">=1.1.0-rc.8",
   "authors": [
     "parkjoos",
-    "StopDragon",
-    "VysseCodes"
+    "StopDragon"
   ],
   "license": "AGPL-3.0",
-  "description": "HMG-API mod for the Korean Tucson NX4 (260902): wireless CarPlay and Android Auto on the head unit's hotspot, with turn-by-turn on the cluster and HUD. Based on Korea Projection (StopDragon) and the Wireless CarPlay + Android Auto mod (VysseCodes).",
+  "description": "HMG-API add-on for the Korean Tucson NX4 (260902) with a manager app. The app shows the USB install progress and checks HMG-API and the official Wireless CarPlay + Android Auto mod (wireless-carplay-aa) on this car (versions, boot guard, hooks and map, the projection Wi-Fi AP and Wi-Fi part, other Wi-Fi packages), says what blocks wireless projection and what to do, and counts CarPlay connections. It can request a reboot, held back while installing or near the HMG-API boot guard, and asks before the USB installer collects a diagnostic log.",
   "system": {
     "model": [
       "NX4",
@@ -22,9 +21,6 @@
       "260902"
     ]
   },
-  "conflicts": [
-    "wireless-carplay-aa"
-  ],
   "apps": [
     {
       "apk": "app/NX4KOR.apk",
@@ -32,13 +28,6 @@
     }
   ],
   "services": [
-    {
-      "name": "ap",
-      "script": "svc/ap.sh",
-      "user": "root",
-      "start": "android",
-      "restart": true
-    },
     {
       "name": "launch",
       "script": "svc/launch.sh",
@@ -51,86 +40,12 @@
     "launcher": [
       {
         "package": "io.github.jayparklab.nx4kor",
-        "class": ".StatusActivity"
+        "class": ".StatusActivity",
+        "icon": "icons/icon.png",
+        "icon_night": "icons/icon_night.png",
+        "icon_disabled": "icons/icon_disabled.png",
+        "icon_disabled_night": "icons/icon_disabled_night.png"
       }
     ]
-  },
-  "parts": [
-    {
-      "id": "projection"
-    },
-    {
-      "id": "tbt",
-      "when": "settings.tbt"
-    },
-    {
-      "id": "bridge",
-      "when": "settings.bridge"
-    },
-    {
-      "id": "audio",
-      "when": "settings.audio"
-    }
-  ],
-  "feature_flags": [
-    "com.hkmc.software.connectivity.carplay_wireless",
-    "com.hkmc.software.connectivity.androidauto_wireless"
-  ],
-  "hooks": {
-    "jar": "hooks.jar",
-    "entry": "hmgapi.mods.wireless.Wireless",
-    "points": {
-      "framework.context_impl.start_service": "replace",
-      "framework.navigation_cluster.update_tbt_info": "replace",
-      "framework.navigation_cluster.update_tbt_sub_info": "replace",
-      "framework.navigation_cluster.update_tbt_sub_info_b": "replace",
-      "framework.navigation_cluster.update_tbt_sub_info2": "replace",
-      "framework.navigation_cluster.update_tbt_sub_info2_b": "replace",
-      "framework.navigation_cluster.update_tbt_sub_info_2c": "replace",
-      "framework.navigation_cluster.update_remain_dis": "replace",
-      "framework.navigation_cluster.update_tp_crossroad_name": "replace",
-      "framework.navigation_cluster.update_tp_destination_name": "replace",
-      "framework.navigation_cluster.update_tp_turn_list": "replace",
-      "framework.navigation_cluster.update_tp_turn_list_new": "replace",
-      "framework.navigation_cluster.update_tp_lane_info": "replace",
-      "framework.navigation_cluster.update_lane_info": "replace",
-      "iap2.init_info.check_supports_features": "change",
-      "iap2.service.on_create": "observe",
-      "iap2.service_receiver.on_receive": "observe",
-      "gpm.navigation_status.init": "change",
-      "gpm.navigation_status.next_turn": "observe",
-      "gpm.navigation_status.next_turn_distance": "observe",
-      "gpm.navigation_status.status": "observe",
-      "gpm.receiver.send_navigation_focus": "observe",
-      "gpm.receiver.destroy": "observe",
-      "dipo.iap2_proxy.stop_route_guidance": "observe",
-      "dipo.btcm.register_listener": "observe",
-      "dipo.carplay.session_created": "observe",
-      "dipo.carplay.session_started": "observe",
-      "dipo.carplay.session_finalized": "observe",
-      "dipo.carplay.iap_message": "observe",
-      "dipo.utils.is_support_wireless_carplay": "replace",
-      "dipo.iap2_listener.connected": "replace",
-      "dipo.iap2_listener.disconnected": "replace",
-      "dipo.iap2_listener.notify": "replace",
-      "dipo.session_listener.session_details": "observe",
-      "dipo.iap2.bt_address": "change",
-      "dipo.bt.set_carplay_bt_address": "replace"
-    },
-    "native": {
-      "libautoreceiver_infobank.so": [
-        "recipes/aa-tbt-48ee793a.recipe",
-        "recipes/aa-tbt-a0bea1c4.recipe"
-      ],
-      "libCarPlayCore.so": [
-        "recipes/carplay-core-wifi.recipe"
-      ],
-      "libCarPlayAudio.so": [
-        "recipes/carplay-audio-formats.recipe"
-      ],
-      "libCarPlayUtils.so": [
-        "recipes/carplay-utils-converter.recipe"
-      ]
-    }
   }
 }
