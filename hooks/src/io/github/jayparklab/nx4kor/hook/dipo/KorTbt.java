@@ -1,0 +1,305 @@
+package io.github.jayparklab.nx4kor.hook.dipo;
+// NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-25 (#67). The route guidance listener, its thread,
+// the 1-second refresh and the Stop/Start restart follow the official Wireless CarPlay + Android Auto
+// mod's Dipo.java (Open-HMG/hmgapi-wireless-cp-aa v2.2.0-rc.9, VysseCodes, AGPL-3.0) and Korea
+// Projection's (StopDragon/HMG-API korea-build 6258357, AGPL-3.0). The cluster override is NX4 KOR's.
+
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.IBinder;
+import android.os.SystemClock;
+
+import com.tcc.iap2.IIap2Listener;
+import com.tcc.iap2.IIap2Service;
+import com.tcc.iap2.Iap2ListenerInfo;
+import com.tcc.iap2.Iap2NotiMsg;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import hmgapi.hook.Car;
+import hmgapi.hook.Cluster;
+import hmgapi.hook.LoadedApp;
+import hmgapi.hook.MethodHook;
+import hmgapi.hook.ModContext;
+
+/**
+ * Korean CarPlay turn-by-turn in DiPO, beside the official mod (whose "tbt" stays on: it still
+ * tells the iPhone the car takes route guidance, keeps the car navigation off the cluster and
+ * runs Android Auto's turn-by-turn).
+ *
+ * 1. Its own iAP2 listener for route guidance (type 4096, name NX4KOR_RG) gets the phone's
+ *    120/121/122 next to the official mod's, and Korea Projection's CpTurnsFit (with
+ *    HMG-Seogaemo's lane glyphs) works out what the cluster and HUD show, on a thread of its own,
+ *    resending every second while guidance is on. The official mod stops at a maneuver its
+ *    table has no icon for, or whose 121 it missed (#67); CpTurnsFit doesn't.
+ * 2. The cluster calls in DiPO (framework.navigation_cluster.*, hooked "change": HMG-API keeps
+ *    the official mod's "replace" hooks, which are only in the car navigation, loaded) remember
+ *    what this thread sent; while CpTurnsFit has guidance on, a call from any other thread (the
+ *    official mod's) gets this thread's last arguments for that call instead, so both senders
+ *    show the same. With nothing from this listener (none of ours active), the official mod's
+ *    calls pass as they are.
+ * 3. DiPO's own Stop of the phone's route guidance (CarPlay ends) clears ours too.
+ */
+public final class KorTbt {
+    private KorTbt() {}
+
+    static final String IAP2_ACTION = "com.remote.service.IAP2SERVICE";
+    /** iAP2 listener type for route guidance (notifications 120, 121, 122), as the official mod's */
+    static final int LISTENER_ROUTE_GUIDANCE = 4096;
+    static final String LISTENER_NAME = "NX4KOR_RG";
+    static final int RG_UPDATE = 120, RG_MANEUVER = 121, RG_LANES = 122;
+    static final String[] RG_COMPONENTS = { "RouteGuidanceComponent0" };
+    /** the cluster calls HMG-API's Cluster API makes (all CpTurnsFit sends) */
+    static final String[] CLUSTER_POINTS = {
+        "update_tbt_info", "update_tbt_sub_info_b", "update_tbt_sub_info_2c", "update_tp_turn_list_new",
+        "update_lane_info", "update_tp_destination_name", "update_tp_crossroad_name", "update_tp_turn_list",
+    };
+    /** after a restart of ours, CpTurnsFit asks again for a maneuver it misses only after this long (as KP) */
+    static final long RESTART_QUIET_MS = 10000L;
+
+    static ModContext mod;
+    static volatile IIap2Service iap2;
+    static HandlerThread thread;
+    static Handler handler;
+    static CpTurnsFit turns;
+    /** CpTurnsFit has guidance on (written on its thread, read by the cluster hooks on others) */
+    static volatile boolean active;
+    /** cluster call point -> this thread's last arguments */
+    static final Map<String, Object[]> last = new ConcurrentHashMap<String, Object[]>();
+    /** points whose first override was logged */
+    static final Set<String> overrideLogged = Collections.synchronizedSet(new HashSet<String>());
+    /** set while this mod itself calls the iAP2 server (its restart), so its own Stop isn't DiPO's */
+    static final ThreadLocal<Boolean> OWN = new ThreadLocal<Boolean>();
+    static final Object RESTART_LOCK = new Object();
+    static volatile long lastRestartAt;
+    static volatile boolean heard;
+    /** whether REFRESH is scheduled (only touched on the thread) */
+    static boolean refreshing;
+    static int refreshErrors;
+
+    static void log(String m) {
+        mod.log(m);
+    }
+
+    static void error(String m, Throwable t) {
+        mod.error(m, t);
+    }
+
+    /** Nx4KorHooks.appLoaded (reflection), in DiPO's process */
+    public static void start(ModContext m, LoadedApp app) {
+        mod = m;
+        if (Car.stepOfSpec() >= 999) {
+            log("CarPlay (NX4 KOR): stepofspec is 999 or more, DiPO's own turn-by-turn runs (Korean turn-by-turn stays off)");
+            return;
+        }
+        Cluster c = Cluster.of(app.context);
+        if (c == null) {
+            log("CarPlay (NX4 KOR): no cluster service here (Korean turn-by-turn stays off)");
+            return;
+        }
+        thread = new HandlerThread("nx4kor-cp-tbt");
+        thread.start();
+        handler = new Handler(thread.getLooper());
+        turns = new CpTurnsFit(app.context, c, new Runnable() {
+            @Override
+            public void run() {
+                // Stop, a moment, Start: off this thread (as KP's restart)
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        restartRouteGuidance();
+                    }
+                }, "nx4kor-cp-rg").start();
+            }
+        });
+        turns.debug = m.settingBoolean("kor_tbt_log", true);
+        turns.onActive = new Runnable() {
+            @Override
+            public void run() {
+                if (refreshing) return;
+                refreshing = true;
+                handler.postDelayed(REFRESH, 1000L);
+            }
+        };
+        turns.busy = new CpTurnsFit.Busy() {
+            @Override
+            public boolean busy() {
+                long at = lastRestartAt;
+                return at != 0L && SystemClock.elapsedRealtime() - at < RESTART_QUIET_MS;
+            }
+        };
+        // DiPO stops the phone's route guidance itself (CarPlay ends, the car takes turn-by-turn): clear ours
+        m.hook(app.classLoader, "dipo.iap2_proxy.stop_route_guidance", new MethodHook() {
+            @Override
+            protected void beforeHookedMethod(Param p) {
+                if (OWN.get() != null) return;
+                post(new Runnable() {
+                    @Override
+                    public void run() {
+                        turns.stop();
+                    }
+                });
+            }
+        });
+        for (String point : CLUSTER_POINTS) override(point);
+        final Listener listener = new Listener();
+        boolean bound = app.context.bindService(new Intent(IAP2_ACTION), new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder b) {
+                IIap2Service s = IIap2Service.Stub.asInterface(b);
+                iap2 = s;
+                try {
+                    Iap2ListenerInfo info = new Iap2ListenerInfo();
+                    info.onSetSupportType(LISTENER_ROUTE_GUIDANCE);
+                    info.onSetListenerName(LISTENER_NAME);
+                    log("CarPlay (NX4 KOR): Iap2SvcInit(" + LISTENER_NAME + ", 0x1000) = " + s.Iap2SvcInit(listener, info));
+                } catch (Throwable t) {
+                    error("CarPlay (NX4 KOR): route guidance listener", t);
+                }
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+                iap2 = null;
+                log("CarPlay (NX4 KOR): iAP2 server gone");
+            }
+        }, Context.BIND_AUTO_CREATE);
+        log("CarPlay (NX4 KOR): Korean turn-by-turn (Korea Projection's fit) beside the official mod; iAP2 server "
+                + (bound ? "binding" : "can't be bound"));
+    }
+
+    /** a cluster call: remember ours, give the official mod's ours while guidance is on */
+    static void override(final String point) {
+        mod.hook(null, "framework.navigation_cluster." + point, new MethodHook() {
+            @Override
+            protected void beforeHookedMethod(Param p) {
+                if (Thread.currentThread() == thread) {
+                    last.put(point, copy(p.args));
+                    return;
+                }
+                if (!active) return;
+                Object[] ours = last.get(point);
+                if (ours == null || ours.length != p.args.length) return;
+                Object[] c = copy(ours);
+                System.arraycopy(c, 0, p.args, 0, c.length);
+                if (overrideLogged.add(point)) {
+                    log("CarPlay (NX4 KOR): " + point + " from the official mod replaced with ours (logged once per call)");
+                }
+            }
+        });
+    }
+
+    /** the arguments, with byte frames copied (both senders reuse nothing, but a frame must not change under the other) */
+    static Object[] copy(Object[] a) {
+        Object[] c = a.clone();
+        for (int i = 0; i < c.length; i++) {
+            if (c[i] instanceof byte[]) c[i] = ((byte[]) c[i]).clone();
+        }
+        return c;
+    }
+
+    /** runs r on the thread, then notes whether guidance is on (and forgets our calls when it goes off) */
+    static void post(final Runnable r) {
+        Handler h = handler;
+        if (h == null) return;
+        h.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    r.run();
+                } catch (Throwable x) {
+                    error("CarPlay (NX4 KOR) turn-by-turn", x);
+                }
+                noteActive();
+            }
+        });
+    }
+
+    static void noteActive() {
+        boolean a = turns.active();
+        if (!a && active) {
+            last.clear();
+            log("CarPlay (NX4 KOR): guidance off: the official mod's cluster calls pass again");
+        } else if (a && !active) {
+            log("CarPlay (NX4 KOR): guidance on: the official mod's cluster calls get ours");
+        }
+        active = a;
+    }
+
+    static final Runnable REFRESH = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                turns.refresh();
+            } catch (Throwable x) {
+                if (refreshErrors++ < 3) error("CarPlay (NX4 KOR) turn-by-turn refresh", x);
+            }
+            noteActive();
+            if (turns.active()) handler.postDelayed(this, 1000L);
+            else refreshing = false;
+        }
+    };
+
+    /** Stop, then Start, so the phone sends its whole current state (as the official mod and KP) */
+    static void restartRouteGuidance() {
+        IIap2Service s = iap2;
+        if (s == null) return;
+        lastRestartAt = SystemClock.elapsedRealtime();
+        synchronized (RESTART_LOCK) {
+            OWN.set(Boolean.TRUE);
+            try {
+                s.Iap2SvcStopRouteGuidanceUpdate(RG_COMPONENTS);
+                Thread.sleep(200);
+                s.Iap2SvcStartRouteGuidanceUpdate(RG_COMPONENTS, true, true);
+            } catch (Throwable t) {
+                // the session went away meanwhile
+            } finally {
+                OWN.remove();
+            }
+        }
+    }
+
+    /** this mod's iAP2 listener for route guidance: everything goes to CpTurnsFit on its thread */
+    static final class Listener extends IIap2Listener.Stub {
+        @Override
+        public void connected(int component, String serial) {}
+
+        @Override
+        public void disconnected(int component) {
+            // as the official mod's listener: component 2 isn't a session.
+            // (The official mod also skips its wireless bridge's own sessions; this mod can't see those.)
+            if (component == 2) return;
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    turns.disconnected();
+                }
+            });
+        }
+
+        @Override
+        public void notify(final int what, int a1, int a2, final Iap2NotiMsg msg) {
+            if ((what != RG_UPDATE && what != RG_MANEUVER && what != RG_LANES) || msg == null) return;
+            if (!heard) {
+                heard = true;
+                log("CarPlay (NX4 KOR): route guidance reaches this listener (first " + what + ")");
+            }
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    if (what == RG_UPDATE) turns.routeGuidance(msg);
+                    else if (what == RG_MANEUVER) turns.maneuver(msg);
+                    else turns.lanes(msg);
+                }
+            });
+        }
+    }
+}

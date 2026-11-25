@@ -2,7 +2,7 @@
 # NX4 KOR 묶음을 만든다(투싼 NX4 한국 내수 260902 전용, docs/design.md).
 #   out/hmgapi-nx4-kor-<버전>.zip      HMG-API 모드(작성자 키로 서명): HMG-API 앱·adb·USB로 설치
 #   out/hmgapi-nx4-kor-<버전>-usb.zip  USB 묶음: Engineering Mode > DSP > Update OTA로 설치
-# 모드는 mod/ 폴더(mod.json, 서비스·상태 스크립트, 무선 훅·네이티브 패치)에 관리 앱과 busybox를 더한 것이다.
+# 모드는 mod/ 폴더(mod.json, settings.json, 서비스·상태 스크립트)에 관리 앱, hooks.jar(hooks/src에서 만듦), busybox를 더한 것이다.
 # 필요한 것: JDK, python3, zip/unzip, HMG-API 소스(서명 도구 tools/mkmodpkg.sh), 관리 앱 APK,
 #   busybox를 Alpine에서 받을 때는 curl과 인터넷(NX4_BUSYBOX 참고).
 # 환경 변수(명령 앞에 주거나 .env.local에 적는다. .env.example, scripts/local-env.sh):
@@ -12,6 +12,8 @@
 #                     java -cp $HMGAPI_SRC/out/engine-host hmgapi.engine.Signing keygen $NX4_MOD_KEY
 #                   HMG-API는 같은 키로 서명한 업데이트만 받는다: 이 키를 잃으면 모드를 지우고 다시 설치해야 한다
 #   NX4_APK          관리 앱(기본 mod/app/NX4KOR.apk, scripts/build-app.sh로 만듦)
+#   ANDROID_HOME     Android SDK. hooks.jar(한국 카플레이 길안내, #67)를 scripts/build-hooks.sh로 만들 때 쓴다
+#   NX4_HOOKS_JAR    이미 만든 hooks.jar(주면 build-hooks.sh를 부르지 않고 그것을 넣는다. 테스트·관리용)
 #   NX4_BUSYBOX      함께 넣을 busybox. 주지 않으면 mod/bin/busybox(있으면 SHA-256 확인 없이), 그것도 없으면 Alpine
 #                   저장소에서 받는다(scripts/fetch-busybox.sh: BusyBox 1.36.1, NOTICE.md의 SHA-256과 같을 때만.
 #                   <OUT>/busybox에 둠. 미러는 NX4_BUSYBOX_URL).
@@ -59,6 +61,16 @@ APK=${NX4_APK:-$PKG/app/NX4KOR.apk}
 [ -f "$APK" ] || { echo "관리 앱이 없습니다: $APK (scripts/build-app.sh로 만들거나 NX4_APK로 주세요)" >&2; exit 1; }
 mkdir -p "$M/app"
 [ "$APK" -ef "$M/app/NX4KOR.apk" ] || cp "$APK" "$M/app/NX4KOR.apk"
+
+# hooks.jar(#67, 한국 카플레이 길안내): hooks/src를 HMG-API 런타임에 대고 만든다. 소스는 mod/ 밖에 두므로 모드에 들어가지 않는다
+HJ=$NX4_HOOKS_JAR
+if [ -z "$HJ" ]; then
+  sh "$B/scripts/build-hooks.sh" "$W/hooks.jar" > "$W/build-hooks.out" 2>&1 || { cat "$W/build-hooks.out" >&2; echo "hooks.jar를 만들지 못했습니다(scripts/build-hooks.sh)" >&2; exit 1; }
+  tail -n 1 "$W/build-hooks.out"
+  HJ=$W/hooks.jar
+fi
+[ -f "$HJ" ] || { echo "hooks.jar가 없습니다: $HJ" >&2; exit 1; }
+cp "$HJ" "$M/hooks.jar"
 
 # busybox: 이 모드의 스크립트는 busybox로 돈다. NX4 내비에 /system/bin/busybox가 없으면 함께 넣은 것만 쓸 수 있으므로
 # 늘 넣는다(내비에 있으면 모드 스크립트가 그것을 먼저 쓴다). 넣지 않으려면 NX4_BUSYBOX=none
