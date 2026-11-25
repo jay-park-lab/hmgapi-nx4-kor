@@ -717,11 +717,12 @@ diag_dongle() {
   done > $_o/usb-drivers.txt 2>&1
   ls -l $ROOT/sys/class/net > $_o/net-ls.txt 2>&1
   # 일련번호와 MAC이 든 줄은 뺀다(bcmdhd "Broadcom Dongle Host Driver mac=…", Realtek "rtw_macaddr_cfg MAC Address = …",
-  # 그 밖에 xx:xx:xx:xx:xx:xx·xx-xx-…꼴). mksh case 패턴이라 busybox가 필요 없다
+  # "hwaddr …", 그 밖에 xx:xx:xx:xx:xx:xx·xx-xx-…·구분자 없는 12자리 꼴, PR #66 리뷰 1·3). 12자리 꼴은 같은 길이의 다른
+  # 16진수·숫자 줄도 빼지만, 기록을 공개 이슈에 올리므로 덜 남기는 쪽을 고른다. mksh case 패턴이라 busybox가 필요 없다
   _h='[0-9a-fA-F][0-9a-fA-F]'
   kmsg 2>/dev/null | while IFS= read -r _l; do
     case "$_l" in
-      *SerialNumber*|*[Mm][Aa][Cc]=*|*[Mm][Aa][Cc]\ [Aa]ddr*|*[Mm][Aa][Cc][Aa]ddr*|*$_h:$_h:$_h:$_h:$_h:$_h*|*$_h-$_h-$_h-$_h-$_h-$_h*) ;;
+      *SerialNumber*|*[Mm][Aa][Cc]=*|*[Mm][Aa][Cc]\ [Aa]ddr*|*[Mm][Aa][Cc][Aa]ddr*|*[Hh][Ww][Aa]ddr*|*$_h:$_h:$_h:$_h:$_h:$_h*|*$_h-$_h-$_h-$_h-$_h-$_h*|*$_h$_h$_h$_h$_h$_h*) ;;
       *usb*|*USB*|*ehci*|*ohci*|*dwc*|*otg*|*dhd*|*DHD*|*wlan*|*cfg80211*|*80211*|*rtw*|*RTW*|*rtl*|*8822*|*88x2*|*8851*|*firmware*) echo "$_l" ;;
     esac
   done > $_o/dmesg-usb-wifi.txt

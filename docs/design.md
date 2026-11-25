@@ -222,7 +222,7 @@
     | `system-wifi-ls.txt`, `system-wifi-md5.txt`, `ko-vermagic.txt` | `/system/wifi`(순정 `bcmdhd.ko` 등)의 목록·md5, `/system/wifi`·`/system/lib/modules`의 `.ko`마다 vermagic |
     | `wifi-strings.txt` | 순정 HAL(`libhardware_legacy.so`)·`hostapd`·`wpa_supplicant`·`netd`에서 드라이버 관련 문자열만(모듈 이름, insmod 인자 `iface_name` 등, `nl80211`, `add_ie`) |
     | `usb.txt`, `usb-ls.txt`, `usb-drivers.txt` | USB 장치의 ID·속도·전력·종류·제조사·제품 이름(일련번호는 넣지 않음), 버스·컨트롤러 경로, 드라이버에 붙은 인터페이스 |
-    | `net-ls.txt`, `dmesg-usb-wifi.txt` | 네트워크 장치 이름과 경로(MAC은 넣지 않음), 커널 로그 중 USB·Wi-Fi 줄. `SerialNumber` 줄과 MAC이 든 줄(`mac=`, `MAC Address`, `macaddr`, `xx:xx:xx:xx:xx:xx`·`xx-xx-…` 꼴)은 뺌(PR #66 리뷰 1) |
+    | `net-ls.txt`, `dmesg-usb-wifi.txt` | 네트워크 장치 이름과 경로(MAC은 넣지 않음), 커널 로그 중 USB·Wi-Fi 줄. `SerialNumber` 줄과 MAC이 든 줄(`mac=`, `MAC Address`, `macaddr`, `hwaddr`, `xx:xx:xx:xx:xx:xx`·`xx-xx-…`·구분자 없는 12자리 꼴)은 뺌(PR #66 리뷰 1·3). 12자리 꼴은 같은 길이의 다른 16진수·숫자가 든 줄도 빼지만, 공개 이슈에 올릴 기록이라 덜 남기는 쪽을 골랐습니다 |
 
     md5·압축 풀기·문자열은 busybox로 합니다. busybox가 없으면 `config.gz` 복사와 목록만 남기고 그렇다고 적습니다. 고른 busybox에 `gunzip`·`sha256sum`·`strings`(또는 `grep -m`·`-E`)가 없으면 빈 값 대신 그 까닭을 적고(`config-sum.txt`, `ko-vermagic.txt`, `wifi-strings.txt`, PR #66 리뷰 2), `config.gz`는 PC에서 풉니다. `config-sum.txt` 첫 줄에 쓴 busybox를 적습니다. 동글을 꽂은 채 모으면 그 동글의 ID와 경로도 담깁니다.
 
