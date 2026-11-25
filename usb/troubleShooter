@@ -566,6 +566,7 @@ old_revert() {
 #   car-report*         HMG-API Car Report(hmgapid engine report: 이 차에서 찾은 훅 지점, map 확인, 기능, 오류).
 #                       HMG-API가 VIN·일련번호를 넣지 않고 기록 줄을 가린다
 #   logs/               이 모드의 기록(ap.log, 서비스 기록, map 만들기·확인·계획·적용 결과, 상태 파일)과 HMG-API 설치 기록
+#   dongle/             USB Wi-Fi 동글 드라이버를 이 차 커널에 맞춰 빌드하고 순정 HAL에 잇는 데 필요한 것(#48, 아래 diag_dongle)
 # HMG-API 명령은 HMG-API가 응답할 때만 돌린다. 비밀번호가 든 Wi-Fi 설정 파일(softap.conf·hostapd-nx4.conf·
 # wpa_supplicant.conf)과 이 모드의 백업 폴더($NX4_ROOT/backup)는 넣지 않는다. 못 모은 것은 기록만 하고 넘어간다.
 DIAGBB=$ROOT/data/local/tmp/nx4-kor-diag-busybox
@@ -621,6 +622,116 @@ diag_bb() {
   $DIAGBB true >/dev/null 2>&1 || return 1
   echo $DIAGBB
 }
+# 진단 기록의 동글 준비 정보(#48 1단계). 읽기만 한다. $1 폴더, $2 busybox(없으면 빈 값: md5·압축 풀기·문자열은 빠짐)
+#   kernel.txt          커널 판(osrelease, /proc/version), 모듈 적재 조건(modules_disabled, sig_enforce), cfg80211,
+#                       USB 포트 전원 매개변수(vbus*), boot_id(시동 끄고 켜기가 새 부팅인지 견줌), Wi-Fi 속성
+#   modules.txt         /proc/modules(지금 올라온 모듈)
+#   config.gz, config.txt, config-sum.txt  차 커널 설정(/proc/config.gz)과 그 md5·sha256. 드라이버 빌드에 쓰고,
+#                       Korea Projection 빌드의 설정(sha256 d35af8a0…, 출처 저장소가 404)과 견준다
+#   system-wifi-ls.txt, system-wifi-md5.txt, ko-vermagic.txt  /system/wifi(순정 bcmdhd.ko 등)와 순정 모듈의 vermagic
+#   wifi-strings.txt    순정 HAL(libhardware_legacy.so)·hostapd·wpa_supplicant·netd의 드라이버 관련 문자열(모듈 이름,
+#                       insmod 인자, nl80211 등). 동글 드라이버를 HAL이 올리는 bcmdhd 자리에 맞추는 데 쓴다
+#   usb.txt, usb-ls.txt, usb-drivers.txt  USB 장치(ID·속도·전력·종류·제품 이름, 일련번호는 넣지 않음), 버스·컨트롤러 경로,
+#                       드라이버에 붙은 인터페이스
+#   net-ls.txt          네트워크 장치 이름과 경로(MAC은 넣지 않음)
+#   dmesg-usb-wifi.txt  커널 로그 중 USB·Wi-Fi 줄(SerialNumber 줄과 MAC이 든 줄은 뺌)
+# busybox에 gunzip·sha256sum·strings·grep이 없으면 빈 값 대신 그 까닭을 적는다(bbok)
+diag_dongle() {
+  _o=$1; _b=$2
+  mkdir -p $_o || { log "진단 기록: 동글 준비 정보 폴더를 만들지 못함"; return 0; }
+  {
+    echo "osrelease: $(cat $ROOT/proc/sys/kernel/osrelease 2>/dev/null)"
+    echo "version: $(cat $ROOT/proc/version 2>/dev/null)"
+    echo "modules_disabled: $(cat $ROOT/proc/sys/kernel/modules_disabled 2>/dev/null)"
+    echo "sig_enforce: $(cat $ROOT/sys/module/module/parameters/sig_enforce 2>/dev/null)"
+    if [ -e $ROOT/sys/module/cfg80211 ]; then echo "cfg80211: yes"; else echo "cfg80211: no"; fi
+    for _v in $ROOT/sys/module/*/parameters/vbus*; do
+      [ -f "$_v" ] && echo "${_v#$ROOT/sys/module/}: $(cat $_v 2>/dev/null)"
+    done
+    echo "boot_id: $(cat $BOOT_ID 2>/dev/null)"
+    for _p in wifi.interface wlan.driver.status ro.board.platform; do echo "$_p: $(getprop $_p 2>/dev/null)"; done
+  } > $_o/kernel.txt 2>&1
+  cat $ROOT/proc/modules > $_o/modules.txt 2>&1
+  # 커널 설정: /proc 파일은 cp가 크기 0으로 볼 수 있어 cat으로 옮긴다
+  if [ -f $ROOT/proc/config.gz ]; then
+    cat $ROOT/proc/config.gz > $_o/config.gz 2>/dev/null
+    if [ -n "$_b" ]; then
+      _gz=1
+      $_b gunzip -c $_o/config.gz > $_o/config.txt 2>/dev/null || { rm -f $_o/config.txt; _gz=; }
+      {
+        echo "busybox: $_b"
+        echo "config.gz md5: $(dsum $_b md5sum $_o/config.gz)"
+        if [ -z "$_gz" ]; then
+          echo "config.txt: busybox로 풀지 못함(gunzip이 없거나 실패, config.gz는 PC에서 풂)"
+        else
+          echo "config.txt md5: $(dsum $_b md5sum $_o/config.txt)"
+          if bbok $_b sha256sum; then
+            echo "config.txt sha256: $(dsum $_b sha256sum $_o/config.txt)"
+          else
+            echo "config.txt sha256: busybox에 sha256sum이 없음(PC에서 셈)"
+          fi
+        fi
+      } > $_o/config-sum.txt 2>&1
+    else
+      echo "md5를 셀 busybox가 없음: config.gz만 복사" > $_o/config-sum.txt
+    fi
+  else
+    echo "/proc/config.gz 없음(커널이 설정을 내보내지 않음)" > $_o/config-sum.txt
+    log "진단 기록: /proc/config.gz가 없음(동글 드라이버 빌드에 쓸 커널 설정을 못 모음)"
+  fi
+  ls -l $ROOT/system/wifi > $_o/system-wifi-ls.txt 2>&1
+  if [ -n "$_b" ]; then
+    for _f in $ROOT/system/wifi/*; do
+      [ -f "$_f" ] && echo "$(dsum $_b md5sum $_f)  ${_f#$ROOT}"
+    done > $_o/system-wifi-md5.txt 2>&1
+  fi
+  # vermagic·문자열은 busybox의 strings와 grep(-m, -E)이 있어야 한다. 없으면 빈 결과와 "문자열이 없음"이 구분되지 않으므로
+  # 그렇다고 적는다
+  if [ -z "$_b" ]; then
+    echo "busybox가 없어 vermagic을 못 읽음" > $_o/ko-vermagic.txt
+    echo "busybox가 없어 문자열을 못 읽음" > $_o/wifi-strings.txt
+  elif ! bbok $_b strings /dev/null || ! echo a | $_b grep -m 1 -E 'a|b' >/dev/null 2>&1; then
+    echo "busybox($_b)에 strings나 grep -m·-E가 없어 vermagic을 못 읽음" > $_o/ko-vermagic.txt
+    echo "busybox($_b)에 strings나 grep -m·-E가 없어 문자열을 못 읽음" > $_o/wifi-strings.txt
+    log "진단 기록: busybox($_b)에 strings·grep이 없어 동글 준비 정보의 vermagic·문자열은 빠짐"
+  else
+    for _f in $ROOT/system/wifi/*.ko $ROOT/system/lib/modules/*.ko; do
+      [ -f "$_f" ] && echo "${_f#$ROOT}: $($_b strings $_f 2>/dev/null | $_b grep -m 1 '^vermagic=')"
+    done > $_o/ko-vermagic.txt 2>&1
+    for _f in $ROOT/system/lib/libhardware_legacy.so $ROOT/system/bin/hostapd $ROOT/system/bin/wpa_supplicant $ROOT/system/bin/netd; do
+      [ -f "$_f" ] || continue
+      echo "== ${_f#$ROOT}"
+      $_b strings $_f 2>/dev/null | $_b grep -E 'bcmdhd|\.ko|iface_name|firmware_path|nvram_path|/system/wifi|nl80211|wlan0|add_ie|wifi\.interface|wlan\.driver|DRIVER_|insmod|rmmod|init_module'
+    done > $_o/wifi-strings.txt 2>&1
+  fi
+  [ -n "$_b" ] || echo "busybox가 없어 md5·vermagic·문자열은 빠짐(이름·크기는 system-wifi-ls.txt)" > $_o/system-wifi-md5.txt
+  ls -l $ROOT/sys/bus/usb/devices > $_o/usb-ls.txt 2>&1
+  for _u in $ROOT/sys/bus/usb/devices/*; do
+    [ -f $_u/idVendor ] || continue
+    echo "${_u##*/} $(cat $_u/idVendor 2>/dev/null):$(cat $_u/idProduct 2>/dev/null) speed=$(cat $_u/speed 2>/dev/null) maxpower=$(cat $_u/bMaxPower 2>/dev/null) class=$(cat $_u/bDeviceClass 2>/dev/null) manufacturer=$(cat $_u/manufacturer 2>/dev/null) product=$(cat $_u/product 2>/dev/null)"
+  done > $_o/usb.txt 2>&1
+  for _r in $ROOT/sys/bus/usb/drivers/*; do
+    [ -d "$_r" ] || continue
+    echo "== ${_r##*/}"
+    ls $_r
+  done > $_o/usb-drivers.txt 2>&1
+  ls -l $ROOT/sys/class/net > $_o/net-ls.txt 2>&1
+  # 일련번호와 MAC이 든 줄은 뺀다(bcmdhd "Broadcom Dongle Host Driver mac=…", Realtek "rtw_macaddr_cfg MAC Address = …",
+  # "hwaddr …", 그 밖에 xx:xx:xx:xx:xx:xx·xx-xx-…·구분자 없는 12자리 꼴, PR #66 리뷰 1·3). 12자리 꼴은 같은 길이의 다른
+  # 16진수·숫자 줄도 빼지만, 기록을 공개 이슈에 올리므로 덜 남기는 쪽을 고른다. mksh case 패턴이라 busybox가 필요 없다
+  _h='[0-9a-fA-F][0-9a-fA-F]'
+  kmsg 2>/dev/null | while IFS= read -r _l; do
+    case "$_l" in
+      *SerialNumber*|*[Mm][Aa][Cc]=*|*[Mm][Aa][Cc]\ [Aa]ddr*|*[Mm][Aa][Cc][Aa]ddr*|*[Hh][Ww][Aa]ddr*|*$_h:$_h:$_h:$_h:$_h:$_h*|*$_h-$_h-$_h-$_h-$_h-$_h*|*$_h$_h$_h$_h$_h$_h*) ;;
+      *usb*|*USB*|*ehci*|*ohci*|*dwc*|*otg*|*dhd*|*DHD*|*wlan*|*cfg80211*|*80211*|*rtw*|*RTW*|*rtl*|*8822*|*88x2*|*8851*|*firmware*) echo "$_l" ;;
+    esac
+  done > $_o/dmesg-usb-wifi.txt
+  log "진단 기록: 동글 준비 정보를 모음(dongle/)"
+}
+# busybox $2(md5sum·sha256sum)로 센 값만(파일 이름 없이). 못 세면 빈 값
+dsum() { _s=$($1 $2 < $3 2>/dev/null); echo "${_s%% *}"; }
+# busybox $1에 애플릿 $2가 있어 도는가(입력은 /dev/null, 나머지 인자는 그대로)
+bbok() { _bb1=$1; shift; $_bb1 "$@" < /dev/null > /dev/null 2>&1; }
 diag() {
   _d=$K/diag/$(date '+%Y%m%d-%H%M%S')
   [ -e $_d ] && _d=$_d-$$
@@ -656,6 +767,7 @@ diag() {
     echo "md5를 셀 busybox가 없음(내비·설치된 모드·스틱 모두): 이름·크기는 system-lib-ls.txt" > $_d/system-lib-md5.txt
     log "진단 기록: md5를 셀 busybox가 없어 /system/lib는 이름·크기만 모음"
   fi
+  diag_dongle $_d/dongle "$_bb"
   rm -f $DIAGBB
   if [ -x $HMGAPID ] && [ -d $HMGDATA ] && $HMGAPID ping >/dev/null 2>&1; then
     $HMGAPID engine status > $_d/hmgapi-status.txt 2>&1
