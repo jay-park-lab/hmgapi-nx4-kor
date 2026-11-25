@@ -121,6 +121,15 @@
 | `UNINSTALL`, `UNINSTALL-ALL`, `REINSTALL` | 아래 "지우기", "같은 판" |
 
 **HMG-API 확인**(아무것도 바꾸기 전)
+- **HMG-API 기다리기**(2026-11-25, 부팅이 끝나면 바로 눌러도 되게): HMG-API(`hmgapid`)가 있으면 `hmgapid ping`에 답할 때까지 기다립니다. 진단 기록이 HMG-API 상태·Car Report를 모으므로 진단 기록 묻기보다 먼저입니다. HMG-API가 없는 차는 기다리지 않습니다.
+  - 근거(HMG-API 1.1.0-rc.8): `hmgapid daemon`은 zygote가 시작할 때마다 zygote 래퍼가 띄우고(`core/zygote/zygote.c` `start_hmgapid`), 부팅 훅(`hmgapid boot`)도 없으면 띄웁니다. 소켓을 열기 전에는 "not running"이고, 일꾼 8개(`MAX_WORKERS`)가 차면 75(busy)로 바로 끊습니다(`core/hmgapid/hmgapid.c`). 부팅 뒤에는 `boot.sh`(`install/common/boot.sh`)가 binds·앱 설치·`engine recover`를 바로, `map-car --local`을 90초 뒤, 앱 목록 동기화를 120초 뒤에 돌립니다.
+  - 시간: 3초마다 다시 묻고, 부팅 뒤 300초까지 기다립니다(관리 앱의 Wi-Fi 기다림 `AP_WAIT`, 재부팅 거절의 줄 없을 때 끝과 같은 300초). 늦게 눌렀어도 30초는 다시 묻습니다. 그래서 최대 약 5분입니다. 기다리는 동안 토스트("HMG-API가 준비되기를 기다리는 중입니다(최대 N분). USB를 빼지 마세요.")를 처음과 1분마다 띄웁니다. 끝까지 답이 없으면 지금처럼 "기다려도 HMG-API가 응답하지 않습니다. … 재부팅하고 다시"로 멈춥니다(아무것도 바꾸지 않음). 지우기도 같습니다.
+  - HMG-API 부팅 작업은 기다리지 않습니다. 설치기가 부르는 engine 명령은 모두 `state/engine.lock`을 잡고 하나씩 돌기 때문입니다(`core/runtime/java/hmgapi/engine/Engine.java` `lock`, 최대 15분 기다림). `engine recover`가 돌면 설치기의 첫 engine 명령(시작 전 계획)이 기다리고, recover가 재부팅하면 아무것도 바꾸기 전에 끊깁니다. `map-car --local --if-needed`는 HMG-API에 이 차의 map이 있을 때만 점을 더하는데 rc.8에는 NX4 map이 없어 아무것도 쓰지 않습니다(`engine/MapProbe.java` `run`). 나중에 NX4 map이 들어와도 설치기의 `map-car --write`는 "not written"으로 끝나고, `--local`이 쓰는 점은 HMG-API가 스스로 확인한 뒤 다음 시작부터 씁니다.
+- **재부팅 안내 전 부팅 보호 기다리기**: 무엇이 바뀌어 재부팅을 안내하기 직전(지우기는 스스로 재부팅하기 직전)에, 이번 zygote 시작이 HMG-API 부팅 보호에 아직 확인되지 않았으면(`hook/starts` ≥ 1) 확인 시각까지 기다립니다. 훅이 켜진 시작이 120초(`GUARD_DELAY`)를 버티면 watcher가 `starts`를 0으로 씁니다. 그 전에 재부팅하면 `starts`가 쌓이고 6번 이어지면 다음 시작의 훅이 꺼지기 때문입니다(`core/zygote/zygote.c`).
+  - 확인 시각은 관리 앱의 [지금 재부팅] 거절(`mod/bin/status.sh` `take_rbreq`)과 같습니다: 이번 부팅 커널 로그의 마지막 "hooks on" 줄 시각 + 120 + 15초, 그 줄이 없으면 부팅 뒤 300초. `take_rbreq`는 `starts`가 5·6일 때만 막지만, 설치기는 RESET으로 하는 재부팅을 막을 수 없으므로 1부터 기다립니다. `starts`가 0이 되면 바로 멈춥니다.
+  - 기다리지 않는 때(`status.sh`와 같은 규칙): `starts`를 못 읽음·0, 이번 부팅 줄이 off·guard(watcher가 없음), 줄이 없고 `hook/enable`이 없거나 `hook/disable`이 있음.
+  - 기다리는 동안 진행 기록은 `state=run`("재부팅해도 되는 때를 기다리는 중입니다")이라 [지금 재부팅]도 받지 않고, 토스트를 한 번 띄웁니다. map 만들기(1~2분)가 끼면 보통 이미 지나 있습니다.
+  - `status.sh`는 busybox awk를 쓰고 설치기는 툴박스·mksh만 쓰므로 같은 계산을 mksh로 옮겨 두었습니다(`zygote_info`). 바꾸면 둘을 함께 봅니다.
 - HMG-API가 없으면 같은 스틱의 HMG-API 설치기로 넘기거나 멈춥니다.
 - 최소 판은 설치기의 `HMG_MIN`(`1.1.0-rc.8`)과 스틱의 두 모드 `mod.json` `hmgapi`(`>=…`) 중 가장 높은 것입니다. 설치된 판(`installed.txt`의 `version`)이 낮으면 같은 스틱의 HMG-API 설치기가 그 판 이상(`HMGAPI/install/payload/VERSION`)일 때 그것으로 넘기고(업데이트 뒤 재부팅, Update OTA를 한 번 더), 아니면 "HMG-API <최소 판> 이상으로 먼저 올려 주세요"로 멈춥니다.
 - 판 비교는 HMG-API `Version`과 같은 규칙(semver, `-rc.N`까지)입니다. 최소 판에 꼬리가 없으면 그 판의 rc도 채웁니다(`meetsHmgapi`). 판을 읽지 못하거나 비교할 수 없는 꼬리면 기록만 하고 지나갑니다(엔진이 설치할 때 다시 봄).

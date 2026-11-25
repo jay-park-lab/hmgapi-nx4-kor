@@ -96,12 +96,12 @@
    ```
 2. 시동을 건 채 차를 세우고 USB를 꽂은 뒤 Engineering Mode → USB Copy → DSP → Update OTA를 누릅니다.
    - **NEMESIS에 Korea Projection이 있는 차:** "NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다"가 나오고 아무것도 바꾸지 않습니다(HMG-API 설치 전에 멈춤). NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤 다시 누릅니다. 아래 "알아 두실 점".
-   - **HMG-API가 없는 차:** "NX4 KOR: HMG-API를 먼저 설치합니다"가 나오고 HMG-API가 설치된 뒤 재부팅됩니다. 부팅이 끝나고 1~2분 뒤 **같은 USB로 Update OTA를 한 번 더** 누릅니다.
+   - **HMG-API가 없는 차:** "NX4 KOR: HMG-API를 먼저 설치합니다"가 나오고 HMG-API가 설치된 뒤 재부팅됩니다. 부팅이 끝나면 바로 **같은 USB로 Update OTA를 한 번 더** 눌러도 됩니다. 설치기가 HMG-API가 준비될 때까지 스스로 기다립니다(최대 약 5분, "HMG-API가 준비되기를 기다리는 중입니다" 토스트).
    - **HMG-API가 1.1.0-rc.8보다 낮은 차:** "NX4 KOR: HMG-API를 …에서 …(으)로 먼저 올립니다"가 나오고 HMG-API가 업데이트된 뒤 재부팅됩니다. 위와 같이 한 번 더 누릅니다. USB에 HMG-API가 없으면 아무것도 바꾸지 않고 멈춥니다.
    - **HMG-API 1.1.0-rc.8 이상인 차:** 바로 아래 3으로 갑니다.
    - USB의 `HMGAPI/install.log`에 `isn't a known stock build`가 있으면 HMG-API 설치기가 이 차의 `app_process`를 모르는 것입니다. 그때는 `HMGAPI/FORCE` 빈 파일을 만들고 다시 합니다(자기 책임).
    - HMG-API 앱의 "Check USB updates"로 모드를 넣는 HMG-API 문서의 방법은 처음에는 쓸 수 없습니다. HMG-API에 NX4 map이 없어 HMG-API 앱 타일이 생기지 않기 때문입니다. 이 USB 설치기가 map을 만들어 줍니다.
-3. 설치기가 차례로 합니다. OTA 화면의 오류 684는 정상입니다. 모두 **3~5분** 걸리니 그동안 USB를 빼거나 끄지 마세요.
+3. 설치기가 차례로 합니다. OTA 화면의 오류 684는 정상입니다. 모두 **3~5분** 걸리니 그동안 USB를 빼거나 끄지 마세요. 부팅 직후에 눌렀으면 HMG-API가 준비되기를 먼저 기다리고, 끝에 재부팅을 안내하기 전에 켜진 지 2분 남짓이 될 때까지(HMG-API 부팅 보호) 기다릴 수 있습니다.
    - HMG-API 앱에 다른 모드의 적용하지 않은 변경이 있으면 아무것도 바꾸지 않고 멈춥니다. HMG-API 앱에서 먼저 적용한 뒤 다시 누릅니다.
    - 옛 NX4 KOR 2.0.x가 있으면 먼저 끝까지 되돌립니다(Wi-Fi 잠금·순정 핫스팟 저장값·무선 권한 파일 포함). 2.0.x는 공식 무선 모드와 함께 쓸 수 없습니다.
    - 2.0.x를 HMG-API 앱에서 먼저 지운 차(모드 폴더 없이 `/data/nx4-kor/backup`만 남음)나 2.0.x 위에 2.1.0 이후를 adb 등으로 넣은 차(`backup`이 남음)도, USB에 함께 든 2.0.x의 되돌리기 스크립트(`NX4/legacy-2.0`, `v2.0.4-beta.1`에서 그대로)로 남은 설정을 되돌립니다.

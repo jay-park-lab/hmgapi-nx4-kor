@@ -19,7 +19,9 @@ HMG-API의 "Install anyway"(--any-car)로 설치합니다.
 HMG-API 1.1.0-rc.8 이상이 필요합니다.
 - HMGAPI 폴더가 있으면 HMG-API가 함께 들어 있는 묶음입니다(이 저장소의 릴리스 묶음).
   HMG-API가 없거나 1.1.0-rc.8보다 낮으면 첫 번째 Update OTA가 HMG-API를 설치(또는 업데이트)하고 재부팅합니다.
-  부팅이 끝나고 1~2분 뒤 같은 USB로 Update OTA를 한 번 더 누르면 나머지가 설치됩니다.
+  부팅이 끝나면 바로 같은 USB로 Update OTA를 한 번 더 누르면 나머지가 설치됩니다.
+  설치기가 HMG-API가 준비될 때까지 스스로 기다립니다(최대 약 5분, "HMG-API가 준비되기를 기다리는 중" 토스트).
+  그동안 USB를 빼지 마세요.
 - HMG-API가 들어 있지 않은 묶음이면 HMG-API USB(hmgapi-<버전>-usb.zip)로 먼저 설치하고 재부팅한 뒤 이 USB를 씁니다.
   HMG-API가 낮은 판인데 이 USB에 HMG-API가 없으면 설치기가 아무것도 바꾸지 않고 멈춥니다.
 
