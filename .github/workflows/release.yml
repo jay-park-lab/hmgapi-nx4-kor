@@ -289,7 +289,7 @@ jobs:
           cp .github/release/mod.key.pub "$K/mod.key.pub"
           [ -s "$K/app/release.keystore" ] || { echo "::error::NX4_APP_KEYSTORE_B64를 풀지 못했습니다"; exit 1; }
 
-      - name: 상태 화면 앱
+      - name: 관리 앱
         env:
           ANDROID_HOME: ${{ runner.temp }}/android-sdk
           NX4_APP_KEYS: ${{ runner.temp }}/keys/app
@@ -445,7 +445,7 @@ jobs:
             echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음(HMG-API $HMGAPI_VER, 공식 무선 모드 $WIRELESS_VER 포함). 빈 USB 맨 위에 풀고 Engineering Mode > USB Copy > DSP > Update OTA. HMG-API가 없거나 $NEED보다 낮은 차는 첫 번째에 HMG-API를 설치하고 재부팅하므로, 같은 USB로 한 번 더 누릅니다 |"
             echo
             echo "- 모드 UUID: \`$UUID\`"
-            echo "- 상태 화면 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
+            echo "- 관리 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
             echo "- busybox: $BB"
             echo "- HMG-API: $NEED 이상 필요. USB 묶음에 $HMGAPI_VER를 함께 넣음(대응 소스 https://github.com/Open-HMG/HMG-API/tree/$HMGAPI_COMMIT, 태그 v$HMGAPI_VER)"
             echo "- 공식 무선 모드: USB 묶음에 wireless-carplay-aa $WIRELESS_VER를 고치지 않고 넣음. USB 설치기가 NX4에 --any-car로 설치(대응 소스 https://github.com/Open-HMG/hmgapi-wireless-cp-aa/tree/v$WIRELESS_VER)"

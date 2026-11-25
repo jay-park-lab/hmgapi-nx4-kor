@@ -11,20 +11,20 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
     - 서비스는 `svc/launch.sh`로, 삭제는 `bin/uninstall.sh`로 옮겼습니다. 위치는 `svc/env.sh`에서 정합니다.
     - USB 설치기 `usb/troubleShooter`와 빌드 `scripts/build.sh`를 새로 넣었습니다.
   - 2.0.x(2026-11-19~23)에는 따로 설치하던 한국 차 빌드 무선 모드 `wireless-carplay-aa` 2.4.5(`hooks.jar`, 레시피, `libleafiaaac.so`, 설정)를 이 모드에 합치고, 원본의 핫스팟 서비스(`svc/hotspot.sh`)로 HMG-API map을 만들고 적용했습니다.
-- **2.1.0 구조로 줄였습니다(2026-11-23).** 무선 카플레이·안드로이드 오토는 HMG-API와 HMG-API 공식 무선 모드(고치지 않고 따로 설치)에 맡기고, `nx4-kor`에는 상태 화면 앱과 그 서비스만 남겼습니다.
+- **2.1.0 구조로 줄였습니다(2026-11-23).** 무선 카플레이·안드로이드 오토는 HMG-API와 HMG-API 공식 무선 모드(고치지 않고 따로 설치)에 맡기고, `nx4-kor`에는 관리 앱과 그 서비스만 남겼습니다.
   - 뺀 것: 합쳤던 무선 모드 2.4.5 전부(`hooks.jar`, `recipes/`, `files/libleafiaaac.so`, `patches.json`, `settings.json`, `mod.json`의 `parts`·`feature_flags`·`hooks`, 저장소의 `wireless/`), 서비스 `ap`(`svc/ap.sh`, `scripts/post.sh`, `svc/hotspot.sh`의 순정 `hostapd`·`dnsmasq` 핫스팟·Wi-Fi 설정 잠금·칩 깨우기·자동 설정).
-  - `svc/hotspot.sh`는 상태 화면이 쓰는 함수만 남겨 `svc/lib.sh`로 바꿨습니다(원본에서 온 softap.conf 읽기, 카플레이 연결 수 세기 등).
-  - `bin/status.sh`의 판정과 상태 파일 키, `scripts/preun.sh`·`bin/uninstall.sh`, 상태 화면 앱의 자세히 표를 새 구조에 맞췄습니다.
+  - `svc/hotspot.sh`는 관리 앱이 쓰는 함수만 남겨 `svc/lib.sh`로 바꿨습니다(원본에서 온 softap.conf 읽기, 카플레이 연결 수 세기 등).
+  - `bin/status.sh`의 판정과 상태 파일 키, `scripts/preun.sh`·`bin/uninstall.sh`, 관리 앱의 자세히 표를 새 구조에 맞췄습니다.
 - **뺀 것:**
   - NEMESIS 관련: NEMESIS 버전 판정, NEMESIS판·wireless.projection과의 충돌 확인, NEMESIS 문구
     - 2026-11-24에 USB 설치기에 확인 하나를 새로 넣었습니다([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). NEMESIS의 Korea Projection 패키지(`/data/nemesis/apps/korea.projection`)가 있으면 설치·업데이트하지 않고 멈춥니다. 원본의 충돌 확인을 되살린 것이 아니고, 그 패키지만 봅니다(`wireless.projection` 등 다른 NEMESIS 패키지는 막지 않음).
   - 다른 차: 차 목록, 차별 map, 패치 세트, 니로 featurexml 되돌리기
-  - 제보 기능: 상태 화면의 제보 파일 만들기·QR, `bin/carreport.sh`, 리포트, USB 진단·로그 꺼내기
+  - 제보 기능: 관리 앱의 제보 파일 만들기·QR, `bin/carreport.sh`, 리포트, USB 진단·로그 꺼내기
   - 그 밖: 이슈 자동 분류 워크플로·이슈 양식, 후원 링크, NEMESIS용 문서·빌드(`docs/install-guide.md`, `docs/car-report-guide.md`, `scripts/build-usb.sh`)
 - **이름을 바꾼 것:** 원본과 섞이지 않게
   - HMG-API 모드 id `nx4-kor`(앱 목록 이름 "NX4 KOR: Tucson NX4 (Korea)"), USB 폴더 `NX4/`, 결과 파일 `hmgapi-nx4-kor-<판>.zip`·`-usb.zip`
   - 차 안 위치: 기록 `/data/nx4-kor`, 작업 폴더 `/data/local/tmp/nx4-kor`, 상태 파일 `/data/local/tmp/nx4-kor-*.txt`
-  - 상태 화면 앱:
+  - 관리 앱:
     - 이름 "NX4 KOR"(원본 "Korea Projection"), 안드로이드 패키지 `io.github.jayparklab.nx4kor`(원본 `korea.projection.app`)
     - 소스 `app/`, APK `NX4KOR.apk`, 서명 키는 저장소 밖(`.env.local`의 `NX4_APP_KEYS`, `scripts/build-app.sh`)
     - 화면이 열릴 때 `hmgapid service-start launch`를 부르고, 상태 파일이 새로 쓰이면 다시 그립니다
@@ -55,7 +55,7 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
 
 - https://busybox.net
 - 모드에 `bin/busybox`가 들어 있습니다(Korea Projection 1.7.0부터 들어 있던 것과 같은 파일).
-  - busybox가 없는 내비에서도 이 모드의 스크립트(상태 화면)를 돌리려고 함께 넣었습니다. 내비에 `/system/bin/busybox`가 있으면 그것을 쓰고, 이 파일은 쓰지 않습니다.
+  - busybox가 없는 내비에서도 이 모드의 스크립트(관리 앱이 부르는 스크립트)를 돌리려고 함께 넣었습니다. 내비에 `/system/bin/busybox`가 있으면 그것을 쓰고, 이 파일은 쓰지 않습니다.
 - BusyBox는 NX4 KOR와 따로 동작하는 프로그램이고, AGPL-3.0이 아니라 **GNU GPL 2.0**으로 배포됩니다. 이 파일은 고치지 않았습니다.
 - 파일: BusyBox v1.36.1, Alpine Linux 3.20 `busybox-static-1.36.1-r31` 패키지의 `/bin/busybox.static`(ARMv7 정적 링크, 877,900바이트)
   - SHA-256 `3d31efecd4d09625a5d04597ad857f3475d35e6d63a3365912a7edd4c60770a5`

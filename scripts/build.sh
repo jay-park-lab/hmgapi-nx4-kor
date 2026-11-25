@@ -2,8 +2,8 @@
 # NX4 KOR 묶음을 만든다(투싼 NX4 한국 내수 260902 전용, docs/design.md).
 #   out/hmgapi-nx4-kor-<버전>.zip      HMG-API 모드(작성자 키로 서명): HMG-API 앱·adb·USB로 설치
 #   out/hmgapi-nx4-kor-<버전>-usb.zip  USB 묶음: Engineering Mode > DSP > Update OTA로 설치
-# 모드는 mod/ 폴더(mod.json, 서비스·상태 스크립트, 무선 훅·네이티브 패치)에 상태 화면 앱과 busybox를 더한 것이다.
-# 필요한 것: JDK, python3, zip/unzip, HMG-API 소스(서명 도구 tools/mkmodpkg.sh), 상태 화면 앱 APK,
+# 모드는 mod/ 폴더(mod.json, 서비스·상태 스크립트, 무선 훅·네이티브 패치)에 관리 앱과 busybox를 더한 것이다.
+# 필요한 것: JDK, python3, zip/unzip, HMG-API 소스(서명 도구 tools/mkmodpkg.sh), 관리 앱 APK,
 #   busybox를 Alpine에서 받을 때는 curl과 인터넷(NX4_BUSYBOX 참고).
 # 환경 변수(명령 앞에 주거나 .env.local에 적는다. .env.example, scripts/local-env.sh):
 #   HMGAPI_SRC      HMG-API 저장소 위치(필수). 서명은 그 tools/mkmodpkg.sh가 한다
@@ -11,7 +11,7 @@
 #                     (cd $HMGAPI_SRC && mkdir -p out/engine-host && javac --release 8 -d out/engine-host core/runtime/java/hmgapi/engine/*.java)
 #                     java -cp $HMGAPI_SRC/out/engine-host hmgapi.engine.Signing keygen $NX4_MOD_KEY
 #                   HMG-API는 같은 키로 서명한 업데이트만 받는다: 이 키를 잃으면 모드를 지우고 다시 설치해야 한다
-#   NX4_APK          상태 화면 앱(기본 mod/app/NX4KOR.apk, scripts/build-app.sh로 만듦)
+#   NX4_APK          관리 앱(기본 mod/app/NX4KOR.apk, scripts/build-app.sh로 만듦)
 #   NX4_BUSYBOX      함께 넣을 busybox. 주지 않으면 mod/bin/busybox(있으면 SHA-256 확인 없이), 그것도 없으면 Alpine
 #                   저장소에서 받는다(scripts/fetch-busybox.sh: BusyBox 1.36.1, NOTICE.md의 SHA-256과 같을 때만.
 #                   <OUT>/busybox에 둠. 미러는 NX4_BUSYBOX_URL).
@@ -44,7 +44,7 @@ nx4_need NX4_MOD_KEY "모드 작성자 키 파일. 만드는 법은 이 파일 �
 HMGAPI_SRC=$(cd "$HMGAPI_SRC" && pwd)
 case $NX4_MOD_KEY in /*) ;; *) NX4_MOD_KEY=$PWD/$NX4_MOD_KEY ;; esac
 
-# 판: mod.json의 version(상태 화면·USB 설치기도 이 값을 읽는다)
+# 판: mod.json의 version(관리 앱·USB 설치기도 이 값을 읽는다)
 V=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$PKG/mod.json" | head -1)
 [ -n "$V" ] || { echo "mod.json에서 판을 읽지 못했습니다" >&2; exit 1; }
 
@@ -56,7 +56,7 @@ cp -R "$PKG/." "$M/"
 # NX4 map은 모드에 없다: 그 차에서 HMG-API가 만든다(USB 설치기 usb/troubleShooter가 engine map-car --write → verify-map)
 
 APK=${NX4_APK:-$PKG/app/NX4KOR.apk}
-[ -f "$APK" ] || { echo "상태 화면 앱이 없습니다: $APK (scripts/build-app.sh로 만들거나 NX4_APK로 주세요)" >&2; exit 1; }
+[ -f "$APK" ] || { echo "관리 앱이 없습니다: $APK (scripts/build-app.sh로 만들거나 NX4_APK로 주세요)" >&2; exit 1; }
 mkdir -p "$M/app"
 [ "$APK" -ef "$M/app/NX4KOR.apk" ] || cp "$APK" "$M/app/NX4KOR.apk"
 

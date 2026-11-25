@@ -1,5 +1,5 @@
 #!/bin/sh
-# NX4 KOR 상태 화면 앱(APK, 패키지 io.github.jayparklab.nx4kor)을 만든다 → mod/app/NX4KOR.apk
+# NX4 KOR 관리 앱(APK, 패키지 io.github.jayparklab.nx4kor)을 만든다 → mod/app/NX4KOR.apk
 # 필요한 것: JDK, Android SDK build-tools(aapt2, d8, zipalign, apksigner)와 android-19 플랫폼.
 # 경로는 명령 앞에 주거나 .env.local에 적는다(.env.example, scripts/local-env.sh):
 #   ANDROID_HOME   Android SDK. 그 아래 build-tools/<버전>/, platforms/<이름>/android.jar
@@ -11,7 +11,7 @@ B=$(cd "$(dirname "$0")/.." && pwd)
 . "$B/scripts/local-env.sh"
 nx4_env "$B"
 nx4_need ANDROID_HOME "Android SDK 위치"
-nx4_need NX4_APP_KEYS "상태 화면 앱 서명 키 폴더"
+nx4_need NX4_APP_KEYS "관리 앱 서명 키 폴더"
 SRC=$B/app
 OUTAPK=$B/mod/app/NX4KOR.apk
 SDK=$ANDROID_HOME

@@ -8,7 +8,7 @@
     "StopDragon"
   ],
   "license": "AGPL-3.0",
-  "description": "HMG-API add-on for the Korean Tucson NX4 (260902): a status screen for HMG-API and the official Wireless CarPlay + Android Auto mod (wireless-carplay-aa) on this car. Based on Korea Projection (StopDragon).",
+  "description": "HMG-API add-on for the Korean Tucson NX4 (260902) with a manager app. The app shows the USB install progress and checks HMG-API and the official Wireless CarPlay + Android Auto mod (wireless-carplay-aa) on this car (versions, boot guard, hooks and map, the projection Wi-Fi AP and Wi-Fi part, other Wi-Fi packages), says what blocks wireless projection and what to do, and counts CarPlay connections. It can request a reboot, held back while installing or near the HMG-API boot guard, and asks before the USB installer collects a diagnostic log.",
   "system": {
     "model": [
       "NX4",

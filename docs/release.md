@@ -48,7 +48,7 @@ PC에서 `.env.local`의 키로 `sh scripts/build.sh`를 돌려 만드는 길도
 
 | 이름 | 종류 | 내용 | 로컬 파일 |
 |---|---|---|---|
-| `NX4_APP_KEYSTORE_B64` | `production` 환경 secret | 상태 화면 앱 키스토어를 base64로 | `<NX4_APP_KEYS>/release.keystore` |
+| `NX4_APP_KEYSTORE_B64` | `production` 환경 secret | 관리 앱 키스토어를 base64로 | `<NX4_APP_KEYS>/release.keystore` |
 | `NX4_APP_KEY_PASS` | `production` 환경 secret | 키스토어 비밀번호 | `<NX4_APP_KEYS>/pass` |
 | `NX4_MOD_KEY` | `production` 환경 secret | HMG-API 모드 작성자 키(비밀 키) | `<NX4_MOD_KEY>` |
 | `.github/release/mod.key.pub` | 커밋한 파일 | 모드 작성자 공개 키 | `<NX4_MOD_KEY>.pub` |
@@ -216,7 +216,7 @@ GitHub secret은 넣기만 되고 읽어 올 수 없으므로 백업이 아닙�
 
 - 키 폴더의 네 파일(`release.keystore`, `pass`, `mod.key`, `mod.key.pub`)을 오프라인에 두 곳 이상 백업합니다. 예: 암호화한 USB, 비밀번호 관리자의 보안 메모나 첨부. 비밀번호(`pass`)는 키스토어와 같은 곳에만 두지 않습니다.
 - 잃으면:
-  - 앱 키를 잃으면 차가 상태 화면 앱 업데이트를 받지 않습니다. 사용자가 앱을 지우고 다시 설치해야 합니다.
+  - 앱 키를 잃으면 차가 관리 앱 업데이트를 받지 않습니다. 사용자가 앱을 지우고 다시 설치해야 합니다.
   - 모드 키를 잃으면 HMG-API가 업데이트를 받지 않습니다. 모드를 지우고 다시 설치해야 하고, 새 키라서 UUID도 바뀝니다.
 - 키를 바꾸면 secret, `.github/release/`의 두 값, 이 문서의 UUID를 함께 바꿉니다.
 
