@@ -30,10 +30,12 @@ KREL=3.18.24-tcc
 mkdir -p $DL $TC /out
 
 . $S/lib.sh
+# 받기의 다시 묻기: curl --retry는 503 같은 잠깐의 오류(408·429·5xx)에서 다시 묻는다. 사이를 15초씩 두고 8번까지
+CURL_RETRY="--retry 8 --retry-delay 15"
 # 받기: 없을 때만 받고, 다 받은 뒤에만 이름을 바꾼다
 fetch() {
   [ -s "$2" ] && return 0
-  curl -fsSL --retry 3 -o "$2.part" "$1" || die "받지 못함: $1"
+  curl -fsSL $CURL_RETRY -o "$2.part" "$1" || die "받지 못함: $1"
   mv "$2.part" "$2"
 }
 # 툴체인: 커밋으로 고정한 묶음을 받아 폴더 전체 값으로 확인한다(묶음 파일은 받을 때마다 만들어져 그 sha256은 고정되지 않음).
@@ -41,7 +43,11 @@ fetch() {
 get_toolchain() {
   [ -x $TC/bin/arm-eabi-gcc ] && [ "$(tree_sum $TC)" = "$TOOLCHAIN_TREE_SHA256" ] && return 0
   rm -rf $TC; mkdir -p $TC
-  curl -fsSL --retry 3 "$TOOLCHAIN_URL" | tar -xz -C $TC || die "툴체인을 받지 못함"
+  # googlesource는 묶음을 그때 만들어 주므로 503을 낼 때가 있다(CI에서 겪음). 파일로 받고, 사이를 두고 여러 번 다시 묻는다
+  rm -f $DL/toolchain.tar.gz
+  curl -fsSL $CURL_RETRY -o $DL/toolchain.tar.gz "$TOOLCHAIN_URL" || die "툴체인을 받지 못함"
+  tar -xzf $DL/toolchain.tar.gz -C $TC || die "툴체인 묶음을 풀지 못함"
+  rm -f $DL/toolchain.tar.gz
   [ "$(tree_sum $TC)" = "$TOOLCHAIN_TREE_SHA256" ] || die "툴체인 폴더 값이 다릅니다($(tree_sum $TC))"
 }
 
