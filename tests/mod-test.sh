@@ -630,7 +630,10 @@ printf 'driver=nl80211\n' > $R/system/bin/hostapd
 for f in idVendor:0bda idProduct:b812 speed:480 bMaxPower:500mA bDeviceClass:00 manufacturer:Realtek product:802.11ac_NIC serial:SERIALX; do echo ${f#*:} > $R/sys/bus/usb/devices/1-1/${f%%:*}; done
 for f in idVendor:1d6b idProduct:0002 speed:480; do echo ${f#*:} > $R/sys/bus/usb/devices/usb1/${f%%:*}; done
 echo MACX > $R/sys/class/net/wlan0/address
-printf '%s\n' "<6>[   30.1] usb 1-1: new high-speed USB device number 2 using ehci-tcc" "<6>[   30.2] usb 1-1: SerialNumber: SERIALX" "<6>[   31.0] hmgapi-hook: something else" > $T/ddmesg
+# MAC이 든 줄(순정 bcmdhd, Realtek, 대시 꼴)은 빠져야 한다(PR #66 리뷰 1)
+printf '%s\n' "<6>[   30.1] usb 1-1: new high-speed USB device number 2 using ehci-tcc" "<6>[   30.2] usb 1-1: SerialNumber: SERIALX" "<6>[   31.0] hmgapi-hook: something else" \
+  "<4>[   32.0] dhd_attach: Broadcom Dongle Host Driver mac=00:90:4c:11:22:33" "<4>[   33.0] RTW: rtw_macaddr_cfg MAC Address  = 00:e0:4c:aa:bb:cc" \
+  "<4>[   34.0] wlan0: link up 00-e0-4c-dd-ee-ff" "<4>[   35.0] RTW: rtw_ndev_init(wlan0) if1" > $T/ddmesg
 # 이 회는 진단 기록만 본다. backup이 있어 설치기가 2.0.x 되돌리기 길을 타지 않게 legacy-2.0을 치워(가드에서 아무것도 바꾸지 않고 멈춤)
 # 진단 기록에 백업 폴더가 들어가지 않는지만 본다(PR #52 리뷰 10). 끝나면 backup을 지운다
 rm -rf $K/diag; legoff
@@ -654,8 +657,19 @@ KO5=$(md5sum < $R/system/wifi/bcmdhd.ko | cut -d" " -f1)
 check "USB 설치기 진단 기록(동글 준비): /system/wifi 목록·md5, 순정 bcmdhd.ko의 vermagic, HAL·hostapd의 드라이버 문자열(관계없는 줄은 뺌)" \
   'grep -q "fw_bcmdhd.bin" $DG/system-wifi-ls.txt && grep -qx "$KO5  /system/wifi/bcmdhd.ko" $DG/system-wifi-md5.txt && grep -q "^/system/wifi/bcmdhd.ko: vermagic=3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8" $DG/ko-vermagic.txt && grep -qx "== /system/lib/libhardware_legacy.so" $DG/wifi-strings.txt && grep -qx "iface_name=" $DG/wifi-strings.txt && grep -qx "/system/wifi/bcmdhd.ko" $DG/wifi-strings.txt && grep -qx "driver=nl80211" $DG/wifi-strings.txt && ! grep -q "unrelated" $DG/wifi-strings.txt' || cat $DG/wifi-strings.txt $DG/ko-vermagic.txt
 check "USB 설치기 진단 기록(동글 준비): USB 장치(ID·속도·전력·제품), 드라이버에 붙은 인터페이스, 네트워크 장치, 커널 로그의 USB·Wi-Fi 줄. 일련번호·MAC은 넣지 않음" \
-  'grep -q "^1-1 0bda:b812 speed=480 maxpower=500mA class=00 manufacturer=Realtek product=802.11ac_NIC$" $DG/usb.txt && grep -q "^usb1 1d6b:0002 " $DG/usb.txt && grep -q "1-1" $DG/usb-ls.txt && grep -qx "== rtl88x2bu" $DG/usb-drivers.txt && grep -qx "1-1:1.0" $DG/usb-drivers.txt && grep -q "wlan0" $DG/net-ls.txt && grep -q "new high-speed USB device" $DG/dmesg-usb-wifi.txt && ! grep -q "hmgapi-hook" $DG/dmesg-usb-wifi.txt && ! grep -rq -e SERIALX -e MACX $K/diag && grep -q "동글 준비 정보를 모음" $K/install.log' || cat $DG/usb.txt $DG/dmesg-usb-wifi.txt
+  'grep -q "^1-1 0bda:b812 speed=480 maxpower=500mA class=00 manufacturer=Realtek product=802.11ac_NIC$" $DG/usb.txt && grep -q "^usb1 1d6b:0002 " $DG/usb.txt && grep -q "1-1" $DG/usb-ls.txt && grep -qx "== rtl88x2bu" $DG/usb-drivers.txt && grep -qx "1-1:1.0" $DG/usb-drivers.txt && grep -q "wlan0" $DG/net-ls.txt && grep -q "new high-speed USB device" $DG/dmesg-usb-wifi.txt && grep -q "rtw_ndev_init(wlan0)" $DG/dmesg-usb-wifi.txt && ! grep -q "hmgapi-hook" $DG/dmesg-usb-wifi.txt && ! grep -rqi -e SERIALX -e MACX -e 11:22:33 -e aa:bb:cc -e dd-ee-ff $K/diag && grep -q "동글 준비 정보를 모음" $K/install.log' || cat $DG/usb.txt $DG/dmesg-usb-wifi.txt
 legon; rm -rf $R/data/nx4-kor/backup
+# 내비의 busybox에 strings·sha256sum·gunzip이 없으면 빈 값 대신 까닭을 적음(PR #66 리뷰 2)
+printf '#!/bin/sh\ncase "$1" in strings|sha256sum|gunzip) echo "$1: applet not found" >&2; exit 127 ;; esac\ncommand -v "$1" >/dev/null 2>&1 || exit 127\nexec "$@"\n' > $R/system/bin/busybox
+rm -rf $K/diag; ts $U; DG=$(dg)/dongle
+check "USB 설치기 진단 기록(동글 준비): busybox에 gunzip·sha256sum·strings가 없으면 config.gz md5는 남기고, 풀지 못함·vermagic·문자열을 못 읽음을 적음" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "config.gz md5: $KCG5" $DG/config-sum.txt && grep -q "^config.txt: busybox로 풀지 못함" $DG/config-sum.txt && [ ! -f $DG/config.txt ] && grep -q "strings나 grep" $DG/ko-vermagic.txt && grep -q "strings나 grep" $DG/wifi-strings.txt && grep -qx "$KO5  /system/wifi/bcmdhd.ko" $DG/system-wifi-md5.txt && grep -q "strings·grep이 없어" $K/install.log' || cat $DG/config-sum.txt $DG/ko-vermagic.txt
+# gunzip은 있고 sha256sum만 없으면 sha256 줄에 까닭을 적음
+printf '#!/bin/sh\ncase "$1" in sha256sum) exit 127 ;; esac\ncommand -v "$1" >/dev/null 2>&1 || exit 127\nexec "$@"\n' > $R/system/bin/busybox
+rm -rf $K/diag; ts $U; DG=$(dg)/dongle
+check "USB 설치기 진단 기록(동글 준비): sha256sum만 없으면 config.txt와 md5는 남기고 sha256 줄에 까닭을 적음" \
+  'cmp -s $T/kconfig $DG/config.txt && grep -q "^config.txt md5: " $DG/config-sum.txt && grep -qx "config.txt sha256: busybox에 sha256sum이 없음(PC에서 셈)" $DG/config-sum.txt && grep -q "vermagic=3.18.24-tcc" $DG/ko-vermagic.txt' || cat $DG/config-sum.txt
+cp $T/bin/bb $R/system/bin/busybox
 # md5를 셀 busybox: 내비에 없으면 설치된 모드의 것, 그것도 없으면 스틱의 것을 /data로 복사해 쓰고 지움. 모두 없으면 그렇다고 적음
 rm $R/system/bin/busybox; cp $T/bin/bb $HD/mods/nx4-kor/bin/busybox
 ts $U
