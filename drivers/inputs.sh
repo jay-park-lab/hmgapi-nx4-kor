@@ -5,10 +5,11 @@
 KERNEL_URL=https://cdn.kernel.org/pub/linux/kernel/v3.x/linux-3.18.24.tar.xz
 KERNEL_SHA256=ed54cf8c3ac6b95fc17b07b3a236bc42719c96fee08fe696cabfb5b8e07f8c1b
 
-# 툴체인: AOSP arm-eabi-4.7(kitkat-release). 순정 모듈이 "GNU C 4.7"로 빌드됨.
-# googlesource의 묶음 파일은 받을 때마다 만들어져 묶음의 sha256은 고정되지 않는다. 그래서 컴파일러 파일로 확인한다
-TOOLCHAIN_URL=https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-eabi-4.7/+archive/refs/heads/kitkat-release.tar.gz
-TOOLCHAIN_GCC_SHA256=89a07707b49062910fdec9b55a7fb920809638fde0517a70cf669cb6e4d3661b
+# 툴체인: AOSP arm-eabi-4.7(kitkat-release 브랜치의 커밋 8b880805로 고정). 순정 모듈이 "GNU C 4.7"로 빌드됨.
+# googlesource의 묶음 파일은 받을 때마다 만들어져 묶음의 sha256은 고정되지 않는다. 그래서 푼 폴더 전체 값(lib.sh tree_sum:
+# 모든 파일의 sha256과 링크)으로 확인한다. 그 안의 bin/arm-eabi-gcc는 KP가 적은 sha256 89a07707…과 같다
+TOOLCHAIN_URL=https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-eabi-4.7/+archive/8b880805d454664b3eed11d0f053cdeafa1ff06e.tar.gz
+TOOLCHAIN_TREE_SHA256=201fc60234606b9b6abb8d31ac6cd90bf3b7726c681c6ad9a0bdce7c0c7c6bee
 
 # 차 커널 설정(tcc803x, /proc/config.gz를 푼 것). Korea Projection 1.8.0이 쓴 설정과 sha256이 같다.
 # KP가 적은 출처(JongMinKim-93/jmk-gen5w-ioniq5)는 404라 같은 파일이 있는 공개 저장소의 커밋으로 고정한다.

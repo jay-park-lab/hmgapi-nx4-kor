@@ -1345,25 +1345,58 @@ check "fetch-wireless: 기본 주소는 Open-HMG/hmgapi-wireless-cp-aa 릴리스
 # --- drivers/(USB Wi-Fi 동글 드라이버, #48) --- Docker 빌드는 scripts/build-driver.sh가 한다(오래 걸리고 인터넷이 필요해 여기서는
 # 돌리지 않음). 여기서는 Docker 없이 볼 수 있는 것만: 구문, 바깥 자료 고정 값, 패치 차례와 꼴, 문서와 값이 같은지
 DI=$B/drivers/inputs.sh
-# inputs.sh의 꼴: 주소는 https, sha256은 64자리, 커밋은 40자리, 차 설정 주소는 커밋으로 고정(브랜치 이름이면 바뀔 수 있음)
+# inputs.sh의 꼴: 주소는 https, sha256은 64자리, 커밋은 40자리, 툴체인·차 설정 주소는 커밋으로 고정(브랜치 이름이면 바뀔 수 있음)
 drv_inputs_ok() (
   . $DI
   for u in "$KERNEL_URL" "$TOOLCHAIN_URL" "$CARCFG_URL" "$RTL88X2BU_GIT"; do case "$u" in https://*) ;; *) exit 1 ;; esac; done
-  for h in "$KERNEL_SHA256" "$TOOLCHAIN_GCC_SHA256" "$CARCFG_SHA256"; do echo "$h" | grep -qx '[0-9a-f]\{64\}' || exit 1; done
-  echo "$RTL88X2BU_COMMIT" | grep -qx '[0-9a-f]\{40\}' && echo "$CARCFG_URL" | grep -q '/[0-9a-f]\{40\}/' && echo "$KP_88X2BU_MD5" | grep -qx '[0-9a-f]\{32\}'
+  for h in "$KERNEL_SHA256" "$TOOLCHAIN_TREE_SHA256" "$CARCFG_SHA256"; do echo "$h" | grep -qx '[0-9a-f]\{64\}' || exit 1; done
+  echo "$RTL88X2BU_COMMIT" | grep -qx '[0-9a-f]\{40\}' && echo "$CARCFG_URL" | grep -q '/[0-9a-f]\{40\}/' \
+    && echo "$TOOLCHAIN_URL" | grep -q '/+archive/[0-9a-f]\{40\}\.tar\.gz$' && echo "$KP_88X2BU_MD5" | grep -qx '[0-9a-f]\{32\}'
 )
-# README·NOTICE에 적은 값이 inputs.sh와 같은가(차 설정 sha256 앞 8자리, 드라이버 커밋)
+# 앞 8자리
+p8() { echo "$1" | cut -c1-8; }
+# README·NOTICE에 적은 값이 inputs.sh와 같은가: 커널·툴체인·차 설정 값과 차 설정·툴체인 커밋은 앞 8자리, 드라이버 커밋과 KP md5는 전부
 drv_docs_ok() (
   . $DI
-  grep -q "${CARCFG_SHA256%"${CARCFG_SHA256#????????}"}" $B/drivers/README.md && grep -q "$RTL88X2BU_COMMIT" $B/drivers/README.md && grep -q "$RTL88X2BU_COMMIT" $B/NOTICE.md \
-    && grep -q "${KERNEL_SHA256%"${KERNEL_SHA256#????????}"}" $B/drivers/README.md && grep -q "$KP_88X2BU_MD5" $B/drivers/README.md
+  _cc=$(echo "$CARCFG_URL" | grep -o '/[0-9a-f]\{40\}/' | tr -d /)
+  _tc=$(echo "$TOOLCHAIN_URL" | grep -o '[0-9a-f]\{40\}')
+  for v in $(p8 $KERNEL_SHA256) $(p8 $TOOLCHAIN_TREE_SHA256) $(p8 $CARCFG_SHA256) $(p8 $_cc) $(p8 $_tc) $RTL88X2BU_COMMIT $KP_88X2BU_MD5; do
+    grep -q "$v" $B/drivers/README.md || { echo "drivers/README.md에 없음: $v"; exit 1; }
+  done
+  grep -q "$RTL88X2BU_COMMIT" $B/NOTICE.md && grep -q "$(p8 $_tc)" $B/NOTICE.md
 )
 check "drivers: 빌드 스크립트 구문(bash -n·sh -n)" \
-  'bash -n $B/drivers/build-in-container.sh && sh -n $B/scripts/build-driver.sh && bash -n $B/drivers/kernel/hdr-patch.sh && bash -n $B/drivers/kernel/hdr-patch-803x.sh && bash -n $DI'
-check "drivers/inputs.sh: 바깥 자료마다 https 주소와 sha256(또는 커밋), 차 커널 설정 주소는 커밋으로 고정" 'drv_inputs_ok'
+  'bash -n $B/drivers/build-in-container.sh && bash -n $B/drivers/lib.sh && bash -n $B/drivers/kernel/prepare.sh && sh -n $B/scripts/build-driver.sh && bash -n $B/drivers/kernel/hdr-patch.sh && bash -n $B/drivers/kernel/hdr-patch-803x.sh && bash -n $DI'
+check "drivers/inputs.sh: 바깥 자료마다 https 주소와 sha256(또는 커밋), 툴체인·차 커널 설정 주소는 커밋으로 고정" 'drv_inputs_ok'
+check "drivers: GPL-2.0 전문(drivers/COPYING), build-driver.sh는 빌드 날짜를 LC_ALL=C·UTC로, drivers/를 바꾼 마지막 커밋 시각에서" \
+  'head -2 $B/drivers/COPYING | grep -q "GNU GENERAL PUBLIC LICENSE" && grep -q "Version 2, June 1991" $B/drivers/COPYING && [ "$(grep -o "LC_ALL=C TZ=UTC date" $B/scripts/build-driver.sh | grep -c .)" = 4 ] && [ "$(grep -o "date -[rd]" $B/scripts/build-driver.sh | grep -c .)" = 4 ] && grep -q "log -1 --format=%ct -- drivers scripts/build-driver.sh" $B/scripts/build-driver.sh && grep -q "fetch-depth: 0" $B/.github/workflows/drivers.yml'
 check "drivers/rtl88x2bu: 패치는 번호 차례(0001 KP 보호 패치, 0002 HAL 맞춤)이고 -p1 꼴, nx4 빌드는 모듈 이름 bcmdhd·iface_name을 ifname으로 받음" \
   '[ "$(ls $B/drivers/rtl88x2bu/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-kp-protect.diff 0002-nx4-hal.diff " ] && ! grep -h "^+++ " $B/drivers/rtl88x2bu/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_88x2bu \$D bcmdhd" $B/drivers/build-in-container.sh && grep -q "module_param_named(iface_name, ifname" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "module_param_string(firmware_path" $B/drivers/rtl88x2bu/0002-nx4-hal.diff'
-check "drivers: README·NOTICE의 값(차 설정·커널 sha256, 드라이버 커밋, KP md5)이 inputs.sh와 같음" 'drv_docs_ok'
+check "drivers: README·NOTICE의 값(커널·툴체인·차 설정 값과 커밋, 드라이버 커밋, KP md5)이 inputs.sh와 같음" 'drv_docs_ok'
+# lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
+# 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
+MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc
+cat > $MR/bin/make <<E
+#!/bin/sh
+n=\$(( \$(cat $MR/calls 2>/dev/null || echo 0) + 1 )); echo \$n > $MR/calls
+case "\$(sed -n "\${n}p" $MR/plan)" in
+  segv) echo "Segmentation fault (core dumped)"; echo "make[2]: *** [scripts/Makefile.host:108: scripts/dtc/flattree.o] Error 139"
+        echo "make[2]: *** [scripts/Makefile.modpost:90: $MR/out/bcmdhd.ko] Error 4"; exit 2 ;;
+  err) echo "foo.c:1: error: something"; exit 2 ;;
+  *) echo built; exit 0 ;;
+esac
+E
+chmod +x $MR/bin/make
+mr() { rm -f $MR/calls; printf '%s\n' "$@" > $MR/plan; mkdir -p $MR/out; : > $MR/k/scripts/dtc/flattree.o; : > $MR/out/bcmdhd.ko
+  (PATH=$MR/bin:$PATH bash -c '. "$1"; make_retry "$2" "$3" -j2' x $B/drivers/lib.sh $MR/log $MR/k) > $MR/out.txt 2>&1; echo $? > $MR/rc; }
+mr segv ok
+check "drivers/lib.sh make_retry: 에뮬레이션 충돌(Segmentation fault)이면 실패한 대상(make 폴더 기준 상대 경로, 절대 경로 .ko)을 지우고 이어서 다시 돌려 성공" \
+  '[ "$(cat $MR/rc)" = 0 ] && [ "$(cat $MR/calls)" = 2 ] && [ ! -e $MR/k/scripts/dtc/flattree.o ] && [ ! -e $MR/out/bcmdhd.ko ] && grep -q "다시 돌림(1번째 실패" $MR/out.txt && grep -q built $MR/log && grep -q "Segmentation fault" $MR/log' || cat $MR/out.txt
+mr segv segv segv ok
+check "drivers/lib.sh make_retry: 모두 3번까지(세 번째도 충돌이면 실패)" '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 3 ]' || cat $MR/out.txt
+mr err ok
+check "drivers/lib.sh make_retry: 다른 오류는 다시 돌리지 않고 바로 실패, 대상은 지우지 않음" \
+  '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 1 ] && [ -e $MR/k/scripts/dtc/flattree.o ] && grep -q "error: something" $MR/out.txt' || cat $MR/out.txt
 
 # --- 끝까지: 빌드 → HMG-API 엔진에 설치(HMGAPI_SRC가 있을 때만) ---
 if [ -n "$HMGAPI_SRC" ]; then
