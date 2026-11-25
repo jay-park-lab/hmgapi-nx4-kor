@@ -134,7 +134,7 @@ NX4 KOR("NX4 KOR: Tucson NX4 (Korea)")의 설정은 둘입니다.
 | 설정 | 기본 | 하는 일 |
 |---|---|---|
 | `kor_tbt` "Korean CarPlay turn-by-turn on the cluster and HUD" | 켬 | 한국 카플레이 길안내(위 "무엇을 하나"). 끄면 공식 무선 모드의 길안내 그대로입니다 |
-| `kor_tbt_log` "Log the CarPlay turn-by-turn diagnosis" | 켬 | Korea Projection의 진단 줄(곧 회전 판단, 계기판에 보낸 값, 차선, 길안내 앱 이름)을 HMG-API 기록에 더 남깁니다. 꺼도 받은 안내의 숫자(종류·각도, 시작마다 300줄까지)와 보낸 HUD 목록 줄은 남습니다. 길·장소 이름은 어느 쪽이든 남기지 않습니다. 계기판이 이상하게 보였을 때 원인을 찾는 데 씁니다 |
+| `kor_tbt_log` "Log the CarPlay turn-by-turn diagnosis" | 켬 | Korea Projection의 진단 줄(곧 회전 판단, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)을 HMG-API 기록에 더 남깁니다. 꺼도 받은 안내의 숫자(종류·각도, 시작마다 300줄까지), 보낸 HUD 목록 줄, 길안내 앱이 바뀐 줄(두 앱 이름), 지운 줄은 남습니다. 길·장소 이름은 어느 쪽이든 남기지 않습니다. 계기판이 이상하게 보였을 때 원인을 찾는 데 씁니다 |
 
 무선 기능의 설정은 HMG-API 앱의 "Wireless CarPlay + Android Auto"(공식 무선 모드)에 있습니다. 그중 `bridge`(Wireless CarPlay)를 끄면 무선 카플레이가 되지 않고 관리 앱이 `bridgeoff`를 보입니다. 계기판·HUD 길안내는 `tbt`입니다. 한국 카플레이 길안내도 공식 모드의 `tbt`가 켜져 있어야 합니다(아이폰에 길안내를 받는다고 알리고, 순정 내비가 계기판에 끼어드는 것을 막는 일은 공식 모드가 합니다). 설정을 바꾼 뒤에는 HMG-API 앱에서 변경 사항을 적용하고 재부팅합니다.
 

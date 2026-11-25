@@ -95,7 +95,21 @@ got = sorted(re.findall(r"\"(update_[a-z0-9_]+)\"", a))
 want = sorted(p.split(".")[-1] for p, v in m["hooks"]["points"].items() if v == "change")
 assert got == want, (got, want)
 assert "\"dipo.iap2_proxy.stop_route_guidance\"" in part
+# 판단은 TbtGate가 한다(아래 호스트 테스트): 우리 호출 기록, 남의 호출에 줄 인자, 남의 Stop 미루기, 비켜 주기, 앱에서 끔
+for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), mod.enabled())",
+          "gate.stopSeen(", "gate.stopDue(", "gate.yielding(", "gate.heard(", "gate.setActive(turns.active())", "if (!mod.enabled()) return;"):
+    assert s in part, s
 PY'
+# KorTbt의 판단(TbtGate: 덮어쓰기, 비켜 주기, 남의 Stop 미루기, 앱에서 끔. PR #68 리뷰 1~4)을 PC에서 돌린다
+if command -v javac >/dev/null 2>&1; then
+  mkdir -p $T/gate
+  javac --release 8 -Xlint:-options -nowarn -d $T/gate $HK/dipo/TbtGate.java $B/tests/tools/TbtGateTest.java > $T/gate.err 2>&1
+  java -cp $T/gate io.github.jayparklab.nx4kor.hook.dipo.TbtGateTest > $T/gate.out 2>&1
+  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음" \
+    'tail -n 1 $T/gate.out | grep -qx ok && ! grep -q "^FAIL" $T/gate.out' || cat $T/gate.err $T/gate.out
+else
+  echo "skip TbtGate 테스트(javac 없음)"
+fi
 check "hooks 소스: 순정 내비 쪽 막대 방송(PhoneBarOut)은 보내지 않음, KP의 순정 층(CpTurns)은 옮기지 않음" \
   '! grep -q "sendBroadcast" $HK/dipo/PhoneBarOut.java && [ ! -e $HK/dipo/CpTurns.java ] && ! grep -qE "new CpTurns\(|[^/ ]CpTurns\.[A-Za-z]+\(" $HK/dipo/*.java'
 check "lib.sh: 모드 id·HMG-API 최소 판이 mod.json과 같음, 공식 무선 모드 최소 판, env.sh의 NX4_MOD_ID도 같음, 앱 Report의 최소 판도 같음" \
@@ -1443,7 +1457,7 @@ if [ -n "$HMGAPI_SRC" ]; then
   check "빌드: busybox를 넣는데 라이선스 안내가 없으면 만들지 않음" '[ "$(cat $T/build.rc)" != 0 ] && grep -q "라이선스 안내" $T/build.out && [ ! -f $T/out-nolic/hmgapi-nx4-kor-$V-usb.zip ]'
   echo "BusyBox GPL-2.0 test notice" > $T/test-bb-LICENSE.txt
   bld env NX4_BUSYBOX=$T/test-bb OUT=$T/out
-  check "빌드: 모드 zip과 USB 묶음을 만듦" '[ "$(cat $T/build.rc)" = 0 ] && [ -f $T/out/hmgapi-nx4-kor-$V.zip ] && [ -f $T/out/hmgapi-nx4-kor-$V-usb.zip ]' || cat $T/build.out
+  check "빌드: 모드 zip과 USB 묶음을 만듦, 받은 hooks.jar(NX4_HOOKS_JAR)를 넣었다고 찍음" '[ "$(cat $T/build.rc)" = 0 ] && [ -f $T/out/hmgapi-nx4-kor-$V.zip ] && [ -f $T/out/hmgapi-nx4-kor-$V-usb.zip ] && grep -q "hooks.jar는 NX4_HOOKS_JAR($T/hooks.jar)를 넣었습니다" $T/build.out' || cat $T/build.out
   rm -rf $T/ux; mkdir -p $T/ux; (cd $T/ux && unzip -q $T/out/hmgapi-nx4-kor-$V-usb.zip)
   check "USB 묶음: HMG-API 앱용 업데이트·공식 모드 묶음(HMGAPI/updates)은 넣지 않음, HMGAPI-SOURCE.txt에 뺀 것을 적음" \
     '[ ! -e $T/ux/HMGAPI/updates ] && grep -q "HMGAPI/updates" $T/ux/HMGAPI-SOURCE.txt'

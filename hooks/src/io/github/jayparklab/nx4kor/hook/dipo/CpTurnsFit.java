@@ -4,7 +4,7 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 // https://github.com/Open-HMG/hmgapi-wireless-cp-aa). Its own notes below are Korea Projection's.
 // Modified by NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-25 (#67): moved into the nx4-kor mod's DiPO part,
 //   which runs beside the official mod (its tbt stays on) and overrides what it sends to the cluster;
-//   Dipo.log -> KorTbt.log; CpIcons.exactIcon -> CpIcons.exactIcon (copied from KP's CpTurns);
+//   Dipo.log -> KorTbt.log; CpTurns.exactIcon -> CpIcons.exactIcon (copied from KP's CpTurns);
 //   PhoneBarOut is a no-op here (its receiver, KP's TrapBar in the car navigation, isn't in this mod);
 //   make() removed (only the fitted layer: KP's stock layer CpTurns isn't ported).
 // Modified by Korea Projection (StopDragon/HMG-API, branch korea-build), 2026-11-07:

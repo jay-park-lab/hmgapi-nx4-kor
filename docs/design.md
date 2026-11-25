@@ -63,8 +63,11 @@
   1. iAP2 서버에 자기 길안내 리스너(`NX4KOR_RG`, 종류 4096, 공식 모드의 `HMGAPI_RG`와 같은 종류)를 등록해 120·121·122를 받습니다.
   2. KP의 `CpTurnsFit`(seogaemo 차선 그림 포함)으로 계기판·HUD에 보낼 값을 정해 HMG-API `Cluster` API로 보냅니다. 표에 없는 안내도 가까운 화살표로 보내고, 길안내 중에는 1초마다 다시 보냅니다(KP `refresh`). 내용(121)을 3초 넘게 못 받으면 길안내를 다시 요청합니다(KP 2.4.7).
   3. DiPO 안 계기판 호출 8곳을 `change`로 겁니다. 이 모드의 스레드가 보낸 값을 기억하고, 길안내가 켜진 동안 다른 스레드(공식 모드)가 부르면 인자를 이 모드의 마지막 값으로 바꿉니다. 그래서 두 엔진이 계기판에서 다투지 않습니다. 이 모드의 길안내가 꺼져 있으면(리스너가 받은 것이 없거나 안내가 끝남) 공식 모드의 호출은 그대로 갑니다.
-  4. DiPO가 길안내를 멈추면(`dipo.iap2_proxy.stop_route_guidance`, `observe`, 이 모드 자신의 다시 요청은 뺌) 이 모드의 안내도 지웁니다.
-- **설정:** `kor_tbt`를 끄면 위 일을 하나도 하지 않아 공식 모드 그대로입니다. `kor_tbt_log`는 KP의 진단 줄(곧 회전 판단의 차로 수·거리·D, 계기판에 보낸 값, 차선, 길안내 앱 이름)을 HMG-API 기록에 더 남깁니다. 꺼도 받은 안내의 숫자 줄(`CarPlay: maneuver type … side … junction … exit …`, 시작마다 300줄까지)과 보낸 HUD 목록 줄(`CarPlay: hud list …`)은 남습니다. 길 이름·장소 이름은 어느 쪽이든 남기지 않습니다. 줄 머리는 공식 모드처럼 `CarPlay:`이고, HMG-API 앱 기록에서 출처가 `nx4-kor`로 나옵니다.
+     - **비켜 주기:** 공식 모드는 3초 넘게 계속 부르는데 이 모드의 리스너는 3초 넘게 아무것도 받지 못하면(폰은 보내는데 이 모드만 못 받음), 공식 모드의 호출을 그대로 보내고 이 모드의 1초 다시 보내기도 멈춥니다. 이 모드가 다시 받으면 돌아옵니다(로그 `giving way until it hears again`). 신호 대기처럼 폰이 아무에게도 보내지 않는 동안은 비켜 주지 않습니다(PR #68 리뷰 3).
+  4. 이 모드 것이 아닌 길안내 멈춤(`dipo.iap2_proxy.stop_route_guidance`, `observe`)을 보면 2초 뒤에 이 모드의 안내를 지웁니다. 그 사이 폰이 다시 보내면 지우지 않습니다. 공식 모드도 같은 길로 다시 요청(멈춤 뒤 시작: 길안내 앱 이름이 바뀔 때, 무선에서 감시가 다시 요청할 때)을 하므로, 바로 지우면 계기판이 깜빡이기 때문입니다. DiPO가 정말로 멈추면(카플레이 끝남) 폰이 더 보내지 않아 2초 뒤 지워집니다. 이 모드 자신의 다시 요청은 처음부터 뺍니다(PR #68 리뷰 1).
+  5. HMG-API 앱에서 NX4 KOR를 재시작 없이 끄면 HMG-API가 이 모드의 훅을 통과시키고, 이 모드도 받기·다시 보내기를 멈추고 상태를 비웁니다(지우지는 않음: 공식 모드가 이어 그림). 다시 켜면 폰의 다음 갱신부터 새로 받습니다(PR #68 리뷰 2).
+  - 3·4·5의 판단은 `TbtGate.java`에 따로 두고 `tests/mod-test.sh`가 PC에서 돌립니다(`tests/tools/TbtGateTest.java`).
+- **설정:** `kor_tbt`를 끄면 위 일을 하나도 하지 않아 공식 모드 그대로입니다. `kor_tbt_log`는 KP의 진단 줄(곧 회전 판단의 차로 수·거리·D, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)을 HMG-API 기록에 더 남깁니다. 꺼도 받은 안내의 숫자 줄(`CarPlay: maneuver type … side … junction … exit …`, 시작마다 300줄까지), 보낸 HUD 목록 줄(`CarPlay: hud list …`), 길안내 앱이 바뀐 줄(`route guidance source changed from <앱> to <앱>`), 지운 줄(`turn-by-turn cleared`)은 남습니다. 길 이름·장소 이름은 어느 쪽이든 남기지 않습니다. 줄 머리는 공식 모드처럼 `CarPlay:`이고, HMG-API 앱 기록에서 출처가 `nx4-kor`로 나옵니다.
 - **가져온 것과 바꾼 것**(`NOTICE.md`):
   - KP `StopDragon/HMG-API` `korea-build` `6258357`: `CpTurnsFit.java`·`CpTbt.java`(그대로, 패키지·로그만 바꿈), `CpTurns.java`의 `exactIcon`(`CpIcons.java`). `CpTurnsFit`의 seogaemo 출처 줄은 그대로 둡니다.
   - `PhoneBarOut`은 아무것도 보내지 않습니다. KP는 곧 회전 막대를 순정 내비 쪽 `TrapBar` 훅으로 방송했지만, 그 훅은 선언하지 않은 원시 훅이라 가져오지 않았습니다.
@@ -73,7 +76,8 @@
 - **빌드:** `scripts/build-hooks.sh`가 `hooks/src`를 HMG-API 런타임 소스(`HMGAPI_SRC`의 `core/runtime`)에 대고 컴파일해 d8로 `hooks.jar`를 만듭니다(Android SDK, `ANDROID_HOME`). `scripts/build.sh`가 그것을 모드에 넣어 서명합니다.
 - **테스트**(`tests/mod-test.sh`): HMG-API 엔진의 `HookPlan`에 이 모드와 공식 모드 rc.9의 훅 선언(`tests/fixtures/wireless-carplay-aa-2.2.0-rc.9-hooks.json`)을 NX4 map 지점(`tests/fixtures/nx4-map-points.txt`, 2026-11-25 Car Report의 393점)으로 함께 올려 둘 다 올라오는지, `replace`를 하나라도 섞으면 공식 모드가 꺼지는지를 봅니다. `hooks.jar` 덱스에 이 모드의 클래스만 들었는지도 봅니다.
 - **한계(차에서 확인):**
-  - 리스너 둘이 같은 종류(4096)로 함께 받는지는 iAP2 서버 소스가 없어 차에서만 확인됩니다. 이 모드의 리스너가 아무것도 받지 못하면 공식 모드가 그대로 보내고, 공식 모드가 받지 못하면 이 모드가 혼자 보냅니다. HMG-API 기록의 `CarPlay (NX4 KOR): route guidance reaches this listener`가 받은 표시입니다.
+  - 리스너 둘이 같은 종류(4096)로 함께 받는지는 iAP2 서버 소스가 없어 차에서만 확인됩니다. 이 모드의 리스너가 아무것도 받지 못하면 공식 모드가 그대로 보내고, 공식 모드가 받지 못하면 이 모드가 혼자 보냅니다. 받다가 이 모드만 끊기면 3초 뒤 비켜 줍니다(위 3). HMG-API 기록의 `CarPlay (NX4 KOR): route guidance reaches this listener`가 받은 표시입니다.
+  - 남의 멈춤을 2초 미루므로, 카플레이가 끝난 뒤 계기판의 화살표가 지워지기까지 2초쯤 걸립니다.
   - 무선(동글, #48)에서는 공식 모드가 자기 블루투스 브리지 세션의 끝(`disconnected`)을 거르지만, 이 모드는 그 세션을 알 수 없어 거르지 못합니다. 무선 카플레이에서 길안내가 잠깐 지워졌다 다시 나오는지 봅니다.
 
 ## 관리 앱
@@ -321,9 +325,11 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - **한국 카플레이 길안내가 도는지**([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67), 위 "[한국 카플레이 길안내](#한국-카플레이-길안내-hooks-67)"). 결과는 #67에 적습니다.
   - HMG-API 기록(Everything)에 `nx4-kor`의 `CarPlay (NX4 KOR): Iap2SvcInit(NX4KOR_RG, 0x1000) = true`, 길안내를 시작하면 `route guidance reaches this listener`가 남는지(리스너 둘이 함께 받는지). 공식 모드의 `CarPlay: hud list type …` 줄도 함께 늘어나는지
   - 2026-11-25 19:35처럼 공식 모드만으로 멈추던 곳에서 계기판이 0 m에 멈추지 않는지. 멈추면 그때의 `CarPlay: maneuver type … side … junction … exit …` 줄(이 모드의 기록)을 적습니다
-  - 길안내 중 `guidance on: the official mod's cluster calls get ours`, 끝나면 `guidance off` 줄이 나오는지. 카플레이를 끊거나 길안내를 끝낸 뒤 계기판의 화살표가 지워지는지
+  - 길안내 중 `guidance on: the official mod's cluster calls get ours`, 끝나면 `guidance off` 줄이 나오는지. 카플레이를 끊거나 길안내를 끝낸 뒤 2초쯤 안에 계기판의 화살표가 지워지는지
+  - 길안내 앱을 바꾸거나(애플 지도 ↔ 네이버 지도) 애플 지도로 갈 때 계기판이 비었다 돌아오는 깜빡임이 없는지(남의 멈춤 2초 미루기)
+  - `giving way until it hears again` 줄이 나오는지(나오면 이 모드의 리스너만 끊긴 것: 그 앞뒤 기록을 #67에)
   - 차선 정보를 보내는 앱(애플 지도 등)으로 차선 안내가 나오는 교차로에서 차선 그림이 나오는지(카카오내비는 차선을 보내지 않음)
-  - HMG-API 앱에서 `kor_tbt`를 끄고 다시 시작하면 공식 모드 그대로 돌아가는지(`Korean turn-by-turn off` 줄)
+  - HMG-API 앱에서 `kor_tbt`를 끄고 다시 시작하면 공식 모드 그대로 돌아가는지(`Korean turn-by-turn off` 줄). HMG-API 앱의 Mods에서 NX4 KOR를 재시작 없이 끄면 길안내 중 계기판이 공식 모드 것으로 바뀌고 두 값이 번갈아 나오지 않는지(`mod turned off` 줄)
   - 안드로이드 오토 계기판 길안내가 그대로인지(공식 모드가 함)
 - **관리 앱 모양이 차에서 맞게 보이는지**(#28 순정 5W 모양). 2026-11-25에 화면 크기·밀도(1920x720, 1.5)와 상태 줄이 `<`를 덮지 않는 것을 확인했고, 나머지(순정 화면 비교, 확인 창 색, 주간·야간)는 확인하지 않기로 했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
   - 화면 아래 정보 줄의 화면 크기와 밀도. 크기는 화면 폭에 맞춰 늘이고 줄이므로 1920 폭이 아니면 글자가 함께 커지거나 작아집니다.

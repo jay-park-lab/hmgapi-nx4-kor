@@ -20,9 +20,7 @@ import com.tcc.iap2.Iap2NotiMsg;
 
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import hmgapi.hook.Car;
 import hmgapi.hook.Cluster;
@@ -45,8 +43,14 @@ import hmgapi.hook.ModContext;
  *    what this thread sent; while CpTurnsFit has guidance on, a call from any other thread (the
  *    official mod's) gets this thread's last arguments for that call instead, so both senders
  *    show the same. With nothing from this listener (none of ours active), the official mod's
- *    calls pass as they are.
- * 3. DiPO's own Stop of the phone's route guidance (CarPlay ends) clears ours too.
+ *    calls pass as they are. If the official mod keeps calling while this listener hears nothing
+ *    for 3 s, this mod gives way (its calls pass, ours stop resending) until it hears again.
+ * 3. A Stop of the phone's route guidance that isn't this mod's own clears ours 2 s later, unless
+ *    the phone sends again meanwhile: the official mod asks again with Stop and Start (a source
+ *    change, its watchdog), and only DiPO's own Stop (CarPlay ends) is followed by silence.
+ * 4. The mod turned off in the HMG-API app while DiPO runs: its hooks pass (HMG-API), and this
+ *    part stops feeding and resending (mod.enabled()), so only the official mod draws.
+ * The decisions of 2 and 3 are in TbtGate (the PC tests run them).
  */
 public final class KorTbt {
     private KorTbt() {}
@@ -70,10 +74,8 @@ public final class KorTbt {
     static HandlerThread thread;
     static Handler handler;
     static CpTurnsFit turns;
-    /** CpTurnsFit has guidance on (written on its thread, read by the cluster hooks on others) */
-    static volatile boolean active;
-    /** cluster call point -> this thread's last arguments */
-    static final Map<String, Object[]> last = new ConcurrentHashMap<String, Object[]>();
+    /** what to give the official mod's cluster calls, giving way, the pending Stop (written on the thread and the binder) */
+    static final TbtGate gate = new TbtGate();
     /** points whose first override was logged */
     static final Set<String> overrideLogged = Collections.synchronizedSet(new HashSet<String>());
     /** set while this mod itself calls the iAP2 server (its restart), so its own Stop isn't DiPO's */
@@ -84,6 +86,8 @@ public final class KorTbt {
     /** whether REFRESH is scheduled (only touched on the thread) */
     static boolean refreshing;
     static int refreshErrors;
+    /** giving way logged (only touched on the thread) */
+    static boolean yieldLogged;
 
     static void log(String m) {
         mod.log(m);
@@ -136,17 +140,15 @@ public final class KorTbt {
                 return at != 0L && SystemClock.elapsedRealtime() - at < RESTART_QUIET_MS;
             }
         };
-        // DiPO stops the phone's route guidance itself (CarPlay ends, the car takes turn-by-turn): clear ours
+        // A Stop of the phone's route guidance that isn't ours: DiPO's own (CarPlay ends) or the official
+        // mod asking again (Stop, then Start). Clear ours only if the phone stays quiet (TbtGate.stopDue)
         m.hook(app.classLoader, "dipo.iap2_proxy.stop_route_guidance", new MethodHook() {
             @Override
             protected void beforeHookedMethod(Param p) {
                 if (OWN.get() != null) return;
-                post(new Runnable() {
-                    @Override
-                    public void run() {
-                        turns.stop();
-                    }
-                });
+                gate.stopSeen(SystemClock.elapsedRealtime());
+                Handler h = handler;
+                if (h != null) h.postDelayed(STOP_CHECK, TbtGate.STOP_WAIT_MS + 50L);
             }
         });
         for (String point : CLUSTER_POINTS) override(point);
@@ -176,34 +178,23 @@ public final class KorTbt {
                 + (bound ? "binding" : "can't be bound"));
     }
 
-    /** a cluster call: remember ours, give the official mod's ours while guidance is on */
+    /** a cluster call: remember ours, give the official mod's ours (TbtGate.forOther) */
     static void override(final String point) {
         mod.hook(null, "framework.navigation_cluster." + point, new MethodHook() {
             @Override
             protected void beforeHookedMethod(Param p) {
                 if (Thread.currentThread() == thread) {
-                    last.put(point, copy(p.args));
+                    gate.ours(point, p.args);
                     return;
                 }
-                if (!active) return;
-                Object[] ours = last.get(point);
-                if (ours == null || ours.length != p.args.length) return;
-                Object[] c = copy(ours);
+                Object[] c = gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), mod.enabled());
+                if (c == null) return;
                 System.arraycopy(c, 0, p.args, 0, c.length);
                 if (overrideLogged.add(point)) {
                     log("CarPlay (NX4 KOR): " + point + " from the official mod replaced with ours (logged once per call)");
                 }
             }
         });
-    }
-
-    /** the arguments, with byte frames copied (both senders reuse nothing, but a frame must not change under the other) */
-    static Object[] copy(Object[] a) {
-        Object[] c = a.clone();
-        for (int i = 0; i < c.length; i++) {
-            if (c[i] instanceof byte[]) c[i] = ((byte[]) c[i]).clone();
-        }
-        return c;
     }
 
     /** runs r on the thread, then notes whether guidance is on (and forgets our calls when it goes off) */
@@ -224,27 +215,55 @@ public final class KorTbt {
     }
 
     static void noteActive() {
-        boolean a = turns.active();
-        if (!a && active) {
-            last.clear();
-            log("CarPlay (NX4 KOR): guidance off: the official mod's cluster calls pass again");
-        } else if (a && !active) {
-            log("CarPlay (NX4 KOR): guidance on: the official mod's cluster calls get ours");
-        }
-        active = a;
+        int t = gate.setActive(turns.active());
+        if (t < 0) log("CarPlay (NX4 KOR): guidance off: the official mod's cluster calls pass again");
+        else if (t > 0) log("CarPlay (NX4 KOR): guidance on: the official mod's cluster calls get ours");
     }
 
+    /** resend about every second while guidance is on; not while the mod is off or gives way (TbtGate.yielding) */
     static final Runnable REFRESH = new Runnable() {
         @Override
         public void run() {
-            try {
-                turns.refresh();
-            } catch (Throwable x) {
-                if (refreshErrors++ < 3) error("CarPlay (NX4 KOR) turn-by-turn refresh", x);
+            if (!mod.enabled()) {
+                // turned off in the HMG-API app: forget ours (nothing cleared: the official mod draws now);
+                // turned on again, the phone's next update starts it afresh
+                turns.reset();
+                noteActive();
+                refreshing = false;
+                log("CarPlay (NX4 KOR): mod turned off: Korean turn-by-turn stopped, the official mod's alone");
+                return;
+            }
+            boolean yielding = gate.yielding(SystemClock.elapsedRealtime());
+            if (yielding && !yieldLogged) {
+                yieldLogged = true;
+                log("CarPlay (NX4 KOR): this listener hears nothing while the official mod sends: giving way until it hears again");
+            } else if (!yielding) {
+                yieldLogged = false;
+            }
+            if (!yielding) {
+                try {
+                    turns.refresh();
+                } catch (Throwable x) {
+                    if (refreshErrors++ < 3) error("CarPlay (NX4 KOR) turn-by-turn refresh", x);
+                }
             }
             noteActive();
             if (turns.active()) handler.postDelayed(this, 1000L);
             else refreshing = false;
+        }
+    };
+
+    /** a Stop that wasn't ours, STOP_WAIT_MS later: clear ours if the phone stayed quiet */
+    static final Runnable STOP_CHECK = new Runnable() {
+        @Override
+        public void run() {
+            if (!gate.stopDue(SystemClock.elapsedRealtime())) return;
+            try {
+                turns.stop();
+            } catch (Throwable x) {
+                error("CarPlay (NX4 KOR) turn-by-turn stop", x);
+            }
+            noteActive();
         }
     };
 
@@ -288,6 +307,9 @@ public final class KorTbt {
         @Override
         public void notify(final int what, int a1, int a2, final Iap2NotiMsg msg) {
             if ((what != RG_UPDATE && what != RG_MANEUVER && what != RG_LANES) || msg == null) return;
+            // turned off in the HMG-API app: the official mod's turn-by-turn alone (its calls already pass)
+            if (!mod.enabled()) return;
+            gate.heard(SystemClock.elapsedRealtime());
             if (!heard) {
                 heard = true;
                 log("CarPlay (NX4 KOR): route guidance reaches this listener (first " + what + ")");

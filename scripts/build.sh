@@ -70,6 +70,8 @@ if [ -z "$HJ" ]; then
   HJ=$W/hooks.jar
 fi
 [ -f "$HJ" ] || { echo "hooks.jar가 없습니다: $HJ" >&2; exit 1; }
+# 커밋에서 만들지 않은 jar가 배포 묶음에 말없이 들어가지 않게, 받은 파일이면 그렇다고 찍는다(docs/git-flow.md 규칙 7)
+[ -z "$NX4_HOOKS_JAR" ] || echo "참고: hooks.jar는 NX4_HOOKS_JAR($NX4_HOOKS_JAR)를 넣었습니다. 배포 묶음은 비우고 만드세요(scripts/build-hooks.sh)"
 cp "$HJ" "$M/hooks.jar"
 
 # busybox: 이 모드의 스크립트는 busybox로 돈다. NX4 내비에 /system/bin/busybox가 없으면 함께 넣은 것만 쓸 수 있으므로

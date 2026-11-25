@@ -34,7 +34,7 @@ $J -cp "$JAR" -d "$W/stubs" $(find "$B/hooks/stubs" -name '*.java')
 $J -cp "$JAR:$W/rt:$W/rtstubs:$W/stubs" -d "$W/classes" $(find "$B/hooks/src" -name '*.java')
 "$BT/d8" --release --min-api 19 --lib "$JAR" --classpath "$W/rt" --classpath "$W/rtstubs" --classpath "$W/stubs" \
   --output "$W/hooks.jar" $(find "$W/classes" -name '*.class')
-# 우리 클래스만 들었는지(런타임·스텁이 섞이면 차의 것과 부딪힌다)
+# 덱스가 들었는지. 우리 클래스만 들었는지(런타임·스텁이 섞이면 차의 것과 부딪힌다)는 tests/mod-test.sh가 dexdump로 본다
 unzip -l "$W/hooks.jar" | grep -q 'classes.dex' || { echo "hooks.jar에 classes.dex가 없습니다" >&2; exit 1; }
 mkdir -p "$(dirname "$OUTJ")"
 cp "$W/hooks.jar" "$OUTJ"
