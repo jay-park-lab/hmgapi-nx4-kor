@@ -23,7 +23,7 @@
             android:launchMode="singleTask"
             android:screenOrientation="landscape" />
         <!-- 진단 기록을 모을지 묻는 확인 창. USB 설치기(root)가 연다. 투명 화면 위에 확인 창만 보인다.
-             taskAffinity="": 상태 화면(StatusActivity)의 task에 얹히지 않고 자기 task로 열려, 창 뒤에 DSP OTA 화면이 보인다 -->
+             taskAffinity="": 관리 앱 화면(StatusActivity)의 task에 얹히지 않고 자기 task로 열려, 창 뒤에 DSP OTA 화면이 보인다 -->
         <activity
             android:name=".DiagActivity"
             android:label="@string/app_name"

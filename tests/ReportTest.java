@@ -1,7 +1,7 @@
 package io.github.jayparklab.nx4kor;
 
 /**
- * PC에서 상태 화면의 판단(Report)을 시험한다. tests/mod-test.sh가 javac로 컴파일해 돌린다.
+ * PC에서 관리 앱의 판단(Report)을 테스트한다. tests/mod-test.sh가 javac로 컴파일해 돌린다.
  * 실패하면 "FAIL ..."을 찍고 종료 코드 1.
  */
 public class ReportTest {
@@ -296,7 +296,7 @@ public class ReportTest {
             !Report.watchGone(wf, "boot-A", 600) && Report.watchGone(wf, "boot-A", 697) && Report.watchGone(wf, "boot-A", 800)
             && Report.watchGone(wf, "boot-B", 600) && Report.watchGone(null, "boot-A", 600) && Report.watchGone("boot=boot-A\nuntil=x\n", "boot-A", 600)
             && Report.watchGone(wf, null, 600));
-        check("  감시자가 끝났을 때 안내: 화면을 다시 열면 감시자가 다시 뜸", Report.RB_NOWATCH.equals("상태 화면을 닫았다가 다시 연 뒤 눌러 주세요."));
+        check("  감시자가 끝났을 때 안내: 화면을 다시 열면 감시자가 다시 뜸", Report.RB_NOWATCH.equals("관리 앱을 닫았다가 다시 연 뒤 눌러 주세요."));
 
         // --- 보이는 문구에 없어진 이름·기능이 남지 않음 ---
         String bad = null;

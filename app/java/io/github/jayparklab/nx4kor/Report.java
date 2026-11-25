@@ -250,7 +250,7 @@ final class Report {
     /** 요청이 늦게 닿았거나 이번 부팅의 새 요청으로 받지 못함(감시자는 있음) */
     static final String RB_RETRY = "재부팅 요청을 받지 못했습니다. 다시 눌러 주세요.";
     /** 요청을 받을 감시자(화면을 연 뒤 10분)가 이미 끝났을 때. 요청을 보내지 않고 바로 보인다(화면을 다시 열면 감시자가 다시 뜬다) */
-    static final String RB_NOWATCH = "상태 화면을 닫았다가 다시 연 뒤 눌러 주세요.";
+    static final String RB_NOWATCH = "관리 앱을 닫았다가 다시 연 뒤 눌러 주세요.";
     /** 앱 폴더에 요청 파일을 쓰지 못했을 때 */
     static final String RB_WRITE_FAILED = "재부팅 요청을 저장하지 못했습니다. RESET 버튼으로 재부팅해 주세요.";
 

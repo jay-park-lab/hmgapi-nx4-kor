@@ -16,7 +16,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 
 /**
- * NX4 KOR 상태 화면. HMG-API 앱의 모드 실행 항목(mod.json provides.launcher)으로 연다. 열릴 때 HMG-API 서비스 "launch"를
+ * NX4 KOR 관리 앱의 화면. HMG-API 앱의 모드 실행 항목(mod.json provides.launcher)으로 연다. 열릴 때 HMG-API 서비스 "launch"를
  * 불러 bin/status.sh(root)가 상태 파일을 새로 쓰게 하고, 이 화면은 그것을 읽어 판정·요약·상태표를 보여 준다. 판단은 Report에 있다.
  * 설치가 진행 중이면(서비스의 진행 기록 state=run) 먼저 진행 막대(0~100%)와 단계·경과 시간을 보여 준다.
  * 1초마다 다시 읽고, 끝나면(그리고 status.sh가 상태 파일을 새로 쓰면) 결과 화면으로 바뀐다.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# 에뮬레이터에 NX4 KOR 상태 화면용 가짜 상태 파일을 넣는다(시나리오 하나). adb root가 되어 있어야 한다.
+# 에뮬레이터에 NX4 KOR 관리 앱용 가짜 상태 파일을 넣는다(시나리오 하나). adb root가 되어 있어야 한다.
 #   sh tests/emu/scen.sh <시나리오>
 #   시나리오: ready | connected | installing | reboot | failed | nowireless | nowifipart | nocar | nobb | hint | bootguard | bootguard2
 # 차에서는 bin/status.sh(상태), USB 설치기(진행·알림)가 쓰는 파일이다. 힌트는 2.0.x 서비스가 쓰던 것(2.1.0에는 쓰는 곳 없음, 앱은 그대로 읽음).

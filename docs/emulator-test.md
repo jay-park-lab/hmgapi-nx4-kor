@@ -1,6 +1,6 @@
-# 에뮬레이터 시험 (상태 화면 앱)
+# 에뮬레이터 테스트 (관리 앱)
 
-Android 에뮬레이터에서 NX4 KOR 상태 화면 앱(`io.github.jayparklab.nx4kor/.StatusActivity`)을 실제로 띄워, 상태마다 화면이 맞게 나오는지와 [지금 재부팅] 버튼이 root 쪽 답에 맞게 안내하는지 봅니다.
+Android 에뮬레이터에서 NX4 KOR 관리 앱(`io.github.jayparklab.nx4kor/.StatusActivity`)을 실제로 띄워, 상태마다 화면이 맞게 나오는지와 [지금 재부팅] 버튼이 root 쪽 답에 맞게 안내하는지 봅니다.
 
 차에서는 root 쪽 스크립트가 `/data/local/tmp/nx4-kor-*.txt`를 쓰고 앱은 그 파일만 읽습니다. 이 시험은 그 파일을 손으로 만들어 넣습니다. 그래서 **앱 화면과 앱·root 사이 파일 약속**을 보고, root 쪽 스크립트·HMG-API·Wi-Fi는 보지 않습니다(그쪽은 `tests/mod-test.sh`).
 
@@ -70,7 +70,7 @@ showDeviceFrame=no
 ```
 
 - 1920x720 가로는 NX4 내비 화면 크기입니다.
-- 밀도 240(앱 아래 줄에 "밀도 1.5"로 보임)은 어림값입니다. 차에서 상태 화면 아래 줄의 "화면 …(밀도 …)"를 보고 다르면 맞춥니다.
+- 밀도 240(앱 아래 줄에 "밀도 1.5"로 보임)은 어림값입니다. 차에서 관리 앱 화면 아래 줄의 "화면 …(밀도 …)"를 보고 다르면 맞춥니다.
 - `hw.gpu.mode=swiftshader_indirect`는 에뮬레이터 37.2가 받지 않고 `auto`로 바꿉니다.
 
 ### 4. 시험용 앱 빌드
@@ -103,7 +103,7 @@ $ADB install -r mod/app/NX4KOR.apk
 - 부팅할 때마다 `adb root`와 `setenforce 0`을 다시 합니다.
 - `adb install -r`이 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`로 실패하면 AVD에 다른 키로 서명한 앱이 남아 있는 것입니다. `$ADB uninstall io.github.jayparklab.nx4kor`로 지운 뒤 다시 설치합니다(앱 폴더의 테스트 파일도 함께 지워짐).
 
-## 상태 화면 시나리오
+## 관리 앱 시나리오
 
 ```sh
 for s in ready connected installing reboot failed nowireless nowifipart nocar nobb hint bootguard bootguard2; do
@@ -113,7 +113,7 @@ done
 
 `shot.sh`는 `scen.sh <시나리오>`로 파일을 넣고, 앱을 끈 뒤 다시 열고, 2초 기다렸다가 `out/emu/<시나리오>.png`를 찍습니다(`OUT=<폴더>`로 바꿀 수 있음). 바로 찍으면 앱이 그리기 전이라 런처가 찍힙니다.
 
-결과 화면은 순정 설정 상세 화면 모양입니다([`design.md`](design.md) "상태 화면").
+결과 화면은 순정 설정 상세 화면 모양입니다([`design.md`](design.md) "관리 앱").
 
 - 위 제목 줄: 가운데 "NX4 KOR 2.0.0", 왼쪽 위 `<`([닫기])
 - 왼쪽 칸: 요약 3줄(흰 제목, 회색 값)과 "자세히" 표, 맨 아래 확인 시각·앱 판·화면 크기 줄
@@ -125,7 +125,7 @@ done
 |---|---|---|
 | `ready` | `verdict=ready`, 진행 100% | 시안 세로 표시와 시안 글자 "무선 카플레이·안드로이드 오토 준비됨."(띠 없음), [지금 재부팅]. 왼쪽 칸에 설치 "끝남", 무선 Wi-Fi "켜짐(HMG-API)", 폰 연결 "지금 연결된 폰 없음", "자세히" 표(공식 무선 모드 "2.2.0-rc.9, 켜짐", 무선 연결용 Wi-Fi "켜짐") |
 | `connected` | `cp_conn=1`, `verdict=connected` | 시안 표시와 시안 "무선 카플레이 연결됨", 왼쪽 칸 폰 연결 "카플레이 1대 연결됨" |
-| `installing` | 진행 `pct=55`, `step=3/5`, `state=run` | 상태 화면 대신 설치 진행 화면(가운데 정렬): "NX4 KOR 2.0.0 설치 중", "단계 3/5 · map을 확인하는 중입니다", 시안 막대 55%, 시안 "55%"와 회색 "경과 2분 02초", 회색 "보통 5분 안에 끝납니다 …", 맨 아래 [닫기] 블록 |
+| `installing` | 진행 `pct=55`, `step=3/5`, `state=run` | 결과 화면 대신 설치 진행 화면(가운데 정렬): "NX4 KOR 2.0.0 설치 중", "단계 3/5 · map을 확인하는 중입니다", 시안 막대 55%, 시안 "55%"와 회색 "경과 2분 02초", 회색 "보통 5분 안에 끝납니다 …", 맨 아래 [닫기] 블록 |
 | `reboot` | `verdict=reboot` | 노란 띠 "내비를 3분 후 재부팅해 주세요." |
 | `failed` | `verdict=failed`(설치기가 쓴 실패 문장), `hookmap=mismatch` | 빨간 띠(설치기 문장), 왼쪽 칸 설치 "안 됨(오른쪽 안내를 보세요)" |
 | `nowireless` | `verdict=nowireless`, `wm=no` | 빨간 띠 "공식 무선 모드(Wireless CarPlay + Android Auto)가 설치되어 있지 않습니다 …", 표의 공식 무선 모드 "없음 (설치 필요)" |
@@ -142,7 +142,7 @@ done
 
 ### 앱과 root 사이 약속
 
-1. 버튼을 누르면 앱이 감시자 파일(`nx4-kor-watch.txt`: `boot=<boot_id>`, `until=<부팅 뒤 초>`)을 봅니다. 이번 부팅 것이 아니거나 3초 안에 끝나면 요청을 보내지 않고 바로 "상태 화면을 닫았다가 다시 연 뒤 눌러 주세요."를 보입니다.
+1. 버튼을 누르면 앱이 감시자 파일(`nx4-kor-watch.txt`: `boot=<boot_id>`, `until=<부팅 뒤 초>`)을 봅니다. 이번 부팅 것이 아니거나 3초 안에 끝나면 요청을 보내지 않고 바로 "관리 앱을 닫았다가 다시 연 뒤 눌러 주세요."를 보입니다.
 2. 감시자가 있으면 확인 창("차를 세운 상태에서만 누르세요. …")을 띄웁니다. [재부팅]을 누르면 `files/reboot.req`를 쓰고, 버튼을 끄고, "재부팅합니다…"를 보입니다.
 3. 1초마다 `nx4-kor-reboot-result.txt`(`id=`, `boot=`, `code=`)를 읽습니다. 내 요청 id와 이번 부팅의 답이면 아래 표대로 안내하고 버튼을 다시 켭니다. 80초(`RB_WAIT`) 안에 답이 없으면 실패로 봅니다.
 
@@ -168,7 +168,7 @@ done
 ADB=$ANDROID_HOME/platform-tools/adb
 shot() { $ADB exec-out screencap -p > out/emu/$1.png; }
 
-# 1. 감시자 없음 → 확인 창 없이 노란 띠 "상태 화면을 닫았다가 다시 연 뒤 눌러 주세요."
+# 1. 감시자 없음 → 확인 창 없이 노란 띠 "관리 앱을 닫았다가 다시 연 뒤 눌러 주세요."
 sh tests/emu/shot.sh ready
 sh tests/emu/watch.sh off
 $ADB shell input tap 1600 672; shot rb-nowatch
@@ -230,7 +230,7 @@ $ADB shell rm -f $ANS; $ADB shell am start -W -n io.github.jayparklab.nx4kor/.Di
 ask 1005 60 $(( $($ADB shell date +%s | tr -d '\r') - 1 )); $ADB shell cat $ANS
 ask 1006 60 $(( $($ADB shell date +%s | tr -d '\r') + 15 )); $ADB shell cat $ANS; $ADB shell input keyevent 4
 
-# 6. 상태 화면을 연 뒤 홈으로 나간 상태에서 열어도, 창 뒤에 상태 화면이 아니라 그 전 화면(런처)이 보임(자기 task)
+# 6. 관리 앱을 연 뒤 홈으로 나간 상태에서 열어도, 창 뒤에 관리 앱이 아니라 그 전 화면(런처)이 보임(자기 task)
 $ADB shell am start -n io.github.jayparklab.nx4kor/.StatusActivity; sleep 2; $ADB shell input keyevent 3; sleep 1
 ask 1007 60; shot diag-own-task
 $ADB shell input tap 1112 596; sleep 2
@@ -287,5 +287,5 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
   - 5초 동안 고르지 않으면 `timeout`. 모두 창이 닫힘
 - id 없이 열면 답 파일을 쓰지 않고 바로 닫힘
 - `until`이 지난 뒤 열면 답 파일을 쓰지 않고 바로 닫힘. 아직이면 평소대로 `shown`(PR #41 리뷰 6)
-- 상태 화면을 연 뒤 홈으로 나가 상태 화면 task가 뒤에 있어도, 창 뒤에 런처가 보이고 [건너뛰기] 뒤에도 런처가 앞에 옴(자기 task, PR #41 리뷰 7)
+- 관리 앱을 연 뒤 홈으로 나가 관리 앱 task가 뒤에 있어도, 창 뒤에 런처가 보이고 [건너뛰기] 뒤에도 런처가 앞에 옴(자기 task, PR #41 리뷰 7)
 - 이 앱의 크래시 없음

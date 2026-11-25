@@ -1,5 +1,5 @@
 #!/bin/sh
-# 시나리오를 넣고 상태 화면을 새로 연 뒤 화면을 찍는다: sh tests/emu/shot.sh <시나리오>
+# 시나리오를 넣고 관리 앱을 새로 연 뒤 화면을 찍는다: sh tests/emu/shot.sh <시나리오>
 # 결과: out/emu/<시나리오>.png (OUT으로 바꿀 수 있다). 방법은 docs/emulator-test.md.
 E=$(cd "$(dirname "$0")" && pwd)
 B=$(cd "$E/../.." && pwd)
