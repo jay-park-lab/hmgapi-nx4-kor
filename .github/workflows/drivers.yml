@@ -1,0 +1,68 @@
+# USB Wi-Fi 동글 드라이버(#48, drivers/README.md): drivers/나 빌드 스크립트가 바뀌면 PC와 같은 방법(scripts/build-driver.sh,
+# Docker)으로 빌드한다. 키·비밀값을 쓰지 않고 저장소에 쓰지 않는다.
+#   1. --kp-check  Korea Projection 1.8.0-beta.2의 88x2bu.ko와 md5까지 같은지(방법이 KP와 같은지)
+#   2. 우리 드라이버(bcmdhd.ko). 빌드 날짜·시각을 커밋 시각으로 고정하므로 같은 커밋이면 PC와 같은 md5가 나온다.
+#      결과의 md5는 실행 요약에, .ko와 정보 파일은 artifact(drivers-tcc803x)에 둔다
+name: drivers
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'drivers/**'
+      - 'scripts/build-driver.sh'
+      - '.github/workflows/drivers.yml'
+  pull_request:
+    paths:
+      - 'drivers/**'
+      - 'scripts/build-driver.sh'
+      - '.github/workflows/drivers.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: drivers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 동글 드라이버 빌드
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash # 명시해야 -o pipefail이 켜진다
+    steps:
+      - name: 저장소
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # PR이면 합친 커밋이 아니라 브랜치 끝 커밋으로(커밋 시각이 빌드 날짜가 되므로 PC와 같은 커밋이어야 md5가 같다)
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: KP 1.8.0-beta.2와 같은지
+        run: sh scripts/build-driver.sh --kp-check
+
+      - name: 우리 드라이버(bcmdhd.ko)
+        run: |
+          sh scripts/build-driver.sh
+          {
+            echo '### 동글 드라이버'
+            echo '```'
+            cat out/drivers/kp-check/88x2bu.ko.txt
+            echo '---'
+            cat out/drivers/tcc803x/rtl88x2bu/bcmdhd.ko.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 결과 올리기
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: drivers-tcc803x
+          path: out/drivers/tcc803x/
+          if-no-files-found: error
+          retention-days: 30

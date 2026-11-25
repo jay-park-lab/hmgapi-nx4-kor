@@ -20,6 +20,7 @@
 | `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때(설치기·관리 앱 문구별 할 일, 부팅 보호, 되돌리기, 남길 기록) |
 | `docs/emulator-test.md` | 에뮬레이터에서 관리 앱 테스트(SDK·AVD 준비, 시나리오, [지금 재부팅] 흐름, 이 테스트가 보지 않는 것) |
 | `docs/git-flow.md` | 브랜치 전략(Git Flow) 규칙, 흐름(작업마다 워크트리), 강제 장치 |
+| `drivers/README.md` | USB Wi-Fi 동글 드라이버(#48): 순정 HAL 자리(`bcmdhd`)에 맞추는 방법, Docker 빌드(`scripts/build-driver.sh`, CI `.github/workflows/drivers.yml`), KP와 같은지 확인(`--kp-check`), 바깥 자료와 출처·라이선스(GPL-2.0) |
 | GitHub 이슈(`gh issue list`) | 정하지 않은 것(라벨 `결정 필요`), 차에서 확인할 일(`차 확인`), 릴리스 일(`릴리스`). 결정을 기다리는 일과 이후 할 일은 모두 여기 |
 | `docs/release.md` | 태그로 도는 배포 워크플로(`.github/workflows/release.yml`), 배포 키 secret, `production` 환경, 키 백업, 유출 위험 |
 | `usb/README.txt` | USB 설치기 안내 |

@@ -1342,6 +1342,29 @@ check "fetch-wireless: 받지 못하면 멈춤" '[ "$(cat $T/fw.rc)" != 0 ] && g
 check "fetch-wireless: 기본 주소는 Open-HMG/hmgapi-wireless-cp-aa 릴리스 v<판>의 wireless-carplay-aa-<판>.zip(https), NOTICE.md에 같은 판의 파일 이름·대응 소스와 SHA-256 하나" \
   '[ -n "$WV" ] && grep -q "https://github.com/Open-HMG/hmgapi-wireless-cp-aa/releases/download/v\$WV/\$NAME" $B/scripts/fetch-wireless.sh && grep -q "wireless-carplay-aa-$WV.zip" $B/NOTICE.md && grep -q "hmgapi-wireless-cp-aa/tree/v$WV" $B/NOTICE.md && [ "$(grep -c "공식 모드 zip SHA-256 \`[0-9a-f]\{64\}\`" $B/NOTICE.md)" = 1 ]'
 
+# --- drivers/(USB Wi-Fi 동글 드라이버, #48) --- Docker 빌드는 scripts/build-driver.sh가 한다(오래 걸리고 인터넷이 필요해 여기서는
+# 돌리지 않음). 여기서는 Docker 없이 볼 수 있는 것만: 구문, 바깥 자료 고정 값, 패치 차례와 꼴, 문서와 값이 같은지
+DI=$B/drivers/inputs.sh
+# inputs.sh의 꼴: 주소는 https, sha256은 64자리, 커밋은 40자리, 차 설정 주소는 커밋으로 고정(브랜치 이름이면 바뀔 수 있음)
+drv_inputs_ok() (
+  . $DI
+  for u in "$KERNEL_URL" "$TOOLCHAIN_URL" "$CARCFG_URL" "$RTL88X2BU_GIT"; do case "$u" in https://*) ;; *) exit 1 ;; esac; done
+  for h in "$KERNEL_SHA256" "$TOOLCHAIN_GCC_SHA256" "$CARCFG_SHA256"; do echo "$h" | grep -qx '[0-9a-f]\{64\}' || exit 1; done
+  echo "$RTL88X2BU_COMMIT" | grep -qx '[0-9a-f]\{40\}' && echo "$CARCFG_URL" | grep -q '/[0-9a-f]\{40\}/' && echo "$KP_88X2BU_MD5" | grep -qx '[0-9a-f]\{32\}'
+)
+# README·NOTICE에 적은 값이 inputs.sh와 같은가(차 설정 sha256 앞 8자리, 드라이버 커밋)
+drv_docs_ok() (
+  . $DI
+  grep -q "${CARCFG_SHA256%"${CARCFG_SHA256#????????}"}" $B/drivers/README.md && grep -q "$RTL88X2BU_COMMIT" $B/drivers/README.md && grep -q "$RTL88X2BU_COMMIT" $B/NOTICE.md \
+    && grep -q "${KERNEL_SHA256%"${KERNEL_SHA256#????????}"}" $B/drivers/README.md && grep -q "$KP_88X2BU_MD5" $B/drivers/README.md
+)
+check "drivers: 빌드 스크립트 구문(bash -n·sh -n)" \
+  'bash -n $B/drivers/build-in-container.sh && sh -n $B/scripts/build-driver.sh && bash -n $B/drivers/kernel/hdr-patch.sh && bash -n $B/drivers/kernel/hdr-patch-803x.sh && bash -n $DI'
+check "drivers/inputs.sh: 바깥 자료마다 https 주소와 sha256(또는 커밋), 차 커널 설정 주소는 커밋으로 고정" 'drv_inputs_ok'
+check "drivers/rtl88x2bu: 패치는 번호 차례(0001 KP 보호 패치, 0002 HAL 맞춤)이고 -p1 꼴, nx4 빌드는 모듈 이름 bcmdhd·iface_name을 ifname으로 받음" \
+  '[ "$(ls $B/drivers/rtl88x2bu/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-kp-protect.diff 0002-nx4-hal.diff " ] && ! grep -h "^+++ " $B/drivers/rtl88x2bu/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_88x2bu \$D bcmdhd" $B/drivers/build-in-container.sh && grep -q "module_param_named(iface_name, ifname" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "module_param_string(firmware_path" $B/drivers/rtl88x2bu/0002-nx4-hal.diff'
+check "drivers: README·NOTICE의 값(차 설정·커널 sha256, 드라이버 커밋, KP md5)이 inputs.sh와 같음" 'drv_docs_ok'
+
 # --- 끝까지: 빌드 → HMG-API 엔진에 설치(HMGAPI_SRC가 있을 때만) ---
 if [ -n "$HMGAPI_SRC" ]; then
   HS=$(cd "$HMGAPI_SRC" && pwd)

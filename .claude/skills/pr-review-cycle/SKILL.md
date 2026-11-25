@@ -41,7 +41,7 @@ argument-hint: "[PR 번호 | PR URL]"
 - 리뷰·답글·댓글·보고는 존댓말 한국어로 쓴다.
 - 자동 리뷰는 PR 작성자와 같은 계정으로 달린다. 리뷰어의 글은 첫 줄 머리말 `(자동 리뷰 — ` 로, 내 반영
   답글은 커밋 SHA 로 구분한다. `user.login` 으로 가르지 않는다.
-- 이 저장소에는 PR 때 도는 CI 가 없다(release 워크플로는 `v*` 태그에서만 돈다). `gh pr checks` 는 필요한 때 한 번만 보고, 검사가 없거나 진행
+- PR 때 도는 CI 는 `drivers` 워크플로뿐이다(`drivers/`·`scripts/build-driver.sh` 가 바뀐 PR 에서 동글 드라이버를 빌드, `drivers/README.md`). release 워크플로는 `v*` 태그에서만 돈다. `gh pr checks` 는 필요한 때 한 번만 보고, 검사가 없거나 진행
   중이면 로컬 검증 결과를 근거로 삼는다. 주기적으로 조회하지 않는다.
 - 비밀값을 지킨다. `.env.local`, 서명 키(`NX4_APP_KEYS` 폴더, `NX4_MOD_KEY`)는 커밋하지 않고, 그 내용과
   비밀번호를 화면·PR·로그에 남기지 않는다. `git add -f` 를 쓰지 않는다.

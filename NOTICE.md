@@ -51,6 +51,14 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
 - 라이선스: GNU AGPL-3.0(이 저장소와 같음)
 - 대응 소스: https://github.com/Open-HMG/hmgapi-wireless-cp-aa/tree/v2.2.0-rc.9
 
+## USB Wi-Fi 동글 드라이버 (`drivers/`, GPL-2.0)
+
+- 2.2.0에서 USB Wi-Fi 동글을 지원하려고 넣었습니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)). 이 폴더는 저장소의 다른 부분(AGPL-3.0)과 달리 **GNU GPL 2.0**입니다. 리눅스 커널 모듈인 드라이버가 GPL-2.0이기 때문입니다.
+- 드라이버 원본: RTL88x2BU, https://github.com/cilynx/rtl88x2bu (Realtek, GPL-2.0), 커밋 `fc158d1f71b9e5dfcd1fccaf4d28725b65086e3b`. 저장소에는 넣지 않고 빌드할 때 받습니다.
+- Korea Projection 1.8.0-beta.2(StopDragon)의 동글 드라이버 소스 묶음(`rtl88x2bu-source-1.8.0-beta.2.tar.gz`, GPL-2.0)에서 그대로 가져온 것: 보호 패치 `drivers/rtl88x2bu/0001-kp-protect.diff`, 헤더 배치 패치 `drivers/kernel/hdr-patch.sh`·`hdr-patch-803x.sh`. 커널 준비 단계(`drivers/build-in-container.sh`)는 그 묶음의 `build-tcc803x.sh`를 바탕으로 고쳤습니다.
+- 이 저장소가 쓴 것: 순정 HAL에 맞추는 패치 `drivers/rtl88x2bu/0002-nx4-hal.diff`, `drivers/Dockerfile`·`inputs.sh`·`build-in-container.sh`, `scripts/build-driver.sh`
+- 빌드에 받는 것(저장소에 넣지 않음): kernel.org `linux-3.18.24`(GPL-2.0), AOSP `arm-eabi-4.7` 툴체인(GPL), tcc803x 내비 커널 설정(공개 저장소 `JMK-labs/jmk-gen5w`의 `driver/config_tcc803x.txt`, sha256으로 확인). 자세한 것은 `drivers/README.md`.
+
 ## BusyBox (GPL-2.0)
 
 - https://busybox.net

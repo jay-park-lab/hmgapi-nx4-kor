@@ -1,0 +1,22 @@
+--- a/os_dep/linux/os_intfs.c
++++ b/os_dep/linux/os_intfs.c
+@@ -472,6 +472,19 @@
+ module_param(ifname, charp, 0644);
+ MODULE_PARM_DESC(ifname, "The default name to allocate for first interface");
+ 
++/* nx4-hal: 순정 Wi-Fi HAL(libhardware_legacy)이 이 모듈을 /system/wifi/bcmdhd.ko 자리에서 bcmdhd로 올릴 때 주는 인자를 받는다.
++ * - iface_name: 첫 인터페이스 이름(HAL이 wlan0을 줌). ifname과 같은 변수를 쓴다
++ * - firmware_path, nvram_path: 순정 bcmdhd의 매개변수. AP·STA를 바꿀 때 HAL·netd가 sysfs(/sys/module/bcmdhd/parameters/)에
++ *   펌웨어 경로를 쓴다. 이 드라이버는 펌웨어를 따로 읽지 않으므로 받아 두기만 한다(AOSP는 이 쓰기가 실패하면 AP를 켜지 않음) */
++module_param_named(iface_name, ifname, charp, 0644);
++MODULE_PARM_DESC(iface_name, "nx4-hal: same as ifname (the stock HAL passes iface_name)");
++static char nx4_firmware_path[256];
++module_param_string(firmware_path, nx4_firmware_path, sizeof(nx4_firmware_path), 0660);
++MODULE_PARM_DESC(firmware_path, "nx4-hal: accepted and ignored (stock bcmdhd parameter)");
++static char nx4_nvram_path[256];
++module_param_string(nvram_path, nx4_nvram_path, sizeof(nx4_nvram_path), 0660);
++MODULE_PARM_DESC(nvram_path, "nx4-hal: accepted and ignored (stock bcmdhd parameter)");
++
+ #ifdef CONFIG_PLATFORM_ANDROID
+ 	char *if2name = "p2p%d";
+ #else /* CONFIG_PLATFORM_ANDROID */

@@ -1,0 +1,183 @@
+diff -ruN a/os_dep/linux/os_intfs.c b/os_dep/linux/os_intfs.c
+--- a/os_dep/linux/os_intfs.c	2026-06-15 16:07:00.000000000 +0000
++++ b/os_dep/linux/os_intfs.c	2026-11-23 05:55:36.908590014 +0000
+@@ -3834,6 +3834,16 @@
+ 		return 0;
+ 	}
+ 
++	/* kp-protect: open - 내리는 중이거나 장치가 떨어졌으면 열지 않는다(원래 열기는 뽑힘 표시를 지우고 사라진 장치에 hal_init을 한다) */
++	printk(KERN_INFO "kp-protect: netdev open\n");
++#ifdef CONFIG_USB_HCI
++	if (adapter_to_dvobj(padapter)->processing_dev_remove == _TRUE
++	    || interface_to_usbdev(adapter_to_dvobj(padapter)->pusbintf)->state == USB_STATE_NOTATTACHED) {
++		printk(KERN_INFO "kp-protect: open refused\n");
++		return -ENODEV;
++	}
++#endif
++
+ 	_enter_critical_mutex(&(adapter_to_dvobj(padapter)->hw_init_mutex), NULL);
+ #ifdef CONFIG_NEW_NETDEV_HDL
+ 	ret = _netdev_open(pnetdev);
+diff -ruN a/os_dep/linux/usb_intf.c b/os_dep/linux/usb_intf.c
+--- a/os_dep/linux/usb_intf.c	2026-06-15 16:07:00.000000000 +0000
++++ b/os_dep/linux/usb_intf.c	2026-11-23 05:55:36.927590014 +0000
+@@ -1429,6 +1429,11 @@
+ 
+ 	rtw_dev_unload(padapter);
+ 
++	/* kp-protect: tasklet - 쓰기 완료 콜백이 오류 때도 다시 예약하므로 메모리를 풀기 전에 끝낸다 */
++	tasklet_kill(&padapter->recvpriv.recv_tasklet);
++	tasklet_kill(&padapter->xmitpriv.xmit_tasklet);
++	printk(KERN_INFO "kp-protect: unload done\n");
++
+ 	RTW_INFO("+r871xu_dev_remove, hw_init_completed=%d\n", rtw_get_hw_init_completed(padapter));
+ 
+ #ifdef CONFIG_BT_COEXIST
+@@ -1467,11 +1472,13 @@
+ 	_adapter *padapter = NULL;
+ 	int status = _FAIL;
+ 	struct dvobj_priv *dvobj;
++	int kp_step = 0; /* kp-protect: probe 실패 단계 */
+ #ifdef CONFIG_CONCURRENT_MODE
+ 	int i;
+ #endif
+ 
+ 	/* RTW_INFO("+rtw_drv_init\n"); */
++	printk(KERN_INFO "kp-protect: probe start if=%d\n", pusb_intf->cur_altsetting->desc.bInterfaceNumber);
+ 
+ 	/* step 0. */
+ 	process_spec_devid(pdid);
+@@ -1479,17 +1486,21 @@
+ 	/* Initialize dvobj_priv */
+ 	dvobj = usb_dvobj_init(pusb_intf, pdid);
+ 	if (dvobj == NULL) {
++		kp_step = 1;
+ 		goto exit;
+ 	}
+ 
+ 	padapter = rtw_usb_primary_adapter_init(dvobj, pusb_intf);
+ 	if (padapter == NULL) {
+ 		RTW_INFO("rtw_usb_primary_adapter_init Failed!\n");
++		kp_step = 2;
+ 		goto free_dvobj;
+ 	}
+ 
+-	if (usb_reprobe_switch_usb_mode(padapter) == _TRUE)
++	if (usb_reprobe_switch_usb_mode(padapter) == _TRUE) {
++		kp_step = 3;
+ 		goto free_if_prim;
++	}
+ 
+ #ifdef CONFIG_CONCURRENT_MODE
+ 	if (padapter->registrypriv.virtual_iface_num > (CONFIG_IFACE_NUMBER - 1))
+@@ -1498,6 +1509,7 @@
+ 	for (i = 0; i < padapter->registrypriv.virtual_iface_num; i++) {
+ 		if (rtw_drv_add_vir_if(padapter, usb_set_intf_ops) == NULL) {
+ 			RTW_INFO("rtw_drv_add_iface failed! (%d)\n", i);
++			kp_step = 4;
+ 			goto free_if_vir;
+ 		}
+ 	}
+@@ -1511,8 +1523,10 @@
+ #endif
+ 
+ 	/* dev_alloc_name && register_netdev */
+-	if (rtw_os_ndevs_init(dvobj) != _SUCCESS)
++	if (rtw_os_ndevs_init(dvobj) != _SUCCESS) {
++		kp_step = 5;
+ 		goto free_if_vir;
++	}
+ 
+ #ifdef CONFIG_HOSTAPD_MLME
+ 	hostapd_mode_init(padapter);
+@@ -1547,6 +1561,7 @@
+ 	if (status != _SUCCESS)
+ 		usb_dvobj_deinit(pusb_intf);
+ exit:
++	printk(KERN_INFO "kp-protect: probe ret=%d step=%d\n", status == _SUCCESS ? 0 : -ENODEV, kp_step);
+ 	return status == _SUCCESS ? 0 : -ENODEV;
+ }
+ 
+@@ -1566,8 +1581,15 @@
+ 
+ 	dvobj->processing_dev_remove = _TRUE;
+ 
++	/* kp-protect: unplug - USB 장치가 이미 떨어졌으면 내리기 전에 뽑힘 표시를 세워 사라진 장치에 요청을 보내지 않는다.
++	 * rmmod는 원래 순서대로 칩을 끄고, usbfs 떼어 냄·리셋은 원래 코드대로 아래에서 뽑힘 표시를 세운다 */
++	printk(KERN_INFO "kp-protect: dev_remove start attached=%d\n", interface_to_usbdev(pusb_intf)->state != USB_STATE_NOTATTACHED);
++	if (interface_to_usbdev(pusb_intf)->state == USB_STATE_NOTATTACHED)
++		rtw_set_surprise_removed(padapter);
++
+ 	/* TODO: use rtw_os_ndevs_deinit instead at the first stage of driver's dev deinit function */
+ 	rtw_os_ndevs_unregister(dvobj);
++	printk(KERN_INFO "kp-protect: dev_remove ndev gone\n");
+ 
+ 	if (usb_drv.drv_registered == _TRUE) {
+ 		/* RTW_INFO("r871xu_dev_remove():padapter->bSurpriseRemoved == _TRUE\n"); */
+@@ -1613,6 +1635,7 @@
+ 	usb_dvobj_deinit(pusb_intf);
+ 
+ 	RTW_INFO("-r871xu_dev_remove, done\n");
++	printk(KERN_INFO "kp-protect: dev_remove done\n");
+ 
+ 	return;
+ 
+@@ -1685,3 +1708,6 @@
+ 
+ module_init(rtw_drv_entry);
+ module_exit(rtw_drv_halt);
++
++/* kp-protect: version - Korea Projection 보호 패치 표시 */
++MODULE_INFO(kp_protect, "5");
+diff -ruN a/os_dep/linux/usb_ops_linux.c b/os_dep/linux/usb_ops_linux.c
+--- a/os_dep/linux/usb_ops_linux.c	2026-06-15 16:07:00.000000000 +0000
++++ b/os_dep/linux/usb_ops_linux.c	2026-11-23 05:55:37.008590014 +0000
+@@ -744,6 +744,30 @@
+ 
+ int recvbuf2recvframe(PADAPTER padapter, void *ptr);
+ 
++/* kp-protect: rxloop - 수신 오류 때 곧바로 다시 보내는 것을 1초 200번으로 제한하고, 장치가 CONFIGURED보다 낮으면(떨어짐·리셋 중) 멈춘다(SUSPENDED는 멈추지 않음) */
++static int kp_rx_err_stop(_adapter *padapter, struct urb *purb)
++{
++	static unsigned long kp_win;
++	static int kp_cnt;
++	static int kp_said;
++
++	if (purb->dev == NULL || purb->dev->state < USB_STATE_CONFIGURED)
++		goto stop;
++	if (kp_cnt == 0 || time_after(jiffies, kp_win + HZ)) {
++		kp_win = jiffies;
++		kp_cnt = 0;
++	}
++	if (++kp_cnt <= 200)
++		return 0;
++stop:
++	if (kp_said < 3) {
++		kp_said++;
++		printk(KERN_INFO "kp-protect: rx error loop stopped\n");
++	}
++	rtw_set_drv_stopped(padapter);
++	return 1;
++}
++
+ #ifdef CONFIG_USE_USB_BUFFER_ALLOC_RX
+ void usb_recv_tasklet(void *priv)
+ {
+@@ -822,6 +846,8 @@
+ 				pHalData->srestpriv.Wifi_Error_Status = USB_READ_PORT_FAIL;
+ 			}
+ 			#endif
++			if (kp_rx_err_stop(padapter, purb)) /* kp-protect: rxloop */
++				break;
+ 			rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+ 			break;
+ 		case -EINPROGRESS:
+@@ -981,6 +1007,8 @@
+ 				pHalData->srestpriv.Wifi_Error_Status = USB_READ_PORT_FAIL;
+ 			}
+ 			#endif
++			if (kp_rx_err_stop(padapter, purb)) /* kp-protect: rxloop */
++				break;
+ 			rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+ 			break;
+ 		case -EINPROGRESS:
