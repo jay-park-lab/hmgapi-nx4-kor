@@ -16,9 +16,10 @@ HMG-API의 "Install anyway"(--any-car)로 설치합니다.
       ├─ legacy-2.0              옛 NX4 KOR 2.0.x를 되돌리는 스크립트(v2.0.4-beta.1에서 그대로)
       └─ hmgapi                  HMG-API 설치기 (함께 넣은 경우)
 
-HMG-API 1.1.0-rc.8 이상이 필요합니다.
+HMG-API 1.1.0-rc.9 이상이 필요합니다(2.1.1부터. 2.1.0은 rc.8 이상).
 - HMGAPI 폴더가 있으면 HMG-API가 함께 들어 있는 묶음입니다(이 저장소의 릴리스 묶음).
-  HMG-API가 없거나 1.1.0-rc.8보다 낮으면 첫 번째 Update OTA가 HMG-API를 설치(또는 업데이트)하고 재부팅합니다.
+  HMG-API가 없거나 1.1.0-rc.9보다 낮으면(2.1.0을 쓰던 차의 rc.8 포함) 첫 번째 Update OTA가 HMG-API를 설치(또는 업데이트)하고
+  재부팅합니다. 업데이트는 NEMESIS 1.17에서도 안전합니다.
   부팅이 끝나면 바로 같은 USB로 Update OTA를 한 번 더 누르면 나머지가 설치됩니다.
   설치기가 HMG-API가 준비될 때까지 스스로 기다립니다(최대 약 5분, "HMG-API가 준비되기를 기다리는 중" 토스트).
   그동안 USB를 빼지 마세요.
@@ -58,6 +59,17 @@ HMG-API 1.1.0-rc.8 이상이 필요합니다.
   옛 NX4 KOR 2.0.x를 HMG-API 앱에서 먼저 지운 차나 2.0.x 위에 2.1.0을 넣은 차는 2.0.x가 남긴 설정(Wi-Fi 잠금 등)을
   NX4/legacy-2.0으로 되돌립니다.
   둘 다 지울 때는 NX4 KOR를 먼저, HMG-API를 나중에 지우는 것을 권합니다.
+
+  !! NEMESIS 1.17이 깔린 차에서는 HMG-API를 1.1.0-rc.9 이상으로 올리기 전에 지우지 마세요.
+  HMG-API 1.1.0-rc.8 이하를 지우면 재부팅 한두 번 뒤 Android가 뜨지 않습니다. 복구하려면 NEMESIS 비상 USB나 adb가 필요합니다.
+  지울 때 도는 것은 그 HMG-API를 설치할 때 저장해 둔 삭제라서, 새 판 HMG-API USB의 HMGAPI/UNINSTALL로 지워도 같습니다.
+  먼저 이 USB(2.1.1 이후)로 Update OTA를 눌러 HMG-API를 올리고 재부팅한 뒤 지웁니다.
+  NEMESIS 1.16 이하나 NEMESIS가 없는 차, HMG-API 업데이트는 해당하지 않습니다.
+  이미 지웠고 Android가 아직 뜬다면, 다시 재부팅하기 전에 이 USB로 Update OTA를 눌러 HMG-API를 새로 설치합니다
+  (UNINSTALL-PURGE로 지웠으면 아래 주소를 봅니다).
+  Android가 이미 뜨지 않으면 아래 주소의 복구를 따릅니다. 그때 NEMESIS를 지우지 마세요(복구할 길이 없어집니다).
+    https://github.com/Open-HMG/HMG-API/issues/397
+  자세한 것: 저장소 README "HMG-API를 지울 때"
 
 같은 판을 다시 설치: NX4 폴더에 빈 파일 REINSTALL을 만듭니다(NX4 KOR와 같은 판의 공식 무선 모드를 다시 설치).
 
