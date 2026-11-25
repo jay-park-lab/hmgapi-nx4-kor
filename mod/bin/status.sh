@@ -1,9 +1,9 @@
 #!/system/bin/sh
-# NX4 KOR 상태: 상태 화면 앱(io.github.jayparklab.nx4kor)이 읽는 상태 파일을 쓴다.
+# NX4 KOR 상태: 관리 앱(io.github.jayparklab.nx4kor)이 읽는 상태 파일을 쓴다.
 # 앱이 열릴 때 hmgapid service-start launch → svc/launch.sh가 이 스크립트를 root로 부른다.
 #   (인자 없음) 상태 파일을 쓰고, 재부팅 요청을 받는 감시자(--watch)를 10분 동안 띄운다.
 #   --wait      설치가 진행 중이면 끝날 때까지(최대 15분) 기다렸다가 상태 파일을 다시 쓴다.
-#   --watch     상태 화면의 [지금 재부팅] 요청을 받는다.
+#   --watch     관리 앱의 [지금 재부팅] 요청을 받는다.
 # 2.1.0의 판정은 "HMG-API + 공식 무선 모드(wireless-carplay-aa) + 이 모드" 구조를 본다: HMG-API 판, 공식 모드가 깔리고 켜졌는지와
 # 그 판·훅, HMG-API 훅(map), HMG-API가 띄우는 프로젝션 AP, Wi-Fi 부품. 읽기만 하고 아무것도 바꾸지 않는다.
 # 상태 파일에는 이름, 버전, 예/아니요, 개수만 넣는다(SSID, 비밀번호, 휴대폰 이름, MAC, IP 없음).
@@ -14,7 +14,7 @@ APP=${APP:-/data/hmgapi/mods/nx4-kor}
 umask 077
 bbx mkdir -p $W 2>/dev/null
 # --wait: 설치 중에 화면을 열면 뒤에서 한 번 더 돈다. 설치가 끝날 때까지(최대 15분) 기다렸다가 아래 보통 흐름으로
-# 상태 파일을 다시 쓴다. 상태 화면 앱은 진행 막대를 보여 주다가 상태 파일이 새로 쓰이면 결과 화면으로 바뀐다.
+# 상태 파일을 다시 쓴다. 관리 앱은 진행 막대를 보여 주다가 상태 파일이 새로 쓰이면 결과 화면으로 바뀐다.
 WAITED=0
 if [ "$1" = --wait ]; then
   _i=0
@@ -40,7 +40,7 @@ if ! has_bb; then
     } 2>/dev/null > $_st.tmp && chmod 644 $_st.tmp 2>/dev/null && mv $_st.tmp $_st 2>/dev/null )
   exit 0
 fi
-# 상태 화면 앱(StatusActivity)이 읽는 key=value 파일. 앱은 root가 아니므로 누구나 읽을 수 있게(644)
+# 관리 앱(StatusActivity)이 읽는 key=value 파일. 앱은 root가 아니므로 누구나 읽을 수 있게(644)
 # /data/local/tmp 바로 아래에 둔다. 값은 예/아니요·버전·개수뿐이다 (SSID, 비밀번호, 휴대폰 이름, MAC, IP 없음).
 STATUS=${STATUS:-/data/local/tmp/nx4-kor-status.txt}
 yesno() { if "$@" >/dev/null 2>&1; then echo yes; else echo no; fi; }
@@ -142,7 +142,7 @@ AP_WAIT=${AP_WAIT:-300}
 
 # --- 판정은 한 곳에서 ---
 # st_collect가 판정에 쓰는 값을 한 번만 구하고(K_*), st_verdict가 차례대로 판정해 V_*에 둔다. 상태 파일(status_kv)에 쓰고,
-# 상태 화면 앱은 상태 파일의 verdict·verdict_lv·verdict_msg를 그대로 보인다.
+# 관리 앱은 상태 파일의 verdict·verdict_lv·verdict_msg를 그대로 보인다.
 # 판정 순서: HMG-API 부팅 보호 → 설치 중 → 이 모드의 차가 아님 → HMG-API 판 → 설치기가 남긴 재부팅 필요·실패 →
 # 공식 무선 모드(설치·켜짐·판) → HMG-API 훅(map) → 공식 모드의 훅 → 무선 카플레이 설정 → 무선 기능 → 프로젝션 AP 요청 →
 # 연결됨 → 다른 Wi-Fi 패키지 → AP 켜짐(준비됨·일반 핫스팟) → Wi-Fi 클라이언트 → AP 꺼짐 → 켜는 중(부팅 뒤 5분 전) →
@@ -467,7 +467,7 @@ sysw_match() {
   esac
   return 1
 }
-# 감시자: 상태 화면이 열릴 때(launch) 띄운다. 1초마다 재부팅 요청을 본다.
+# 감시자: 관리 앱이 열릴 때(launch) 띄운다. 1초마다 재부팅 요청을 본다.
 # 끝나는 조건: watch.until(부팅 뒤 초, launch가 "지금+WATCH_SECS"로 씀)이 지남. 화면을 다시 열면 늘어난다.
 # 그 값을 읽지 못하거나 숫자가 아니면 바로 끝난다.
 # 한 번에 하나만: watch.lock 폴더(mkdir은 한 번에 하나만 성공)와 watch.pid "<pid> <boot_id>". 잠금이 있는데 1초 뒤에도
@@ -501,7 +501,7 @@ if [ "$1" = --watch ]; then
     case "$_wu" in ''|*[!0-9]*) break ;; esac
     case "$_wn" in ''|*[!0-9]*) break ;; esac
     if [ "$_wn" -ge "$_wu" ]; then
-      # 끝내기 전에 1초 뒤 한 번 더 읽는다. 상태 화면이 막 늘렸으면(이 감시자가 살아 있다고 보고 새로 띄우지 않음) 계속
+      # 끝내기 전에 1초 뒤 한 번 더 읽는다. 관리 앱이 막 늘렸으면(이 감시자가 살아 있다고 보고 새로 띄우지 않음) 계속
       sleep 1
       _wu=; { read _wu < $W/watch.until; } 2>/dev/null; { read _wn _wx < $UPTIME; } 2>/dev/null; _wn=${_wn%%.*}
       case "$_wu" in ''|*[!0-9]*) break ;; esac
@@ -511,7 +511,7 @@ if [ "$1" = --watch ]; then
     # 재부팅 요청을 본다. 재부팅이 되면 이 셸도 함께 끝난다.
     # 남는 잠금(watch.lock)은 다음 부팅의 감시자가 "지난 부팅 것"으로 보고 지운다. 명령이 돌아오면(실패) 기록하고 계속 감시한다.
     if [ -f $RBREQ ] && take_rbreq; then
-      aplog "상태 화면에서 재부팅 요청: 지금 재부팅함(sync 뒤 reboot)"
+      aplog "관리 앱에서 재부팅 요청: 지금 재부팅함(sync 뒤 reboot)"
       # NX4_SYNC는 PC 시험용(NX4_REBOOT처럼). 차에서는 sync
       ${NX4_SYNC:-sync}
       # 검사와 재부팅 사이(특히 sync가 길 때) 시스템 영역을 바꾸는 작업이 새로 시작했으면 지금 거절한다
@@ -536,7 +536,7 @@ if [ "$1" = --watch ]; then
     fi
     sleep 1
   done
-  # 끝내기로 정한 뒤 상태 화면이 끝 시각을 늘렸으면, 그 상태 화면 갱신은 이 감시자가 살아 있다고 보고 새로 띄우지
+  # 끝내기로 정한 뒤 관리 앱이 끝 시각을 늘렸으면, 그 갱신은 이 감시자가 살아 있다고 보고 새로 띄우지
   # 않았다. 그래서 끝 시각을 watch.pid를 지우기 전과 잠금을 푼 뒤 두 번 보고, 어느 쪽이든 늘어났으면 새 감시자를 **한 번만** 띄운다
   # (띄우는 곳은 아래 한 줄뿐). 부팅 뒤 초를 못 읽으면 띄우지 않는다(못 읽어 0으로 보면 끝 시각이 늘 커 보여 끝없이 띄우게 됨).
   # 새 감시자는 그 끝 시각에 끝나고, 그때 다시 볼 때는 늘어나지 않았으므로 또 띄우지 않는다
@@ -552,7 +552,7 @@ if [ "$1" = --watch ]; then
   watch_more && _again=1
   [ "$(cat $W/watch.pid 2>/dev/null)" = "$_me" ] && rm -f $W/watch.pid
   rm -rf $W/watch.lock
-  # 앱이 "감시자 끝남"을 알게 지금 시각으로 쓴다(못 읽으면 0). 그 사이 상태 화면이 새 끝 시각을 썼으면(이 감시자가 본 마지막
+  # 앱이 "감시자 끝남"을 알게 지금 시각으로 쓴다(못 읽으면 0). 그 사이 관리 앱이 새 끝 시각을 썼으면(이 감시자가 본 마지막
   # 값과 다름: 새 감시자가 뜸) 덮지 않는다
   _wn=; { read _wn _wx < $UPTIME; } 2>/dev/null; _wn=${_wn%%.*}; case "$_wn" in ''|*[!0-9]*) _wn=0 ;; esac
   _wf=; [ -f $WATCHF ] && _wf=$($BB awk -F= '$1 == "until" { print $2 }' $WATCHF 2>/dev/null)
@@ -564,7 +564,7 @@ fi
 
 # 하위 셸 없이 이 셸에서 쓴다(그래야 끝의 한 줄 요약이 방금 구한 값 K_*를 다시 쓸 수 있다: softap.conf·연결 수·AP 판정을
 # 두 번 구하지 않음). 상태 파일만 644로 만들고 umask는 되돌린다. parse_conf가 위치 인자를 바꾸지만 이 뒤에는 $1을 쓰지 않는다.
-# 이 셸에서 바로 돈다. status_kv 안에 $(( ))를 넣을 때는 값이 숫자인지 먼저 확인하세요(틀린 산술은 상태 화면 갱신 전체를 끝냄)
+# 이 셸에서 바로 돈다. status_kv 안에 $(( ))를 넣을 때는 값이 숫자인지 먼저 확인하세요(틀린 산술은 관리 앱이 보는 상태 갱신 전체를 끝냄)
 umask 022
 status_kv 2>/dev/null > $STATUS.tmp && $BB chmod 644 $STATUS.tmp && $BB mv -f $STATUS.tmp $STATUS
 umask 077

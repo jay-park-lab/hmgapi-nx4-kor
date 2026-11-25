@@ -31,7 +31,7 @@ for f in $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/usb/troubleShooter $B/
   for KSH in $KSHS; do check "구문 검사 $(basename $KSH): ${f#$B/}" '$KSH -n $f'; done
 done
 
-# --- mod.json: NX4 KOR 모드(2.1.0: 상태 화면 앱과 그 서비스만. 무선은 HMG-API와 공식 무선 모드 wireless-carplay-aa가 맡음) ---
+# --- mod.json: NX4 KOR 모드(2.1.0: 관리 앱과 그 서비스만. 무선은 HMG-API와 공식 무선 모드 wireless-carplay-aa가 맡음) ---
 check "mod.json: launch 서비스·앱·런처만, NX4.KOR 260902만, HMG-API 1.1.0-rc.8 이상, 훅·무선 부분·Wi-Fi 요청·충돌·requires 없음" 'python3 - "$PKG" <<PY
 import json, os, sys
 d = sys.argv[1]
@@ -70,7 +70,7 @@ for f in want.values():
     w, h, depth, ctype = struct.unpack(">IIBB", b[16:26])
     assert (w, h, depth) == (99, 99, 8) and (ctype == 6 or (ctype == 3 and b"tRNS" in b)), (f, w, h, depth, ctype)
 PY'
-check "상태 화면 앱 아이콘(android:icon) = 앱 메뉴 타일의 낮·밤 그림" \
+check "관리 앱 아이콘(android:icon) = 앱 메뉴 타일의 낮·밤 그림" \
   'grep -q "android:icon=\"@drawable/ic_launcher\"" $B/app/AndroidManifest.xml && cmp -s $B/app/res/drawable-hdpi/ic_launcher.png $PKG/icons/icon.png && cmp -s $B/app/res/drawable-night-hdpi/ic_launcher.png $PKG/icons/icon_night.png'
 # HMG-API USB 묶음 안의 파일 이름 NEMESIS.data(빌드가 빼는 파일)는 그대로 둔다.
 # USB 설치기의 Korea Projection 패키지 확인(#13)만 예외: NEMESIS·korea.projection은 세 가지 줄에서만 받는다.
@@ -85,15 +85,15 @@ check "NEMESIS·다른 차·제보 흔적 없음(모드·USB·빌드 스크립�
 # 정적 검사: 맨 위(함수 밖) 기본값 대입이 아래에서 정해지는 변수를 먼저 쓰지 않음, "> 파일 2>/dev/null" 순서가 없음
 python3 $B/tests/tools/defuse-check.py $PKG > $T/defuse.out 2>&1; DEFRC=$?
 check "정적 검사: 정의 전에 쓰는 변수·'> 파일 2>/dev/null' 순서가 모드 스크립트에 없음(tests/tools/defuse-check.py)" '[ $DEFRC = 0 ] && [ ! -s $T/defuse.out ]'
-# 상태 화면 앱: Report(상태 파일 읽기·판정 문구·상태표·재부팅 요청). android.* 없이 PC JVM으로 돈다
+# 관리 앱: Report(상태 파일 읽기·판정 문구·상태표·재부팅 요청). android.* 없이 PC JVM으로 돈다
 if command -v javac >/dev/null 2>&1; then
   J=$T/java; mkdir -p $J
   if javac -nowarn -encoding UTF-8 -d $J $B/app/java/io/github/jayparklab/nx4kor/Report.java $B/tests/ReportTest.java 2>$T/javac.err; then
     java -cp $J io.github.jayparklab.nx4kor.ReportTest > $T/java.out 2>&1; jr=$?
     grep -E "^FAIL" $T/java.out | sed 's/^/  [Java] /'
-    check "상태 화면 앱 ReportTest 전부($(grep -c "^ok" $T/java.out)개)" '[ $jr -eq 0 ]'
+    check "관리 앱 ReportTest 전부($(grep -c "^ok" $T/java.out)개)" '[ $jr -eq 0 ]'
   else
-    cat $T/javac.err; check "상태 화면 앱 Report 컴파일" 'false'
+    cat $T/javac.err; check "관리 앱 Report 컴파일" 'false'
   fi
 else
   echo "skip ReportTest(javac 없음)"
@@ -107,7 +107,12 @@ cat > $T/bin/hmgapid <<E
 echo "hmgapid \$*" >> $T/calls
 H=\${HMGDATA:-$HD}
 case "\$1 \$2" in
-  "ping "*) exit 0 ;;
+  # ping.fails: 남은 실패 횟수(부를 때마다 1 줄임, always면 늘 실패). 없으면 답함
+  "ping "*)
+    f=\$(cat $T/ping.fails 2>/dev/null)
+    [ "\$f" = always ] && { echo "hmgapid: not running" >&2; exit 1; }
+    case "\$f" in ''|0) exit 0 ;; esac
+    echo \$((f - 1)) > $T/ping.fails; echo "hmgapid: not running" >&2; exit 1 ;;
   "engine install")
     # zip의 mod.json id 폴더에 푼다(꺼 둔 표시 .disabled는 남김). install-fail은 모든 설치를, install-fail-<id>는 그 모드만 거절
     [ -f $T/install-fail ] && { echo "refused: test"; exit 1; }
@@ -165,7 +170,7 @@ cat > $T/bin/am <<E
 #!/bin/sh
 echo "am \$*" >> $T/calls
 case "\$*" in
-  # 상태 화면이 열릴 때의 설치 진행 기록을 남긴다(USB 설치기가 쓰는 중인 기록의 꼴을 본다)
+  # 관리 앱이 열릴 때의 설치 진행 기록을 남긴다(USB 설치기가 쓰는 중인 기록의 꼴을 본다)
   *StatusActivity*) cp $T/root/data/local/tmp/nx4-kor-progress.txt $T/prog-at-open 2>/dev/null ;;
   *DiagActivity*)
     id=; prev=
@@ -300,7 +305,8 @@ oldmod() {
 # 설치된 nx4-kor가 공식 무선 모드와 충돌을 선언하는가(옛 2.0.x 꼴)
 old_conf() { grep -q '"conflicts"' $HD/mods/nx4-kor/mod.json; }
 # 설치기는 스틱의 NX4/install.log에 이어 쓴다. 테스트마다 그 회의 기록만 보도록 지우고 돌린다(KEEPLOG=1이면 남김)
-ts() { : > $T/calls; rm -f $PG $T/prog-at-open; [ -n "$KEEPLOG" ] || rm -f $K/install.log; (env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/bin/hmgapid NX4_USB_DIRS="$1" NX4_APP_WAIT=4 NX4_DIAG_WAIT=1 NX4_DIAG_SHOWN=1 BOOT_ID=$T/bootid UPTIME=$T/uptime sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
+# TSX: 그 회에만 더 줄 환경(예: HMG-API 기다리기의 짧은 시간)
+ts() { : > $T/calls; rm -f $PG $T/prog-at-open; [ -n "$KEEPLOG" ] || rm -f $K/install.log; (env -u NX4_APP $TSX PATH=$P0 ROOT=$R HMGAPID=$T/bin/hmgapid NX4_USB_DIRS="$1" NX4_APP_WAIT=4 NX4_DIAG_WAIT=1 NX4_DIAG_SHOWN=1 BOOT_ID=$T/bootid UPTIME=$T/uptime sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc; }
 pg() { sed -n "s/^$1=//p" $PG; }
 # 호출 기록에서 그 줄이 처음 나온 위치(없으면 99999)
 at() { _n=$(grep -n -- "$1" $T/calls | head -1 | cut -d: -f1); echo ${_n:-99999}; }
@@ -407,6 +413,30 @@ for VSH in $KSHS; do
   check "USB 설치기 계획 읽기($(basename $VSH)): 차의 실제 rc.7 계획(home Wi-Fi·network 줄)과 rc.8 설명 줄은 할 일 없음, 설명 줄과 함께 온 change는 적용, hooks … won't load는 막음(… share it은 받음)" \
     '[ "$(pcase $T/pc-rc7car final 0)" = "0:" ] && [ "$(pcase $T/pc-rc8desc final 0)" = "0:" ] && [ "$(pcase $T/pc-rc8chg final 0)" = "1:" ] && [ "$(pcase $T/pc-wontload final 0)" = "0:hooks" ] && [ "$(pcase $T/plan-same final 0)" = "0:" ]'
 done
+# 커널 로그의 zygote 훅 줄 읽기(PR #61 리뷰 2): 설치기의 zyg_scan만 꺼내 차의 셸(mksh)과 ksh·dash 중 있는 것마다 돌리고,
+# 관리 앱 쪽 status.sh zygote_info(busybox awk, 여기서는 PC의 awk)와 답("<ZH> <ZON>", 없으면 -)이 같은지 본다
+sed -n '/^zyg_scan() {/,/^}/p' $B/usb/troubleShooter > $T/zs.sh
+sed -n '/^zygote_info() {/,/^}/p' $PKG/bin/status.sh > $T/zi.sh
+ZD=$T/zdm; mkdir -p $ZD
+ZX='hmgapid, exec /system/bin/app_process.hmgapi-stock'
+printf '<6>[   20.512345] hmgapi-hook: zygote, hooks on, start 2 (this boot 1), %s\n' "$ZX" > $ZD/on
+{ echo "<6>[    3.100000] init: starting service zygote"; printf '<6>[   20.512345] hmgapi-hook: zygote, hooks on, start 2 (this boot 1), %s\n' "$ZX"
+  echo "<6>[  140.600000] hmgapi-hook: zygote 1234 up 120 s, boot guard reset"; printf '<6>[  395.000001] hmgapi-hook: zygote, hooks on, start 1 (this boot 2), %s\n' "$ZX"; } > $ZD/twice
+{ printf '[   20.5] hmgapi-hook: zygote, hooks on, start 3 (this boot 1), %s\n' "$ZX"; printf '[  130.0] hmgapi-hook: zygote, hooks off (boot guard, starts=6, this boot 3), %s\n' "$ZX"; } > $ZD/guard
+printf '<6>[    5.0] hmgapi-hook: zygote, hooks off (disable file), %s\n' "$ZX" > $ZD/off
+{ echo "<6>[    5.0] hmgapi-hook: app_process, exec x"; echo "<6>[    6.0] hmgapi-hook: zygote (re-exec), exec x"; echo "<6>[  125.0] hmgapi-hook: zygote 99 up 120 s, boot guard reset"; } > $ZD/none
+: > $ZD/empty
+printf 'hmgapi-hook: zygote, hooks on, start 1 (this boot 1), %s\n' "$ZX" > $ZD/nots
+printf '<6>[12345.678901] hmgapi-hook: zygote, hooks on, start 1 (this boot 1), %s\n' "$ZX" > $ZD/big
+zref() { (PATH=$P0 BB=$T/bin/bb NX4_DMESG=$1 sh -c '. "$1"; zygote_info; echo "${ZH:--} ${ZON:--}"' x $T/zi.sh); }
+ZWANT="on 20|on 395|guard 20|off -|- -|- -|on -|on 12345"
+ZREF=; for z in on twice guard off none empty nots big; do ZREF="$ZREF${ZREF:+|}$(zref $ZD/$z)"; done
+check "status.sh zygote_info(관리 앱 쪽 기준)의 답이 예상과 같음(마지막 hooks on 시각, guard·off, 줄 없음, 시각 없음)" '[ "$ZREF" = "$ZWANT" ]' || echo "  $ZREF"
+for VSH in $KSHS; do
+  zcase() { $VSH -c '. "$1"; zyg_scan < "$2"' x $T/zs.sh "$1"; }
+  ZGOT=; for z in on twice guard off none empty nots big; do ZGOT="$ZGOT${ZGOT:+|}$(zcase $ZD/$z)"; done
+  check "USB 설치기 커널 로그 읽기($(basename $VSH)): zyg_scan의 답이 status.sh zygote_info와 같음" '[ "$ZGOT" = "$ZREF" ] && [ -n "$ZREF" ]' || echo "  $ZGOT"
+done
 # release.yml "태그와 판 번호 확인"(그 step의 run 줄을 그대로 꺼내 돌림): 태그에서 v를 뗀 판이 mod.json·versionName과 같아야 함.
 # 베타는 -beta.<n>까지 같아야 한다(git-flow 규칙 4). git은 흉내(커밋이 origin/release/2.0.3에 있음)
 RV=$T/relver; rm -rf $RV; mkdir -p $RV/mod $RV/app $RV/bin
@@ -462,26 +492,26 @@ for hv in $NEEDV 1.1.0-rc.10 1.1.0 1.2.0-beta.1; do
   rm -rf $HD/mods/nx4-kor $HD/mods/wireless-carplay-aa
 done
 rm -f $HD/installed.txt
-# 처음 설치: 공식 무선 모드(--any-car) → nx4-kor → 상태 화면 → map 만들기 → 확인 → 계획 → 적용 → "재부팅 필요"
+# 처음 설치: 공식 무선 모드(--any-car) → nx4-kor → 관리 앱 → map 만들기 → 확인 → 계획 → 적용 → "재부팅 필요"
 pset plan-new; mapnew
 T0=$(date +%s)
 ts $U
 T1=$(date +%s)
-check "USB 설치기: 새로 설치 → 공식 무선 모드(engine install <zip> --any-car) → nx4-kor → 상태 화면 → map-car --write → verify-map → 계획 → apply 차례, 재부팅하지 않음" \
+check "USB 설치기: 새로 설치 → 공식 무선 모드(engine install <zip> --any-car) → nx4-kor → 관리 앱 → map-car --write → verify-map → 계획 → apply 차례, 재부팅하지 않음" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "hmgapid engine install $R/data/local/tmp/nx4-kor-usb/wireless-carplay-aa.zip --any-car" $T/calls && grep -qx "hmgapid engine install $R/data/local/tmp/nx4-kor-usb/nx4-kor.zip" $T/calls && [ $(at "wireless-carplay-aa.zip --any-car") -lt $(at "nx4-kor.zip") ] && [ $(at "nx4-kor.zip") -lt $(at "StatusActivity") ] && [ $(at "StatusActivity") -lt $(at "map-car --write") ] && [ $(at "map-car --write") -lt $(at "verify-map") ] && [ $(at "verify-map") -lt $(at "engine apply") ] && ! grep -q "service-stop" $T/calls && ! grep -q "engine remove" $T/calls && [ -f $HD/mods/nx4-kor/mod.json ] && [ -f $HD/mods/wireless-carplay-aa/mod.json ] && [ -f $HD/state/local-map.json ] && [ ! -d $R/data/local/tmp/nx4-kor-usb ]' || { cat $T/ts.out; cat $T/calls; }
 check "  진행 기록: 끝은 state=reboot(설정을 마쳤습니다, 100%, 이번 부팅 id, 644), 스틱의 install.log에 설치·계획·map 출력" \
   '[ "$(pg state)" = reboot ] && [ "$(pg pct)" = 100 ] && pg stage | grep -q "설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요" && [ "$(pg boot)" = test-boot-id ] && [ "$(ls -l $PG | cut -c1-10)" = "-rw-r--r--" ] && grep -q "설치됨: $V" $K/install.log && grep -q "공식 무선 모드 설치됨: $WV" $K/install.log && grep -q "^--- engine plan (final, 종료 코드 0)" $K/install.log && grep -q "^--- engine map-car --write" $K/install.log' || cat $PG
-# 진행 기록의 꼴은 2.0.x 서비스(hotspot.sh prog)와 같다: 상태 화면 앱(Report.java)이 그대로 읽는다
-check "  진행 기록 꼴: 줄 차례 pct·state·stage·start·t·boot·step·ust·ut, 진행 중(상태 화면을 열 때)은 state=run·step=4/6, 시각·부팅 뒤 초(ust·ut=100)" \
+# 진행 기록의 꼴은 2.0.x 서비스(hotspot.sh prog)와 같다: 관리 앱(Report.java)이 그대로 읽는다
+check "  진행 기록 꼴: 줄 차례 pct·state·stage·start·t·boot·step·ust·ut, 진행 중(관리 앱을 열 때)은 state=run·step=4/6, 시각·부팅 뒤 초(ust·ut=100)" \
   '[ "$(cut -d= -f1 $PG | tr "\n" " ")" = "pct state stage start t boot step ust ut " ] && [ "$(sed -n "s/^state=//p" $T/prog-at-open)" = run ] && [ "$(sed -n "s/^step=//p" $T/prog-at-open)" = 4/6 ] && [ "$(sed -n "s/^ust=//p" $T/prog-at-open)" = 100 ] && [ "$(sed -n "s/^ut=//p" $T/prog-at-open)" = 100 ] && [ "$(sed -n "s/^start=//p" $T/prog-at-open)" -ge $T0 ] && [ "$(sed -n "s/^t=//p" $T/prog-at-open)" -le $T1 ] && [ "$(pg step)" = "" ]' || { cat $T/prog-at-open; cat $PG; }
 DUNTIL=$(sed -n 's/^am start -n .*DiagActivity .* --el until \([0-9][0-9]*\)$/\1/p' $T/calls)
 check "USB 설치기 진단 기록: 확인 창(DiagActivity, id·기다릴 초·창을 기다리는 마지막 시각 until=시작+NX4_DIAG_SHOWN)을 먼저 띄우고 [모으기]면 아무것도 바꾸기 전에 모음(engine report가 engine install보다 먼저), 결과 안내가 마지막" \
-  'grep -q "^am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id [0-9][0-9]* --ei wait 1 --el until [0-9][0-9]*$" $T/calls && [ -n "$DUNTIL" ] && [ "$DUNTIL" -ge $((T0 + 1)) ] && [ "$DUNTIL" -le $((T1 + 1)) ] && [ $(at DiagActivity) -lt $(at "^hmgapid engine report") ] && [ $(at "^hmgapid engine report") -lt $(at "^hmgapid engine install") ] && [ "$(grep -n "진단 기록을 USB에 모으는 중입니다(1~2분)" $T/ts.out | cut -d: -f1)" -lt "$(grep -n "설치하는 중" $T/ts.out | head -1 | cut -d: -f1)" ] && tail -n 1 $T/ts.out | grep -q "설치를 마쳤습니다. 상태 화면의 \[지금 재부팅\]" && grep -q "\[모으기\]를 고름" $K/install.log'
+  'grep -q "^am start -n io.github.jayparklab.nx4kor/.DiagActivity --es id [0-9][0-9]* --ei wait 1 --el until [0-9][0-9]*$" $T/calls && [ -n "$DUNTIL" ] && [ "$DUNTIL" -ge $((T0 + 1)) ] && [ "$DUNTIL" -le $((T1 + 1)) ] && [ $(at DiagActivity) -lt $(at "^hmgapid engine report") ] && [ $(at "^hmgapid engine report") -lt $(at "^hmgapid engine install") ] && [ "$(grep -n "진단 기록을 USB에 모으는 중입니다(1~2분)" $T/ts.out | cut -d: -f1)" -lt "$(grep -n "설치하는 중" $T/ts.out | head -1 | cut -d: -f1)" ] && tail -n 1 $T/ts.out | grep -q "설치를 마쳤습니다. 관리 앱의 \[지금 재부팅\]" && grep -q "\[모으기\]를 고름" $K/install.log'
 cp $K/install.log $T/first.log; FIRSTN=$(($(wc -l < $T/first.log)))
 # 같은 판: nx4-kor·공식 무선 모드를 다시 설치하지 않고 map도 만들지 않음. 있는 map을 확인하고, 계획에 할 일이 없으면 "설정이 끝나 있음"
 pset plan-same
 KEEPLOG=1; ts $U; KEEPLOG=
-check "USB 설치기: 같은 판이 있으면 다시 설치하지 않고(map도 다시 만들지 않음) 상태 화면을 열고, map 확인·계획만 함 → 할 일 없음이면 state=done" \
+check "USB 설치기: 같은 판이 있으면 다시 설치하지 않고(map도 다시 만들지 않음) 관리 앱을 열고, map 확인·계획만 함 → 할 일 없음이면 state=done" \
   '[ "$(cat $T/ts.rc)" = 0 ] && ! grep -q "engine install" $T/calls && ! grep -q "map-car" $T/calls && grep -qx "hmgapid engine verify-map" $T/calls && ! grep -q "engine apply" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && grep -q "이미 설치되어" $T/ts.out && [ "$(pg state)" = done ] && [ "$(pg stage)" = "무선 카플레이 설정이 끝나 있습니다." ]' || { cat $T/ts.out; cat $PG; }
 check "USB 설치기: 스틱의 install.log에 이어 씀(앞의 시도 기록이 그대로 맨 앞에 남고, 빈 줄 뒤에 이번 기록, 한 번씩만)" \
   '[ $FIRSTN -gt 0 ] && head -n $FIRSTN $K/install.log | cmp -s - $T/first.log && [ "$(grep -c "USB 설치기 시작" $K/install.log)" = 2 ] && [ "$(grep -c "설치됨: $V" $K/install.log)" = 1 ] && grep -q "같은 판($V)이 이미 설치됨" $K/install.log && [ "$(grep -n "설치됨: $V" $K/install.log | cut -d: -f1)" -lt "$(grep -n "같은 판" $K/install.log | cut -d: -f1)" ] && grep -qx "" $K/install.log' || cat $K/install.log
@@ -491,6 +521,91 @@ modset $HD/mods/nx4-kor/mod.json version=$V-beta.1
 ts $U
 check "USB 설치기: 판은 같은지만 봄. 설치된 판이 $V-beta.1이면 $V와 다른 판이라 예전 판 정리 뒤 engine install(공식 무선 모드는 같은 판이라 그대로)" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^hmgapid engine install .*/nx4-kor.zip$" $T/calls && ! grep -q "wireless-carplay-aa.zip" $T/calls && grep -q "$V-beta.1에서 $V(으)로 바꾸는 중" $T/ts.out && ! grep -q "같은 판" $K/install.log && grep -q "\"version\": \"$V\"" $HD/mods/nx4-kor/mod.json && [ "$(pg state)" = reboot ]' || { cat $T/ts.out; cat $K/install.log; }
+# --- HMG-API 기다리기(부팅 직후에 Update OTA를 눌러도 됨, 2026-11-25) --- 대기 간격 1초, 최대 시간은 몇 초로 줄여 돌린다(uptime 100초)
+# 1) hmgapid가 처음 두 번 답하지 않다가 답함: 기다린 뒤 진단 묻기·설치
+rm -rf $HD/mods/nx4-kor $HD/mods/wireless-carplay-aa $K/diag; pset plan-new; mapnew
+echo 2 > $T/ping.fails
+TSX="NX4_HMG_POLL=1 NX4_HMG_WAIT=103 NX4_HMG_TRY=2"; ts $U; TSX=
+PING3=$(grep -n "^hmgapid ping$" $T/calls | sed -n 3p | cut -d: -f1)
+check "USB 설치기 HMG-API 기다리기: ping이 처음 두 번 실패해도 기다린 뒤(최대 부팅 뒤 NX4_HMG_WAIT초까지, 토스트 한 번) 진단 묻기·설치를 끝까지 함" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && [ "$(grep -c "HMG-API가 준비되기를 기다리는 중입니다(최대 1분). USB를 빼지 마세요." $T/ts.out)" = 1 ] && grep -q "부팅 뒤 100초): 최대 3초 기다림" $K/install.log && grep -q "HMG-API가 응답함(2초 기다림)" $K/install.log && [ -n "$PING3" ] && [ "$PING3" -lt $(at DiagActivity) ] && [ $(at DiagActivity) -lt $(at "^hmgapid engine install") ] && [ -f $HD/mods/nx4-kor/mod.json ] && [ "$(pg state)" = reboot ]' || { cat $T/ts.out; cat $T/calls; }
+# 2) 끝까지 답하지 않음: 지금처럼 "재부팅하고 다시"로 멈춤. 늦게 눌렀어도(부팅 뒤 NX4_HMG_WAIT초가 지남) NX4_HMG_TRY초는 다시 묻는다
+echo always > $T/ping.fails; cp $HD/mods/nx4-kor/mod.json $T/nx4mod.keep; rm -rf $K/diag
+TSX="NX4_HMG_POLL=1 NX4_HMG_WAIT=0 NX4_HMG_TRY=2 NX4_TOAST_EVERY=1"; ts $U; TSX=
+check "USB 설치기 HMG-API 기다리기: 끝까지 답이 없으면 아무것도 바꾸지 않고 멈춤(엔진·진행 기록 없음, 진단에 HMG-API 상태 없음), 늦게 눌러도 NX4_HMG_TRY초는 기다림, 토스트는 NX4_TOAST_EVERY초마다" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "기다려도 HMG-API가 응답하지 않습니다. 내비를 재부팅하고 다시 해 주세요. 아무것도 바꾸지 않았습니다." $T/ts.out && ! engcalls && ! grep -q "engine" $T/calls && [ ! -f $PG ] && [ "$(grep -c "HMG-API가 준비되기를 기다리는 중입니다" $T/ts.out)" = 2 ] && grep -q "최대 2초 기다림" $K/install.log && grep -q "HMG-API가 2초 기다려도 응답하지 않음" $K/install.log && cmp -s $T/nx4mod.keep $HD/mods/nx4-kor/mod.json' || { cat $T/ts.out; cat $T/calls; }
+: > $K/UNINSTALL; rm -f $T/stublog
+TSX="NX4_HMG_POLL=1 NX4_HMG_WAIT=0 NX4_HMG_TRY=1"; ts $U; TSX=
+check "  지우기(UNINSTALL)도 기다린 뒤 답이 없으면 아무것도 지우지 않고 멈춤" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "기다려도 HMG-API가 응답하지 않습니다. 재부팅하고 다시" $T/ts.out && [ ! -f $T/stublog ] && ! grep -q "engine" $T/calls && [ -f $HD/mods/nx4-kor/mod.json ]' || cat $T/ts.out
+rm -f $K/UNINSTALL
+# 3) HMG-API가 없는 차(hmgapid 없음)는 기다리지 않고 지금처럼 멈춤(스틱에 HMG-API 설치기가 있으면 그것으로 넘김)
+mv $HD $T/hd.away; rm -f $K/install.log
+(env -u NX4_APP PATH=$P0 ROOT=$R HMGAPID=$T/nohmgapid NX4_USB_DIRS=$U NX4_APP_WAIT=1 NX4_DIAG_WAIT=1 NX4_DIAG_SHOWN=1 NX4_HMG_POLL=1 NX4_HMG_TRY=5 BOOT_ID=$T/bootid UPTIME=$T/uptime sh $B/usb/troubleShooter) > $T/ts.out 2>&1; echo $? > $T/ts.rc
+check "USB 설치기 HMG-API 기다리기: HMG-API가 없는 차는 기다리지 않음(HMG-API가 없습니다로 바로 멈춤)" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "HMG-API가 없습니다" $T/ts.out && ! grep -q "기다리는 중" $T/ts.out && ! grep -q "응답하지 않음" $R/data/local/tmp/nx4-kor-usb.log' || cat $T/ts.out
+# hmgapid는 있는데 /data/hmgapi가 없는 차(PR #61 리뷰 4)도 설치 갈래가 "HMG-API 없음"으로 보므로 기다리지 않는다(기다렸다면 30초)
+echo always > $T/ping.fails
+W0=$(date +%s); TSX="NX4_HMG_POLL=1 NX4_HMG_WAIT=0 NX4_HMG_TRY=30"; ts $U; TSX=; W1=$(date +%s)
+check "  hmgapid는 있는데 /data/hmgapi가 없으면 기다리지 않고 바로 HMG-API가 없습니다로 멈춤" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "HMG-API가 없습니다" $T/ts.out && ! grep -q "기다리는 중" $T/ts.out && [ $((W1 - W0)) -lt 20 ]' || cat $T/ts.out
+mv $T/hd.away $HD; rm -f $T/ping.fails $K/install.log
+# 4) HMG-API 부팅 보호: 이번 zygote 시작이 아직 확인되지 않았으면(starts ≥ 1) 재부팅 안내 전에 확인 시각(마지막 "hooks on" 줄 + 120 + 15초,
+#    줄이 없으면 부팅 뒤 300초)까지 기다림. 가짜 커널 로그의 줄은 20초, uptime 100초, NX4_GUARD_DELAY로 남은 시간을 줄인다
+#    status.sh take_rbreq처럼 HMG-API 판(installed.txt)이 있을 때만 본다
+printf 'version %s\n' $NEEDV > $HD/installed.txt
+mkdir -p $HD/hook; : > $HD/hook/enable; echo 2 > $HD/hook/starts
+echo "<6>[   20.512345] hmgapi-hook: zygote, hooks on, start 2 (this boot 1), hmgapid, exec /system/bin/app_process.hmgapi-stock" > $T/dmesg
+gfresh() { rm -rf $HD/mods/nx4-kor $HD/mods/wireless-carplay-aa; pset plan-new; mapnew; }
+gfresh; TSX="NX4_HMG_POLL=1 NX4_GUARD_DELAY=68 NX4_DMESG=$T/dmesg"; ts $U; TSX=
+gl() { _n=$(grep -n -- "$1" $K/install.log | head -1 | cut -d: -f1); echo ${_n:-99999}; }
+check "USB 설치기 부팅 보호 기다리기: 이번 시작이 확인 전(starts=2)이면 적용 뒤·재부팅 안내 전에 확인 시각(20+68+15=103초)까지 기다림(토스트 한 번)" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "starts=2, 부팅 뒤 100초, 확인 시각 103초): 최대 3초 기다린 뒤 재부팅을 안내" $K/install.log && grep -q "확인 시각까지 3초 기다림" $K/install.log && [ $(gl "적용함") -lt $(gl "부팅 보호") ] && [ $(gl "부팅 보호") -lt $(gl "설치를 마침") ] && [ "$(grep -c "HMG-API 시작 확인을 기다리는 중입니다(최대 1분). 아직 재부팅하지 마세요." $T/ts.out)" = 1 ] && [ "$(pg state)" = reboot ]' || { cat $T/ts.out; cat $K/install.log; }
+# watcher가 starts를 0으로 쓰면 바로 멈춤(확인 시각은 먼 뒤)
+gfresh; ( /bin/sleep 2; echo 0 > $HD/hook/starts ) & GBG=$!
+G0=$(date +%s); TSX="NX4_HMG_POLL=1 NX4_GUARD_DELAY=600 NX4_DMESG=$T/dmesg"; ts $U; TSX=; G1=$(date +%s); wait $GBG
+check "  watcher가 starts를 0으로 쓰면 확인 시각 전이라도 바로 멈춤" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "이번 시작이 확인됨(starts=0" $K/install.log && [ $((G1 - G0)) -lt 30 ] && [ "$(pg state)" = reboot ]' || cat $K/install.log
+# 커널 로그에 이번 부팅 줄이 없으면 부팅 뒤 300초까지(uptime 298초로 2초)
+echo 1 > $HD/hook/starts; echo "298.10 50.00" > $T/uptime
+gfresh; TSX="NX4_HMG_POLL=1 NX4_DMESG=$T/nodmesg"; ts $U; TSX=
+check "  커널 로그에 이번 zygote 줄이 없고 hook/enable이 있으면 부팅 뒤 300초까지 기다림" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "starts=1, 부팅 뒤 298초, 확인 시각 300초): 최대 2초" $K/install.log' || cat $K/install.log
+echo "100.00 50.00" > $T/uptime
+# 기다리지 않는 때: 이번 시작이 부팅 보호로 꺼짐(watcher 없음), starts=0(이미 확인됨), 줄이 없고 hook/disable이 있음, 바꾼 것이 없음
+echo 7 > $HD/hook/starts; echo "<6>[   20.5] hmgapi-hook: zygote, hooks off (boot guard, starts=6, this boot 1), hmgapid, exec /system/bin/app_process.hmgapi-stock" > $T/dmesg-guard
+gfresh; TSX="NX4_HMG_POLL=1 NX4_GUARD_DELAY=600 NX4_DMESG=$T/dmesg-guard"; ts $U; TSX=; _g1=$(cat $T/ts.rc); _g1l=$(grep -c "부팅 보호" $K/install.log)
+echo 0 > $HD/hook/starts
+gfresh; TSX="NX4_HMG_POLL=1 NX4_GUARD_DELAY=600 NX4_DMESG=$T/dmesg"; ts $U; TSX=; _g2=$(cat $T/ts.rc); _g2l=$(grep -c "부팅 보호" $K/install.log)
+echo 3 > $HD/hook/starts; : > $HD/hook/disable
+gfresh; TSX="NX4_HMG_POLL=1 NX4_DMESG=$T/nodmesg"; ts $U; TSX=; _g3=$(cat $T/ts.rc); _g3l=$(grep -c "부팅 보호" $K/install.log)
+rm -f $HD/hook/disable; pset plan-same
+TSX="NX4_HMG_POLL=1 NX4_GUARD_DELAY=600 NX4_DMESG=$T/dmesg"; ts $U; TSX=; _g4=$(cat $T/ts.rc); _g4l=$(grep -c "부팅 보호" $K/install.log); _g4s=$(pg state)
+check "  기다리지 않음: 이번 시작의 훅이 부팅 보호로 꺼짐, starts=0, 줄이 없고 hook/disable이 있음, 같은 판에 바꿀 것이 없음(재부팅 안내 없음)" \
+  '[ "$_g1$_g2$_g3$_g4" = 0000 ] && [ "$_g1l$_g2l$_g3l$_g4l" = 0000 ] && [ "$_g4s" = done ]'
+# PR #61 리뷰 3: 줄이 없을 때도 take_rbreq처럼 파일로 보아 이번 시작이 이미 부팅 보호로 꺼졌으면(guard_files) 기다리지 않는다.
+# 이번 부팅 횟수(hook/boot "<이번 boot_id> <n>") ≥ 4, 또는 ≥ 1이고 starts ≥ 7. 다른 부팅의 hook/boot면 꺼진 것으로 보지 않고 기다린다.
+# HMG-API 판(installed.txt)이 없어도 기다리지 않는다. 고친 것을 되돌려도 오래 걸리지 않게 uptime 298초(줄 없음 → 300초)로 돈다
+echo "298.10 50.00" > $T/uptime
+echo 7 > $HD/hook/starts; echo "test-boot-id 1" > $HD/hook/boot
+gfresh; TSX="NX4_HMG_POLL=1 NX4_DMESG=$T/nodmesg"; ts $U; TSX=; _f1=$(cat $T/ts.rc)$(grep -c "부팅 보호" $K/install.log)
+echo 4 > $HD/hook/starts; echo "test-boot-id 4" > $HD/hook/boot
+gfresh; TSX="NX4_HMG_POLL=1 NX4_DMESG=$T/nodmesg"; ts $U; TSX=; _f2=$(cat $T/ts.rc)$(grep -c "부팅 보호" $K/install.log)
+echo 7 > $HD/hook/starts; echo "old-boot-id 5" > $HD/hook/boot
+gfresh; TSX="NX4_HMG_POLL=1 NX4_DMESG=$T/nodmesg"; ts $U; TSX=; _f3=$(cat $T/ts.rc); grep -q "starts=7, 부팅 뒤 298초, 확인 시각 300초)" $K/install.log; _f3l=$?
+rm -f $HD/hook/boot $HD/installed.txt; echo 2 > $HD/hook/starts
+gfresh; TSX="NX4_HMG_POLL=1 NX4_DMESG=$T/nodmesg"; ts $U; TSX=; _f4=$(cat $T/ts.rc)$(grep -c "부팅 보호" $K/install.log)
+printf 'version %s\n' $NEEDV > $HD/installed.txt; echo "100.00 50.00" > $T/uptime
+check "  줄이 없을 때 파일로 보아 이번 시작이 이미 꺼졌으면(이번 부팅 1번·starts 7, 이번 부팅 4번) 기다리지 않음, 다른 부팅의 기록이면 기다림, HMG-API 판이 없으면 기다리지 않음" \
+  '[ "$_f1$_f2$_f4" = 000000 ] && [ "$_f3$_f3l" = 00 ]'
+# 지우기(UNINSTALL)는 스스로 재부팅하므로 그 전에 기다림
+echo 2 > $HD/hook/starts; : > $K/UNINSTALL; rm -f $T/stublog
+TSX="NX4_HMG_POLL=1 NX4_GUARD_DELAY=67 NX4_DMESG=$T/dmesg"; ts $U; TSX=
+check "  지우기(UNINSTALL)도 재부팅 전에 확인 시각까지 기다림" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "최대 2초 기다린 뒤 재부팅을 안내" $K/install.log && [ "$(grep -n "HMG-API 시작 확인을 기다리는 중" $T/ts.out | cut -d: -f1)" -lt "$(grep -n "지웠습니다. 재부팅합니다" $T/ts.out | cut -d: -f1)" ] && [ ! -d $HD/mods/nx4-kor ]' || cat $T/ts.out
+rm -f $K/UNINSTALL $HD/installed.txt; rm -rf $HD/hook
+# 다음 테스트가 쓰는 상태(같은 판의 nx4-kor·공식 무선 모드·map)로 되돌린다
+gfresh; ts $U; pset plan-same
 # 진단 기록: /system/lib(하위 폴더·링크), 내비의 busybox, 이 모드의 기록. 비밀번호가 든 파일(Wi-Fi 설정, 백업 폴더)은 넣지 않음
 mkdir -p $R/system/lib/hw $R/system/bin $R/data/nx4-kor/logs $R/data/nx4-kor/backup $R/data/local/tmp/nx4-kor $HD/logs/nx4-kor $R/data/misc/wifi
 echo core > $R/system/lib/libCarPlayCore.so; echo hw > $R/system/lib/hw/gralloc.so; ln -s libCarPlayCore.so $R/system/lib/liblink.so
@@ -528,7 +643,7 @@ rm -rf $K/diag $K/install/payload/bin/busybox
 ts $U
 check "USB 설치기 진단 기록: md5를 셀 busybox가 없으면 그렇다고 적고(이름·크기는 ls -lR) 설치기는 그대로 끝남" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "md5_busybox: none" $(dg)/info.txt && grep -q "busybox가 없음" $(dg)/system-lib-md5.txt && grep -q "libCarPlayCore.so" $(dg)/system-lib-ls.txt && grep -q "busybox가 없어" $K/install.log'
-# 확인 창에서 모으지 않는 경우: 진단 폴더를 만들지 않고 HMG-API 명령도 부르지 않으며, 설치기는 그대로 이어짐(같은 판: 상태 화면)
+# 확인 창에서 모으지 않는 경우: 진단 폴더를 만들지 않고 HMG-API 명령도 부르지 않으며, 설치기는 그대로 이어짐(같은 판: 관리 앱)
 dno() { rm -rf $K/diag; ts $U; [ "$(cat $T/ts.rc)" = 0 ] && [ ! -d $K/diag ] && ! grep -q "engine report" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && grep -q "이미 설치되어" $T/ts.out && grep -q "$1" $K/install.log; }
 echo no > $T/diag.reply
 check "USB 설치기 진단 기록: [건너뛰기]·뒤로면 모으지 않고 설치기는 이어짐" 'dno "\[건너뛰기\]를 고름"'
@@ -544,7 +659,7 @@ rm -f $T/diag.reply
 check "USB 설치기 진단 기록: 확인 창이 없는 예전 판 앱이면(am start가 Error) 기다리지 않고 모으지 않음" 'dno "확인 창을 열지 못함"'
 echo yes > $T/diag.reply; rm -f $T/app-ready
 rm -rf $K/diag; ts $U
-check "USB 설치기 진단 기록: 상태 화면 앱이 없으면 묻지 못해 모으지 않음(확인 창을 띄우지 않음)" \
+check "USB 설치기 진단 기록: 관리 앱이 없으면 묻지 못해 모으지 않음(확인 창을 띄우지 않음)" \
   '[ ! -d $K/diag ] && ! grep -q "DiagActivity" $T/calls && grep -q "앱이 없어 묻지 못함" $K/install.log'
 : > $T/app-ready
 rm -rf $R/system $R/data/misc $R/data/nx4-kor $R/data/local/tmp/nx4-kor $R/data/local/tmp/nx4-kor-status.txt $HD/logs $HD/install.log $HD/public
@@ -577,7 +692,7 @@ check "USB 설치기: 꺼 둔 공식 무선 모드는 켬(hmgapid enable) → �
 printf 'change   /system/framework/framework.odex [other-mod] -> 89ab   [restart the head unit]\n' > $T/plan-other; cat $T/plan-same >> $T/plan-other
 wmod 2.2.0-rc.5; pset plan-other
 ts $U
-check "USB 설치기: 시작 전 계획에 다른 모드의 변경이 있으면 아무것도 바꾸지 않고 멈춤(설치·지우기·적용 없음, 진행 기록 없음), 같은 판이라 상태 화면은 먼저 엶" \
+check "USB 설치기: 시작 전 계획에 다른 모드의 변경이 있으면 아무것도 바꾸지 않고 멈춤(설치·지우기·적용 없음, 진행 기록 없음), 같은 판이라 관리 앱은 먼저 엶" \
   '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "다른 모드의 적용하지 않은 변경이 있습니다" $T/ts.out && ! grep -q -E "engine (install|remove|apply)" $T/calls && [ ! -f $PG ] && grep -q "\"version\": \"2.2.0-rc.5\"" $HD/mods/wireless-carplay-aa/mod.json && [ $(at "StatusActivity") -lt $(at "engine plan") ]'
 # 되돌리기 줄(restore …, 모드 이름 없음)이 시작 전 계획에 있는데 이번에 지울 모드가 없으면: 앞서 다른 모드를 지우고 적용하지 않은 것이라
 # 끝에서 받을 수 없다. 설치·map 만들기 전에 멈춘다(PR #52 리뷰 1)
@@ -618,14 +733,29 @@ check "USB 설치기: 스틱의 nx4-kor가 옛 2.0.x 꼴(공식 무선 모드와
   '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "옛 2.0.x 꼴(공식 무선 모드와 충돌)이라 이 설치기와 함께 쓸 수 없습니다" $T/ts.out && ! engcalls && [ ! -f $PG ]'
 modset $K/install/payload/mod.json conflicts=-
 # 원본 Korea Projection 패키지(#13): 설치·업데이트 갈래(같은 판 포함)에서 그 패키지 폴더가 있으면 아무것도 바꾸기 전에 멈춘다.
-# 진단 기록 묻기 뒤, HMG-API 확인(HMG-API 설치기로 넘기기) 앞이라 같은 판이어도 상태 화면을 열지 않는다.
+# HMG-API 기다리기·HMG-API 확인(HMG-API 설치기로 넘기기) 앞이라 같은 판이어도 관리 앱을 열지 않는다. 진단 기록은 멈추기 전에 묻는다.
 # 다른 NEMESIS 패키지는 막지 않고, 지우기 갈래도 막지 않는다. 진단 기록은 [건너뛰기]로 두어 HMG-API 명령이 하나도 없는지 본다
 KPD=$R/data/nemesis/apps/korea.projection
 KPMSG="NX4 KOR: $KORPROJ_TEXT"
 mkdir -p $KPD; echo no > $T/diag.reply; pset plan-new; cp $HD/mods/nx4-kor/mod.json $T/kp-nx4.json
 ts $U
-check "USB 설치기(#13): NEMESIS의 Korea Projection 패키지 폴더가 있으면 아무것도 바꾸지 않고 멈춤(종료 1, 안내 문구, 진단 기록은 먼저 물음, HMG-API 명령 없음, 같은 판이어도 상태 화면을 열지 않음, 진행 기록 없음)" \
+check "USB 설치기(#13): NEMESIS의 Korea Projection 패키지 폴더가 있으면 아무것도 바꾸지 않고 멈춤(종료 1, 안내 문구, 진단 기록은 멈추기 전에 물음, HMG-API 명령 없음(HMG-API 기다리기보다 앞이라 ping도 없음), 같은 판이어도 관리 앱을 열지 않음, 진행 기록 없음)" \
   '[ "$(cat $T/ts.rc)" = 1 ] && grep -qxF "$KPMSG" $T/ts.out && grep -q DiagActivity $T/calls && ! grep -q "^hmgapid" $T/calls && ! grep -q StatusActivity $T/calls && [ ! -f $PG ] && [ ! -d $R/data/local/tmp/nx4-kor-usb ] && cmp -s $T/kp-nx4.json $HD/mods/nx4-kor/mod.json && grep -q "원본 Korea Projection 패키지가 있음" $K/install.log' || { cat $T/ts.out; cat $T/calls; }
+# PR #61 리뷰 1: Korea Projection 패키지가 있는 차와 잘못된 스틱(옛 2.0.x 꼴 payload, 묶음 없음)은 부팅 직후 HMG-API가 답하지 않아도
+# 기다리지 않고 바로 원래 문구로 멈춘다(ping도 부르지 않음). 기다렸다면 NX4_HMG_TRY=30초가 걸린다
+echo always > $T/ping.fails; echo yes > $T/diag.reply; rm -rf $K/diag
+W0=$(date +%s); TSX="NX4_HMG_POLL=1 NX4_HMG_WAIT=0 NX4_HMG_TRY=30"; ts $U; TSX=; W1=$(date +%s)
+check "  Korea Projection 패키지가 있으면 HMG-API가 답하지 않아도 기다리지 않고 바로 KORPROJ_MSG로 멈춤(진단 기록은 [모으기]면 모음)" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -qxF "$KPMSG" $T/ts.out && ! grep -q "기다리는 중" $T/ts.out && ! grep -q "응답하지 않습니다" $T/ts.out && [ $((W1 - W0)) -lt 20 ] && [ -f $(dg)/info.txt ] && [ ! -f $PG ]' || cat $T/ts.out
+rm -rf $KPD $K/diag; cp $K/install/payload/mod.json $T/pay.keep; modset $K/install/payload/mod.json conflicts=wireless-carplay-aa
+W0=$(date +%s); TSX="NX4_HMG_POLL=1 NX4_HMG_WAIT=0 NX4_HMG_TRY=30"; ts $U; TSX=; W1=$(date +%s)
+_w1=$(cat $T/ts.rc); _w1t=$((W1 - W0)); grep -q "옛 2.0.x 꼴" $T/ts.out; _w1m=$?; grep -q "기다리는 중" $T/ts.out; _w1w=$?
+cp $T/pay.keep $K/install/payload/mod.json; mv $K/wireless $T/wireless.away
+W0=$(date +%s); TSX="NX4_HMG_POLL=1 NX4_HMG_WAIT=0 NX4_HMG_TRY=30"; ts $U; TSX=; W1=$(date +%s)
+mv $T/wireless.away $K/wireless
+check "  잘못된 스틱(옛 2.0.x 꼴 payload, NX4/wireless 없음)도 HMG-API를 기다리지 않고 바로 원래 문구로 멈춤(엔진 명령 없음)" \
+  '[ "$_w1$_w1m$_w1w" = 101 ] && [ $_w1t -lt 20 ] && [ "$(cat $T/ts.rc)" = 1 ] && grep -q "USB에 NX4/wireless" $T/ts.out && ! grep -q "기다리는 중" $T/ts.out && [ $((W1 - W0)) -lt 20 ] && ! engcalls' || cat $T/ts.out
+rm -f $T/ping.fails; rm -rf $K/diag; mkdir -p $KPD; echo no > $T/diag.reply
 mv $HD $T/hd.away; mkdir -p $K/hmgapi $U/HMGAPI/install/payload; echo "# hmg-api" > $K/hmgapi/troubleShooter
 ts $U
 check "  HMG-API가 없고 스틱에 HMG-API 설치기가 있어도 그것으로 넘기기 전에 멈춤(HMG-API를 설치하지 않음)" \
@@ -721,11 +851,11 @@ check "USB 설치기: nx4-kor 없이 2.0.x 기록만 남았으면 스틱의 lega
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^legacy-uninstall NX4_APP=$R/data/local/tmp/nx4-kor-usb/old bb=yes *$" $T/stublog && [ ! -d $R/data/nx4-kor ] && ! grep -q "engine remove nx4-kor" $T/calls && [ $(at "engine apply") -lt $(at "nx4-kor.zip") ] && [ "$(grep -c "^hmgapid engine apply$" $T/calls)" = 2 ] && grep -q "2.0.x가 남긴 설정(Wi-Fi 잠금 등)을 되돌리는 중" $T/ts.out && [ -f $HD/mods/nx4-kor/mod.json ] && [ "$(pg state)" = reboot ]' || { cat $T/ts.out; cat $T/calls; cat $T/stublog; }
 rm -f $K/install/payload/bin/busybox
 # 2.0.x 위에 adb·HMG-API 앱으로 2.1.0 이후가 들어간 차(설치된 nx4-kor는 같은 판 2.1.0, 2.0.x 기록 backup이 남음): 2.1.0을 HMG-API에서 빼고
-# 적용한 뒤 legacy-2.0으로 되돌리고 nx4-kor를 다시 설치한다. 상태 화면은 다시 설치한 뒤에 연다(PR #52 리뷰 7)
+# 적용한 뒤 legacy-2.0으로 되돌리고 nx4-kor를 다시 설치한다. 관리 앱은 다시 설치한 뒤에 연다(PR #52 리뷰 7)
 mkdir -p $R/data/nx4-kor/backup; echo 0 > $R/data/nx4-kor/backup/wifi_on; rm -f $T/stublog
 pset plan-same plan-oldgone plan-new; mapnew
 ts $U
-check "USB 설치기: 2.1.0이 설치됐는데 2.0.x 기록(backup)이 남았으면 2.1.0을 빼고(engine remove) 적용 → legacy-2.0으로 되돌림 → nx4-kor 다시 설치 → 상태 화면" \
+check "USB 설치기: 2.1.0이 설치됐는데 2.0.x 기록(backup)이 남았으면 2.1.0을 빼고(engine remove) 적용 → legacy-2.0으로 되돌림 → nx4-kor 다시 설치 → 관리 앱" \
   '[ "$(cat $T/ts.rc)" = 0 ] && [ $(at "engine remove nx4-kor") -lt $(at "engine apply") ] && [ $(at "engine apply") -lt $(at "nx4-kor.zip") ] && [ $(at "nx4-kor.zip") -lt $(at "StatusActivity") ] && grep -q "^legacy-uninstall NX4_APP=$R/data/local/tmp/nx4-kor-usb/old " $T/stublog && [ ! -d $R/data/nx4-kor ] && [ -f $HD/mods/nx4-kor/mod.json ] && [ "$(pg state)" = reboot ]' || { cat $T/ts.out; cat $T/calls; cat $T/stublog; }
 mkdir -p $R/data/nx4-kor/backup; rm -f $T/stublog; legoff
 ts $U
@@ -824,7 +954,7 @@ TP=$T/pkg; rm -rf $TP; cp -R $PKG $TP
 for f in svc/lib.sh scripts/preun.sh bin/status.sh; do
   sed "s#^export PATH=.*#export PATH=$P0#" $PKG/$f > $TP/$f
 done
-# preun.sh: 업데이트 갈래. 작업 폴더·상태 화면 파일만 지우고, 진행 기록(USB 설치기가 씀)·알림은 둔다
+# preun.sh: 업데이트 갈래. 작업 폴더·관리 앱 파일만 지우고, 진행 기록(USB 설치기가 씀)·알림은 둔다
 prun() { (env PATH=${PP:-$P0} BB_SYS=$T/bin/bb NX4_APP=$TP W=$T/uw HINT=$T/uhint PROG=$T/uprog NOTICE=$T/unotice RBRES=$T/urbres HMGDATA=$T/uh BOOT_ID=$T/bootid "$@" sh $TP/scripts/preun.sh) > $T/pu.out 2>&1; echo $? > $T/pu.rc; }
 pureset() {
   rm -rf $T/uw $T/uh; mkdir -p $T/uw $T/uh/mods/nx4-kor; : > $T/uw/watch.until
@@ -834,7 +964,7 @@ pureset() {
 pureset; prun NX4_UPDATE=1
 check "preun.sh: NX4_UPDATE=1이면 작업 폴더·상태 안내를 지우고 끝남, 진행 기록(설치기가 씀)·알림은 둠, HMG-API를 부르지 않음" \
   '[ "$(cat $T/pu.rc)" = 0 ] && grep -q "NX4 KOR 업데이트: 이전 판 정리" $T/pu.out && [ ! -d $T/uw ] && [ ! -f $T/uhint ] && [ -f $T/uprog ] && [ -f $T/unotice ] && ! grep -q "^hmgapid" $T/calls' || cat $T/pu.out
-# preun.sh: 상태 화면이 띄운 감시자(status.sh --watch)를 멈춘다. 명령줄은 가짜 /proc의 cmdline(NUL로 나눔)으로 본다
+# preun.sh: 관리 앱이 띄운 감시자(status.sh --watch)를 멈춘다. 명령줄은 가짜 /proc의 cmdline(NUL로 나눔)으로 본다
 # (멈출 프로세스는 하위 셸에서 띄워 이 셸의 작업으로 남지 않게 한다: 멈추면 바로 거둬져 kill -0이 실패한다)
 pureset; (sleep 20 >/dev/null 2>&1 & echo $! > $T/slp.pid); SLP=$(cat $T/slp.pid)
 mkdir -p $T/uproc/$SLP; printf 'sh\0/data/hmgapi/mods/nx4-kor/bin/status.sh\0--watch\0' > $T/uproc/$SLP/cmdline
@@ -926,7 +1056,7 @@ streset; spr 100 fail "이 차의 map을 확인하지 못했습니다(설치기 
 check "  state=fail → verdict=failed, 설치기가 쓴 이유 문장이 판정 문구(빨강)" '[ "$(sv verdict)" = failed ] && [ "$(sv verdict_lv)" = 2 ] && [ "$(sv verdict_msg)" = "이 차의 map을 확인하지 못했습니다(설치기 기록을 보세요)." ]' || cat $T/status.txt
 streset; spr 100 fail "지난 부팅의 실패" other-boot; stsh
 check "  지난 부팅의 진행 기록은 보지 않음(ready)" '[ "$(sv verdict)" = ready ]'
-# 공식 무선 모드(requires로 걸지 않으므로 없거나 꺼진 것을 상태 화면이 알림)
+# 공식 무선 모드(requires로 걸지 않으므로 없거나 꺼진 것을 관리 앱이 알림)
 streset; rm -rf $SH/mods/wireless-carplay-aa; stsh
 check "status.sh: 공식 무선 모드가 없으면 verdict=nowireless(USB 설치기로 다시 설치), wm=no" '[ "$(sv verdict)" = nowireless ] && [ "$(sv wm)" = no ] && [ "$(sv verdict_lv)" = 2 ] && grep -q "USB 설치기로 다시 설치" $T/status.txt' || cat $T/status.txt
 streset; : > $SH/mods/wireless-carplay-aa/.disabled; stsh
@@ -1035,7 +1165,7 @@ check "  hook/disable이 있거나 hook/enable이 없으면(횟수가 멈춘 옛
 : > $T/sdmesg
 rm -f $T/ps.out $T/features
 
-# status.sh --watch: 상태 화면의 [지금 재부팅] 요청(앱 개인 폴더의 reboot.req)을 받는 감시자
+# status.sh --watch: 관리 앱의 [지금 재부팅] 요청(앱 개인 폴더의 reboot.req)을 받는 감시자
 RW=$T/rw; rm -rf $RW; mkdir -p $RW/w $RW/bk $RW/proc
 printf '#!/bin/sh\necho reboot >> %s/rbcalls\nexit 1\n' $RW > $T/bin/fakereboot; chmod +x $T/bin/fakereboot
 echo "100.00 50.00" > $RW/uptime; echo 200 > $RW/w/watch.until
@@ -1048,7 +1178,7 @@ rbwait() { _k=0; until grep -qx "id=$1" $RW/rbres 2>/dev/null || [ $_k -ge 100 ]
 rbreq() { echo "$1 $2 $3" > $RW/reboot.req.tmp; mv -f $RW/reboot.req.tmp $RW/reboot.req; rbwait $1; }
 rbreq 5001 test-boot-id 95
 check "status.sh --watch: 이번 부팅의 새 요청(5초 전) → sync 뒤 reboot을 부름, 명령이 돌아오면 결과 code=cmd(앱은 RESET 안내), 요청 지움" \
-  '[ "$(grep -c reboot $RW/rbcalls 2>/dev/null)" = 1 ] && grep -qx "code=cmd" $RW/rbres && [ ! -f $RW/reboot.req ] && grep -q "상태 화면에서 재부팅 요청" $RW/ap.log'
+  '[ "$(grep -c reboot $RW/rbcalls 2>/dev/null)" = 1 ] && grep -qx "code=cmd" $RW/rbres && [ ! -f $RW/reboot.req ] && grep -q "관리 앱에서 재부팅 요청" $RW/ap.log'
 rbreq 5002 other-boot 95
 check "  지난 부팅의 요청 → reboot 안 부름, code=bad" '[ "$(grep -c reboot $RW/rbcalls)" = 1 ] && grep -qx "code=bad" $RW/rbres'
 rbreq 5003 test-boot-id 30

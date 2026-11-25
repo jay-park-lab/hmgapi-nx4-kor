@@ -1,10 +1,10 @@
 #!/system/bin/sh
-# 지우기 전 정리(bin/uninstall.sh가 부른다). 2.1.0의 이 모드가 바꾸는 것은 HMG-API에 선언한 것(상태 화면 앱·앱 메뉴 타일·
-# launch 서비스)과 상태 화면의 작업 파일뿐이다. 시스템 파일·Wi-Fi 설정은 바꾸지 않으므로 되돌릴 것도 그것뿐이다.
-#   1. 상태 화면이 띄운 대기(status.sh --wait)·감시자(--watch)를 멈추고 작업 폴더·상태 파일을 지운다. NX4_UPDATE=1(새 판으로
+# 지우기 전 정리(bin/uninstall.sh가 부른다). 2.1.0의 이 모드가 바꾸는 것은 HMG-API에 선언한 것(관리 앱·앱 메뉴 타일·
+# launch 서비스)과 관리 앱의 작업 파일뿐이다. 시스템 파일·Wi-Fi 설정은 바꾸지 않으므로 되돌릴 것도 그것뿐이다.
+#   1. 관리 앱이 띄운 대기(status.sh --wait)·감시자(--watch)를 멈추고 작업 폴더·상태 파일을 지운다. NX4_UPDATE=1(새 판으로
 #      바꾸기 전)이면 여기서 끝난다. 설치 진행 기록은 USB 설치기가 쓰는 파일이라 업데이트 때는 두고, 지울 때만 지운다.
 #   2. HMG-API에서 이 모드를 뺀다(engine remove). HMG-API(rc.8 Packages.remove → LiveState.publish)는 그때 앱·서비스 목록
-#      (state/apps.txt·services.txt)을 다시 쓰고, hmgapid가 상태 화면 앱을 지우고 launch 서비스를 내린다. 이 모드는 시스템 파일을
+#      (state/apps.txt·services.txt)을 다시 쓰고, hmgapid가 관리 앱을 지우고 launch 서비스를 내린다. 이 모드는 시스템 파일을
 #      바꾸지 않아 적용(engine apply)할 것이 없으므로 계획을 보거나 적용하지 않는다(다른 모드가 쌓아 둔 변경도 건드리지 않음).
 #      HMG-API를 먼저 지웠으면 HMG-API 삭제가 이미 내렸다.
 # 2.0.x가 바꾼 것(Wi-Fi 설정 잠금, 무선 권한 파일, 순정 AP 저장값, 한국 포크 무선 기능)은 여기서 되돌리지 않는다. USB 설치기가
@@ -16,7 +16,7 @@ BB=
 # bin/uninstall.sh가 NX4_APP를 넘긴다. lib.sh는 2번 전에 읽어 둔다(engine remove가 모드 폴더를 지운다)
 APP=${NX4_APP:-/data/hmgapi/mods/nx4-kor}
 . $APP/svc/lib.sh
-# 상태 화면이 띄운 대기(status.sh --wait)와 감시자(--watch)를 멈춘다(업데이트 때도: 새 판이 다시 띄운다).
+# 관리 앱이 띄운 대기(status.sh --wait)와 감시자(--watch)를 멈춘다(업데이트 때도: 새 판이 다시 띄운다).
 # 파일 첫 칸이 pid다. 명령줄은 NUL로 나뉘어 있어 busybox가 있으면 pcmd(NUL → 빈칸)로, 없으면 cat으로 읽어 본다
 # (셸의 $(…)는 NUL을 버려 낱말이 붙지만 "status.sh"는 그대로 보인다).
 for _pf in wait.pid watch.pid; do
@@ -26,7 +26,7 @@ for _pf in wait.pid watch.pid; do
   case "$_pc" in *status.sh*) kill $1 2>/dev/null ;; esac
 done
 rm -rf $W
-# 상태 화면용 파일(bin/status.sh가 $W 밖에 쓴다). 업데이트 때도 지운다(새 판이 다시 쓴다). 상태 안내(hint)는 2.0.x 서비스가 쓰던 것
+# 관리 앱용 파일(bin/status.sh가 $W 밖에 쓴다). 업데이트 때도 지운다(새 판이 다시 쓴다). 상태 안내(hint)는 2.0.x 서비스가 쓰던 것
 rm -f /data/local/tmp/nx4-kor-status.txt /data/local/tmp/nx4-kor-status.txt.tmp
 rm -f /data/local/tmp/nx4-kor-watch.txt /data/local/tmp/nx4-kor-watch.txt.tmp
 rm -f $HINT $HINT.tmp
@@ -35,7 +35,7 @@ if [ "$NX4_UPDATE" = 1 ]; then
   echo "NX4 KOR 업데이트: 이전 판 정리"
   exit 0
 fi
-# 지울 때만: 설치 진행 기록, 재부팅 결과 파일(status.sh rb_result), 알림 기록. 상태 화면 앱도 함께 지워진다
+# 지울 때만: 설치 진행 기록, 재부팅 결과 파일(status.sh rb_result), 알림 기록. 관리 앱도 함께 지워진다
 RBRES=${RBRES:-/data/local/tmp/nx4-kor-reboot-result.txt}
 rm -f $PROG $PROG.tmp $RBRES $RBRES.tmp $NOTICE $NOTICE.tmp
 modmsg=""
@@ -54,7 +54,7 @@ elif ! _rmo=$(hmgapid engine remove $MOD_ID 2>&1); then
   echo "HMG-API에서 모드 지우기 실패 ($_rmo)"
   modmsg=" HMG-API 앱에서 NX4 KOR를 지워 주세요."
 else
-  echo "HMG-API에서 이 모드를 지움(상태 화면 앱과 서비스는 HMG-API가 내림)"
+  echo "HMG-API에서 이 모드를 지움(관리 앱과 서비스는 HMG-API가 내림)"
 fi
 echo "NX4 KOR를 지웠습니다.$modmsg"
 exit 0

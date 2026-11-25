@@ -22,14 +22,14 @@
 4. **판 번호는 `release/`와 `hotfix/` 브랜치에서만 바꿉니다.** `feature/`에서는 바꾸지 않습니다. 바꿀 곳은 세 군데이고 함께 바꿉니다.
    - `mod/mod.json`의 `version`
    - `app/AndroidManifest.xml`의 `versionName` (`mod.json`과 같은 값)
-   - `app/AndroidManifest.xml`의 `versionCode`: 지금까지 낸 묶음(`v2.*` 태그) 중 가장 큰 값보다 1 크게 합니다. `v1.*` 태그는 예전 NEMESIS 묶음입니다. 그때의 상태 화면 앱은 패키지가 달라(`korea.projection.app`, `nemesis-pkg/app-src/`) 이 앱(`io.github.jayparklab.nx4kor`)의 `versionCode`와 상관없고, `app/AndroidManifest.xml`도 없습니다(PR #43 리뷰 7·8). 베타도 같습니다. 내려가면 차가 앱 업데이트를 받지 않습니다(HMG-API가 `pm install -r`로 넣어 낮은 값은 거절됨, 차에는 옛 상태 화면 앱이 남음).
+   - `app/AndroidManifest.xml`의 `versionCode`: 지금까지 낸 묶음(`v2.*` 태그) 중 가장 큰 값보다 1 크게 합니다. `v1.*` 태그는 예전 NEMESIS 묶음입니다. 그때의 앱은 패키지가 달라(`korea.projection.app`, `nemesis-pkg/app-src/`) 이 앱(`io.github.jayparklab.nx4kor`)의 `versionCode`와 상관없고, `app/AndroidManifest.xml`도 없습니다(PR #43 리뷰 7·8). 베타도 같습니다. 내려가면 차가 앱 업데이트를 받지 않습니다(HMG-API가 `pm install -r`로 넣어 낮은 값은 거절됨, 차에는 옛 판 관리 앱이 남음).
      - `develop`의 값은 뒤처져 있습니다. 2.0.3까지의 `release/`를 `develop`에 되돌려 합치지 않아 `develop`은 38인데, 낸 묶음은 `v2.0.3-beta.1`의 41까지입니다(PR #43 리뷰 6). 그래서 `develop`에서 자른 뒤 "1 올림"이 아니라 태그를 봅니다: `git tag --list 'v2.*'`의 태그마다 `git show <태그>:app/AndroidManifest.xml`. `release/2.0.4`의 첫 베타는 42입니다.
    - **베타는 판에도 꼬리를 붙입니다**(2026-11-23 사용자 결정). 차에서 확인하는 동안 `release/<판>`의 판은 `<판>-beta.<n>`(예: `2.0.4-beta.2`)이고, 정식으로 낼 때만 `<판>`(예: `2.0.4`)으로 바꿉니다. 숫자는 앞자리 0 없이 씁니다(`beta.02`가 아니라 `beta.2`, release 워크플로가 확인).
      - 까닭: 파일의 판이 베타와 정식에서 같으면, 고친 베타를 같은 판으로 낼 수 없습니다. USB 설치기는 판이 같으면 "같은 판이 이미 설치됨"으로 건너뛰고(`usb/troubleShooter`), 자동 설정도 새 판을 알아보지 못합니다(`$BK/applied`). 그래서 예전에는 고칠 때마다 판을 올렸습니다(2.0.0 → 2.0.3, 모두 베타).
      - 판의 차례(semver, `2.0.3 < 2.0.4-beta.1 < 2.0.4-beta.2 < 2.0.4-beta.10 < 2.0.4`)를 보는 것은 HMG-API입니다. `engine install`은 설치된 판보다 낮은 판을 `--force` 없이 거절합니다. USB 설치기는 이 모드의 판이 같은지만 봅니다(같으면 건너뜀, `NX4/REINSTALL`이 있으면 다시 설치). 다르면 예전 판을 정리(`uninstall.sh --update`)한 뒤 `engine install`을 부르고, 거절되면 예전 판의 서비스를 다시 띄우고 실패로 끝냅니다.
      - 그래서 정식 `<판>`이 들어간 차에는 같은 판의 베타(`<판>-beta.<n>`)를 넣지 않습니다(HMG-API가 거절).
      - **새 방식은 2.0.4-beta.1부터입니다.** 2.0.3-beta.1까지는 파일의 판에 꼬리가 없었습니다(이미 공개한 `v2.0.3-beta.1`의 판은 `2.0.3`). 2.0.3의 베타를 꼬리 붙여 이어 가면, `v2.0.3-beta.1`을 넣은 차는 `2.0.3-beta.<n>`을 낮은 판이라 받지 못하고, 정식 `2.0.3`은 같은 판이라 건너뜁니다(PR #43 리뷰 2). 그래서 2.0.3은 정식으로 내지 않고 다음 판 2.0.4로 넘어갑니다.
-     - 상태 화면(설치 중 제목 "NX4 KOR <판> 설치 중", 확인 줄)은 앱의 `versionName`을 그대로 보이므로, 차에서 어느 베타인지 바로 보입니다.
+     - 관리 앱(설치 중 제목 "NX4 KOR <판> 설치 중", 확인 줄)은 자기 `versionName`을 그대로 보이므로, 차에서 어느 베타인지 바로 보입니다.
 5. **PR은 merge commit으로 합칩니다.** squash와 rebase 합치기는 쓰지 않습니다. 작업 브랜치 단위의 이력이 `main`·`develop`에 그대로 남아야 합니다.
    - 명령은 `gh pr merge <PR> --merge`입니다. `develop` ruleset이 승인 1을 요구해(아래 "강제 장치"), `develop`으로 가는 PR은 `gh pr view <PR> --json mergeStateStatus,reviewDecision`이 `BLOCKED`, `REVIEW_REQUIRED`입니다. 혼자 쓰는 저장소라 자기 PR은 승인할 수 없습니다.
    - 그때는 **사용자가 합치기를 고른 경우에만** `gh pr merge <PR> --merge --admin`으로 사용자 예외를 써서 합칩니다(GitHub 화면에서는 bypass 체크). PR #56을 이렇게 합쳤습니다(2026-11-24). `--admin`을 붙여도 merge commit이고, squash·rebase는 여전히 쓰지 않습니다.
@@ -43,7 +43,7 @@
 8. **합치기 전에 확인합니다.**
    - 모든 PR: `sh tests/mod-test.sh`가 "모두 통과", 바뀐 동작에 맞게 문서(`README.md`, `docs/`)를 고침
    - `release/`·`hotfix/`: `.env.local`에 `HMGAPI_SRC`를 두어 빌드·HMG-API 엔진 시험까지 통과, `docs/design.md`의 "차에서 확인할 것" 중 해당 항목 확인
-   - 상태 화면 앱을 바꾼 PR: [`docs/emulator-test.md`](emulator-test.md)의 시나리오와 [지금 재부팅] 흐름
+   - 관리 앱을 바꾼 PR: [`docs/emulator-test.md`](emulator-test.md)의 시나리오와 [지금 재부팅] 흐름
 9. **강제 푸시(`--force`)는 `main`·`develop`에 하지 않습니다.** 작업 브랜치도 PR을 연 뒤에는 하지 않습니다.
 10. **합친 작업 브랜치는 지웁니다.** `release/`·`hotfix/`는 `main`과 `develop` 양쪽에 합친 뒤에 지웁니다.
 11. **작업은 작업 브랜치마다 워크트리를 따로 만들어 시작합니다.** 만들고 지우는 법은 아래 "워크트리"에 있습니다.

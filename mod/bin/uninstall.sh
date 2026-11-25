@@ -2,7 +2,7 @@
 # NX4 KOR 모드를 지우거나(인자 없음), 새 판으로 바꾸기 전에 정리한다(--update).
 # root로 돈다: USB 설치기(troubleShooter), 또는 adb에서
 #   adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
-#   1. scripts/preun.sh: 상태 화면의 감시자를 멈추고 작업 파일을 지우고, HMG-API에서 이 모드를 뺀다(engine remove: HMG-API가
+#   1. scripts/preun.sh: 관리 앱의 감시자를 멈추고 작업 파일을 지우고, HMG-API에서 이 모드를 뺀다(engine remove: HMG-API가
 #      앱·서비스·타일을 내림. 이 모드는 적용할 것이 없어 적용하지 않음).
 #      --update면 감시자와 작업 파일만 정리한다.
 #   2. HMG-API를 먼저 지운 경우(hmgapid도 설치 기록도 없음): HMG-API 삭제는 이 모드의 서비스를 멈추지만, 모드 폴더를 남기고
@@ -30,7 +30,7 @@ if ! command -v $HMGAPID >/dev/null 2>&1 && [ ! -f $HMGDATA/installed.txt ]; the
 mod_out() {
   if [ $HMG_GONE = 1 ]; then
     rm -rf $HMGDATA/mods/$NX4_MOD_ID
-    pm uninstall $APP_ID >/dev/null 2>&1 && echo "상태 화면 앱을 지움"
+    pm uninstall $APP_ID >/dev/null 2>&1 && echo "관리 앱을 지움"
     [ ! -d $HMGDATA/mods/$NX4_MOD_ID ] || { echo "남은 모드 폴더를 지우지 못함: $HMGDATA/mods/$NX4_MOD_ID"; return 1; }
     return 0
   fi

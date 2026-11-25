@@ -1,8 +1,8 @@
 #!/system/bin/sh
-# NX4 KOR 공용 함수: 상태 화면(bin/status.sh)과 지우기 전 정리(scripts/preun.sh)가 ". svc/lib.sh"로 읽는다(혼자 돌지 않음).
+# NX4 KOR 공용 함수: 관리 앱 쪽(bin/status.sh)과 지우기 전 정리(scripts/preun.sh)가 ". svc/lib.sh"로 읽는다(혼자 돌지 않음).
 # 2.1.0부터 무선 카플레이·안드로이드 오토는 HMG-API(1.1.0-rc.8 이상)와 공식 무선 모드 wireless-carplay-aa(2.2.0-rc.9 이상)가
 # 맡는다. 프로젝션 AP는 HMG-API가 공식 모드의 "wifi": {"projection": true} 요청으로 띄운다. 이 모드는 핫스팟을 띄우지 않고
-# 시스템 파일·Wi-Fi 설정도 바꾸지 않는다. 여기에는 상태를 읽는 함수와 상태 화면의 요청을 받는 데 쓰는 함수만 있다.
+# 시스템 파일·Wi-Fi 설정도 바꾸지 않는다. 여기에는 상태를 읽는 함수와 관리 앱의 요청을 받는 데 쓰는 함수만 있다.
 # 2.0.x의 svc/hotspot.sh(순정 hostapd·dnsmasq 핫스팟, Wi-Fi 잠금, 칩 깨우기, 자동 설정 setup_hmgapi)를 줄인 것이다.
 # map 만들기·확인과 적용은 USB 설치기(usb/troubleShooter)가 한다.
 # 시험: BB, SRC, W, BK, PROC, BOOT_ID, UPTIME, HMGDATA 등을 밖에서 정해 두면 그대로 쓴다.
@@ -33,7 +33,7 @@ if [ "$BB" = "$BB_OWN" ]; then PS="$BB ps -o pid,stat,args"; else PS="$BB ps"; f
 SRC=${SRC:-/data/misc/wifi/softap.conf}
 # Wi-Fi 장치 이름은 여기 한 곳에서 정한다(기본값 wlan0). 주석·화면 문구 속 "wlan0" 글자는 그대로 둔다
 WIF=${WIF:-wlan0}
-# 상태 화면의 작업 폴더(감시자 pid·끝 시각, 받은 재부팅 요청). /data/local/tmp 아래라 재부팅 뒤에도 남는다
+# 관리 앱의 작업 폴더(감시자 pid·끝 시각, 받은 재부팅 요청). /data/local/tmp 아래라 재부팅 뒤에도 남는다
 W=${W:-/data/local/tmp/nx4-kor}
 BK=${BK:-/data/nx4-kor/backup}
 PROC=${PROC:-/proc}
@@ -48,7 +48,7 @@ MOD_ID=${NX4_MOD_ID:-nx4-kor}
 # 이 모드가 요구하는 HMG-API 판(mod.json "hmgapi"와 같게 둔다. 앱 Report.MIN_HMGAPI도 같게)
 HMG_MIN=1.1.0-rc.8
 # 공식 무선 모드(고치지 않음, NX4에는 USB 설치기가 --any-car로 넣는다). 판은 앱 Report.MIN_WIRELESS와 같게 둔다.
-# mod.json "requires"로 걸지 않는다: 공식 모드가 없거나 꺼지면 HMG-API가 이 모드의 앱·서비스까지 멈춰 상태 화면이 알릴 수 없다
+# mod.json "requires"로 걸지 않는다: 공식 모드가 없거나 꺼지면 HMG-API가 이 모드의 앱·서비스까지 멈춰 관리 앱이 알릴 수 없다
 WM_ID=wireless-carplay-aa
 WM_MIN=2.2.0-rc.9
 WM_NAME='Wireless CarPlay + Android Auto'
@@ -61,14 +61,14 @@ WIFI_SEEN=${WIFI_SEEN:-$HMGDATA/public/wifi-chip}
 #   wifi/ap.fail    이번 부팅에 띄우지 못하고 다시 시도하는 중: 부팅 id. 기록 줄은 logs/hmgapi/wifi.log
 HMGWIFI=${HMGWIFI:-$HMGDATA/wifi}
 WIFIASKS=${WIFIASKS:-$HMGDATA/state/wifi.txt}
-# 설치 진행 기록(USB 설치기가 쓰고 상태 화면 앱이 1초마다 읽음, 644, 비밀값 없음). 한 줄에 key=value:
+# 설치 진행 기록(USB 설치기가 쓰고 관리 앱이 1초마다 읽음, 644, 비밀값 없음). 한 줄에 key=value:
 #   pct, state(run 진행 중|done 준비됨|reboot 재부팅 필요|fail 실패), stage(지금 단계·실패 이유, 한국어), start·t(시각 초),
-#   boot(부팅 id), step(N/M), ust·ut(부팅 뒤 초). 상태 화면은 이번 부팅의 기록만 본다
+#   boot(부팅 id), step(N/M), ust·ut(부팅 뒤 초). 관리 앱은 이번 부팅의 기록만 본다
 PROG=${PROG:-/data/local/tmp/nx4-kor-progress.txt}
 # 알림 기록(한 줄에 "<시각(초)> <부팅 id> <문구>", 앱은 이번 부팅의 줄만 보인다)과 예전 판의 상태 안내. 지울 때 함께 지운다
 NOTICE=${NOTICE:-/data/local/tmp/nx4-kor-notice.txt}
 HINT=${HINT:-/data/local/tmp/nx4-kor-hint.txt}
-# [지금 재부팅] 요청: 상태 화면 앱이 앱 개인 폴더에 요청 파일을 쓴다. 내용은 한 줄 "<요청 id> <boot_id> <부팅 뒤 초>"
+# [지금 재부팅] 요청: 관리 앱이 앱 개인 폴더에 요청 파일을 쓴다. 내용은 한 줄 "<요청 id> <boot_id> <부팅 뒤 초>"
 # (요청 id는 앱의 부팅 뒤 밀리초, 숫자만). 다른 앱은 이 폴더에 쓸 수 없다. 감시자(status.sh --watch)만 받는다.
 RBREQ=${NX4_RBREQ:-/data/data/io.github.jayparklab.nx4kor/files/reboot.req}
 NOCAR_MSG="지원하지 않는 차입니다(투싼 NX4 한국 내수 260902 전용). 아무것도 바꾸지 않았습니다."
@@ -329,7 +329,7 @@ ver_lt() {
   return 1
 }
 
-# --- 상태 화면 앱의 요청과 그 감시자 ---
+# --- 관리 앱의 요청과 그 감시자 ---
 # /proc/<pid>/cmdline은 인자를 NUL로 나눈다. busybox 1.8.1 grep은 첫 NUL 뒤를 못 볼 수 있어 NUL을 빈칸으로
 # 바꾼 한 줄로 본다. 읽지 못하면 빈 값.
 pcmd() { $BB tr '\0' ' ' < $PROC/$1/cmdline 2>/dev/null; }
@@ -374,7 +374,7 @@ st_alive() {
   return 1
 }
 
-# 쓸 수 있는 busybox가 없을 때(내비에 없고, 함께 넣은 것도 실행되지 않음: 예 /data가 noexec): 상태 화면은 "지원하지 않는 내비"를 보인다
+# 쓸 수 있는 busybox가 없을 때(내비에 없고, 함께 넣은 것도 실행되지 않음: 예 /data가 noexec): 관리 앱은 "지원하지 않는 내비"를 보인다
 has_bb() { [ "$BB_OK" = 1 ]; }
 # 명령: busybox가 있으면 busybox로, 없으면 toolbox의 같은 이름으로.
 bbx() { if has_bb; then $BB "$@"; else "$@"; fi; }
