@@ -1388,12 +1388,15 @@ esac
 E
 chmod +x $MR/bin/make
 mr() { rm -f $MR/calls; printf '%s\n' "$@" > $MR/plan; mkdir -p $MR/out; : > $MR/k/scripts/dtc/flattree.o; : > $MR/out/bcmdhd.ko
-  (PATH=$MR/bin:$PATH bash -c '. "$1"; make_retry "$2" "$3" -j2' x $B/drivers/lib.sh $MR/log $MR/k) > $MR/out.txt 2>&1; echo $? > $MR/rc; }
+  (env PATH=$MR/bin:$PATH $MRX bash -c '. "$1"; make_retry "$2" "$3" -j2' x $B/drivers/lib.sh $MR/log $MR/k) > $MR/out.txt 2>&1; echo $? > $MR/rc; }
 mr segv ok
 check "drivers/lib.sh make_retry: 에뮬레이션 충돌(Segmentation fault)이면 실패한 대상(make 폴더 기준 상대 경로, 절대 경로 .ko)을 지우고 이어서 다시 돌려 성공" \
   '[ "$(cat $MR/rc)" = 0 ] && [ "$(cat $MR/calls)" = 2 ] && [ ! -e $MR/k/scripts/dtc/flattree.o ] && [ ! -e $MR/out/bcmdhd.ko ] && grep -q "다시 돌림(1번째 실패" $MR/out.txt && grep -q built $MR/log && grep -q "Segmentation fault" $MR/log' || cat $MR/out.txt
 mr segv segv segv ok
-check "drivers/lib.sh make_retry: 모두 3번까지(세 번째도 충돌이면 실패)" '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 3 ]' || cat $MR/out.txt
+check "drivers/lib.sh make_retry: 기본은 모두 3번까지(세 번째도 충돌이면 실패)" '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 3 ]' || cat $MR/out.txt
+MRX=MAKE_TRIES=4; mr segv segv segv ok; MRX=
+check "drivers/lib.sh make_retry: MAKE_TRIES(build-driver.sh NX4_DRV_TRIES)로 횟수를 늘림" \
+  '[ "$(cat $MR/rc)" = 0 ] && [ "$(cat $MR/calls)" = 4 ] && grep -q "모두 4번까지" $MR/out.txt && grep -q "MAKE_TRIES=\"\${NX4_DRV_TRIES:-3}\"" $B/scripts/build-driver.sh' || cat $MR/out.txt
 mr err ok
 check "drivers/lib.sh make_retry: 다른 오류는 다시 돌리지 않고 바로 실패, 대상은 지우지 않음" \
   '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 1 ] && [ -e $MR/k/scripts/dtc/flattree.o ] && grep -q "error: something" $MR/out.txt' || cat $MR/out.txt
