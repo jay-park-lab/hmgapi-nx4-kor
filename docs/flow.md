@@ -47,21 +47,24 @@ flowchart LR
 
 ### 시작 전 확인
 
-이 그림의 멈춤은 모두 아무것도 바꾸지 않고, 진행 기록도 쓰지 않습니다. 차례는 설치기(`usb/troubleShooter`)가 도는 차례입니다(스틱 확인, Korea Projection 패키지 확인, HMG-API 확인 순). Korea Projection 패키지는 HMG-API 설치기로 넘기기(HMG-API를 설치·업데이트하고 재부팅) 전에 봅니다.
+이 그림의 멈춤은 모두 아무것도 바꾸지 않고, 진행 기록도 쓰지 않습니다. 차례는 설치기(`usb/troubleShooter`)가 도는 차례입니다(스틱 확인, Korea Projection 패키지 확인, HMG-API 기다리기, 진단 기록 묻기, HMG-API 확인 순. 스틱·Korea Projection 확인에서 멈출 때는 기다리지 않고 진단 기록만 묻고 멈춤). Korea Projection 패키지는 HMG-API 설치기로 넘기기(HMG-API를 설치·업데이트하고 재부팅) 전에 봅니다.
 
 ```mermaid
 flowchart TD
-  S(["Update OTA 누름"]) --> DIAG["진단 기록을 모을지 화면에서 물음<br/>(DiagActivity, 60초, 아무것도 바꾸기 전)"]
-  DIAG --> UN{"NX4/UNINSTALL<br/>또는 UNINSTALL-ALL?"}
-  UN -->|"예"| DEL["아래 5절 지우기로"]
+  S(["Update OTA 누름<br/>(부팅이 끝나면 바로 눌러도 됨)"]) --> UN{"NX4/UNINSTALL<br/>또는 UNINSTALL-ALL?"}
+  UN -->|"예"| DEL["아래 5절 지우기로<br/>(먼저 HMG-API 기다리기 → 진단 기록 묻기)"]
   UN -->|"아니요"| S0{"0. 스틱 확인<br/>묶음(install·wireless)이 있고<br/>nx4-kor가 2.1.0 꼴?"}
-  S0 -->|"아니요<br/>(묶음 없음, 2.0.x 꼴)"| STOP0["멈춤: 2.1.0 이후의<br/>USB 묶음을 써 주세요"]
+  S0 -->|"아니요<br/>(묶음 없음, 2.0.x 꼴)"| STOP0["진단 기록을 물은 뒤 멈춤:<br/>2.1.0 이후의 USB 묶음을 써 주세요"]
   S0 -->|"예"| KPKG{"NEMESIS의 Korea Projection 패키지<br/>(/data/nemesis/apps/korea.projection)가 있나?"}
-  KPKG -->|"예"| STOPK["멈춤: NEMESIS에서 Korea Projection을 지우고<br/>내비를 재부팅한 뒤 다시(KORPROJ_MSG)"]
-  KPKG -->|"아니요"| H{"HMG-API가 있나?"}
+  KPKG -->|"예"| STOPK["진단 기록을 물은 뒤 멈춤:<br/>NEMESIS에서 Korea Projection을 지우고<br/>내비를 재부팅한 뒤 다시(KORPROJ_MSG)"]
+  KPKG -->|"아니요"| HW{"HMG-API(hmgapid·/data/hmgapi)가 있고<br/>ping에 답하지 않음?"}
+  HW -->|"예"| WAIT["답할 때까지 3초마다 다시 물음<br/>(부팅 뒤 300초까지, 적어도 30초)<br/>토스트: HMG-API가 준비되기를 기다리는 중"]
+  HW -->|"아니요<br/>(답함, 또는 HMG-API 없음)"| DIAG
+  WAIT --> DIAG["진단 기록을 모을지 화면에서 물음<br/>(DiagActivity, 60초, 아무것도 바꾸기 전)"]
+  DIAG --> H{"HMG-API가 있나?"}
   H -->|"없음 +<br/>스틱에 HMG-API 묶음 있음"| HU["스틱의 HMG-API 설치기로 넘김<br/>→ 재부팅 → Update OTA 한 번 더"]
   H -->|"없음 +<br/>스틱에도 없음"| STOP1["멈춤: HMG-API를 먼저<br/>설치하거나 올려 주세요"]
-  H -->|"있지만<br/>응답 없음"| STOP2["멈춤: 재부팅하고 다시"]
+  H -->|"있지만<br/>기다려도 응답 없음"| STOP2["멈춤: 재부팅하고 다시"]
   H -->|"있고 응답함"| VER{"최소 판 이상?<br/>(1.1.0-rc.8과 두 모드의 hmgapi 중 높은 것)"}
   VER -->|"낮음 +<br/>스틱의 HMG-API가 그 판 이상"| HU
   VER -->|"낮음 +<br/>스틱에 없거나 낮음"| STOP1
@@ -77,6 +80,7 @@ flowchart TD
 ```
 
 - Korea Projection 패키지 확인은 그 패키지 폴더만 봅니다. 다른 NEMESIS 패키지는 막지 않고, 지우기(5절)도 막지 않습니다([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). 이 멈춤은 같은 판의 관리 앱 열기보다 앞이라 관리 앱을 열지 않습니다.
+- HMG-API 기다리기는 부팅 직후에 눌러도 되게 하려는 것입니다(2026-11-25). hmgapid는 zygote가 시작할 때 뜨고, 부팅 뒤 몇 분은 HMG-API 자신의 부팅 작업으로 바빠 잠깐 답하지 않을 수 있습니다. HMG-API가 필요 없는 확인(스틱, Korea Projection 패키지) 뒤에 기다리므로, 그 확인에서 멈출 차는 기다리지 않습니다. 진단 기록이 HMG-API 상태·Car Report를 모으므로 진단 묻기는 기다린 뒤입니다(그 앞에서 멈출 때는 멈추기 전에 묻습니다). HMG-API가 없는 차(`hmgapid`나 `/data/hmgapi`가 없음)는 기다리지 않습니다. 근거와 시간은 `design.md` "HMG-API 확인"에 있습니다.
 - HMG-API의 판을 읽지 못하거나 비교할 수 없으면 기록만 하고 지나갑니다. 엔진이 설치할 때 다시 봅니다.
 - 설치된 nx4-kor가 2.0.x 자체면 아래 2단계에서 그 판의 것으로 되돌립니다. 그래서 `legacy-2.0` 멈춤(`OLDLEFT_MSG`)에 걸리지 않습니다.
 - "같은 판"은 `NX4/REINSTALL`이 없고 2.0.x 기록도 없을 때입니다.
@@ -102,7 +106,10 @@ flowchart TD
   APPLY -->|"실패"| APF["실패로 끝(APPLYFAIL_MSG)"]
   APPLY -->|"성공"| R{"7. 무엇이 바뀌었나?"}
   TODO -->|"없음(적용 건너뜀)"| R
-  R -->|"예"| RB["진행 기록 state=reboot<br/>관리 앱: [지금 재부팅]"]
+  R -->|"예"| GW{"이번 zygote 시작이 HMG-API 부팅 보호에<br/>아직 확인되지 않음?(hook/starts ≥ 1)"}
+  GW -->|"예"| GWW["확인 시각까지 기다림(state=run)<br/>마지막 hooks on 줄 + 120 + 15초,<br/>줄이 없으면 부팅 뒤 300초. starts가 0이 되면 바로 끝"]
+  GW -->|"아니요"| RB
+  GWW --> RB["진행 기록 state=reboot<br/>관리 앱: [지금 재부팅]"]
   R -->|"아니요"| DONE["state=done<br/>설정이 끝나 있습니다"]
 ```
 
@@ -113,6 +120,7 @@ flowchart TD
   - nx4-kor 설치 거절(`INSTFAIL_MSG`). 예전 판에서 돌던 서비스를 다시 띄웁니다
 - 2단계에서 nx4-kor 없이 2.1.0 이후의 기록(`/data/nx4-kor`)만 남은 차는 스틱의 사본(`payload/bin/uninstall.sh`)으로 정리만 합니다. 실패해도 계속합니다.
 - map 만들기·확인과 적용은 USB 설치기만 합니다(2026-11-23 결정, [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)). 차에 남는 nx4-kor는 부팅 때 아무것도 설정하지 않습니다.
+- 7단계의 부팅 보호 기다리기는 안내를 보자마자 재부팅해 HMG-API 부팅 보호 횟수(`hook/starts`)가 쌓이지 않게 하려는 것입니다. 기준 시각은 관리 앱의 [지금 재부팅] 거절(`status.sh` `take_rbreq`)과 같습니다. map 만들기가 끼면 보통 이미 지나 있습니다. 지우기(5절)도 스스로 재부팅하기 전에 같은 것을 기다립니다.
 - 설치기 기록은 스틱의 `NX4/install.log`에 이어 씁니다.
 
 ## 3. 재부팅 뒤 무선 연결
@@ -214,7 +222,7 @@ flowchart TD
 ```
 
 - 자세한 갈래는 `design.md` "설치·업데이트·지우기"의 "지우기"에 있습니다.
-- 그림에서 뺀 멈춤이 둘 있습니다. HMG-API가 있는데 응답하지 않을 때("재부팅하고 다시"), 모드 폴더 없이 2.0.x 기록만 남았는데 스틱에 `legacy-2.0`이 없을 때(`OLDLEFT_MSG`)입니다. 이 둘과 "설치되어 있지 않습니다", 스틱의 사본을 `/data`로 복사하지 못할 때("USB에서 복사하지 못했습니다")는 아무것도 바꾸지 않고 재부팅하지 않습니다. 그 밖에는 지우기가 실패해도 끝에 재부팅합니다.
+- 그림에서 뺀 멈춤이 둘 있습니다. HMG-API가 있는데 기다려도(2절 시작 전 확인과 같음) 응답하지 않을 때("재부팅하고 다시"), 모드 폴더 없이 2.0.x 기록만 남았는데 스틱에 `legacy-2.0`이 없을 때(`OLDLEFT_MSG`)입니다. 이 둘과 "설치되어 있지 않습니다", 스틱의 사본을 `/data`로 복사하지 못할 때("USB에서 복사하지 못했습니다")는 아무것도 바꾸지 않고 재부팅하지 않습니다. 그 밖에는 지우기가 실패해도 끝에 재부팅합니다. 재부팅 전에 이번 zygote 시작이 HMG-API 부팅 보호에 아직 확인되지 않았으면 확인 시각까지 기다립니다(2절 7단계와 같음).
 - HMG-API를 먼저 지운 차는 `old_revert` 없이(계획·적용 없이) 그 `uninstall.sh`만 돌립니다. 2.0.x 기록만 남았으면 스틱의 `legacy-2.0` 사본을 돌립니다.
 - 공식 무선 모드를 뺀 뒤 계획에 다른 변경이 있으면 적용하지 않고 "HMG-API 앱에서 변경 사항을 적용해 주세요(무선 모드 삭제)"로 알립니다.
 - 2.1.0의 `uninstall.sh`가 남긴 2.0.x 기록을 이 스틱으로 되돌리지 못하면(`legacy-2.0` 없음) 그 폴더를 남기고 화면에 알립니다.
