@@ -64,7 +64,8 @@ HMG-API 1.1.0-rc.8 이상이 필요합니다.
 한 일은 USB의 NX4/install.log(HMG-API 설치는 HMGAPI/install.log)에 남습니다. NX4/install.log는 누를 때마다 아래에 이어 씁니다.
   HMG-API의 map 만들기·확인과 계획 출력도 함께 남습니다.
 관리 앱이 있으면 누를 때마다 "진단 기록 모으기" 확인 창이 먼저 뜹니다. [모으기]를 고르면 진단 기록(내비의 기록,
-  HMG-API Car Report, /system/lib 파일 이름·md5)을 NX4/diag/<시각>/에 모읍니다. 1~2분 걸리니 다음 메시지가 나올 때까지
+  HMG-API Car Report, /system/lib 파일 이름·md5, USB Wi-Fi 동글 드라이버를 만드는 데 쓸 커널 설정과 USB 장치 목록)을
+  NX4/diag/<시각>/에 모읍니다. 1~2분 걸리니 다음 메시지가 나올 때까지
   USB를 빼지 마세요. [건너뛰기]나 60초 동안 고르지 않으면 모으지 않고 이어집니다. Wi-Fi 비밀번호가 든 파일은 넣지 않습니다.
 끝나면 USB를 빼 주세요(꽂혀 있으면 유선 안드로이드 오토가 시작될 수 있습니다).
 

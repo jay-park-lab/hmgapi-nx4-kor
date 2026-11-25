@@ -616,19 +616,45 @@ echo "wpa_passphrase=SECRETPW" > $R/data/misc/wifi/softap.conf; echo SECRETPW > 
 mkdir -p $R/system/etc/permissions $R/system/onebin/nx4hev_kr; : > $R/system/etc/permissions/com.hkmc.software.wifi.module.xml
 echo "-/system/etc/permissions/com.hkmc.software.wifihotspot.xml" > $R/system/onebin/nx4hev_kr/featurexml.cfg
 echo "feature:com.hkmc.software.wifi.module" > $T/features
+# 동글 준비 정보(#48): 커널(/proc, /sys/module), 차 커널 설정, 순정 Wi-Fi 드라이버·HAL·hostapd, USB 장치, 네트워크 장치, 커널 로그.
+# 일련번호·MAC은 들어가지 않아야 한다(SERIALX, MACX)
+mkdir -p $R/proc/sys/kernel $R/sys/module/module/parameters $R/sys/module/tcc_dwc_otg/parameters $R/sys/module/cfg80211 $R/system/wifi \
+  $R/sys/bus/usb/devices/1-1 $R/sys/bus/usb/devices/usb1 $R/sys/bus/usb/drivers/rtl88x2bu/1-1:1.0 $R/sys/class/net/wlan0
+echo 3.18.24-tcc > $R/proc/sys/kernel/osrelease; echo 0 > $R/proc/sys/kernel/modules_disabled; echo N > $R/sys/module/module/parameters/sig_enforce
+echo "Linux version 3.18.24-tcc (gcc version 4.7)" > $R/proc/version; echo "bcmdhd 1234 0 - Live 0x00000000" > $R/proc/modules
+echo 1 > $R/sys/module/tcc_dwc_otg/parameters/vbus_control_enable
+printf 'CONFIG_CFG80211=y\nCONFIG_MODVERSIONS=n\n' > $T/kconfig; gzip -c $T/kconfig > $R/proc/config.gz
+printf 'dhd\nvermagic=3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8 \nlicense=GPL\n' > $R/system/wifi/bcmdhd.ko; echo fw > $R/system/wifi/fw_bcmdhd.bin
+printf 'wifi_load_driver\n/system/wifi/bcmdhd.ko\niface_name=\nunrelated text\n' > $R/system/lib/libhardware_legacy.so
+printf 'driver=nl80211\n' > $R/system/bin/hostapd
+for f in idVendor:0bda idProduct:b812 speed:480 bMaxPower:500mA bDeviceClass:00 manufacturer:Realtek product:802.11ac_NIC serial:SERIALX; do echo ${f#*:} > $R/sys/bus/usb/devices/1-1/${f%%:*}; done
+for f in idVendor:1d6b idProduct:0002 speed:480; do echo ${f#*:} > $R/sys/bus/usb/devices/usb1/${f%%:*}; done
+echo MACX > $R/sys/class/net/wlan0/address
+printf '%s\n' "<6>[   30.1] usb 1-1: new high-speed USB device number 2 using ehci-tcc" "<6>[   30.2] usb 1-1: SerialNumber: SERIALX" "<6>[   31.0] hmgapi-hook: something else" > $T/ddmesg
 # 이 회는 진단 기록만 본다. backup이 있어 설치기가 2.0.x 되돌리기 길을 타지 않게 legacy-2.0을 치워(가드에서 아무것도 바꾸지 않고 멈춤)
 # 진단 기록에 백업 폴더가 들어가지 않는지만 본다(PR #52 리뷰 10). 끝나면 backup을 지운다
 rm -rf $K/diag; legoff
-ts $U
+TSX="NX4_DMESG=$T/ddmesg"; ts $U; TSX=
 check "USB 설치기 진단 기록: 순정 기능(pm list features), /system/etc/permissions 목록, onebin마다 featurexml.cfg 사본" \
   'grep -qx "feature:com.hkmc.software.wifi.module" $(dg)/features.txt && grep -q "com.hkmc.software.wifi.module.xml" $(dg)/permissions-ls.txt && grep -q "wifihotspot.xml" $(dg)/featurexml-nx4hev_kr.cfg' || ls $(dg)
 rm -f $T/features
 CORE5=$(md5sum < $R/system/lib/libCarPlayCore.so | cut -d" " -f1)
 check "USB 설치기 진단 기록: NX4/diag/<시각>/에 /system/lib 아래 모든 파일(하위 폴더·링크 포함)의 md5와 경로, ls -lR" \
-  '[ "$(ls $K/diag | wc -l)" -eq 1 ] && grep -q "^$CORE5  .*/system/lib/libCarPlayCore.so$" $(dg)/system-lib-md5.txt && grep -q "^$CORE5  .*/system/lib/liblink.so$" $(dg)/system-lib-md5.txt && grep -q "  .*/system/lib/hw/gralloc.so$" $(dg)/system-lib-md5.txt && [ "$(wc -l < $(dg)/system-lib-md5.txt)" -eq 3 ] && grep -q "liblink.so -> libCarPlayCore.so" $(dg)/system-lib-ls.txt' || cat $(dg)/system-lib-md5.txt
+  '[ "$(ls $K/diag | wc -l)" -eq 1 ] && grep -q "^$CORE5  .*/system/lib/libCarPlayCore.so$" $(dg)/system-lib-md5.txt && grep -q "^$CORE5  .*/system/lib/liblink.so$" $(dg)/system-lib-md5.txt && grep -q "  .*/system/lib/hw/gralloc.so$" $(dg)/system-lib-md5.txt && [ "$(wc -l < $(dg)/system-lib-md5.txt)" -eq 4 ] && grep -q "liblink.so -> libCarPlayCore.so" $(dg)/system-lib-ls.txt' || cat $(dg)/system-lib-md5.txt
 check "USB 설치기 진단 기록: info.txt(판·공식 무선 모드 판·getprop·내비 busybox 유무·wifi_ap_on), HMG-API 상태·Car Report 복사, 이 모드와 HMG-API 기록" \
   'grep -qx "installed_mod: $V" $(dg)/info.txt && grep -qx "usb_mod: $V" $(dg)/info.txt && grep -qx "installed_wireless: $WV" $(dg)/info.txt && grep -qx "usb_wireless: $WV" $(dg)/info.txt && grep -q "^ro.build.product: NX4.KOR" $(dg)/info.txt && grep -qx "system_busybox: yes" $(dg)/info.txt && grep -qx "md5_busybox: $R/system/bin/busybox" $(dg)/info.txt && grep -qx "wifi_ap_on: 1" $(dg)/info.txt && grep -qx "hmgapid engine status" $T/calls && [ -f $(dg)/hmgapi-status.txt ] && grep -q "^saved: " $(dg)/car-report.txt && [ -f $(dg)/car-report-test.json ] && [ -f $(dg)/car-report-test.md ] && grep -qx aplog $(dg)/logs/ap.log && grep -qx svclog $(dg)/logs/service/ap.log && grep -qx hmgapi-install $(dg)/logs/hmgapi-install.log && grep -qx mapcar $(dg)/logs/map-car.txt && grep -qx status $(dg)/logs/nx4-kor-status.txt && grep -q "진단 기록을 모음: NX4/diag/" $K/install.log' || cat $(dg)/info.txt
 check "USB 설치기 진단 기록: 비밀번호가 든 파일(softap.conf, 백업 폴더)은 넣지 않음(이 회는 설치기가 아무것도 바꾸지 않음)" '! grep -rq SECRETPW $K/diag && ! engcalls'
+DG=$(dg)/dongle
+check "USB 설치기 진단 기록(동글 준비, #48): kernel.txt(커널 판·modules_disabled·sig_enforce·cfg80211·vbus 매개변수·boot_id), /proc/modules" \
+  'grep -qx "osrelease: 3.18.24-tcc" $DG/kernel.txt && grep -q "^version: Linux version 3.18.24-tcc" $DG/kernel.txt && grep -qx "modules_disabled: 0" $DG/kernel.txt && grep -qx "sig_enforce: N" $DG/kernel.txt && grep -qx "cfg80211: yes" $DG/kernel.txt && grep -qx "tcc_dwc_otg/parameters/vbus_control_enable: 1" $DG/kernel.txt && grep -qx "boot_id: test-boot-id" $DG/kernel.txt && grep -q "^bcmdhd " $DG/modules.txt' || cat $DG/kernel.txt
+KCG5=$(md5sum < $R/proc/config.gz | cut -d" " -f1); KCS=$(sha256sum < $T/kconfig | cut -d" " -f1)
+check "USB 설치기 진단 기록(동글 준비): 차 커널 설정(/proc/config.gz) 사본과 푼 것, gz의 md5와 푼 것의 sha256" \
+  'cmp -s $R/proc/config.gz $DG/config.gz && cmp -s $T/kconfig $DG/config.txt && grep -qx "config.gz md5: $KCG5" $DG/config-sum.txt && grep -qx "config.txt sha256: $KCS" $DG/config-sum.txt' || cat $DG/config-sum.txt
+KO5=$(md5sum < $R/system/wifi/bcmdhd.ko | cut -d" " -f1)
+check "USB 설치기 진단 기록(동글 준비): /system/wifi 목록·md5, 순정 bcmdhd.ko의 vermagic, HAL·hostapd의 드라이버 문자열(관계없는 줄은 뺌)" \
+  'grep -q "fw_bcmdhd.bin" $DG/system-wifi-ls.txt && grep -qx "$KO5  /system/wifi/bcmdhd.ko" $DG/system-wifi-md5.txt && grep -q "^/system/wifi/bcmdhd.ko: vermagic=3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8" $DG/ko-vermagic.txt && grep -qx "== /system/lib/libhardware_legacy.so" $DG/wifi-strings.txt && grep -qx "iface_name=" $DG/wifi-strings.txt && grep -qx "/system/wifi/bcmdhd.ko" $DG/wifi-strings.txt && grep -qx "driver=nl80211" $DG/wifi-strings.txt && ! grep -q "unrelated" $DG/wifi-strings.txt' || cat $DG/wifi-strings.txt $DG/ko-vermagic.txt
+check "USB 설치기 진단 기록(동글 준비): USB 장치(ID·속도·전력·제품), 드라이버에 붙은 인터페이스, 네트워크 장치, 커널 로그의 USB·Wi-Fi 줄. 일련번호·MAC은 넣지 않음" \
+  'grep -q "^1-1 0bda:b812 speed=480 maxpower=500mA class=00 manufacturer=Realtek product=802.11ac_NIC$" $DG/usb.txt && grep -q "^usb1 1d6b:0002 " $DG/usb.txt && grep -q "1-1" $DG/usb-ls.txt && grep -qx "== rtl88x2bu" $DG/usb-drivers.txt && grep -qx "1-1:1.0" $DG/usb-drivers.txt && grep -q "wlan0" $DG/net-ls.txt && grep -q "new high-speed USB device" $DG/dmesg-usb-wifi.txt && ! grep -q "hmgapi-hook" $DG/dmesg-usb-wifi.txt && ! grep -rq -e SERIALX -e MACX $K/diag && grep -q "동글 준비 정보를 모음" $K/install.log' || cat $DG/usb.txt $DG/dmesg-usb-wifi.txt
 legon; rm -rf $R/data/nx4-kor/backup
 # md5를 셀 busybox: 내비에 없으면 설치된 모드의 것, 그것도 없으면 스틱의 것을 /data로 복사해 쓰고 지움. 모두 없으면 그렇다고 적음
 rm $R/system/bin/busybox; cp $T/bin/bb $HD/mods/nx4-kor/bin/busybox
@@ -643,6 +669,12 @@ rm -rf $K/diag $K/install/payload/bin/busybox
 ts $U
 check "USB 설치기 진단 기록: md5를 셀 busybox가 없으면 그렇다고 적고(이름·크기는 ls -lR) 설치기는 그대로 끝남" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "md5_busybox: none" $(dg)/info.txt && grep -q "busybox가 없음" $(dg)/system-lib-md5.txt && grep -q "libCarPlayCore.so" $(dg)/system-lib-ls.txt && grep -q "busybox가 없어" $K/install.log'
+check "USB 설치기 진단 기록(동글 준비): busybox가 없어도 커널 설정(config.gz)은 복사하고, md5·문자열이 빠졌다고 적음" \
+  'cmp -s $R/proc/config.gz $(dg)/dongle/config.gz && [ ! -f $(dg)/dongle/config.txt ] && grep -q "busybox가 없음" $(dg)/dongle/config-sum.txt && grep -q "busybox가 없어" $(dg)/dongle/system-wifi-md5.txt && grep -q "0bda:b812" $(dg)/dongle/usb.txt'
+rm -f $R/proc/config.gz; rm -rf $K/diag; ts $U
+check "USB 설치기 진단 기록(동글 준비): /proc/config.gz가 없으면 그렇다고 적고 설치기는 그대로 끝남" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "config.gz 없음" $(dg)/dongle/config-sum.txt && grep -q "/proc/config.gz가 없음" $K/install.log'
+rm -rf $R/proc $R/sys
 # 확인 창에서 모으지 않는 경우: 진단 폴더를 만들지 않고 HMG-API 명령도 부르지 않으며, 설치기는 그대로 이어짐(같은 판: 관리 앱)
 dno() { rm -rf $K/diag; ts $U; [ "$(cat $T/ts.rc)" = 0 ] && [ ! -d $K/diag ] && ! grep -q "engine report" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && grep -q "이미 설치되어" $T/ts.out && grep -q "$1" $K/install.log; }
 echo no > $T/diag.reply
