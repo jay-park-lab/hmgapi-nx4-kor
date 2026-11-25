@@ -7,7 +7,7 @@ USB로 설치하다 멈추거나, 설치 뒤 관리 앱이 빨강·노랑일 때
 > - 상태 판정(`mod/bin/status.sh`, 2.1.0: HMG-API + 공식 무선 모드 구조)과 지우기(`mod/bin/uninstall.sh`)
 > - HMG-API 1.1.0-rc.7의 문서(`wiki/Troubleshooting.md`, `wiki/Uninstalling.md`)와 설치기(`install/common/install.sh`)
 >
-> 차에서 다르게 동작하면 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적어 주세요.
+> 차에서 다르게 동작하면 [GitHub 이슈](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues)에 적어 주세요(무선·동글은 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)).
 
 설치 순서는 [README](../README.md) "설치", 차에서 확인할 일은 [`design.md`](design.md) "차에서 확인할 것"에 있습니다.
 
@@ -85,7 +85,7 @@ HMG-API 설치 중 `HMGAPI/install.log`에 `isn't a known stock build`가 있으
 | 다른 Wi-Fi 패키지가 Wi-Fi를 쓰고 있어… (`otherwifi`) | NEMESIS의 Korea Projection이나 다른 무선·핫스팟 패키지를 지우고 재부팅합니다([`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때") |
 | 내비 Wi-Fi가 일반 핫스팟으로 켜져 있어… (`aphotspot`) | 순정 핫스팟을 끄고 재부팅합니다 |
 | 내비가 일반 Wi-Fi에 접속하는 중이라… (`wificlient`) | HMG-API 앱의 Home Wi-Fi를 쓰면 주차를 풀 때 돌아옵니다. 계속 그렇다면 Home Wi-Fi를 끕니다 |
-| 이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여… (`nowifipart`) | 이 차에서는 무선을 쓸 수 없습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로입니다. 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다. 결과를 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적어 주세요 |
+| 이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여… (`nowifipart`) | 이 차에서는 무선을 쓸 수 없습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로입니다. 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48), 2.2.0)을 기다립니다. 결과를 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적어 주세요 |
 | 무선 연결용 Wi-Fi를 켜는 중입니다 (`apwait`) | 1~2분 뒤 화면을 다시 엽니다. 부팅 뒤 5분 동안은 Wi-Fi 부품이 없는 차도 이렇게 나옵니다 |
 | 무선 연결용 Wi-Fi가 지금 꺼져 있습니다 (`apoff`) / HMG-API가 무선 연결용 Wi-Fi를 켜지 못했습니다·켜지 않았습니다 (`apfail`) | 폰을 연결해 보고, 안 되면 3분 뒤 재부팅합니다. 같으면 adb로 `/data/hmgapi/logs/hmgapi/wifi.log`를 봅니다 |
 | 지원하지 않는 HMG-API 버전입니다 (`oldhmgapi`) / HMG-API가 없습니다 (`nohmgapi`) | HMG-API(1.1.0-rc.8 이상)가 든 릴리스 USB로 다시 누릅니다 |
@@ -149,4 +149,4 @@ HMG-API는 훅 때문에 내비가 제대로 뜨지 못한다고 보면 스스�
 - 몇 번째 Update OTA에서, 어떤 메시지가 떴는지
 - 내비 소프트웨어 판(`NX4.KOR.….260902`), 설치 전 HMG-API 판, 순정 무선 카플레이 트림인지
 
-[GitHub 이슈](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues)에 올려 주세요. 차에서 처음 확인하는 결과는 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 모읍니다.
+[GitHub 이슈](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues)에 올려 주세요. 2.1.0의 첫 차 확인 기록은 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)(닫음)에 있고, 무선·동글 결과는 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 모읍니다.

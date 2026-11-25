@@ -2,7 +2,7 @@
 
 2.1.0에서 설치부터 무선 연결, 관리 앱, 지우기까지 무엇이 어떤 차례로 도는지 그림으로 모았습니다. 자세한 규칙과 근거는 [`design.md`](design.md)에 있고, 이 문서는 그 요약입니다. 둘이 다르면 `design.md`와 코드가 맞습니다.
 
-> ⚠️ 2.1.0 흐름은 차에서 아직 확인하지 않았습니다. PC 테스트(`tests/mod-test.sh`)와 HMG-API 1.1.0-rc.8 엔진(PC)에서만 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23), [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)).
+> 2.1.0 흐름은 2026-11-25 차(2.1.0-beta.3)에서 무선을 빼고 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)). 테스트한 차는 Wi-Fi 부품이 없어 "재부팅 뒤 무선 연결"은 `nowifipart` 갈래만 봤고, 무선 연결은 동글로 확인합니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)).
 
 ## 1. 누가 무엇을 하나
 

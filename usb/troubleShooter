@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # NX4 KOR USB 설치기(2.1.0 구조). Engineering Mode > USB Copy > DSP > Update OTA가 스틱의 ota_package.tar에서
 # 이 파일을 꺼내 root로 돌린다(HMG-API의 USB 설치기와 같은 길). 그 뒤 OTA 화면에 오류 684가 나오는 것은 정상이다.
-# 2.1.0은 HMG-API + 공식 무선 모드(wireless-carplay-aa, 고치지 않음) + NX4 추가분(nx4-kor)이다(docs/design.md "2.1.0 새 구조").
+# 2.1.0은 HMG-API + 공식 무선 모드(wireless-carplay-aa, 고치지 않음) + NX4 추가분(nx4-kor)이다(docs/design.md "2.1.0 구조").
 # HMG-API 쪽 일은 모두 이 설치기가 한다: HMG-API 설치·업데이트(같은 스틱의 HMG-API 설치기로 넘김), 옛 NX4 KOR 2.0.x 정리,
 # 공식 무선 모드 설치(--any-car), nx4-kor 설치, 이 차의 map 만들기·확인, 계획 확인 뒤 적용. nx4-kor 모드는 부팅 때 이 일을 하지 않는다.
 # 스틱의 NX4 폴더를 본다:
