@@ -270,9 +270,10 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
      2 에서 되돌려 합치기까지 고른 경우에만 `--admin` 을 붙인다.
    - `hotfix/` 는 진행 중인 `release/` 에 합치지 않는다(`docs/git-flow.md` 규칙 12). 그 `release/` 에 고침이 필요하면
      `develop` 에 합친 뒤 `release/<판>` 에 `origin/develop` 을 합치고 판을 다음 베타(`<판>-beta.<n+1>`)로 올린다(규칙 4).
-     `develop` 에 다음 판의 작업이 이미 있으면 `develop` 을 합치지 않고, 그 PR 을 합친 merge commit `M` 으로
-     `git cherry-pick -x --no-merges $M^1..$M^2` 해 그 PR 의 커밋만 옮긴다. hotfix 의 판 올리기 커밋은 빼고 옮기고,
-     판은 `release/` 의 다음 베타로 둔다(`docs/git-flow.md` 규칙 12).
+     `develop` 에 다음 판의 작업이 이미 있으면 `develop` 을 합치지 않는다. hotfix 의 고침 커밋만 골라
+     `git cherry-pick -x <고침 커밋>` 으로 하나씩 옮긴다(판 올리기·merge 커밋은 빼고, 충돌하면 고침은 hotfix 쪽·판 세 곳은
+     `release/` 쪽). `feature/` PR 은 그 PR 을 합친 merge commit `M` 으로 `git cherry-pick -x --no-merges $M^1..$M^2`
+     한다(`docs/git-flow.md` 규칙 12).
    - 태그를 올리면 release 워크플로가 `production` 승인을 기다린 뒤 배포 묶음을 만들어 GitHub 릴리스에 올린다
      ([`docs/release.md`](../../../docs/release.md)). 승인은 사용자가 Actions 화면에서 한다. 대신 승인하거나
      승인 여부를 짐작해 말하지 않는다.
