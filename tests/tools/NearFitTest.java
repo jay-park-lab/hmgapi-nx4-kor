@@ -4,7 +4,9 @@ import java.util.Arrays;
 
 /**
  * tests/mod-test.sh (#67, PR #74 review 6): runs the near-turn picture choices KP's mod 2.4.10 added
- * (CpTurnsFit.nearDisplay roundabout 32 and the on-ramp default, onRampDefault, facilityNear) and CpIcons on the PC.
+ * (CpTurnsFit.nearDisplay roundabout 32 and the on-ramp default, onRampDefault, facilityNear), CpIcons, and the
+ * near-turn distance (PR #87: near() itself with ordinary roads at 600 m, out past 650 m, expressway exits at 1050 m;
+ * dynamicD and bar) on the PC.
  * Compiled with hooks/src against the same classpath as scripts/build-hooks.sh (HMG-API runtime, iAP2 stubs, android.jar).
  * Prints one line per case and "ok" at the end; exits 1 on the first failure.
  */

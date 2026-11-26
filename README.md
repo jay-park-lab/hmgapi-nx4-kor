@@ -280,7 +280,7 @@ cp mod/icons/icon_night.png app/res/drawable-night-hdpi/ic_launcher.png
 ```
 
 **PC 시험**
-- `sh tests/mod-test.sh`: `mod.json`(뺀 것 포함), 앱 메뉴 타일 그림과 앱 아이콘, 서비스 래퍼, 삭제 전 정리, 상태 판정(공식 무선 모드·훅·프로젝션 AP·Wi-Fi 부품), [지금 재부팅] 요청, USB 설치기(공식 무선 모드 설치, 옛 2.0.x 되돌리기, map 만들기·확인, 계획 읽기와 적용, 진행 기록), 지우기(HMG-API를 먼저 지운 경우, `UNINSTALL-ALL` 포함), 공식 무선 모드 받기(`fetch-wireless.sh`), 관리 앱의 `ReportTest`, 한국 카플레이 길안내의 판단(`TbtGateTest`), 정적 검사. `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치·계획·지우기, 차종 제한(NX4.KOR 260902만)까지 봅니다. `ANDROID_HOME`도 있으면 `hooks.jar`를 진짜로 만들고 곧 회전 그림 판단(`NearFitTest`)도 돌립니다. 이 모드는 HMG-API 1.1.0-rc.10 이상을 요구하므로 `HMGAPI_SRC`도 v1.1.0-rc.10 이상이어야 합니다(낮으면 엔진이 설치를 거절하고 테스트가 실패로 알림).
+- `sh tests/mod-test.sh`: `mod.json`(뺀 것 포함), 앱 메뉴 타일 그림과 앱 아이콘, 서비스 래퍼, 삭제 전 정리, 상태 판정(공식 무선 모드·훅·프로젝션 AP·Wi-Fi 부품), [지금 재부팅] 요청, USB 설치기(공식 무선 모드 설치, 옛 2.0.x 되돌리기, map 만들기·확인, 계획 읽기와 적용, 진행 기록), 지우기(HMG-API를 먼저 지운 경우, `UNINSTALL-ALL` 포함), 공식 무선 모드 받기(`fetch-wireless.sh`), 관리 앱의 `ReportTest`, 한국 카플레이 길안내의 판단(`TbtGateTest`), 정적 검사. `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치·계획·지우기, 차종 제한(NX4.KOR 260902만)까지 봅니다. `ANDROID_HOME`도 있으면 `hooks.jar`를 진짜로 만들고 곧 회전 그림 판단과 곧 회전 거리(`NearFitTest`)도 돌립니다. 이 모드는 HMG-API 1.1.0-rc.10 이상을 요구하므로 `HMGAPI_SRC`도 v1.1.0-rc.10 이상이어야 합니다(낮으면 엔진이 설치를 거절하고 테스트가 실패로 알림).
 - 에뮬레이터: 관리 앱을 1920x720 에뮬레이터에 띄워 상태별 화면과 [지금 재부팅] 흐름을 봅니다. 준비와 순서는 [`docs/emulator-test.md`](docs/emulator-test.md).
 
 ## 라이선스
