@@ -1,9 +1,11 @@
 package io.github.jayparklab.nx4kor.hook.dipo;
 // NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-26 (#67, PR #68 review 1-4).
 // Modified by NX4 KOR, 2026-11-26 (2.1.2-beta.4, #67): the other sender's call held for this mod's (hold, held, done);
-//   PR #85 review 1, 3, 4: waits for all the listener heard, no wait for a hear while guidance is on, argument count.
+//   PR #85 review 1, 3, 4: waits for all the listener heard, no wait for a hear while guidance is on, argument count;
+//   PR #85 review 6: held-call log lines counted per call and in all, again from each guidance's end (heldLog).
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -68,6 +70,8 @@ final class TbtGate {
     static final long HOLD_MS = 250L;
     /** Within HOLD_MS, how long it waits for this mod's listener to hear the update at all (it may be just behind) */
     static final long HEAR_MS = 50L;
+    /** held calls logged with kor_tbt_log, in all and for one call, until guidance goes off or the connection ends */
+    static final int HELD_LOGS_MAX = 100, HELD_LOGS_PER_POINT = 20;
 
     private final Map<String, Object[]> last = new ConcurrentHashMap<String, Object[]>();
     /** per call: this mod's arguments (the very array in last) when the official mod last carried them, and when */
@@ -86,6 +90,9 @@ final class TbtGate {
     private volatile long stopAt = -1L;
     /** updates this mod's listener heard, the last one its thread finished, and heardSeq when a held call last passed */
     private long heardSeq, doneSeq, passedSeq = -1L;
+    /** held calls logged since guidance last went off or the connection ended: per call, and in all (heldLog) */
+    private final Map<String, Integer> heldLogs = new HashMap<String, Integer>();
+    private int heldLogsAll;
 
     /** a cluster call from this mod's thread */
     void ours(String point, Object[] args) {
@@ -258,12 +265,35 @@ final class TbtGate {
             last.clear();
             carried.clear();
             asked.clear();
+            // PR #85 review 6: the next start's held calls get lines of their own
+            heldLogsReset();
         }
         return a ? 1 : -1;
     }
 
     boolean active() {
         return active;
+    }
+
+    /**
+     * a held call may be logged (kor_tbt_log): at most HELD_LOGS_MAX lines, and HELD_LOGS_PER_POINT for one call, until
+     * this mod's guidance goes off or the connection ends (heldLogsReset), so the next start's always show, and one call
+     * this mod never makes (lanes the official mod's HUD clear sends, say) can't take them all (PR #85 review 6)
+     */
+    synchronized boolean heldLog(String point) {
+        if (heldLogsAll >= HELD_LOGS_MAX) return false;
+        Integer n = heldLogs.get(point);
+        int k = n == null ? 0 : n;
+        if (k >= HELD_LOGS_PER_POINT) return false;
+        heldLogs.put(point, k + 1);
+        heldLogsAll++;
+        return true;
+    }
+
+    /** held calls get lines again (guidance off, the connection ended) */
+    synchronized void heldLogsReset() {
+        heldLogs.clear();
+        heldLogsAll = 0;
     }
 
     /** a Stop of the phone's route guidance that wasn't this mod's own */
