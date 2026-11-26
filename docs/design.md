@@ -124,10 +124,11 @@
     - 재부팅은 새 커널 부팅이라 다음 시작은 `starts`만 봅니다. 그래서 노랑·빨강을 `starts` 6에서 나눕니다.
   - HMG-API의 프로젝션 AP 기록은 HMG-API Wi-Fi 지기(rc.8 `engine/HomeWifi.java`, 서비스 `hmgapi wifi`)의 것입니다. 부팅마다 Android Wi-Fi 서비스가 뜨자마자 한 번 띄우고, 이번 부팅 id를 `wifi/ap.boot`(떴거나 이미 떠 있었음, Wi-Fi 클라이언트가 켜져 있어 두었음)나 `wifi/ap.fail`(다시 시도 중)에 씁니다. 그 줄은 `/data/hmgapi/logs/hmgapi/wifi.log`에 남습니다. 차가 나중에 끈 AP는 지기가 다시 켜지 않고, 폰이 붙을 때 공식 모드가 다시 켭니다(rc.8 `hmgapi.hook.Wifi.projectionAp`).
   - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `kor_hooks`·`kor_hooks_why`·`kor_tbt`·`kor_tbt_log`(이 모드의 한국 카플레이 길안내, 아래), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
-  - **한국 카플레이 길안내 줄**([#71](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/71), 2026-11-26): "자세히" 표의 "한국 카플레이 길안내" 칸에 이 모드의 훅(#67)이 도는지 보입니다.
-    - `kor_hooks`는 공식 모드의 `wm_hooks`와 같은 HMG-API 기록 줄(`mods: loaded nx4-kor …` / `mods: nx4-kor not loaded: <이유>`)에서, 같은 한 번의 읽기로 정합니다. 이유는 HMG-API 영문 그대로(지점·모드 이름뿐) `kor_hooks_why`에 200자까지 둡니다.
-    - `kor_tbt`·`kor_tbt_log`는 HMG-API에 저장된 소유자 값(`/data/hmgapi/settings/nx4-kor.json`)을 보고, 없으면 `mod/settings.json` 기본(켬·끔)입니다.
-    - 칸: "꺼 둠 (설정, 공식 모드 길안내로 동작)"(`kor_tbt` 끔), "훅이 안 켜짐 (공식 모드 길안내로 동작: <이유>)", "켜짐", "켜짐 (진단 기록 켬)"(`kor_tbt_log` 켬), 기록이 없으면 "-".
+  - **한국 카플레이 길안내 줄**([#71](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/71), 2026-11-26): "자세히" 표의 "한국 카플레이 길안내" 칸에 HMG-API가 이 모드의 훅(#67)을 올렸는지 보입니다. DiPO 안에서 길안내를 시작했는지는 아닙니다(stepofspec 999 이상, 계기판 서비스 없음, 앱 부분 실패면 "켜짐"이어도 돌지 않음. HMG-API 앱 Logs 탭의 `CarPlay (NX4 KOR): … stays off`·`didn't start` 줄로 봄, PR #83 리뷰 4).
+    - `kor_hooks`는 공식 모드의 `wm_hooks`와 같은 HMG-API 기록 줄(`mods: loaded nx4-kor …` / `mods: nx4-kor not loaded: <이유>`)에서, 같은 한 번의 읽기로 정합니다. 이유는 HMG-API 영문 그대로(지점·모드 이름뿐) `kor_hooks_why`에 200자까지 둡니다. rc.10의 지점 이유는 `hook point <지점> isn't mapped on this car (…)`, `… is mapped on this car only, which is enough for observe hooks: a change hook needs it …`(이 모드의 계기판 지점 8곳은 `change`), `… isn't one HMG-API has …`입니다(`engine/HookPlan.java`, PR #83 리뷰 1).
+    - 부팅마다 그 부팅의 `hook map:` 줄이 `mods:` 줄보다 먼저 옵니다. 훅이 꺼진 부팅은 `mods:` 줄이 없으므로 `hook map:` 줄에서 두 모드의 값을 비웁니다(지난 부팅의 "loaded"가 남지 않음). 관리 앱은 HMG-API 훅이 꺼졌으면 이 칸을 "안 돎 (HMG-API 훅 꺼짐)"으로 보입니다(PR #83 리뷰 3).
+    - `kor_tbt`·`kor_tbt_log`는 HMG-API에 저장된 소유자 값(`/data/hmgapi/settings/nx4-kor.json`)을 보고, 없으면 `mod/settings.json` 기본(켬·끔, mod-test가 같은지 봄)입니다. 저장된 값이므로, HMG-API 앱에서 바꾼 뒤 다시 시작하기 전에는 실제 동작과 다를 수 있습니다(`"apply": "restart"`, PR #83 리뷰 5·6).
+    - 칸: "안 돎 (HMG-API 훅 꺼짐)", "꺼 둠 (설정, 공식 모드 길안내로 동작)"(`kor_tbt` 끔), "훅이 안 켜짐 (공식 모드 길안내로 동작: <이유>)", "켜짐", "켜짐 (진단 기록 켬)"(`kor_tbt_log` 켬), 기록이 없으면 "-".
     - 판정은 바꾸지 않습니다. 이 모드의 훅이 없어도 공식 모드의 카플레이 길안내는 돌기 때문입니다(관리 앱 UI는 그대로 두고 표에 줄 하나만 더함).
     - 길안내를 실제로 받고 있는지(`route guidance reaches this listener` 줄)는 보이지 않습니다. 그 줄은 HMG-API 앱 Logs 탭에서 봅니다.
   - 2.0.x 서비스가 쓰던 상태 안내 `/data/local/tmp/nx4-kor-hint.txt`(아이폰·AA 안내)는 2.1.0에 쓰는 곳이 없습니다. 앱은 그대로 읽지만 보통 아무것도 보이지 않습니다.
@@ -146,7 +147,8 @@
     - 확인 필요(노랑)·문제(빨강) 판정, 할 일이 있는 안내(노랑), 알림(연노랑)은 운전 중 한눈에 보이게 색을 채운 띠로 둡니다.
   - 글꼴은 시스템 기본 글꼴입니다. 독점 글꼴 파일은 넣지 않습니다.
   - 재부팅 확인 창은 순정 팝업 모양을 몰라 Holo `AlertDialog` 그대로입니다.
-- 앱 메뉴 타일(`provides.launcher`)은 HMG-API가 이 모드를 올릴 때 런처 훅으로 넣습니다(rc.8 `hook/Mods.java`, 이 모드는 자기 훅이 없어도 타일이 생김). HMG-API 훅이 꺼진 동안(이 차의 map이 없거나 부팅 보호)에는 타일이 없습니다(앱·서비스는 그대로). 그때는 같은 USB로 Update OTA를 다시 누르면 관리 앱이 열립니다.
+- 앱 메뉴 타일(`provides.launcher`)은 HMG-API가 이 모드를 올릴 때 런처 훅으로 넣습니다(rc.10 `hook/Mods.java` `loadOne`). HMG-API 훅이 꺼진 동안(이 차의 map이 없거나 부팅 보호)에는 타일이 없습니다(앱·서비스는 그대로). 그때는 같은 USB로 Update OTA를 다시 누르면 관리 앱이 열립니다.
+  - 2.1.0까지는 이 모드에 자기 훅이 없어 HMG-API 훅만 켜지면 타일이 생겼습니다. #67로 훅이 생긴 뒤로는 **HMG-API가 이 모드의 훅을 거절하면(지점이 이 차의 map에 없음, 다른 모드와 겹침) 타일도 없습니다.** HMG-API는 거절한 모드를 기록만 하고 건너뛰어 타일을 넣지 않기 때문입니다(`Mods.load`, PR #83 리뷰 2). 앱·서비스와 공식 모드의 무선·길안내는 그대로이고, 관리 앱은 같은 USB로 Update OTA를 다시 눌러 엽니다("한국 카플레이 길안내" 줄에 이유가 보임). 이 차의 map에는 이 모드의 지점 9곳이 모두 있습니다(`tests/fixtures/nx4-map-points.txt`). 그대로 둘지는 [#71](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/71)에 적었습니다.
 
 ## 설치·업데이트·지우기 (`usb/troubleShooter`)
 

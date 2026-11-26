@@ -1234,14 +1234,21 @@ check "  상태 파일·한 줄 요약에 SSID·비밀번호가 없고, 2.0.x �
 streset; stsh
 check "status.sh(#71): 이 모드의 훅이 켜졌으면 kor_hooks=on, 설정 파일이 없으면 kor_tbt=on·kor_tbt_log=off(기본), 판정 그대로" \
   '[ "$(sv kor_hooks)" = on ] && [ -z "$(sv kor_hooks_why)" ] && [ "$(sv kor_tbt)" = on ] && [ "$(sv kor_tbt_log)" = off ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
+check "  설정 파일이 없을 때의 값이 mod/settings.json의 기본과 같음(기본을 바꾸면 status.sh도, PR #83 리뷰 6)" \
+  'python3 -c "import json,sys; d={x[\"key\"]: x[\"default\"] for x in json.load(open(sys.argv[1]))[\"settings\"]}; v=dict(l.rstrip(\"\\n\").split(\"=\",1) for l in open(sys.argv[2]) if \"=\" in l); assert v[\"kor_tbt\"]==(\"on\" if d[\"kor_tbt\"] else \"off\") and v[\"kor_tbt_log\"]==(\"on\" if d[\"kor_tbt_log\"] else \"off\"), (d, v[\"kor_tbt\"], v[\"kor_tbt_log\"])" $PKG/settings.json $T/status.txt'
 streset; printf '{"kor_tbt": false, "kor_tbt_log": true}\n' > $SH/settings/nx4-kor.json; stsh
 check "  HMG-API에 저장된 설정을 읽음(kor_tbt 끔 → off, kor_tbt_log 켬 → on)" '[ "$(sv kor_tbt)" = off ] && [ "$(sv kor_tbt_log)" = on ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
 streset; printf '{"kor_tbt_log": false, "kor_tbt": true}\n' > $SH/settings/nx4-kor.json; stsh
 check "  kor_tbt 켬·kor_tbt_log 끔 저장(키 차례가 달라도) → on·off" '[ "$(sv kor_tbt)" = on ] && [ "$(sv kor_tbt_log)" = off ]' || cat $T/status.txt
 streset; printf '%s\n' "x I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" "x I/HMG-API: mods: loaded wireless-carplay-aa 2.2.0-rc.9" \
-  "x I/HMG-API: mods: nx4-kor not loaded: hook point framework.navigation_cluster.update_lane_info isn't in this car's map" > $T/shlog/log.log; stsh
+  "x I/HMG-API: mods: nx4-kor not loaded: hook point framework.navigation_cluster.update_lane_info isn't mapped on this car (none): its hooks are off here, its other parts still apply" > $T/shlog/log.log; stsh
 check "  이 모드의 훅이 안 켜졌으면 kor_hooks=off와 이유(HMG-API 영문 그대로), 공식 모드는 on, 판정 그대로" \
-  '[ "$(sv kor_hooks)" = off ] && [ "$(sv kor_hooks_why)" = "hook point framework.navigation_cluster.update_lane_info isn'"'"'t in this car'"'"'s map" ] && [ "$(sv wm_hooks)" = on ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
+  '[ "$(sv kor_hooks)" = off ] && [ "$(sv kor_hooks_why)" = "hook point framework.navigation_cluster.update_lane_info isn'"'"'t mapped on this car (none): its hooks are off here, its other parts still apply" ] && [ "$(sv wm_hooks)" = on ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
+# PR #83 리뷰 3: 이번 부팅에 HMG-API 훅이 꺼졌으면("mods:" 줄 없음) 지난 부팅(log.log.1)의 "loaded"를 쓰지 않는다
+streset; printf '%s\n' "x I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" "x I/HMG-API: mods: loaded wireless-carplay-aa 2.2.0-rc.9" "x I/HMG-API: mods: loaded nx4-kor $V" > $T/shlog/log.log.1
+printf '%s\n' "x I/HMG-API: hook map: none for hyundai/nx4/kor/260902, hooks off" > $T/shlog/log.log; stsh
+check "  이번 부팅에 HMG-API 훅이 꺼졌으면 지난 부팅의 loaded가 남지 않음(kor_hooks·wm_hooks 빈 값), 판정 hooksoff" \
+  '[ -z "$(sv kor_hooks)" ] && [ -z "$(sv wm_hooks)" ] && [ "$(sv hooks)" = off ] && [ "$(sv verdict)" = hooksoff ]' || cat $T/status.txt
 streset; printf '%s\n' "x I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" "x I/HMG-API: mods: loaded wireless-carplay-aa 2.2.0-rc.9" > $T/shlog/log.log; stsh
 check "  이 모드의 줄이 없으면 kor_hooks 빈 값(관리 앱은 '-')" '[ -z "$(sv kor_hooks)" ] && grep -qx "kor_hooks=" $T/status.txt' || cat $T/status.txt
 streset; stsh FAKE_PROD=DEPEHEV.KOR.0000.V039.001.260902

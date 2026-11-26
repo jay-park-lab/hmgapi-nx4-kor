@@ -54,7 +54,8 @@ WMSET=${WMSET:-$HMGDATA/settings/$WM_ID.json}
 wm_on_state() { if [ -f $WMDIR/mod.json ] && [ ! -f $WMDIR/.disabled ]; then echo yes; else echo no; fi; }
 bridge_state() { if $BB grep -q '"bridge" *: *false' $WMSET 2>/dev/null; then echo off; else echo on; fi; }
 # 이 모드의 설정(HMG-API가 /data/hmgapi/settings/<id>.json에 소유자 값만 둔다. 없으면 mod/settings.json 기본: kor_tbt 켬,
-# kor_tbt_log 끔(2.1.2-beta.2부터), #71)
+# kor_tbt_log 끔(2.1.2-beta.2부터, mod-test가 settings.json과 같은지 봄), #71). 저장된 값이다: 두 설정은 "apply": "restart"라,
+# HMG-API 앱에서 바꾼 뒤 DiPO가 다시 시작하기 전에는 실제 동작과 다를 수 있다(bridge와 같음, PR #83 리뷰 5)
 KSET=${KSET:-$HMGDATA/settings/$MOD_ID.json}
 kor_tbt_state() { if $BB grep -q '"kor_tbt" *: *false' $KSET 2>/dev/null; then echo off; else echo on; fi; }
 kor_log_state() { if $BB grep -q '"kor_tbt_log" *: *true' $KSET 2>/dev/null; then echo on; else echo off; fi; }
@@ -65,6 +66,8 @@ kor_log_state() { if $BB grep -q '"kor_tbt_log" *: *true' $KSET 2>/dev/null; the
 #     HMG-API는 모드가 선언한 훅 지점이 그 차 map에 없거나(change·replace는 HMG-API map에 있어야 함), 같은 지점을 replace하는
 #     다른 모드와 겹치면(#17) 그 모드를 통째로 건너뛴다. 이유는 HMG-API가 남긴 영문 그대로(지점·모드 이름뿐, 개인정보 없음)
 #   같은 줄로 이 모드(nx4-kor)의 훅(한국 카플레이 길안내, #67)이 켜졌는가도 본다(#71).
+#   부팅마다 그 부팅의 "hook map:" 줄이 "mods:" 줄보다 먼저 온다(HmgApi.zygoteInit). 훅이 꺼진 부팅은 "mods:" 줄을 남기지
+#   않으므로, "hook map:" 줄에서 두 모드의 값을 비운다. 그래야 지난 부팅의 "loaded"가 남지 않는다(PR #83 리뷰 3).
 # _MH·_KH: "on", "off <이유>"(200자까지) 또는 빈 값(기록 없음). _HK: "on|off <상태>" 또는 빈 값. 로그는 한 번만 읽는다.
 HMGLOG=${HMGLOG:-$HMGDATA/logs/hmgapi}
 hmg_hooks_load() {
@@ -75,6 +78,7 @@ hmg_hooks_load() {
     index($0, "mods: " id " not loaded") > 0 { s = "off"; w = $0; if (index(w, "not loaded: ") > 0 || index(w, "not loaded live: ") > 0) sub(/.*not loaded( live)?: */, "", w); else w = "(예외, 자세한 이유는 HMG-API 로그)" }
     index($0, "mods: loaded " kid " ") > 0 { k = "on"; kw = "" }
     index($0, "mods: " kid " not loaded") > 0 { k = "off"; kw = $0; if (index(kw, "not loaded: ") > 0 || index(kw, "not loaded live: ") > 0) sub(/.*not loaded( live)?: */, "", kw); else kw = "(예외, 자세한 이유는 HMG-API 로그)" }
+    /hook map: / { s = ""; w = ""; k = ""; kw = "" }
     /hook map: .*, hooks on/ { h = "on"; i = index($0, "hook map: "); m = substr($0, i + 10); sub(/[ ,].*/, "", m) }
     /hook map: .*, hooks off/ { h = "off"; i = index($0, "hook map: "); m = substr($0, i + 10); sub(/[ ,].*/, "", m) }
     END { if (s == "off") print "MH off " substr(w, 1, 200); else print "MH " s
