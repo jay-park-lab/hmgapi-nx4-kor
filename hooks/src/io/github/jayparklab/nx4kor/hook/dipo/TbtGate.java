@@ -1,6 +1,7 @@
 package io.github.jayparklab.nx4kor.hook.dipo;
 // NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-26 (#67, PR #68 review 1-4).
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -20,10 +21,20 @@ import java.util.concurrent.ConcurrentHashMap;
  *   Stop then Start (a source change, its watchdog), DiPO stops for good when CarPlay
  *   ends. Both look the same here, so the clear waits STOP_WAIT_MS: if the phone sends
  *   again meanwhile, it was an ask-again and nothing is cleared (stopDue).
+ * - Fewer cluster calls (2026-11-26, #77): the official mod's call already carries this mod's
+ *   arguments, so this mod skips its own call when its values are the ones it last sent
+ *   and the official mod carried exactly those within CARRIED_MS (skipOurs). A call the
+ *   official mod doesn't make (#67's stalled turn) or a resend while the phone is quiet
+ *   (the official mod sends nothing then) still goes out.
  */
 final class TbtGate {
     static final long QUIET_MS = 3000L;
     static final long STOP_WAIT_MS = 2000L;
+    /**
+     * How long the official mod's call that carried this mod's latest arguments stands in for this mod's own call
+     * of the same values: within REFRESH's resend (it resends after 900 ms without an update, CpTurnsFit)
+     */
+    static final long CARRIED_MS = 900L;
     /**
      * What arrives this soon after a Stop was sent before it (the phone's last update on its way): not an
      * ask-again. Both mods ask again with Stop, 200 ms, Start, so a real resend comes later (PR #68 review 12).
@@ -31,6 +42,10 @@ final class TbtGate {
     static final long STOP_RESEND_MIN_MS = 150L;
 
     private final Map<String, Object[]> last = new ConcurrentHashMap<String, Object[]>();
+    /** per call: this mod's arguments (the very array in last) when the official mod last carried them, and when */
+    private final Map<String, Carried> carried = new ConcurrentHashMap<String, Carried>();
+    /** per call: the values this mod last asked to send, in its own form (ClusterOut), before the cluster call */
+    private final Map<String, Object[]> asked = new ConcurrentHashMap<String, Object[]>();
     /** this mod's guidance is on (CpTurnsFit.active) */
     private volatile boolean active;
     /** when this mod's listener last heard the phone (-1: never) */
@@ -58,7 +73,30 @@ final class TbtGate {
             otherLast = now;
             if (now - s >= QUIET_MS) return null;   // the phone sends, this mod doesn't hear it: give way
         }
+        carried.put(point, new Carried(o, now));
         return copy(o);
+    }
+
+    /**
+     * this mod is about to make cluster call point with values key (its own form of the arguments): true to skip it,
+     * when key is what it last asked to send and the official mod carried those arguments (still this mod's latest
+     * for that call) within CARRIED_MS. Otherwise it notes key and the call goes out.
+     */
+    boolean skipOurs(String point, Object[] key, long now) {
+        Object[] was = asked.get(point);
+        if (was != null && Arrays.deepEquals(was, key)) {
+            Carried c = carried.get(point);
+            Object[] l = last.get(point);
+            if (c != null && l != null && c.args == l && now - c.at < CARRIED_MS) return true;
+        }
+        asked.put(point, copy(key));
+        return false;
+    }
+
+    /** while yielding: when the yield ends unless the other sender calls again (ms from now, at least 0) */
+    long yieldEndsIn(long now) {
+        long l = otherLast;
+        return l < 0L ? 0L : Math.max(0L, l + QUIET_MS - now);
     }
 
     /**
@@ -88,7 +126,11 @@ final class TbtGate {
         boolean was = active;
         active = a;
         if (a == was) return 0;
-        if (!a) last.clear();
+        if (!a) {
+            last.clear();
+            carried.clear();
+            asked.clear();
+        }
         return a ? 1 : -1;
     }
 
@@ -111,6 +153,17 @@ final class TbtGate {
         stopAt = -1L;
         long h = heardAt;
         return h < s + STOP_RESEND_MIN_MS;
+    }
+
+    /** an argument array of this mod's that the official mod's call carried, and when */
+    static final class Carried {
+        final Object[] args;
+        final long at;
+
+        Carried(Object[] args, long at) {
+            this.args = args;
+            this.at = at;
+        }
     }
 
     /** the arguments, with byte frames copied (a frame must not change under the other sender) */

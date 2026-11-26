@@ -9,6 +9,10 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 //   make() removed (only the fitted layer: KP's stock layer CpTurns isn't ported).
 // Updated by NX4 KOR, 2026-11-26: taken again from KP's mod 2.4.10 (Korea Projection 1.8.1) with the same changes,
 //   and DIAG_LOGS_MAX kept at 300 (KP 2.4.10: 1200; kor_tbt_log is on by default here).
+// Modified by NX4 KOR, 2026-11-26 (#77, less load on the car): the cluster is ClusterOut (Cluster -> ClusterOut, the
+//   field and the constructor), which skips a call the official mod's call already carried; diagTurn and logManeuver
+//   check their line limit before building the line; the "hud list" line only with kor_tbt_log (debug), up to
+//   HUD_LOGS_MAX lines (the official mod logs its own).
 // Modified by Korea Projection (StopDragon/HMG-API, branch korea-build), 2026-11-07:
 //   - an icon for every maneuver (angle bands, then the type alone, then the blank icon 8);
 //     turn() no longer stops before the distance, HUD and trip when the exact table has none
@@ -104,7 +108,7 @@ import hmgapi.hook.Cluster;
  */
 final class CpTurnsFit implements CpTbt {
     final Context context;
-    final Cluster cluster;
+    final ClusterOut cluster;
     /** restarts the phone's route guidance updates (Stop, then Start) on a thread of its own */
     final Runnable restart;
     /** component id -> its route guidance state (DiPO e/u.Al) */
@@ -186,6 +190,9 @@ final class CpTurnsFit implements CpTbt {
     /** 2.4.3 리뷰 낮음 8: 경로 탐색 시작·끝 줄 수(프로세스당, 다른 줄처럼 한도를 둔다) */
     int searchLogs;
     static final int SEARCH_LOGS_MAX = 100;
+    /** NX4 KOR (#77): "hud list" lines, only with debug (kor_tbt_log), per process */
+    int hudLogs;
+    static final int HUD_LOGS_MAX = 300;
     /**
      * 진단 줄(1.7.2 차-5 뒤, 디버그 로그가 켜졌을 때만): 곧 회전 화면을 쓸지 정한 근거(받은 차로 수, 남은 거리 m, D, 판정과
      * 그 이유)와 보낸 updateTBTInfo 인자. 숫자만 남기고 이름은 남기지 않는다. 거리만 바뀐 줄은 남기지 않고 다른 값이 바뀔 때
@@ -330,7 +337,7 @@ final class CpTurnsFit implements CpTbt {
     }
 
 
-    CpTurnsFit(Context context, Cluster cluster, Runnable restart) {
+    CpTurnsFit(Context context, ClusterOut cluster, Runnable restart) {
         this.context = context;
         this.cluster = cluster;
         this.restart = restart;
@@ -1166,6 +1173,7 @@ final class CpTurnsFit implements CpTbt {
      * 곧 회전일 때 막대가 한 칸 줄 때마다(회전당 많아야 10번) 줄이 남는다: 차에서 막대가 줄어드는지 보려고 일부러 둔다.
      */
     void diagTurn(int index, Maneuver x, Update u, int[] near, int icon, float dist, int unit) {
+        if (diagLogs >= DIAG_LOGS_MAX) return;   // NX4 KOR (#77): no line left, don't build one
         Integer lanes = x.hasLane ? laneCounts.get(x.linkedLane) : null;
         // D: near()가 실제로 쓴 값. 그 전에 판정이 끝났으면(no-dist 등) 이 종류의 기본 D(-가 아니라 350·1050)를 적는다
         int d = nearD >= 0 ? nearD : expressway(x.type) ? D_EXPRESSWAY : D_GENERAL;
@@ -1534,8 +1542,9 @@ final class CpTurnsFit implements CpTbt {
      * 줄이 남을 때의 값만 적는다(거리 값도 넣지 않음)
      */
     void logManeuver(Maneuver x, int state, int icon, String how, int distStr, int distUnits) {
+        if (maneuverLogs >= MANEUVER_LOGS_MAX) return;   // NX4 KOR (#77): the limit first, before building the key
         String k = x.type + " " + x.side + " " + x.junction + " " + x.exit + " " + state + " " + icon + " " + distStr;
-        if (k.equals(maneuverKey) || maneuverLogs >= MANEUVER_LOGS_MAX) return;
+        if (k.equals(maneuverKey)) return;
         maneuverKey = k;
         maneuverLogs++;
         KorTbt.log("CarPlay: maneuver type " + x.type + " side " + x.side + " junction " + x.junction + " exit " + x.exit
@@ -1637,7 +1646,10 @@ final class CpTurnsFit implements CpTbt {
         f[3] = (byte) next;
         f[4] = (byte) third;
         System.arraycopy(r, 0, f, 5, n);
-        KorTbt.log("CarPlay: hud list type " + type + " next " + next + " third " + third);
+        if (debug && hudLogs < HUD_LOGS_MAX) {   // NX4 KOR (#77): only with kor_tbt_log, limited (the official mod logs its own)
+            hudLogs++;
+            KorTbt.log("CarPlay: hud list type " + type + " next " + next + " third " + third);
+        }
         cluster.turnListNew(f);
         hudShown = true;
         lastHud = f;
