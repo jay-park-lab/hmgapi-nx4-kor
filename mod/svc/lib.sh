@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # NX4 KOR 공용 함수: 관리 앱 쪽(bin/status.sh)과 지우기 전 정리(scripts/preun.sh)가 ". svc/lib.sh"로 읽는다(혼자 돌지 않음).
-# 2.1.0부터 무선 카플레이·안드로이드 오토는 HMG-API(1.1.0-rc.8 이상)와 공식 무선 모드 wireless-carplay-aa(2.2.0-rc.9 이상)가
+# 2.1.0부터 무선 카플레이·안드로이드 오토는 HMG-API(2.1.1부터 1.1.0-rc.10 이상)와 공식 무선 모드 wireless-carplay-aa(2.2.0-rc.9 이상)가
 # 맡는다. 프로젝션 AP는 HMG-API가 공식 모드의 "wifi": {"projection": true} 요청으로 띄운다. 이 모드는 핫스팟을 띄우지 않고
 # 시스템 파일·Wi-Fi 설정도 바꾸지 않는다. 여기에는 상태를 읽는 함수와 관리 앱의 요청을 받는 데 쓰는 함수만 있다.
 # 2.0.x의 svc/hotspot.sh(순정 hostapd·dnsmasq 핫스팟, Wi-Fi 잠금, 칩 깨우기, 자동 설정 setup_hmgapi)를 줄인 것이다.
@@ -45,8 +45,10 @@ CARS='NX4.KOR.*.260902 NX4HEV.KOR.*.260902'
 HMGDATA=${HMGDATA:-/data/hmgapi}
 # 이 모드의 id(mod.json "id")
 MOD_ID=${NX4_MOD_ID:-nx4-kor}
-# 이 모드가 요구하는 HMG-API 판(mod.json "hmgapi"와 같게 둔다. 앱 Report.MIN_HMGAPI도 같게)
-HMG_MIN=1.1.0-rc.8
+# 이 모드가 요구하는 HMG-API 판(mod.json "hmgapi"와 같게 둔다. 앱 Report.MIN_HMGAPI도 같게).
+# rc.10: rc.8 이하는 LivePatch(app_process를 스크립트로 바꿈)가 깔린 차에서 지우면, rc.9는 그런 차에 FORCE로 설치한 HMG-API를
+# 올리면 Android가 뜨지 않을 수 있다(Open-HMG/HMG-API#397)
+HMG_MIN=1.1.0-rc.10
 # 공식 무선 모드(고치지 않음, NX4에는 USB 설치기가 --any-car로 넣는다). 판은 앱 Report.MIN_WIRELESS와 같게 둔다.
 # mod.json "requires"로 걸지 않는다: 공식 모드가 없거나 꺼지면 HMG-API가 이 모드의 앱·서비스까지 멈춰 관리 앱이 알릴 수 없다
 WM_ID=wireless-carplay-aa

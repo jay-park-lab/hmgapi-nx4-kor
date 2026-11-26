@@ -3,7 +3,7 @@
 투싼 NX4 한국 내비(260902) 전용 HMG-API 모드. 사용 안내는 `README.md`에 있습니다.
 
 - 앱 이름: 지금까지 '상태 화면 앱'이라 부르던 `io.github.jayparklab.nx4kor`는 '관리 앱'이라고 부릅니다(2026-11-25 사용자 결정. 상태만 보는 앱이 아니라 [지금 재부팅], 진단 기록 확인 창, 앞으로 동글 켜기 등도 하기 때문).
-- **구조(2026-11-23 결정, 2.1.0 정식 2026-11-25):** "HMG-API + 공식 무선 모드(고치지 않음) + 이 저장소의 NX4 추가분(USB 설치기, 관리 앱, 한국 카플레이 길안내 훅, 2.2.0에서 동글)"입니다.
+- **구조(2026-11-23 결정. 2.1.0은 2026-11-25 태그만 있고 릴리스 묶음 없음, 2.1.1 정식 2026-11-26):** "HMG-API + 공식 무선 모드(고치지 않음) + 이 저장소의 NX4 추가분(USB 설치기, 관리 앱, 한국 카플레이 길안내 훅, 2.2.0에서 동글)"입니다.
   - **다른 프로젝트(공식 무선 모드, HMG-API, Korea Projection)에 기여하는 길은 선택지에 넣지 않습니다**(2026-11-25 사용자 결정). 고침과 한국 맞춤은 이 저장소의 모드에 넣습니다. 공식 모드와 같은 훅 지점은 `change`·`observe`로만 겁니다(`replace`로 겹치면 공식 모드가 꺼짐, #17).
   - 한국 카플레이 길안내([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)): KP·HMG-Seogaemo의 보정을 `hooks/`로 가져와 공식 모드 옆 DiPO에서 돌립니다(`docs/design.md` "한국 카플레이 길안내").
   - 근거와 역할 표는 [#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38)과 `docs/design.md` "2.1.0 구조"에 있습니다. 2.1.0의 할 일 [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)와 첫 차 확인 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)은 닫았습니다.

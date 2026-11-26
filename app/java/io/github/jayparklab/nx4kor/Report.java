@@ -36,7 +36,7 @@ final class Report {
     boolean nobb() { return "nobb".equals(v.get("support")); }
 
     /** mod.json "hmgapi"와 같은 최소 버전 (바꾸면 mod.json·svc/lib.sh HMG_MIN·README도 함께 고친다) */
-    static final String MIN_HMGAPI = "1.1.0-rc.8";
+    static final String MIN_HMGAPI = "1.1.0-rc.10";
 
     /** 공식 무선 모드(wireless-carplay-aa)의 최소 버전 (svc/lib.sh WM_MIN과 같게) */
     static final String MIN_WIRELESS = "2.2.0-rc.9";

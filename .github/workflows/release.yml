@@ -20,15 +20,17 @@ concurrency:
 env:
   # CI에는 .env.local이 없다. 스크립트는 step의 환경 변수만 읽는다
   NX4_ENV_FILE: ''
-  # HMG-API v1.1.0-rc.8 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도).
-  # 2.1.0의 USB 설치기와 공식 무선 모드 2.2.0-rc.9가 rc.8 이상을 요구한다(usb/troubleShooter HMG_MIN)
-  HMGAPI_COMMIT: 939484edfc7cbfe5d9f1f1bc3b321056dadb41a6
+  # HMG-API v1.1.0-rc.10 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도).
+  # 2.1.1의 USB 설치기와 nx4-kor가 rc.10 이상을 요구한다(usb/troubleShooter HMG_MIN, mod/mod.json). 공식 무선 모드 2.2.0-rc.9는
+  # rc.8 이상. rc.8 이하는 NEMESIS 1.17에서 지우면 Android가 뜨지 않을 수 있고, rc.9는 FORCE로 설치한 NEMESIS 1.17 차를
+  # 올리면 Android가 뜨지 않는다(https://github.com/Open-HMG/HMG-API/issues/397). rc.9 릴리스는 rc.10이 나오며 지워졌다
+  HMGAPI_COMMIT: daa083717f07565ba16dc8a4d26291b7d68d3bf4
   # 같은 판의 HMG-API USB 묶음. USB 묶음에 함께 넣어, HMG-API가 없는 차는 그것부터 설치한다(scripts/build.sh).
   # 릴리스 파일은 바뀔 수 있으므로 SHA-256으로 고정한다. 판은 위 커밋의 판과 같아야 한다(build job이 확인).
   # HMG-API는 예전 시험판 릴리스를 지운다(rc.4가 지워져 v2.0.0-beta.2가 여기서 멈춤). 받지 못하면 그때 있는 판으로
   # 이 셋을 함께 옮긴다(docs/release.md "HMG-API를 USB 묶음에 함께", https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/14)
-  HMGAPI_USB_URL: https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0-rc.8/hmgapi-1.1.0-rc.8-usb.zip
-  HMGAPI_USB_SHA256: fd5e18c43b4cede7110ba1d195dece1563edc4cb7fcaafd648a9965c1e95766e
+  HMGAPI_USB_URL: https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0-rc.10/hmgapi-1.1.0-rc.10-usb.zip
+  HMGAPI_USB_SHA256: 164e005bf774c1b1a4cfa1d702c96259646bb71cd22fd98244fbbad8a7bf0af9
 
 jobs:
   check:
@@ -105,7 +107,7 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: HMG-API 소스 (v1.1.0-rc.8)
+      - name: HMG-API 소스 (v1.1.0-rc.10)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Open-HMG/HMG-API
@@ -204,7 +206,7 @@ jobs:
           done
           ls "$SDK/build-tools" "$SDK/platforms"
 
-      - name: HMG-API 소스 (v1.1.0-rc.8)
+      - name: HMG-API 소스 (v1.1.0-rc.10)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Open-HMG/HMG-API
