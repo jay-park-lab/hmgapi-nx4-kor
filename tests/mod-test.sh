@@ -1212,7 +1212,8 @@ streset() {
     feature:com.hkmc.software.wifihotspot > $T/features
   printf '%s\n' "11-23 06:00:01.000 I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" \
     "11-23 06:00:02.000 I/HMG-API: mods: wireless-carplay-aa: this mod is for other cars; overrides.ignore_system is set, loading it at the owner's risk" \
-    "11-23 06:00:02.000 I/HMG-API: mods: loaded wireless-carplay-aa 2.2.0-rc.9" > $T/shlog/log.log
+    "11-23 06:00:02.000 I/HMG-API: mods: loaded wireless-carplay-aa 2.2.0-rc.9" \
+    "11-23 06:00:02.000 I/HMG-API: mods: loaded nx4-kor $V" > $T/shlog/log.log
   echo "projection wireless-carplay-aa" > $SH/state/wifi.txt
   cat $T/bootid > $SH/wifi/ap.boot
   : > $T/wifiseen; : > $T/sdmesg
@@ -1229,6 +1230,20 @@ check "status.sh: 준비된 차 → verdict=ready(수준 0), 공식 모드·훅�
   '[ "$(sv verdict)" = ready ] && [ "$(sv verdict_lv)" = 0 ] && [ "$(sv wm)" = yes ] && [ "$(sv wm_ver)" = 2.2.0-rc.9 ] && [ "$(sv wm_on)" = yes ] && [ "$(sv wm_hooks)" = on ] && [ "$(sv hooks)" = on ] && [ "$(sv hookmap)" = verified ] && [ "$(sv proj)" = yes ] && [ "$(sv ap_boot)" = yes ] && [ "$(sv ap)" = yes ] && [ "$(sv ap_mode)" = projection ] && [ "$(sv chip)" = yes ] && [ "$(sv feat_hotspot)" = yes ] && [ "$(sv s2)" = "무선 Wi-Fi: 켜짐(HMG-API)" ] && [ "$(sv pkgver)" = "$V" ]' || cat $T/st.out $T/status.txt
 check "  상태 파일·한 줄 요약에 SSID·비밀번호가 없고, 2.0.x 키(우리 핫스팟·합친 무선 모드)가 없음, 한 줄 요약에 판정 코드" \
   '! grep -qE "CarPlayNX4|SECRETPW|NX4 Hotspot" $T/status.txt $T/st.out && ! grep -qE "^(our_ap|our_dhcp|stock_ssid|stock_seen|applied|oldmod|mod_on|mod_hooks|nowlan|softap_strings|ssid_len|pass_len)=" $T/status.txt && grep -qx "NX4 KOR: 무선 연결용 Wi-Fi 켜짐, 카플레이 연결 0개, 판정 ready" $T/st.out' || cat $T/st.out
+# #71: 이 모드의 한국 카플레이 길안내(훅·설정). 판정은 바꾸지 않는다
+streset; stsh
+check "status.sh(#71): 이 모드의 훅이 켜졌으면 kor_hooks=on, 설정 파일이 없으면 kor_tbt=on·kor_tbt_log=off(기본), 판정 그대로" \
+  '[ "$(sv kor_hooks)" = on ] && [ -z "$(sv kor_hooks_why)" ] && [ "$(sv kor_tbt)" = on ] && [ "$(sv kor_tbt_log)" = off ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
+streset; printf '{"kor_tbt": false, "kor_tbt_log": true}\n' > $SH/settings/nx4-kor.json; stsh
+check "  HMG-API에 저장된 설정을 읽음(kor_tbt 끔 → off, kor_tbt_log 켬 → on)" '[ "$(sv kor_tbt)" = off ] && [ "$(sv kor_tbt_log)" = on ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
+streset; printf '{"kor_tbt_log": false, "kor_tbt": true}\n' > $SH/settings/nx4-kor.json; stsh
+check "  kor_tbt 켬·kor_tbt_log 끔 저장(키 차례가 달라도) → on·off" '[ "$(sv kor_tbt)" = on ] && [ "$(sv kor_tbt_log)" = off ]' || cat $T/status.txt
+streset; printf '%s\n' "x I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" "x I/HMG-API: mods: loaded wireless-carplay-aa 2.2.0-rc.9" \
+  "x I/HMG-API: mods: nx4-kor not loaded: hook point framework.navigation_cluster.update_lane_info isn't in this car's map" > $T/shlog/log.log; stsh
+check "  이 모드의 훅이 안 켜졌으면 kor_hooks=off와 이유(HMG-API 영문 그대로), 공식 모드는 on, 판정 그대로" \
+  '[ "$(sv kor_hooks)" = off ] && [ "$(sv kor_hooks_why)" = "hook point framework.navigation_cluster.update_lane_info isn'"'"'t in this car'"'"'s map" ] && [ "$(sv wm_hooks)" = on ] && [ "$(sv verdict)" = ready ]' || cat $T/status.txt
+streset; printf '%s\n' "x I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" "x I/HMG-API: mods: loaded wireless-carplay-aa 2.2.0-rc.9" > $T/shlog/log.log; stsh
+check "  이 모드의 줄이 없으면 kor_hooks 빈 값(관리 앱은 '-')" '[ -z "$(sv kor_hooks)" ] && grep -qx "kor_hooks=" $T/status.txt' || cat $T/status.txt
 streset; stsh FAKE_PROD=DEPEHEV.KOR.0000.V039.001.260902
 check "status.sh: NX4가 아니면 verdict=nocar, verdict_end=yes" '[ "$(sv verdict)" = nocar ] && [ "$(sv verdict_end)" = yes ] && [ "$(sv tested)" = no ]'
 check "status.sh: 상태 파일과 한 줄 요약에 NEMESIS·Korea Projection·제보 문구 없음" '! grep -qE "NEMESIS|Korea Projection|제보|QR" $T/status.txt $T/st.out'

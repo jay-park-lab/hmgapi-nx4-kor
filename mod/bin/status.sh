@@ -53,27 +53,36 @@ WMDIR=${WMDIR:-$HMGDATA/mods/$WM_ID}
 WMSET=${WMSET:-$HMGDATA/settings/$WM_ID.json}
 wm_on_state() { if [ -f $WMDIR/mod.json ] && [ ! -f $WMDIR/.disabled ]; then echo yes; else echo no; fi; }
 bridge_state() { if $BB grep -q '"bridge" *: *false' $WMSET 2>/dev/null; then echo off; else echo on; fi; }
+# 이 모드의 설정(HMG-API가 /data/hmgapi/settings/<id>.json에 소유자 값만 둔다. 없으면 mod/settings.json 기본: kor_tbt 켬,
+# kor_tbt_log 끔(2.1.2-beta.2부터), #71)
+KSET=${KSET:-$HMGDATA/settings/$MOD_ID.json}
+kor_tbt_state() { if $BB grep -q '"kor_tbt" *: *false' $KSET 2>/dev/null; then echo off; else echo on; fi; }
+kor_log_state() { if $BB grep -q '"kor_tbt_log" *: *true' $KSET 2>/dev/null; then echo on; else echo off; fi; }
 # HMG-API가 부팅 때마다 남기는 줄(log.log.1이 더 오래됨)에서 마지막 것으로 본다. 이번 부팅의 줄을 놓치면 지난 부팅
 # 기록일 수 있다(HMG-API 로그는 logcat에서 옮겨 적는다). map-check.json은 HMG-API 업데이트로 map이 바뀌어도 ok로 남을 수 있어 로그를 본다.
 #   "hook map: <상태> for …, hooks on|off"(engine/CarMap.java): HMG-API 훅이 켜졌는가와 이 차 map의 상태(none, mismatch, mapped, verified 등)
 #   "mods: loaded <id> <판>" / "mods: <id> not loaded: <이유>"(hook/Mods.java): 공식 무선 모드의 훅이 켜졌는가.
 #     HMG-API는 모드가 선언한 훅 지점이 그 차 map에 없거나(change·replace는 HMG-API map에 있어야 함), 같은 지점을 replace하는
 #     다른 모드와 겹치면(#17) 그 모드를 통째로 건너뛴다. 이유는 HMG-API가 남긴 영문 그대로(지점·모드 이름뿐, 개인정보 없음)
-# _MH: "on", "off <이유>"(200자까지) 또는 빈 값(기록 없음). _HK: "on|off <상태>" 또는 빈 값. 로그는 한 번만 읽는다.
+#   같은 줄로 이 모드(nx4-kor)의 훅(한국 카플레이 길안내, #67)이 켜졌는가도 본다(#71).
+# _MH·_KH: "on", "off <이유>"(200자까지) 또는 빈 값(기록 없음). _HK: "on|off <상태>" 또는 빈 값. 로그는 한 번만 읽는다.
 HMGLOG=${HMGLOG:-$HMGDATA/logs/hmgapi}
 hmg_hooks_load() {
   [ "$HK_LOADED" = 1 ] && return 0
   HK_LOADED=1
-  _hh=$($BB cat $HMGLOG/log.log.1 $HMGLOG/log.log 2>/dev/null | $BB awk -v id="$WM_ID" '
+  _hh=$($BB cat $HMGLOG/log.log.1 $HMGLOG/log.log 2>/dev/null | $BB awk -v id="$WM_ID" -v kid="$MOD_ID" '
     index($0, "mods: loaded " id " ") > 0 { s = "on"; w = "" }
     index($0, "mods: " id " not loaded") > 0 { s = "off"; w = $0; if (index(w, "not loaded: ") > 0 || index(w, "not loaded live: ") > 0) sub(/.*not loaded( live)?: */, "", w); else w = "(예외, 자세한 이유는 HMG-API 로그)" }
+    index($0, "mods: loaded " kid " ") > 0 { k = "on"; kw = "" }
+    index($0, "mods: " kid " not loaded") > 0 { k = "off"; kw = $0; if (index(kw, "not loaded: ") > 0 || index(kw, "not loaded live: ") > 0) sub(/.*not loaded( live)?: */, "", kw); else kw = "(예외, 자세한 이유는 HMG-API 로그)" }
     /hook map: .*, hooks on/ { h = "on"; i = index($0, "hook map: "); m = substr($0, i + 10); sub(/[ ,].*/, "", m) }
     /hook map: .*, hooks off/ { h = "off"; i = index($0, "hook map: "); m = substr($0, i + 10); sub(/[ ,].*/, "", m) }
     END { if (s == "off") print "MH off " substr(w, 1, 200); else print "MH " s
+          if (k == "off") print "KH off " substr(kw, 1, 200); else print "KH " k
           if (h != "") print "HK " h " " m; else print "HK " }')
-  _MH=; _HK=
+  _MH=; _HK=; _KH=
   while IFS= read -r _hl; do
-    case "$_hl" in "MH "*) _MH=${_hl#MH } ;; "HK "*) _HK=${_hl#HK } ;; esac
+    case "$_hl" in "MH "*) _MH=${_hl#MH } ;; "HK "*) _HK=${_hl#HK } ;; "KH "*) _KH=${_hl#KH } ;; esac
   done <<HKE
 $_hh
 HKE
@@ -159,6 +168,7 @@ st_collect() {
   _kv=${K_HMG#*version }; [ "$_kv" = "$K_HMG" ] && _kv=; K_HMGV=${_kv%% *}
   K_WM=$(yesno [ -f $WMDIR/mod.json ]); K_WMV=$(mod_ver $WMDIR/mod.json); K_WMON=$(wm_on_state); K_BRIDGE=$(bridge_state)
   hmg_hooks_load; K_MH=${_MH%% *}; K_MHWHY=; [ "$K_MH" = off ] && K_MHWHY=${_MH#off}; K_HK=${_HK%% *}; K_HKMAP=${_HK#* }
+  K_KH=${_KH%% *}; K_KHWHY=; [ "$K_KH" = off ] && K_KHWHY=${_KH#off }; K_KTBT=$(kor_tbt_state); K_KLOG=$(kor_log_state)
   K_AP=$(yesno ap_on); K_APMODE=$(ap_ssid); K_FOREIGN=$(yesno foreign_hostapd)
   K_CP=$(cp_count); K_WPA=$(yesno running wpa_supplicant)
   K_WLAN=$(yesno [ -d $SYSNET/$WIF ]); K_CHIP=$(yesno wifi_chip_seen)
@@ -303,6 +313,11 @@ status_kv() {
   echo "bridge=$K_BRIDGE"
   echo "hooks=$K_HK"
   echo "hookmap=$K_HKMAP"
+  # 이 모드의 한국 카플레이 길안내(#67, #71): 훅(on|off|빈 값)과 그 이유(HMG-API 영문 그대로), 설정 kor_tbt·kor_tbt_log
+  echo "kor_hooks=$K_KH"
+  echo "kor_hooks_why=$K_KHWHY"
+  echo "kor_tbt=$K_KTBT"
+  echo "kor_tbt_log=$K_KLOG"
   echo "feat_carplay=$(yesno k_feat com.hkmc.software.connectivity.carplay_wireless)"
   echo "feat_aa=$(yesno k_feat com.hkmc.software.connectivity.androidauto_wireless)"
   # 칩 전원이 달린 순정 핫스팟 기능(HMG-API가 공식 모드의 요청으로 켬)
