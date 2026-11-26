@@ -10,7 +10,7 @@
 | `develop` | `main` (처음 한 번) | — | 다음 판을 모으는 곳 |
 | `feature/<주제>` | `develop` | `develop` | 기능, 고침, 문서, 시험 등 모든 일반 작업 |
 | `release/<판>` | `develop` | `main`, `develop` | 판 번호 올리기, 차에서 확인만. 고침은 `develop`에서(규칙 12) |
-| `hotfix/<판>` | `main` | `main`, `develop` (진행 중인 `release/`에는 넣지 않음. 필요하면 `develop`을 그 `release/`에 합쳐 다음 베타를 냄, 규칙 12) | 배포한 판의 급한 고침 |
+| `hotfix/<판>` | `main` | `main`, `develop` (진행 중인 `release/`에는 넣지 않음. 필요하면 `develop`을 그 `release/`에 합쳐 다음 베타를 냄. `develop`에 다음 판의 작업이 있으면 체리픽, 규칙 12) | 배포한 판의 급한 고침 |
 
 ## 규칙
 
@@ -58,10 +58,16 @@
       - 고침은 `develop`에 합칩니다.
       - 그 고침이 든 묶음이 필요하면 판을 올리지 않고 같은 `release/<판>`에 `origin/develop`을 합친(merge commit) 뒤, 판을 다음 베타(`<판>-beta.<n+1>`)로 올리고 `v<판>-beta.<n+1>`을 답니다(규칙 4, 아래 "릴리스"). `develop`에 그 사이 들어온 다른 변경도 함께 들어오므로, 이번 판에 넣고 싶지 않은 것이 있으면 합치기 전에 사용자에게 묻습니다.
       - **`develop`에 다음 판의 작업이 이미 있으면 체리픽합니다**(2026-11-26 사용자 결정. 2.1.2-beta.2 때 `develop`에 2.2.0의 USB Wi-Fi 동글 PR #69가 먼저 들어옴).
-        - 이번 판에 넣을 PR도 먼저 평소처럼 `develop`에 합칩니다.
-        - 그다음 `origin/develop`을 합치지 않고, 그 PR의 커밋만 `release/<판>`으로 옮깁니다: `git cherry-pick -x <PR이 시작한 커밋>..<PR의 리뷰된 head>`. `-x`가 원래 커밋을 메시지에 남깁니다. PR이 `develop`을 합친 커밋은 옮기지 않습니다(다음 판의 작업이 따라옴).
-        - 옮긴 뒤 다음 판의 커밋이 섞이지 않았는지 봅니다(`git merge-base --is-ancestor <다음 판의 합친 커밋> HEAD`가 실패해야 함). 그다음 테스트하고 판을 다음 베타로 올립니다.
-        - 정식으로 낸 뒤 `release/<판>`을 `develop`으로 되돌려 합칠 때는 같은 변경이 원래 커밋과 체리픽으로 두 벌 있습니다. 내용이 같아 대개 그대로 합쳐지고, 충돌이 나면 `develop` 쪽을 따릅니다.
+        - 이번 판에 넣을 PR도 먼저 평소처럼 `develop`에 합칩니다(merge commit, 규칙 5).
+        - 그다음 `origin/develop`을 합치지 않고, 그 PR이 가져온 커밋만 `release/<판>`으로 옮깁니다. 범위는 그 PR을 `develop`에 합친 merge commit `M`의 두 부모로 잡습니다. `M^1`은 PR이 들어오기 전의 `develop`, `M^2`는 리뷰된 head입니다:
+          `M=$(gh pr view <PR> --json mergeCommit -q .mergeCommit.oid)`, `git cherry-pick -x --no-merges $M^1..$M^2`
+          - PR이 그 사이 `develop`을 합쳤어도, 그때 따라온 다른 PR의 커밋은 `M^1`에 이미 있어 범위에 들지 않습니다. `--no-merges`는 PR 안의 `develop` 합치기 커밋을 뺍니다(PR #79 리뷰 1).
+          - PR의 첫 커밋이나 갈라져 나온 커밋을 손으로 적지 않습니다(`A..B`에는 `A`가 들지 않아 첫 커밋이 빠지기 쉬움, 리뷰 2).
+          - `-x`가 원래 커밋을 메시지에 남깁니다.
+          - `hotfix/`를 이렇게 옮길 때는 hotfix의 판 올리기 커밋("Release <판>: bump the version")을 빼고 옮깁니다. 판은 `release/`의 다음 베타로 둡니다(리뷰 6).
+        - 옮긴 뒤 옮긴 커밋 목록이 그 PR의 커밋과 같은지 봅니다(`git log --oneline $M^1..$M^2 --no-merges`와 옮긴 커밋의 `cherry picked from` 줄). 다음 판의 merge commit이 조상이 아닌지(`git merge-base --is-ancestor <다음 판의 합친 커밋> HEAD`가 실패)도 봅니다. 복사된 커밋은 이 확인에 걸리지 않으므로 목록 대조가 먼저입니다.
+        - 그다음 테스트하고 판을 다음 베타로 올립니다. 판이 이미 태그 없는 다음 베타면(먼저 올려 둔 경우, 2.1.2-beta.2의 `41c4026`) 그대로 둡니다(리뷰 5).
+        - 정식으로 낸 뒤 `release/<판>`을 `develop`으로 되돌려 합칠 때는 같은 변경이 원래 커밋과 체리픽으로 두 벌 있습니다. 내용이 같아 대개 그대로 합쳐집니다. 겹친 변경이 충돌하면 `develop` 쪽을 따르되, 판 세 곳(`version`, `versionName`, `versionCode`)은 `release/` 쪽을 따릅니다(2.1.1의 `6ea7198`와 같음, 리뷰 4).
       - 예전(2.0.3-beta.1까지)에는 파일의 판에 베타 꼬리가 없어, 고칠 때마다 `develop`에서 `release/`를 다음 판으로 다시 자르고 지난 `release/`를 지웠습니다(`release/2.0.0`의 `v2.0.0-beta.4` 다음이 `release/2.0.1`의 `v2.0.1-beta.1`, … `release/2.0.3`). 지난 `release/`를 지울 때는 끝 커밋에 베타 태그가 있는지 먼저 봅니다(`git tag --points-at origin/release/<판>`). 없으면 지우지 말고 사용자에게 묻습니다.
     - 데스크톱 앱이 `main`에서 만든 워크트리 세션도 작업 브랜치는 `origin/develop`에서 만듭니다.
 13. **`main`의 README 안내만 바꾸는 예외**(2026-11-23 사용자 결정). `main`에 정식 판이 아직 없는 동안, 저장소 첫 화면(`main`의 README)에 보일 안내를 넣을 때 씁니다. 그 안내와 어긋나는 README 줄(예: "릴리스 묶음은 없어 직접 만듭니다")도 함께 고칩니다.
@@ -122,6 +128,7 @@ git push origin v<판>-beta.<n>
 차 확인에서 고칠 것이 나오면 그 `release/`에서 고치지 않습니다(규칙 12).
 1. `develop`에서 시작한 `feature/`로 고쳐 `develop`에 합칩니다.
 2. `release/<판>` 워크트리에서 `git fetch origin`, `git merge origin/develop`으로 고침을 들입니다(merge commit).
+   - `develop`에 다음 판의 작업이 이미 있으면 합치지 않고, 그 고침의 PR만 규칙 12대로 체리픽합니다(`git cherry-pick -x --no-merges $M^1..$M^2`).
    - 그 사이 `hotfix/`가 판을 올려 `develop`에 들어갔으면 판 세 곳(`mod.json` `version`, `versionName`, `versionCode`)이 충돌합니다. 판은 `release/` 쪽의 다음 베타(`<판>-beta.<n+1>`)로, `versionCode`는 낸 묶음 중 가장 큰 값보다 1 크게(규칙 4, 보통 두 쪽 중 큰 값 + 1) 풀고, 3의 판 올리기를 그 merge commit에서 함께 합니다.
 3. 판을 `<판>-beta.<n+1>`로, `versionCode`를 낸 묶음 중 가장 큰 값 + 1(보통 지난 베타 + 1)로 바꿔 커밋하고 푸시한 뒤 `v<판>-beta.<n+1>`을 답니다(위와 같은 순서).
 
