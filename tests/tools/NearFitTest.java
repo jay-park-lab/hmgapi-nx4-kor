@@ -4,7 +4,9 @@ import java.util.Arrays;
 
 /**
  * tests/mod-test.sh (#67, PR #74 review 6): runs the near-turn picture choices KP's mod 2.4.10 added
- * (CpTurnsFit.nearDisplay roundabout 32 and the on-ramp default, onRampDefault, facilityNear) and CpIcons on the PC.
+ * (CpTurnsFit.nearDisplay roundabout 32 and the on-ramp default, onRampDefault, facilityNear), CpIcons, and the
+ * near-turn distance (PR #87: near() itself with ordinary roads at 600 m, out past 650 m, expressway exits at 1050 m;
+ * dynamicD and bar) on the PC.
  * Compiled with hooks/src against the same classpath as scripts/build-hooks.sh (HMG-API runtime, iAP2 stubs, android.jar).
  * Prints one line per case and "ok" at the end; exits 1 on the first failure.
  */
@@ -22,6 +24,15 @@ public class NearFitTest {
 
     static boolean eq(int[] got, int... want) {
         return Arrays.equals(got, want);
+    }
+
+    /** one phone update with distNext m for the maneuver (same turn, a fresh item 10), then near() as turn() asks it */
+    static int[] nearAt(CpTurnsFit f, CpTurnsFit.Update u, CpTurnsFit.Maneuver x, int m) {
+        f.clock += 1000L;
+        u.distNext = m;
+        u.distNextSeen = true;
+        u.distNextFresh = true;
+        return f.near(7, u, x, x.type == 23 ? 164 : 70);
     }
 
     public static void main(String[] a) {
@@ -68,6 +79,28 @@ public class NearFitTest {
         is(CpIcons.distStrState("300") == 1 && CpIcons.distStrState("1.2") == 1, "distStrState: a number 1");
         is(CpIcons.distStrState("-1") == 2 && CpIcons.distStrState("NaN") == 2 && CpIcons.distStrState("Infinity") == 2
                 && CpIcons.distStrState("1,2") == 2 && CpIcons.distStrState("abc") == 2, "distStrState: negative, NaN, infinite or not a number 2");
+
+        // 곧 회전 거리(2026-11-26, PR #87 리뷰 5): 일반 600m, 고속도로 출구 1050m, 들어갈 때 D, 나갈 때 D + 50. near()를 직접 부른다
+        is(CpTurnsFit.D_GENERAL == 600 && CpTurnsFit.D_EXPRESSWAY == 1050, "D: ordinary roads 600 m, expressway exits 1050 m");
+        is(CpTurnsFit.dynamicD(CpTurnsFit.D_GENERAL, 900) == 600 && CpTurnsFit.dynamicD(CpTurnsFit.D_GENERAL, 450) == 450
+                && CpTurnsFit.dynamicD(CpTurnsFit.D_GENERAL, 10) == CpTurnsFit.D_MIN, "dynamicD: 600 at most, the first distance when shorter, D_MIN at least");
+        is(CpTurnsFit.bar(600, 600) == 90 && CpTurnsFit.bar(540, 600) == 90 && CpTurnsFit.bar(539, 600) == 80
+                && CpTurnsFit.bar(300, 600) == 50 && CpTurnsFit.bar(59, 600) == 10, "bar over 600 m: 90 down to 10, a step every 60 m");
+        CpTurnsFit f = new CpTurnsFit(null, null, null);
+        f.clock = 1000L;
+        CpTurnsFit.Update u = new CpTurnsFit.Update(0, null);
+        CpTurnsFit.Maneuver turn = new CpTurnsFit.Maneuver(0, 0, null);
+        turn.type = 1;   // left turn, no exit angle
+        is(nearAt(f, u, turn, 900) == null && nearAt(f, u, turn, 601) == null, "left turn 900 m, 601 m: far card");
+        int[] in = nearAt(f, u, turn, 600);
+        is(in != null && in[0] == 13 && in[3] == 90 && in[4] == 600, "left turn at 600 m: near view 13, bar 90, D 600");
+        is(nearAt(f, u, turn, 650) != null && nearAt(f, u, turn, 651) == null, "on the way back: near up to 650 m (D + 50), far at 651 m");
+        CpTurnsFit.Update ue = new CpTurnsFit.Update(0, null);
+        CpTurnsFit.Maneuver exit = new CpTurnsFit.Maneuver(0, 0, null);
+        exit.type = 23;   // right expressway exit
+        is(nearAt(f, ue, exit, 2000) == null && nearAt(f, ue, exit, 1051) == null, "expressway exit 2000 m, 1051 m: far card");
+        int[] ex = nearAt(f, ue, exit, 1050);
+        is(ex != null && ex[0] == 17 && ex[4] == 1050, "expressway exit at 1050 m: near view 17, D 1050 (unchanged)");
 
         System.out.println(n + " cases");
         System.out.println("ok");

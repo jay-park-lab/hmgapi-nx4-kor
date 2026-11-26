@@ -34,6 +34,9 @@ for f in $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/usb/troubleShooter $B/
   for KSH in $KSHS; do check "구문 검사 $(basename $KSH): ${f#$B/}" '$KSH -n $f'; done
 done
 
+check "한국 길안내: 일반 도로 곧 회전 거리 600m(2026-11-26 사용자 결정, KP는 350m), 고속도로 출구 1050m 그대로" \
+  'grep -q "static final int D_GENERAL = 600, D_EXPRESSWAY = 1050;" $B/hooks/src/io/github/jayparklab/nx4kor/hook/dipo/CpTurnsFit.java'
+
 # --- mod.json: NX4 KOR 모드(관리 앱과 그 서비스, 한국 카플레이 길안내 훅 #67. 무선은 HMG-API와 공식 무선 모드 wireless-carplay-aa가 맡음) ---
 check "mod.json: launch 서비스·앱·런처, 한국 길안내 훅(DiPO), NX4.KOR 260902만, HMG-API 1.1.0-rc.10 이상, 무선 부분·Wi-Fi 요청·충돌·requires 없음" 'python3 - "$PKG" "$B" <<PY
 import json, os, sys
@@ -1940,7 +1943,7 @@ PY'
       $J -cp "$AJ" -d $F/stubs $(find "$B/hooks/stubs" -name '*.java')
       $J -cp "$AJ:$F/rt:$F/rtstubs:$F/stubs" -d $F/classes $(find "$B/hooks/src" -name '*.java') $B/tests/tools/NearFitTest.java
       java -cp "$AJ:$F/rt:$F/rtstubs:$F/stubs:$F/classes" io.github.jayparklab.nx4kor.hook.dipo.NearFitTest ) > $T/fit.out 2>&1
-    check "  곧 회전 그림(KP 2.4.10) $(grep -c '^ok ' $T/fit.out)개: 회전교차로 32는 오른쪽 통행·출구 각도 있을 때만(들어가기 6은 그대로), 각도 없는 진입 램프는 오른쪽 진입 모양, 지하차도 46(좌·우)·고가 44(왼쪽만)는 시설 낱말이 있고 부정·옆길 낱말이 없을 때만, CpIcons" \
+    check "  곧 회전 그림(KP 2.4.10)과 곧 회전 거리 $(grep -c '^ok ' $T/fit.out)개: 회전교차로 32는 오른쪽 통행·출구 각도 있을 때만(들어가기 6은 그대로), 각도 없는 진입 램프는 오른쪽 진입 모양, 지하차도 46(좌·우)·고가 44(왼쪽만)는 시설 낱말이 있고 부정·옆길 낱말이 없을 때만, CpIcons, 곧 회전 거리(near() 직접: 일반 600m, 나갈 때 650m, 고속도로 출구 1050m, 막대 60m마다)" \
       'tail -n 1 $T/fit.out | grep -qx ok && ! grep -q "^FAIL" $T/fit.out' || cat $T/fit.out
   else
     echo "skip hooks.jar 빌드·곧 회전 그림 테스트(NearFitTest)(ANDROID_HOME 없음): 빌드 시험은 자리만 채운 hooks.jar로 봄"
