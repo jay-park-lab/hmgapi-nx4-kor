@@ -1,8 +1,10 @@
 # USB Wi-Fi 동글 드라이버
 
-투싼 NX4 한국 내비(tcc803x, 커널 `3.18.24-tcc`)에서 쓸 USB Wi-Fi 동글 드라이버를 만드는 곳입니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48) 2단계). 아직 모드에 넣지 않았고, 차에서 확인하지 않았습니다.
+투싼 NX4 한국 내비(tcc803x, 커널 `3.18.24-tcc`)에서 쓸 USB Wi-Fi 동글 드라이버를 만드는 곳입니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48) 2·3단계). 아직 모드에 넣지 않았고, 차에서 확인하지 않았습니다.
 
-- 지금은 **RTL88x2BU**(ipTIME A3000MINI `0bda:b812`, TP-Link Archer T3U `2357:012d` 등) 하나입니다. RTL8831BU(`0bda:b831`)는 3단계입니다.
+- 드라이버는 둘입니다. 같은 커널 트리(아래 "커널 준비")와 같은 툴체인으로 빌드합니다.
+  - **RTL88x2BU**(ipTIME A3000MINI `0bda:b812`, TP-Link Archer T3U `2357:012d` 등): [cilynx/rtl88x2bu](https://github.com/cilynx/rtl88x2bu), 패치 `rtl88x2bu/`
+  - **RTL8831BU**(`0bda:b831`, Wi-Fi 6 AX900급 1T1R, 예: TOTOLINK X900USM. 같은 드라이버가 RTL8851BU `0bda:b851`도 받음): [hyeondg/rtl8831bu](https://github.com/hyeondg/rtl8831bu)(Realtek v1.19.10 G6/phl), 패치 `rtl8831bu/`
 - 이 폴더(`drivers/`)의 패치·스크립트는 **GPL-2.0**입니다(드라이버와 커널이 GPL-2.0이기 때문, 전문은 `COPYING`). 저장소의 다른 부분은 AGPL-3.0이고, 이 폴더를 Docker로 돌리는 `scripts/build-driver.sh`도 AGPL-3.0입니다. 출처는 아래 "출처와 라이선스"에 있습니다.
 
 ## 한눈에
@@ -11,20 +13,24 @@
 kernel.org linux-3.18.24 (빌드 뼈대)
   + 현대모비스 GPL 공개 소스의 내비 커널 폴더 AVNT5W_TCC803XKK_kernel/ (우리 릴리스 자산으로 받음)
   + 모비스 defconfig를 차 설정과 같게 맞춤 → modules_prepare           ← drivers/kernel/prepare.sh
-  → 모비스 소스에 든 GCC 4.7로 cilynx/rtl88x2bu + 우리 패치 2개 컴파일   ← drivers/build-in-container.sh
-  → bcmdhd.ko (vermagic 3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8)
+  → 모비스 소스에 든 GCC 4.7로 드라이버 둘을 컴파일                      ← drivers/build-in-container.sh
+      cilynx/rtl88x2bu + rtl88x2bu/ 패치 2개  → tcc803x/rtl88x2bu/bcmdhd.ko
+      hyeondg/rtl8831bu + rtl8831bu/ 패치 3개 → tcc803x/rtl8831bu/bcmdhd.ko
+  (둘 다 vermagic 3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8, 모듈 이름 bcmdhd)
 ```
 
 ## 드라이버를 순정 HAL 자리에 맞추기
 
 순정 Wi-Fi HAL이 Wi-Fi를 켤 때마다 `/system/wifi/bcmdhd.ko`를 `bcmdhd`라는 이름으로 올립니다(11-23 진단 기록 `nochip-wifi.txt`). 그래서 동글 드라이버를 그 자리에 둘 수 있게 만듭니다(#48 갈래 A).
 - 모듈 이름을 `bcmdhd`로 빌드합니다(드라이버 Makefile의 `USER_MODULE_NAME`). HAL은 `/proc/modules`에서 이 이름으로 올라왔는지 보고, 내릴 때도 이 이름을 씁니다.
-- 순정 HAL이 주는 인자를 받습니다(`rtl88x2bu/0002-nx4-hal.diff`).
-  - `iface_name`: 첫 인터페이스 이름입니다. 드라이버의 `ifname`과 같은 값으로 씁니다. 동시 모드는 켜지 않아(드라이버 기본 플랫폼 설정) 인터페이스는 `wlan0` 하나입니다.
+- 순정 HAL이 주는 인자를 받습니다(`rtl88x2bu/0002-nx4-hal.diff`, `rtl8831bu/0002-nx4-hal.diff`. 내용은 같고 넣는 파일만 다름: `os_intfs.c`, `rtw_cfg.c`).
+  - `iface_name`: 첫 인터페이스 이름입니다. 드라이버의 `ifname`과 같은 값으로 씁니다. 두 드라이버 모두 동시 모드를 켜지 않아(RTL88x2BU는 기본 플랫폼 설정, RTL8831BU는 Makefile `CONFIG_CONCURRENT_MODE = n`) 인터페이스는 `wlan0` 하나입니다.
   - `firmware_path`, `nvram_path`: 순정 `bcmdhd`의 매개변수입니다. 받아 두기만 합니다. AOSP는 AP를 켜기 전에 `/sys/module/bcmdhd/parameters/firmware_path`에 쓰고, 실패하면 AP를 켜지 않습니다[추정: 이 차 HAL·netd의 문자열은 USB 진단 기록 `dongle/wifi-strings.txt`로 확인].
   - HAL이 이 밖의 인자를 더 주어도 커널 3.18은 "unknown parameter … ignored"를 남기고 그대로 올립니다(`kernel/module.c` `unknown_module_param_cb`).
 
-## 보호 패치(`rtl88x2bu/0001-nx4-protect.diff`)
+## 보호 패치
+
+### RTL88x2BU(`rtl88x2bu/0001-nx4-protect.diff`)
 
 동글을 쓰다 뽑거나 동글이 망가졌을 때 내비 커널이 멈추지 않게 하는 패치입니다. 이 저장소가 드라이버 원본(`fc158d1f`)을 읽고 새로 썼습니다. **차에서 아직 확인하지 않았습니다**(#48 차 확인: 꽂은 채 뽑기, Wi-Fi 끄고 켜기, 수신이 멈춘 뒤 Wi-Fi 끄고 켜기, 오래 쓰기). 기록은 dmesg의 `nx4-protect:` 줄입니다(드라이버의 `RTW_PRINT`는 디버그 빌드에서만 찍혀 `printk`를 씁니다).
 
@@ -36,6 +42,30 @@ kernel.org linux-3.18.24 (빌드 뼈대)
 | 수신 완료 `usb_read_port_complete`(두 수신 방식) | 오류로 끝나면 수신 요청을 곧바로 다시 겁니다. 연속 오류 세기는 한 번 성공하면 0이 되어, 오류와 성공이 섞이면 멈추지 않고 돕니다 | 성공과 상관없이 1초 안에 100번을 넘으면 surprise removed·drv stopped로 두고 다시 걸지 않습니다. 되살리려면 모듈을 다시 올립니다(Wi-Fi 끄고 켜기: 순정 HAL이 `bcmdhd`를 내렸다 올림, 재부팅, 동글 다시 꽂기). 인터페이스를 내렸다 올려서는 되살아나지 않습니다(`netdev_close`가 `rtw_dev_unload`를 부르지 않아 `bup`이 참으로 남고, 열기는 `bup`이 거짓일 때만 표시를 지움) |
 
 `0002-nx4-hal.diff`보다 먼저 넣습니다(파일 이름 차례).
+
+### RTL8831BU(`rtl8831bu/0001-nx4-protect.diff`)
+
+같은 목적으로 이 드라이버(`fed914c8`, G6/phl 구조)를 읽고 새로 썼습니다. **차에서 확인하지 않았습니다.** 세 곳입니다.
+
+| 곳 | 원본의 문제 | 패치 |
+|---|---|---|
+| 뽑힘 `rtw_dev_remove` | RTL88x2BU와 같음(표시를 네트워크 장치를 내린 뒤에 함) | USB 장치가 이미 떨어졌으면 내리기 전에 `dev_set_surprise_removed` |
+| 열기 `netdev_open` | 내리는 중이거나 없는 장치도 하드웨어를 초기화하러 들어감 | 내리는 중이거나 USB 장치가 떨어졌으면 `-ENODEV` |
+| 수신 완료 `rtw_usb_read_port_complete` | 완료는 phl에 넘깁니다. phl은 성공(·INVALID_PARAM) 뒤에만 수신 요청을 다시 걸고, 오류로 끝난 버퍼는 돌려놓기만 합니다(`phl_pend_rxbuf_usb`). 그래서 보통은 오류마다 걸린 요청(최대 `NR_RECV_URB`개)이 줄어 **수신이 기록 없이 멈춥니다**(오류가 계속 돌지는 않음). 성공 뒤 다시 걸기에 실패하면 10ms 지연 타이머가 요청을 다시 채워, 그때 오류가 몰릴 수 있습니다 | 그 좁은 경우만 막습니다: 1초 안에 100번을 넘으면 surprise removed·drv stopped로 두어 `rtw_usb_read_port`가 `RTW_CANNOT_RX`로 거절하게 합니다. 수신이 멈추면(`nx4-protect:` 줄 없이 멈춘 경우 포함) 되살리기는 모듈을 다시 올리기(Wi-Fi 끄고 켜기·재부팅·다시 꽂기). PR #81 리뷰 3 |
+
+- RTL88x2BU의 네 번째(풀기 전 `tasklet_kill`)는 넣지 않았습니다. 이 드라이버의 tasklet은 phl 처리기이고, phl 정리가 `tasklet_kill`을 합니다(`phl/pltfm_ops_linux.h` `_os_tasklet_deinit`).
+
+## RTL8831BU 빌드 맞춤(`rtl8831bu/0003-nx4-build.diff`)
+
+원본을 그대로 빌드하면 첫 파일에서 GCC 4.7이 멈춥니다. 그것을 고치면 끝까지 빌드되지만(고친 파일의 경고 0), 그대로는 `.ko`가 이 커널에 없는 `strscpy`를 불러 차에서 올라가지 않습니다(아래 "커널 심볼 확인"이 잡음). 둘 다 고칩니다.
+- `os_dep/osdep_service_linux.c`: 2바이트 카운터 `rtw_warn_on_cnt`(`u16`)를 4바이트 `ATOMIC_T*`로 바꿔 `ATOMIC_INC`에 넘깁니다. GCC 4.7의 ARM 인라인 어셈블리가 이것을 받지 않습니다("output number 2 not directly addressable"). 옆 2바이트까지 쓰는 것이기도 해서, 세기만 하는 카운터라 보통 더하기로 바꿉니다.
+- `include/drv_conf.h`, `os_dep/linux/os_intfs.c`: 원본은 새 커널(`strlcpy`가 없어진 6.8 뒤)용으로 `#define strlcpy(a, b, c) strscpy(a, b, c)`를 두고, `rtw_ethtool_get_drvinfo`에서 `strscpy`를 바로 부릅니다. 3.18에는 `strscpy`가 없고(4.3에 생김) `strlcpy`는 매크로가 아닌 함수라 이 정의가 늘 켜집니다. 그래서 `.ko`가 `strscpy`를 불러 insmod가 `Unknown symbol strscpy`로 실패합니다. 정의를 빼고 다섯 곳을 `strlcpy`로 바꿉니다(PR #81 리뷰 1).
+- `Makefile`: 디버그 로그를 끕니다(`CONFIG_RTW_DEBUG = n`, 원본은 켜져 있고 수준 4). 순정 시스템의 dmesg·CPU 부하를 줄입니다. RTL88x2BU도 끈 채로 빌드됩니다.
+- 그 밖의 원본 설정은 그대로입니다: `-O1`(드라이버 Makefile이 붙임), 소프트 플로트(`-msoft-float -mfpu=vfp`, 커널과 같음), 공장 시험 기능(`CONFIG_MP_INCLUDED = y`), 동시 모드 끔.
+
+## 두 드라이버와 자리 하나
+
+두 드라이버 모두 모듈 이름 `bcmdhd`로 빌드해 순정 HAL 자리(`/system/wifi/bcmdhd.ko`)에 맞춥니다. 그런데 그 자리는 하나입니다. 차에 어느 것을 두고 어떻게 고를지(부팅 때 꽂힌 동글의 USB ID로 골라 bind mount, 설치할 때 고름 등)는 4단계(모드에 넣기) 전에 정합니다([#80](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/80)).
 
 ## 커널 준비(빌드 방법)
 
@@ -107,28 +137,48 @@ sh scripts/build-driver.sh --src-asset
 
 ## 빌드
 
-Docker가 필요합니다(linux/amd64. Apple Silicon 맥은 colima 등이 qemu로 돌림). 저장소 맨 위에서:
+Docker가 필요합니다(linux/amd64. Apple Silicon 맥은 아래 "맥에서 빌드"). 저장소 맨 위에서:
 
 ```sh
 sh scripts/build-driver.sh
 ```
 
-- 결과: `out/drivers/tcc803x/rtl88x2bu/bcmdhd.ko`와 `bcmdhd.ko.txt`(드라이버 커밋, 패치 sha256, 커널·커널 소스 자산·설정·툴체인 값, 빌드 날짜, 컴파일 옵션 지문, 매개변수, USB 별칭, md5·sha256, vermagic)
+- 결과: `out/drivers/tcc803x/rtl88x2bu/bcmdhd.ko`, `out/drivers/tcc803x/rtl8831bu/bcmdhd.ko`와 각각의 `bcmdhd.ko.txt`(드라이버 커밋, 패치 sha256, 커널·커널 소스 자산·설정·툴체인 값, 빌드 날짜, 컴파일 옵션 지문, 매개변수, USB 별칭, md5·sha256, vermagic)
 - 받은 자료와 준비한 커널은 Docker 볼륨 `nx4kor-drivers`에 두고 다음 빌드에 다시 씁니다. 처음에는 받기·커널 준비로 오래 걸립니다(qemu 에뮬레이션이면 수십 분). 지우려면 `docker volume rm nx4kor-drivers`.
 - 드라이버는 컴파일 날짜·시각(`__DATE__`, `__TIME__`)을 문자열로 넣습니다. `drivers/`나 `scripts/build-driver.sh`를 마지막으로 바꾼 커밋의 시각(UTC, 달 이름은 로캘과 상관없이 영어)으로 고정합니다. 그래서 같은 커밋이면 같은 `.ko`가 다시 만들어지고, 드라이버와 상관없는 커밋만 쌓여서는 `.ko`가 바뀌지 않습니다. 기록이 다 있어야 하므로 얕은 클론에서는 멈춥니다. 커널 트리 경로(`/work/k/linux-3.18.24`)와 툴체인 경로(`/work/tc`)도 `.ko`에 들어가 고정입니다.
 - 컨테이너는 `drivers/`의 사본으로 돕니다. 빌드 중에 파일을 고쳐도 그 빌드는 바뀌지 않습니다.
-- Apple Silicon 맥의 qemu 에뮬레이션에서는 컴파일러·어셈블러·커널의 호스트 도구가 가끔 `Segmentation fault`(`internal compiler error`)로 멈춥니다. 커널 준비와 드라이버 컴파일 모두, 그때만 `make`를 이어서 다시 돌립니다(모두 8번까지, `NX4_DRV_TRIES`로 바꿈, `lib.sh` `make_retry`). 다시 돌리기 전에 make가 실패로 적은 대상을 지웁니다(커널 3.18의 kbuild에는 `.DELETE_ON_ERROR`가 없어 반쯤 쓴 파일이 남을 수 있음). 다 된 것은 다시 만들지 않아 결과는 같습니다. 충돌이 없으면 한 번에 끝나므로(CI) 횟수를 늘려도 잃는 것이 없습니다. 이 맥에서는 세 번 연속 충돌도 여러 번 있었습니다. 끝까지 멈추면 빌드는 실패로 끝나고, 스크립트를 다시 돌리면 커널 준비를 마친 트리는 다시 쓰고 드라이버는 처음부터 다시 컴파일합니다. 동시 작업 수(`NX4_DRV_JOBS`)를 줄여도 충돌은 날 수 있습니다.
+- Apple Silicon 맥의 qemu 에뮬레이션에서는 컴파일러·어셈블러·커널의 호스트 도구가 가끔 `Segmentation fault`(`internal compiler error`)로 멈춥니다. 커널 준비와 드라이버 컴파일 모두, 그때만 `make`를 이어서 다시 돌립니다(모두 30번까지, `NX4_DRV_TRIES`로 바꿈, `lib.sh` `make_retry`. RTL8831BU는 오브젝트가 379개(RTL88x2BU 157개)라 충돌이 더 잦아, 8번으로는 한 빌드 안에서 다 써 버린 적이 있음). 다시 돌리기 전에 make가 실패로 적은 대상을 지웁니다(커널 3.18의 kbuild에는 `.DELETE_ON_ERROR`가 없어 반쯤 쓴 파일이 남을 수 있음). 다 된 것은 다시 만들지 않아 결과는 같습니다. 충돌이 없으면 한 번에 끝나므로(CI) 횟수를 늘려도 잃는 것이 없습니다. 이 맥에서는 세 번 연속 충돌도 여러 번 있었습니다. 끝까지 멈추면 빌드는 실패로 끝나고, 스크립트를 다시 돌리면 커널 준비를 마친 트리는 다시 쓰고 드라이버는 처음부터 다시 컴파일합니다. 동시 작업 수(`NX4_DRV_JOBS`)를 줄여도 충돌은 날 수 있습니다.
 - 받기는 잠깐의 오류(503 등)면 15초씩 쉬며 8번까지 다시 묻습니다.
-- 저장소가 Docker VM에 공유된 곳에 있어야 합니다. colima는 기본으로 홈 폴더와 `/tmp/colima`만 VM에 붙입니다(`/var/folders` 같은 `mktemp -d` 자리는 안 됨). 붙지 않은 곳이면 스크립트가 먼저 알리고 멈춥니다.
+- `.env.local`의 `NX4_DRV_DOCKER_CONTEXT`가 있으면 이 빌드의 docker 명령에만 그 context를 씁니다(`DOCKER_CONTEXT`, 명령 앞에 준 값이 앞섬). 워크트리에서는 다른 PC 스크립트처럼 `NX4_ENV_FILE=<메인 체크아웃>/.env.local`로 가리킵니다.
+- 저장소가 Docker VM에 공유된 곳에 있어야 합니다. colima는 기본으로 홈 폴더와 `/tmp/colima`(프로필이 `default`가 아니면 `/tmp/colima-<프로필>`, 예: `/tmp/colima-nx4`)만 VM에 붙입니다(`/var/folders` 같은 `mktemp -d` 자리는 안 됨). 붙지 않은 곳이면 스크립트가 먼저 알리고 멈춥니다.
 - Docker가 이 셸의 프록시 설정을 이어받아 받기가 막히면, 프록시 변수를 뺀 셸에서 Docker(colima 등)를 다시 시작합니다.
 - GitHub Actions(`.github/workflows/drivers.yml`)도 `drivers/`나 이 스크립트가 바뀐 `feature/` 푸시·PR마다 같은 방법으로 빌드합니다. md5는 실행 요약에, `.ko`는 artifact `drivers-tcc803x`에 있습니다. 같은 커밋이면 PC와 md5가 같아야 합니다(다르면 PC의 에뮬레이션 쪽을 의심합니다).
+
+### 맥에서 빌드(Apple Silicon)
+
+툴체인(GCC 4.7)과 커널의 호스트 도구가 x86_64용이라 맥에서는 linux/amd64 컨테이너를 에뮬레이션으로 돌립니다. colima의 기본 VM(이 맥은 Virtualization.Framework)은 Rosetta가 꺼져 있어 x86_64 컨테이너를 qemu 사용자 모드(`binfmt_misc`의 `qemu-x86_64`)로 돌려 느리고, 컴파일러가 자주 멈추거나(한 빌드에 20번) `cc-option` 물음이 실패해 `armv5t`로 넘어갔습니다. **Rosetta를 켠 colima 프로필을 이 빌드에만** 씁니다.
+
+```sh
+colima start -p nx4 --cpu 10 --memory 16 --vz-rosetta
+docker context use colima
+```
+
+- 첫 줄은 Rosetta(Apple Virtualization.Framework)로 x86_64를 돌리는 VM을 따로 만듭니다. 다른 프로젝트가 쓰는 기본 VM(`default`, 프로필 `colima`)은 그대로입니다. 적용됐는지는 `colima ssh -p nx4 -- ls /proc/sys/fs/binfmt_misc`에 `rosetta`가 있는지로 봅니다.
+- `colima start -p nx4`는 시작할 때마다 전역 기본 context를 `colima-nx4`로 바꿉니다. 둘째 줄로 기본을 되돌립니다.
+- `.env.local`에 `NX4_DRV_DOCKER_CONTEXT=colima-nx4`를 적으면 `sh scripts/build-driver.sh`가 이 VM으로 빌드합니다(`.env.example`). 셸에 `DOCKER_HOST`가 있으면 docker가 그것을 먼저 써 이 값이 무시되므로, 스크립트가 알리고 멈춥니다(PR #81 리뷰 7).
+- 이 VM은 Docker 볼륨을 따로 가져 첫 빌드는 처음부터 합니다. 2026-11-26 이 맥(M4 Max)에서 처음부터 끝까지(자산 받기·커널 준비·드라이버 둘) 344초였고, 컴파일러 충돌은 한 번도 없었으며, 두 `.ko`의 md5가 같은 커밋의 CI와 같았습니다(커밋 `1edffba`).
+- 안 쓸 때는 `colima stop -p nx4`로 멈춥니다.
+- Rosetta도 에뮬레이션입니다. 차에 넣을 `.ko`는 아래처럼 CI 것만 씁니다.
 
 ### 차에 넣을 `.ko`는 CI에서 만든 것만
 
 - **차에 넣는 `.ko`는 리눅스 x86에서 만든 것만 씁니다**(CI `drivers` 워크플로의 artifact, 4단계부터는 release 워크플로. 2026-11-26 결정).
 - 까닭: Apple Silicon 맥의 qemu 에뮬레이션에서 컴파일러가 **멈추지 않고도 다른 코드를 낸 적이 있습니다**. PR #69의 커밋 `572128e`를 PC에서 빌드했을 때 첫 빌드는 md5 `5035d662…`(`.text`가 다르고 여러 함수의 레지스터 배정·분기 배치가 다름)였습니다. 같은 커널 트리로 다시 빌드하니 CI와 같은 `aabf4de7…`가 나왔습니다. 충돌(Segmentation fault)은 알 수 있어 다시 돌리지만, 이런 조용한 차이는 결과를 보기 전에는 알 수 없었습니다.
 - 알려진 원인 하나(PR #69 리뷰 14·18): 커널은 make마다 컴파일러에 물어(`cc-option`) 옵션을 정합니다. `arch/arm/Makefile`은 `-march=armv7-a`가 안 되면 조용히 `-march=armv5t`로 넘어가고, `-fno-strict-overflow`·`-fconserve-stack` 같은 옵션도 같은 식으로 붙습니다. 에뮬레이션에서 그 물음 중에 컴파일러가 멈추면 다른 옵션으로 컴파일됩니다. 리뷰 중에 실제로 `armv5t`로 컴파일되어 `rev16` 어셈블러 오류가 난 적이 있습니다. `572128e`의 조용한 차이는 충돌도 오류도 없어, 어느 옵션 때문이었는지(또는 이 까닭이었는지)는 확인하지 못했습니다.
-- 그래서 빌드는 끝에 모든 오브젝트의 컴파일 옵션 묶음(`-m`·`-f`·`-W`·`-O`·`-g`·`-std`·`-D__LINUX_ARM_ARCH__`)을 봅니다(`lib.sh` `check_cflags`). 서로 같고, `-march=armv7-a`이며, 그 sha256이 `inputs.sh`의 `EXPECTED_CFLAGS_SHA256`(CI 값 `d81069ca…`)과 같아야 합니다. 아니면 실패로 끝납니다. 그 sha256은 `bcmdhd.ko.txt`의 `cflags` 줄에도 남습니다. 커널 소스·설정·툴체인·드라이버 Makefile·`EXTRA_CFLAGS`를 바꾸면 CI의 "컴파일 옵션 확인" 줄 값으로 `inputs.sh`를 함께 고칩니다.
+- 그래서 빌드는 끝에 모든 오브젝트의 컴파일 옵션 묶음(`-m`·`-f`·`-W`·`-O`·`-g`·`-std`·`-D__LINUX_ARM_ARCH__`)을 봅니다(`lib.sh` `check_cflags`). 서로 같고, `-march=armv7-a`이며, 그 sha256이 `inputs.sh`의 고정 값과 같아야 합니다(드라이버 Makefile이 붙이는 옵션이 달라 따로 둠: RTL88x2BU `EXPECTED_CFLAGS_SHA256` CI 값 `d81069ca…`, RTL8831BU `EXPECTED_CFLAGS_SHA256_8831BU` CI 값 `9772552f…`). 아니면 실패로 끝납니다. 그 sha256은 `bcmdhd.ko.txt`의 `cflags` 줄에도 남습니다. 커널 소스·설정·툴체인·드라이버 Makefile·`EXTRA_CFLAGS`를 바꾸면 CI의 "컴파일 옵션 확인" 줄 값으로 `inputs.sh`를 함께 고칩니다.
+- **커널 심볼 확인**(PR #81 리뷰 2): 커널 준비가 `modules_prepare`까지라 `Module.symvers`가 없어, modpost는 커널에 없는 심볼을 불러도 알리지 않습니다. 그런 `.ko`는 빌드·CI는 통과하고 차에서 `Unknown symbol`로 올라가지 않습니다. 그래서 빌드 끝에 `.ko`가 부르는 이름(`arm-eabi-nm -u`)이 모두 커널이 내보내는 것인지 봅니다(`lib.sh` `check_ksyms`). 내보내는 이름은 커널 트리 소스의 `EXPORT_SYMBOL(_GPL)(이름)`, `EXPORT_PER_CPU_SYMBOL(_GPL)(이름)`(이 커널은 SMP라 내보냄, 리뷰 5), `kernel/params.c`의 `STANDARD_PARAM_DEF`가 만드는 `param_ops_*`입니다(`kernel_exports`, 빌드마다 새로 만듦, 몇 초).
+  - 설정으로 빌드하지 않는 파일의 것도 목록에 들어가, 확인을 통과해도 차 커널에 다 있다는 뜻은 아닙니다. 그래서 차에서 dmesg에 `Unknown symbol`이 없는지도 봅니다.
+  - 거꾸로 위 꼴이 아닌 다른 매크로로 내보내는 이름은 목록에 빠져 거짓으로 걸릴 수 있습니다. 걸리면 그 이름을 커널 소스에서 찾아보고, 정말 내보내는 것이면 `kernel_exports`에 그 꼴을 더합니다.
 - 그래도 PC 빌드는 개발·확인용입니다. `scripts/build-driver.sh`는 Docker VM의 CPU가 x86_64가 아니거나 맥이 Apple Silicon이면(Rosetta 터미널 포함) 끝에 알리고, `bcmdhd.ko.txt`에 `build host <Docker VM CPU>, <OS CPU> (emulated: …)`를 적습니다. PC 결과를 쓰려면 같은 커밋의 CI md5와 같은지 먼저 봅니다.
 
 ## 바깥 자료(`inputs.sh`)
@@ -141,19 +191,22 @@ sh scripts/build-driver.sh
 | 내비 커널 소스 | 이 저장소 릴리스 `src-mobis-avnt5w-r9`의 `mobis-avnt5w-r9-kernel.tar.xz`(원본: 현대모비스 AVNT STD G50 WIDE R9 묶음, sha256 `e7533517…`) | 파일 sha256 `f72306a8…`, 푼 폴더 값 `14aa37f7…` |
 | 커널 설정 | 내비 커널 소스의 `tcc803x_wide_pe_common_defconfig`를 조정 | 설정 값 `b2d52267…`(차 설정과 같음) |
 | 툴체인 | 내비 커널 소스의 `toolchain/arm-eabi-4.7.tar.gz` | sha256 `76960066…` |
-| 드라이버 | [cilynx/rtl88x2bu](https://github.com/cilynx/rtl88x2bu) | 커밋 `fc158d1f71b9e5dfcd1fccaf4d28725b65086e3b` |
+| 드라이버 RTL88x2BU | [cilynx/rtl88x2bu](https://github.com/cilynx/rtl88x2bu) | 커밋 `fc158d1f71b9e5dfcd1fccaf4d28725b65086e3b` |
+| 드라이버 RTL8831BU | [hyeondg/rtl8831bu](https://github.com/hyeondg/rtl8831bu) | 커밋 `fed914c8931f3a768afe087dea9998965816f37e` |
 
 ## 출처와 라이선스
 
 | 파일 | 출처 | 라이선스 |
 |---|---|---|
 | `rtl88x2bu/0001-nx4-protect.diff`, `rtl88x2bu/0002-nx4-hal.diff` | 이 저장소(드라이버 원본에 대는 패치) | GPL-2.0 |
+| `rtl8831bu/0001-nx4-protect.diff`, `rtl8831bu/0002-nx4-hal.diff`, `rtl8831bu/0003-nx4-build.diff` | 이 저장소(드라이버 원본에 대는 패치) | GPL-2.0 |
 | `kernel/prepare.sh`, `build-in-container.sh`, `lib.sh`, `config-sum.sh`, `Dockerfile`, `inputs.sh`, `README.md` | 이 저장소 | GPL-2.0 |
 | `COPYING` | GPL-2.0 전문(드라이버 원본 저장소의 `LICENSE`와 같음) | — |
 
 `drivers/` 밖의 `scripts/build-driver.sh`(Docker를 부르는 PC 스크립트)와 `.github/workflows/drivers.yml`은 저장소의 다른 부분처럼 AGPL-3.0입니다.
 
 - 드라이버 원본: cilynx/rtl88x2bu(Realtek 드라이버, GPL-2.0)
+- 드라이버 원본: hyeondg/rtl8831bu(Realtek 드라이버 v1.19.10). 저장소에 LICENSE 파일은 없고, 소스 머리말이 Realtek의 GPL-2.0("version 2 of the GNU General Public License")입니다. LICENSE 없는 개인 저장소라 사라질 수 있으므로, 4단계에서 `.ko`를 내보낼 때 이 커밋의 소스 사본을 모비스 커널 소스처럼 이 저장소의 릴리스 자산으로 둡니다(GPL-2.0 대응 소스, PR #81 리뷰 4, #48)
 - 내비 커널 소스: 현대모비스 AVNT STD G50 WIDE(R9) 오픈소스(Linux Kernel, GPL-2.0). 위 "커널 소스 자산"
 - 커널 뼈대: kernel.org Linux 3.18.24(GPL-2.0)
 - 모드에 `.ko`를 넣어 내보낼 때는 이 폴더, 드라이버 원본 커밋, 커널 소스 자산·kernel.org 위치를 함께 냅니다(GPL-2.0 대응 소스, #48 4단계).
@@ -163,6 +216,9 @@ sh scripts/build-driver.sh
 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48) 체크리스트에 있습니다. 이 빌드에 걸린 것:
 - 우리 차 커널 설정이 빌드의 설정과 같은지(`sh drivers/config-sum.sh dongle/config.txt`)
 - 빌드한 `.ko`의 vermagic이 순정 모듈의 것과 같은지(`dongle/ko-vermagic.txt`)
+- HAL이 올릴 때 dmesg에 `Unknown symbol`이 없는지(두 드라이버, 빌드의 커널 심볼 확인이 못 잡는 설정 차이)
 - 순정 HAL이 주는 insmod 인자와 `bcmdhd` 매개변수 이름(`dongle/wifi-strings.txt`)
 - HAL이 바꿔 둔 `bcmdhd.ko`를 올렸을 때 `wlan0`이 생기고 HMG-API가 AP를 띄우는지(149번 채널 포함)
-- 보호 패치: 쓰는 중에 동글을 뽑아도 내비가 멈추지 않는지, Wi-Fi를 끄고 켜도 되는지, 수신 오류로 멈춘(`nx4-protect: … rx stopped`) 뒤 Wi-Fi를 끄고 켜면 AP가 돌아오는지, dmesg의 `nx4-protect:` 줄
+- RTL8831BU 동글을 꽂았을 때 USB ID(`0bda:b831`)와 이 드라이버가 붙는지, `wlan0`과 AP(149번 채널 포함). 동글이 실제로 RTL8831BU인지는 `lsusb` ID로 확인합니다(RTL8851BU `0bda:b851`도 이 드라이버가 받음)
+- 보호 패치(두 드라이버): 쓰는 중에 동글을 뽑아도 내비가 멈추지 않는지, Wi-Fi를 끄고 켜도 되는지, 수신 오류로 멈춘(`nx4-protect: … rx stopped`) 뒤 Wi-Fi를 끄고 켜면 AP가 돌아오는지, dmesg의 `nx4-protect:` 줄
+- RTL8831BU: `nx4-protect:` 줄 없이 수신만 멈추는지(AP는 떠 있는데 폰이 통신하지 못함), 그때 Wi-Fi를 끄고 켜면 돌아오는지(PR #81 리뷰 3)

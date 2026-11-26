@@ -22,14 +22,14 @@ tree_sum() {
 }
 
 # make를 돌리되, qemu 에뮬레이션(Apple Silicon 맥)에서 컴파일러·어셈블러·호스트 도구가 Segmentation fault로 멈추면
-# 이어서 다시 돌린다(모두 MAKE_TRIES번까지, 기본 8). make는 이어서 하므로 다 된 것은 다시 만들지 않아 결과는 같다.
+# 이어서 다시 돌린다(모두 MAKE_TRIES번까지, 기본 30. RTL8831BU는 오브젝트가 379개라 한 빌드에서 8번 넘게 충돌함). make는 이어서 하므로 다 된 것은 다시 만들지 않아 결과는 같다.
 # 다른 오류는 바로 멈춘다.
 # 커널 3.18의 kbuild에는 .DELETE_ON_ERROR가 없어 멈춘 단계가 반쯤 쓴 파일을 남길 수 있다. 다시 돌리기 전에 make가 실패로
 # 적은 대상([scripts/Makefile.<무엇>:<줄>: <대상>])을 지운다. 상대 경로는 make를 돈 폴더 기준이다.
 #   make_retry <기록 파일> <make를 돈 폴더(-C)> make 인자...
 make_retry() {
   _log=$1; _dir=$2; shift 2
-  _n=1; _max=${MAKE_TRIES:-8}
+  _n=1; _max=${MAKE_TRIES:-30}
   : > "$_log"
   until make -C "$_dir" "$@" > "$_log.try" 2>&1; do
     cat "$_log.try" >> "$_log"
@@ -49,14 +49,42 @@ make_retry() {
   rm -f "$_log.try"
 }
 
+# 커널이 내보내는 이름 목록(정렬): 커널 트리 소스의 EXPORT_SYMBOL(_GPL·_GPL_FUTURE)(이름), EXPORT_PER_CPU_SYMBOL(_GPL)(이름)
+# (이 커널은 CONFIG_SMP=y라 EXPORT_SYMBOL이 됨, include/linux/percpu-defs.h, PR #81 리뷰 5), kernel/params.c의
+# STANDARD_PARAM_DEF(이름, …)가 매크로로 내보내는 param_ops_<이름>. EXPORT_UNUSED_SYMBOL은 이 설정(CONFIG_UNUSED_SYMBOLS 꺼짐)에서
+# 내보내지 않아 넣지 않는다. 설정으로 빌드하지 않는 파일의 것도 들어가 "목록에 있음"이 차 커널에 있다는 뜻은 아니다. 거꾸로 이
+# 꼴들이 아닌 다른 매크로로 내보내는 이름은 빠져 거짓으로 걸릴 수 있다. 그때는 커널 소스에서 확인하고 여기에 더한다.
+# 모듈 적재기는 미정의 심볼 하나만 못 찾아도 올리지 않는다(insmod: Unknown symbol)
+#   kernel_exports <커널 트리>
+kernel_exports() {
+  { grep -rhoE --include='*.c' --include='*.S' --include='*.h' \
+      'EXPORT_(PER_CPU_)?SYMBOL(_GPL|_GPL_FUTURE)?\([[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\)' "$1" \
+      | sed -E 's/.*\([[:space:]]*([A-Za-z0-9_]+)[[:space:]]*\)/\1/'
+    grep -hoE '^STANDARD_PARAM_DEF\([a-z]+' "$1/kernel/params.c" | sed 's/STANDARD_PARAM_DEF(/param_ops_/'
+  } | LC_ALL=C sort -u
+}
+
+# 모듈이 부르는 것(nm -u의 이름 목록)이 모두 커널이 내보내는 것인지 본다. 커널 준비가 modules_prepare까지라 Module.symvers가
+# 없어, modpost는 커널에 없는 심볼을 알리지 않는다(PR #81 리뷰 1·2: RTL8831BU가 3.18에 없는 strscpy를 불렀다)
+#   check_ksyms <nm -u 이름 목록> <kernel_exports 목록>
+check_ksyms() {
+  _ksu=$(LC_ALL=C sort -u "$1" | grep -c .)
+  _ksm=$(LC_ALL=C sort -u "$1" | LC_ALL=C comm -23 - "$2")
+  [ -z "$_ksm" ] || die "모듈이 커널이 내보내지 않는 심볼을 부릅니다(차에서 insmod가 Unknown symbol로 실패): $(echo $_ksm)"
+  echo "커널 심볼 확인: 부르는 것 ${_ksu}개가 모두 커널이 내보내는 것"
+}
+
 # 컴파일 옵션 확인. 커널은 make마다 컴파일러에 물어(cc-option) 옵션을 정한다. arch/arm/Makefile은 -march=armv7-a가 안 되면
 # 조용히 -march=armv5t로 넘어가고, -fno-strict-overflow·-fconserve-stack 같은 옵션도 같은 식으로 붙는다. 에뮬레이션에서는 이
 # 물음 중에 컴파일러가 멈춰 다른 옵션으로 컴파일될 수 있다(PR #69 리뷰 14: 실제로 armv5t로 컴파일되어 rev16 어셈블러 오류).
 # 그래서 컴파일한 모든 오브젝트(.cmd 첫 줄이 arm-eabi-gcc)의 옵션(-m·-f·-W·-O·-g·-std·-D__LINUX_ARM_ARCH__) 묶음이
 #   1. 서로 같고(make를 이어 돌린 사이에 바뀌지 않음) 2. -march=armv7-a이며 armv5t가 없고
-#   3. EXPECTED_CFLAGS_SHA256(inputs.sh, CI 값)이 있으면 그 sha256과 같은지(한 번에 끝난 빌드에서 옵션 하나가 모두 똑같이
-#      빠진 경우, 리뷰 18) 본다. 그 묶음의 sha256을 CFLAGS_SUM에 둔다
+#   3. 고정한 지문이 있으면 그 sha256과 같은지(한 번에 끝난 빌드에서 옵션 하나가 모두 똑같이 빠진 경우, 리뷰 18) 본다.
+#      지문은 둘째 인자로 받고(드라이버마다 다름: inputs.sh EXPECTED_CFLAGS_SHA256, EXPECTED_CFLAGS_SHA256_8831BU), 없으면
+#      EXPECTED_CFLAGS_SHA256을 쓴다. 그 묶음의 sha256을 CFLAGS_SUM에 둔다
+#   check_cflags <드라이버 폴더> [고정한 지문]
 check_cflags() {
+  _cexp=${2:-${EXPECTED_CFLAGS_SHA256:-}}
   _sets=/tmp/cflags.sets; : > $_sets
   for _c in $(find $1 -name '.*.o.cmd'); do
     head -1 "$_c" | grep -q 'arm-eabi-gcc' || continue
@@ -70,8 +98,8 @@ check_cflags() {
     || die "컴파일 옵션이 -march=armv7-a가 아닙니다(에뮬레이션에서 kbuild cc-option 검사가 실패한 것으로 보임). 다시 돌려 주세요"
   CFLAGS_SUM=$(head -1 $_sets | sha256sum | cut -d' ' -f1)
   echo "컴파일 옵션 확인: 오브젝트 $(grep -c . $_sets)개가 같음, -march=armv7-a ($CFLAGS_SUM)"
-  if [ -n "${EXPECTED_CFLAGS_SHA256:-}" ] && [ "$CFLAGS_SUM" != "$EXPECTED_CFLAGS_SHA256" ]; then
+  if [ -n "$_cexp" ] && [ "$CFLAGS_SUM" != "$_cexp" ]; then
     echo "옵션 묶음: $(head -1 $_sets)"
-    die "컴파일 옵션 지문이 고정한 값과 다릅니다($CFLAGS_SUM, 고정 $EXPECTED_CFLAGS_SHA256). 에뮬레이션이면 다시 돌리고, 커널 설정·툴체인·드라이버 Makefile을 바꿨으면 CI 값으로 inputs.sh를 고칩니다"
+    die "컴파일 옵션 지문이 고정한 값과 다릅니다($CFLAGS_SUM, 고정 $_cexp). 에뮬레이션이면 다시 돌리고, 커널 설정·툴체인·드라이버 Makefile을 바꿨으면 CI 값으로 inputs.sh를 고칩니다"
   fi
 }
