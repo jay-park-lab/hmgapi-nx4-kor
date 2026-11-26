@@ -71,7 +71,12 @@ final class TbtGate {
             long s = otherSince;
             if (s < 0L) otherSince = s = now;
             otherLast = now;
-            if (now - s >= QUIET_MS) return null;   // the phone sends, this mod doesn't hear it: give way
+            if (now - s >= QUIET_MS) {
+                // the phone sends, this mod doesn't hear it: give way. This call carries the official mod's own
+                // values, so what it carried of ours before no longer stands (PR #78 review 4)
+                carried.remove(point);
+                return null;
+            }
         }
         carried.put(point, new Carried(o, now));
         return copy(o);

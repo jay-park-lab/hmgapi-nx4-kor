@@ -136,6 +136,16 @@ public class TbtGateTest {
         p.setActive(false);
         p.setActive(true);
         is(!p.skipOurs(TBT, key1.clone(), 1300), "guidance off and on again: what was carried is forgotten");
+        // PR #78 review 4: giving way, the official call carries its own values: what it carried of ours before no longer stands
+        TbtGate y2 = new TbtGate();
+        y2.setActive(true);
+        y2.heard(1000);
+        y2.skipOurs(TBT, key1, 1000);
+        y2.ours(TBT, a1);
+        y2.forOther(TBT, 9, 5000, true);
+        y2.forOther(TBT, 9, 7500, true);
+        is(y2.forOther(TBT, 9, 8000, true) == null && !y2.skipOurs(TBT, key1.clone(), 8100),
+                "carried 600 ms before giving way: ours still goes out after (the cluster got the official mod's values)");
         // the official mod stops calling for a turn it has no icon for (#67): ours always goes out
         TbtGate q = new TbtGate();
         q.setActive(true);
