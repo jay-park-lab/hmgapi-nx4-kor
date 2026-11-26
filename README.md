@@ -149,7 +149,9 @@ NX4 KOR("NX4 KOR: Tucson NX4 (Korea)")의 설정은 둘입니다.
 | 설정 | 기본 | 하는 일 |
 |---|---|---|
 | `kor_tbt` "Korean CarPlay turn-by-turn on the cluster and HUD" | 켬 | 한국 카플레이 길안내(위 "무엇을 하나"). 끄면 공식 무선 모드의 길안내 그대로입니다 |
-| `kor_tbt_log` "Log the CarPlay turn-by-turn diagnosis" | 베타 켬, 정식 2.1.2부터 끔([#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)) | Korea Projection의 진단 줄(곧 회전 판단, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)과 보낸 HUD 목록 줄(300줄까지)을 HMG-API 기록에 더 남깁니다. 꺼도 받은 안내의 숫자(종류·각도, 시작마다 300줄까지), 길안내 앱이 바뀐 줄(두 앱 이름), 지운 줄은 남습니다. 길·장소 이름은 어느 쪽이든 남기지 않습니다. 계기판이 이상하게 보였을 때 원인을 찾는 데 씁니다 |
+| `kor_tbt_log` "Log the CarPlay turn-by-turn diagnosis" | 끔(2.1.2-beta.2부터, [#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)) | Korea Projection의 진단 줄(곧 회전 판단, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)과 보낸 HUD 목록 줄(300줄까지)을 HMG-API 기록에 더 남깁니다. 꺼도 받은 안내의 숫자(종류·각도, 시작마다 300줄까지), 길안내 앱이 바뀐 줄(두 앱 이름), 지운 줄은 남습니다. 길·장소 이름은 어느 쪽이든 남기지 않습니다. 계기판이 이상하게 보였을 때 원인을 찾는 데 씁니다 |
+
+`kor_tbt_log`는 2.1.2-beta.2부터 기본으로 꺼져 있습니다([#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)). 길안내가 이상할 때 기록을 모으려면 HMG-API 앱의 NX4 KOR 설정에서 켜고 다시 시작합니다. HMG-API 앱은 설정 하나를 바꿀 때 그 모드의 모든 값을 함께 저장하므로, 2.1.2-beta.1까지 NX4 KOR 설정을 바꾼 적이 있으면 이 설정이 켜진 채 남습니다. 그런 차는 HMG-API 앱에서 꺼 주세요.
 
 무선 기능의 설정은 HMG-API 앱의 "Wireless CarPlay + Android Auto"(공식 무선 모드)에 있습니다. 그중 `bridge`(Wireless CarPlay)를 끄면 무선 카플레이가 되지 않고 관리 앱이 `bridgeoff`를 보입니다. 계기판·HUD 길안내는 `tbt`입니다. 한국 카플레이 길안내도 공식 모드의 `tbt`가 켜져 있어야 합니다(아이폰에 길안내를 받는다고 알리고, 순정 내비가 계기판에 끼어드는 것을 막는 일은 공식 모드가 합니다). 설정을 바꾼 뒤에는 HMG-API 앱에서 변경 사항을 적용하고 재부팅합니다.
 

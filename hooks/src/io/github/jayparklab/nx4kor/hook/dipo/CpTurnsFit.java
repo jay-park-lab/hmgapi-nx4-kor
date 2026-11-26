@@ -8,7 +8,7 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 //   PhoneBarOut is a no-op here (its receiver, KP's TrapBar in the car navigation, isn't in this mod);
 //   make() removed (only the fitted layer: KP's stock layer CpTurns isn't ported).
 // Updated by NX4 KOR, 2026-11-26: taken again from KP's mod 2.4.10 (Korea Projection 1.8.1) with the same changes,
-//   and DIAG_LOGS_MAX kept at 300 (KP 2.4.10: 1200; kor_tbt_log is on by default here).
+//   and DIAG_LOGS_MAX kept at 300 (KP 2.4.10: 1200; HMG-API's Logs tab shows the last 64 KB of the shared log).
 // Modified by NX4 KOR, 2026-11-26 (#77, less load on the car): the cluster is ClusterOut (Cluster -> ClusterOut, the
 //   field and the constructor), which skips a call the official mod's call already carried; diagTurn and logManeuver
 //   check their line limit before building the line; the "hud list" line only with kor_tbt_log (debug), up to
@@ -206,7 +206,7 @@ final class CpTurnsFit implements CpTbt {
      * 12MB의 2%쯤이다. 줄이 가장 빨리 쌓인 차 로그(11-09 니로, 4분에 82줄 = 분당 약 20줄)로도 약 1시간을 담는다(전에는 약 15분).
      * 1.8.1 계획의 #306 "25분에 다 참"(분당 12줄)이면 약 100분이다
      */
-    // NX4 KOR: 300 here, not KP's 1200 (kor_tbt_log is on by default and HMG-API's Logs tab shows the last 64 KB, PR #74)
+    // NX4 KOR: 300 here, not KP's 1200 (with kor_tbt_log on, HMG-API's Logs tab shows only the last 64 KB, PR #74)
     static final int DIAG_LOGS_MAX = 300;
     /** 마지막 near() 판정의 이유(진단 줄용): in-d(D 안, 곧 회전), hold(D와 D + NEAR_EXIT_MARGIN 사이에서 곧 회전 유지, 1.7.3), no-dist, stale-dist(새 회전인데 이번 갱신에 거리 없음), put-off(새 회전의 거리를 앞 회전의 값으로 보고 미룸, 2.4.4 후보), jump-hold(같은 회전에서 거리가 뛰어 한 번 붙잡음, 2.4.4 후보), type(큰 그림 없는 종류), far */
     String nearWhy = "";

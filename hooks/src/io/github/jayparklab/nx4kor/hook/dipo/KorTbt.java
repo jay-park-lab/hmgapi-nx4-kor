@@ -90,6 +90,16 @@ public final class KorTbt {
     static int postErrors;
     /** giving way logged (only touched on the thread) */
     static boolean yieldLogged;
+    /** REFRESH waits for the way to end, not a second (#77); hearing again brings the second back (PR #78 review 5) */
+    static volatile boolean refreshBackedOff;
+    static final Runnable RESUME = new Runnable() {
+        @Override
+        public void run() {
+            if (!refreshing || !turns.active()) return;
+            handler.removeCallbacks(REFRESH);
+            handler.postDelayed(REFRESH, 1000L);
+        }
+    };
     /** the mod was turned off while guidance was on (REFRESH reset ours): ask the phone for all of it when back on */
     static volatile boolean wasOff;
 
@@ -124,7 +134,7 @@ public final class KorTbt {
                 restartRouteGuidance();
             }
         });
-        turns.debug = m.settingBoolean("kor_tbt_log", true);
+        turns.debug = m.settingBoolean("kor_tbt_log", false);   // off by default from 2.1.2-beta.2 (#77)
         turns.onActive = new Runnable() {
             @Override
             public void run() {
@@ -259,6 +269,7 @@ public final class KorTbt {
             noteActive();
             // #77: while giving way, nothing to resend: look again when the way ends (the official mod quiet for
             // QUIET_MS; its calls move that on), not every second. Hearing again needs no tick (the update itself sends)
+            refreshBackedOff = yielding && turns.active();
             if (turns.active()) handler.postDelayed(this, yielding ? Math.max(1000L, gate.yieldEndsIn(now)) : 1000L);
             else refreshing = false;
         }
@@ -325,6 +336,11 @@ public final class KorTbt {
                 return;
             }
             gate.heard(SystemClock.elapsedRealtime());
+            if (refreshBackedOff) {
+                refreshBackedOff = false;
+                Handler h = handler;
+                if (h != null) h.post(RESUME);
+            }
             if (wasOff) {
                 // back on: what's left was reset, so have the phone send its whole state (Stop, Start: ours, OWN)
                 wasOff = false;
