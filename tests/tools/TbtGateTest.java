@@ -81,6 +81,27 @@ public class TbtGateTest {
         is(!s.stopDue(9200), "cleared once");
         is(!new TbtGate().stopDue(99999), "no Stop seen: nothing due");
 
+        // review 12: the phone's last update arriving just after DiPO's Stop isn't an ask-again
+        TbtGate d = new TbtGate();
+        d.heard(9500);
+        d.stopSeen(10000);
+        d.heard(10030);
+        is(d.stopDue(12100), "an update 30 ms after the Stop (sent before it), then quiet: clear");
+        d.heard(19000);
+        d.stopSeen(20000);
+        d.heard(20500);
+        is(!d.stopDue(22100), "the phone sends again 500 ms after the Stop (Stop, 200 ms, Start): no clear");
+
+        // review 13: one call from the other sender, then silence for everyone: no giving way
+        TbtGate y = new TbtGate();
+        y.ours(TBT, ours);
+        y.setActive(true);
+        y.heard(1000);
+        is(y.forOther(TBT, 9, 6000, true) != null, "quiet, one other call: still ours");
+        is(!y.yielding(9100), "no more calls from the other sender: no giving way (this mod keeps resending)");
+        is(y.forOther(TBT, 9, 9200, true) == null && y.yielding(9300), "the other calls again after 3 s: give way now");
+        is(!y.yielding(12300), "the other went quiet for 3 s: this mod resends again");
+
         System.out.println(n + " cases");
         System.out.println("ok");
     }

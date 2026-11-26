@@ -24,6 +24,11 @@ import java.util.concurrent.ConcurrentHashMap;
 final class TbtGate {
     static final long QUIET_MS = 3000L;
     static final long STOP_WAIT_MS = 2000L;
+    /**
+     * What arrives this soon after a Stop was sent before it (the phone's last update on its way): not an
+     * ask-again. Both mods ask again with Stop, 200 ms, Start, so a real resend comes later (PR #68 review 12).
+     */
+    static final long STOP_RESEND_MIN_MS = 150L;
 
     private final Map<String, Object[]> last = new ConcurrentHashMap<String, Object[]>();
     /** this mod's guidance is on (CpTurnsFit.active) */
@@ -32,6 +37,8 @@ final class TbtGate {
     private volatile long heardAt = -1L;
     /** when another sender first called while this mod's listener was quiet (-1: not now) */
     private volatile long otherSince = -1L;
+    /** when another sender last called while this mod's listener was quiet (-1: not now) */
+    private volatile long otherLast = -1L;
     /** when another's Stop was seen and its clear is pending (-1: none) */
     private volatile long stopAt = -1L;
 
@@ -48,15 +55,20 @@ final class TbtGate {
         if (quiet(now)) {
             long s = otherSince;
             if (s < 0L) otherSince = s = now;
+            otherLast = now;
             if (now - s >= QUIET_MS) return null;   // the phone sends, this mod doesn't hear it: give way
         }
         return copy(o);
     }
 
-    /** this mod gives way: its listener quiet while another sender has been calling for QUIET_MS */
+    /**
+     * this mod gives way: its listener quiet while another sender has been calling for QUIET_MS and
+     * still is (its last call within QUIET_MS: one call, then silence for everyone, isn't "keeps
+     * calling", PR #68 review 13)
+     */
     boolean yielding(long now) {
-        long s = otherSince;
-        return quiet(now) && s >= 0L && now - s >= QUIET_MS;
+        long s = otherSince, l = otherLast;
+        return quiet(now) && s >= 0L && now - s >= QUIET_MS && l >= 0L && now - l < QUIET_MS;
     }
 
     private boolean quiet(long now) {
@@ -68,6 +80,7 @@ final class TbtGate {
     void heard(long now) {
         heardAt = now;
         otherSince = -1L;
+        otherLast = -1L;
     }
 
     /** this mod's guidance on or off after a step: 1 turned on, -1 turned off (its calls forgotten), 0 the same */
@@ -88,13 +101,16 @@ final class TbtGate {
         stopAt = now;
     }
 
-    /** the pending Stop's clear is due: STOP_WAIT_MS passed and the phone sent nothing since (then it's done) */
+    /**
+     * the pending Stop's clear is due: STOP_WAIT_MS passed and the phone sent nothing since, apart from
+     * what arrived within STOP_RESEND_MIN_MS of the Stop (sent before it) (then it's done)
+     */
     boolean stopDue(long now) {
         long s = stopAt;
         if (s < 0L || now - s < STOP_WAIT_MS) return false;
         stopAt = -1L;
         long h = heardAt;
-        return h < s;
+        return h < s + STOP_RESEND_MIN_MS;
     }
 
     /** the arguments, with byte frames copied (a frame must not change under the other sender) */

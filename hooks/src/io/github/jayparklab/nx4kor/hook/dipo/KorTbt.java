@@ -88,6 +88,8 @@ public final class KorTbt {
     static int refreshErrors;
     /** giving way logged (only touched on the thread) */
     static boolean yieldLogged;
+    /** the mod was turned off while guidance was on (REFRESH reset ours): ask the phone for all of it when back on */
+    static volatile boolean wasOff;
 
     static void log(String m) {
         mod.log(m);
@@ -225,9 +227,13 @@ public final class KorTbt {
         @Override
         public void run() {
             if (!mod.enabled()) {
-                // turned off in the HMG-API app: forget ours (nothing cleared: the official mod draws now);
-                // turned on again, the phone's next update starts it afresh
+                // turned off in the HMG-API app: forget ours, and that it drew anything (nothing cleared now or
+                // later: the official mod draws). Turned on again, the first update asks the phone for all of it
+                // (Listener.notify), since an update without the state would read as "guidance over"
                 turns.reset();
+                turns.shown = false;
+                turns.hudShown = false;
+                wasOff = true;
                 noteActive();
                 refreshing = false;
                 log("CarPlay (NX4 KOR): mod turned off: Korean turn-by-turn stopped, the official mod's alone");
@@ -307,9 +313,24 @@ public final class KorTbt {
         @Override
         public void notify(final int what, int a1, int a2, final Iap2NotiMsg msg) {
             if ((what != RG_UPDATE && what != RG_MANEUVER && what != RG_LANES) || msg == null) return;
-            // turned off in the HMG-API app: the official mod's turn-by-turn alone (its calls already pass)
-            if (!mod.enabled()) return;
+            // turned off in the HMG-API app: the official mod's turn-by-turn alone (its calls already pass).
+            // What's missed meanwhile is asked for again when it's back on
+            if (!mod.enabled()) {
+                wasOff = true;
+                return;
+            }
             gate.heard(SystemClock.elapsedRealtime());
+            if (wasOff) {
+                // back on: what's left was reset, so have the phone send its whole state (Stop, Start: ours, OWN)
+                wasOff = false;
+                log("CarPlay (NX4 KOR): mod turned on again: route guidance asked again");
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        restartRouteGuidance();
+                    }
+                }, "nx4kor-cp-rg").start();
+            }
             if (!heard) {
                 heard = true;
                 log("CarPlay (NX4 KOR): route guidance reaches this listener (first " + what + ")");
