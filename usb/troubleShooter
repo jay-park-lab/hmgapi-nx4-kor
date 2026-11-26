@@ -645,7 +645,118 @@ diag_bb() {
 #                       드라이버에 붙은 인터페이스
 #   net-ls.txt          네트워크 장치 이름과 경로(MAC은 넣지 않음)
 #   dmesg-usb-wifi.txt  커널 로그 중 USB·Wi-Fi 줄(SerialNumber 줄과 MAC이 든 줄은 뺌)
+#   mount.txt           두 동글 드라이버 중 하나를 순정 bcmdhd.ko 자리에 bind mount하는 안(#80)을 차에서 가르는 값. SELinux 모드,
+#                       init·이 설치기·system_server(Wi-Fi HAL이 insmod하는 곳)·이름에 hmgapi가 든 프로세스 모두(데몬 표시)의
+#                       ppid·시작 시각(부팅 뒤 초)·mount 이름공간·SELinux 도메인, init과 이름공간이 다른 프로세스 목록,
+#                       init·설치기·system_server·HMG-API 데몬의 /·/system·/data mountinfo 줄(전파 표시 shared·master),
+#                       커널 기록의 avc: 줄. busybox 없이 /proc와 커널 기록만 읽는다(diag_mount)
 # busybox에 gunzip·sha256sum·strings·grep이 없으면 빈 값 대신 그 까닭을 적는다(bbok)
+# mount 이름공간 이름(ls -l의 링크 대상, 예: mnt:[4026531840]). readlink가 없는 툴박스에서도 되게 ls로 읽는다.
+# 링크 대상을 못 읽으면 링크가 없는 것과 거절(SELinux 포함)을 가른다(PR #84 리뷰 3):
+# - 차의 툴박스 ls(KitKat toolbox/ls.c)는 readlink가 실패하면 아무것도 찍지 않는다. 커널(3.18 fs/proc/namespaces.c)은 ns 링크의
+#   readlink에만 ptrace 권한을 보고 lstat은 막지 않으므로, 거절이면 링크는 있는데(-L, lstat) 대상을 못 읽는다
+# - 링크가 없으면 ls가 lstat 오류 문구(No such file …)를 찍는다. 그 문구를 그대로 적는다
+diag_ns() {
+  _nl=$(ls -l "$1" 2>&1)
+  case "$_nl" in
+    *' -> '*) echo "${_nl##* -> }" ;;
+    *) if [ -L "$1" ]; then echo "읽지 못함(링크는 있음, 대상을 못 읽음: 거절일 수 있음)"
+       elif [ -n "$_nl" ]; then echo "읽지 못함($_nl)"
+       else echo "없음"; fi ;;
+  esac
+}
+# /proc/<pid>/stat에서 ppid(4번째 칸)를 _sp에, 부팅 뒤 시작 시각(22번째 칸 starttime, 1/100초 USER_HZ)을 _st에 둔다. 못 읽으면 ?.
+# 2번째 칸 (comm)에는 공백·글롭 문자가 들 수 있어 마지막 ") " 뒤(3번째 칸 state부터)만 나눈다(PR #84 리뷰 4).
+# 순정 bcmdhd가 부팅 약 9.7초에 올라가므로(#80), 부팅 서비스를 띄우는 HMG-API 데몬이 그보다 늦는지 본다
+diag_stat() {
+  _sp=?; _st=?
+  _sl=; read -r _sl 2>/dev/null < "$1/stat" || return 0
+  case "$_sl" in *") "*) _sl=${_sl##*") "} ;; *) return 0 ;; esac
+  set -- $_sl
+  [ $# -ge 20 ] || return 0
+  case "$2" in ''|*[!0-9]*) ;; *) _sp=$2 ;; esac
+  shift 19
+  case "$1" in ''|*[!0-9]*) ;; *) _st="$(($1 / 100)).$(($1 / 10 % 10))s" ;; esac
+  return 0
+}
+# 프로세스 한 줄: 이름(comm), ppid, 시작 시각, mount 이름공간, SELinux 도메인(attr/current, 못 읽으면 ?). $1 꼬리표, $2 pid(self 포함).
+# HMG-API 데몬(comm hmgapid이고 ppid 1)에는 "데몬"을 붙인다
+diag_proc() {
+  _pc=; read -r _pc 2>/dev/null < $ROOT/proc/$2/comm
+  diag_stat $ROOT/proc/$2
+  _pa=; read -r _pa 2>/dev/null < $ROOT/proc/$2/attr/current
+  _pk=; [ "$_pc" = hmgapid ] && [ "$_sp" = 1 ] && _pk=" 데몬"
+  echo "proc $1: pid=$2 comm=${_pc:-?} ppid=$_sp start=$_st ns=$(diag_ns $ROOT/proc/$2/ns/mnt) se=${_pa:-?}$_pk"
+}
+# mountinfo에서 마운트 지점이 /·/system·/data인 줄
+diag_mi() {
+  [ -f "$1" ] || { echo "(mountinfo 없음)"; return 0; }
+  while read -r _m1 _m2 _m3 _m4 _m5 _mr; do
+    case "$_m5" in /|/system|/data) echo "$_m1 $_m2 $_m3 $_m4 $_m5 $_mr" ;; esac
+  done < "$1"
+}
+# #80 차 확인 값(mount.txt). 프로세스는 /proc/<pid>/comm(이름)으로 찾는다(명령줄은 NUL 처리가 셸마다 달라 보지 않음).
+# - init·이 설치기·system_server 한 줄씩, 이름에 hmgapi가 든 프로세스는 모두 한 줄씩 적는다(PR #84 리뷰 1). /proc 글롭은 사전 순이고
+#   차에는 데몬(comm hmgapid, ppid 1) 말고도 그 요청 worker·클라이언트(hmgapid), 차량 서비스(hmgapi.vehicle)가 있어 하나만
+#   고르면 데몬이 아닌 것을 고를 수 있다. 부팅 서비스(start boot)는 데몬이 띄우므로 데몬의 시작 시각이 그 시각에 가장 가깝다
+# - init과 mount 이름공간이 다른 프로세스를 모두 적는다(앱마다 이름공간을 나누는지. 순정 bcmdhd를 system_server가 아닌 곳이
+#   올렸을 수도 있어서, PR #84 리뷰 2). 앞 ${DIAG_NS_MAX:-100}줄만
+# - 커널 기록의 avc: 줄(SELinux 거절·허용 기록, 도메인마다 enforcing이 다를 수 있음). 앞 ${DIAG_AVC_MAX:-50}줄만, MAC·일련번호
+#   꼴이 든 줄은 뺀다(dmesg-usb-wifi.txt와 같은 규칙)
+diag_mount() {
+  _ss=; _dm=; _hgs=
+  for _pd in $ROOT/proc/[0-9]*; do
+    [ -f $_pd/comm ] || continue
+    read -r _cm 2>/dev/null < $_pd/comm || continue
+    case "$_cm" in
+      system_server) [ -n "$_ss" ] || _ss=${_pd##*/} ;;
+      *hmgapi*) _hgs="$_hgs ${_pd##*/}" ;;
+    esac
+  done
+  _ins=$(diag_ns $ROOT/proc/1/ns/mnt)
+  _h='[0-9a-fA-F][0-9a-fA-F]'
+  {
+    _se=$(getenforce 2>/dev/null) || _se=
+    echo "selinux_getenforce: ${_se:-없음}"
+    if [ -f $ROOT/sys/fs/selinux/enforce ]; then echo "selinux_enforce: $(cat $ROOT/sys/fs/selinux/enforce 2>/dev/null)"; else echo "selinux_enforce: 없음"; fi
+    diag_proc init 1
+    diag_proc self self
+    if [ -n "$_ss" ]; then diag_proc system_server $_ss; else echo "proc system_server: 프로세스 없음"; fi
+    if [ -z "$_hgs" ]; then echo "proc hmgapi: 프로세스 없음"; fi
+    for _p in $_hgs; do
+      diag_proc hmgapi $_p
+      [ -z "$_dm" ] && [ "$_pc" = hmgapid ] && [ "$_sp" = 1 ] && _dm=$_p
+    done
+    echo "== mount 이름공간이 init($_ins)과 다른 프로세스"
+    _n=0
+    for _pd in $ROOT/proc/[0-9]*; do
+      [ -f $_pd/comm ] || continue
+      _pn=$(diag_ns $_pd/ns/mnt)
+      [ "$_pn" = "$_ins" ] && continue
+      _n=$((_n + 1))
+      [ $_n -le ${DIAG_NS_MAX:-100} ] || continue
+      _cm=; read -r _cm 2>/dev/null < $_pd/comm
+      echo "pid=${_pd##*/} comm=${_cm:-?} ns=$_pn"
+    done
+    [ $_n -le ${DIAG_NS_MAX:-100} ] || echo "(… $((_n - ${DIAG_NS_MAX:-100}))개 더)"
+    echo "== mountinfo init(1)"; diag_mi $ROOT/proc/1/mountinfo
+    echo "== mountinfo self"; diag_mi $ROOT/proc/self/mountinfo
+    if [ -n "$_ss" ]; then echo "== mountinfo system_server($_ss)"; diag_mi $ROOT/proc/$_ss/mountinfo; fi
+    if [ -n "$_dm" ]; then echo "== mountinfo hmgapid 데몬($_dm)"; diag_mi $ROOT/proc/$_dm/mountinfo; else echo "== mountinfo hmgapid 데몬: 없음(comm hmgapid이고 ppid 1인 프로세스 없음)"; fi
+    echo "== avc(커널 기록, 앞 ${DIAG_AVC_MAX:-50}줄)"
+    kmsg 2>/dev/null | {
+      _n=0
+      while IFS= read -r _l; do
+        case "$_l" in
+          *SerialNumber*|*[Mm][Aa][Cc]=*|*$_h:$_h:$_h:$_h:$_h:$_h*|*$_h-$_h-$_h-$_h-$_h-$_h*|*$_h$_h$_h$_h$_h$_h*) ;;
+          *avc:*) _n=$((_n + 1)); [ $_n -le ${DIAG_AVC_MAX:-50} ] && echo "$_l" ;;
+        esac
+      done
+      [ $_n -le ${DIAG_AVC_MAX:-50} ] || echo "(… $((_n - ${DIAG_AVC_MAX:-50}))줄 더)"
+      [ $_n -gt 0 ] || echo "(avc 줄 없음)"
+    }
+  } > "$1" 2>&1
+}
 diag_dongle() {
   _o=$1; _b=$2
   mkdir -p $_o || { log "진단 기록: 동글 준비 정보 폴더를 만들지 못함"; return 0; }
@@ -711,7 +822,8 @@ diag_dongle() {
     for _f in $ROOT/system/lib/libhardware_legacy.so $ROOT/system/bin/hostapd $ROOT/system/bin/wpa_supplicant $ROOT/system/bin/netd; do
       [ -f "$_f" ] || continue
       echo "== ${_f#$ROOT}"
-      $_b strings $_f 2>/dev/null | $_b grep -E 'bcmdhd|\.ko|iface_name|firmware_path|nvram_path|/system/wifi|nl80211|wlan0|add_ie|wifi\.interface|wlan\.driver|DRIVER_|insmod|rmmod|init_module'
+      # module_info·module_version·/proc/modules: HAL이 올린 모듈을 무엇으로 확인하는지(바꾼 .ko를 거절하는지, #80)
+      $_b strings $_f 2>/dev/null | $_b grep -E 'bcmdhd|\.ko|iface_name|firmware_path|nvram_path|/system/wifi|nl80211|wlan0|add_ie|wifi\.interface|wlan\.driver|DRIVER_|insmod|rmmod|init_module|module_info|module_version|/proc/modules'
     done > $_o/wifi-strings.txt 2>&1
   fi
   [ -n "$_b" ] || echo "busybox가 없어 md5·vermagic·문자열은 빠짐(이름·크기는 system-wifi-ls.txt)" > $_o/system-wifi-md5.txt
@@ -726,6 +838,7 @@ diag_dongle() {
     ls $_r
   done > $_o/usb-drivers.txt 2>&1
   ls -l $ROOT/sys/class/net > $_o/net-ls.txt 2>&1
+  diag_mount $_o/mount.txt
   # 일련번호와 MAC이 든 줄은 뺀다(bcmdhd "Broadcom Dongle Host Driver mac=…", Realtek "rtw_macaddr_cfg MAC Address = …",
   # "hwaddr …", 그 밖에 xx:xx:xx:xx:xx:xx·xx-xx-…·구분자 없는 12자리 꼴, PR #66 리뷰 1·3). 12자리 꼴은 같은 길이의 다른
   # 16진수·숫자 줄도 빼지만, 기록을 공개 이슈에 올리므로 덜 남기는 쪽을 고른다. mksh case 패턴이라 busybox가 필요 없다
