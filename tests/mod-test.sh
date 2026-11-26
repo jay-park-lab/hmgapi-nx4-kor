@@ -912,6 +912,12 @@ echo no > $T/diag.reply; pset plan-new; cp $HD/mods/nx4-kor/mod.json $T/nm-nx4.j
 ts $U
 check "USB 설치기(#75): NEMESIS(/system/xbin/nemesis)가 있으면 같은 판이어도 아무것도 바꾸지 않고 멈춤(종료 1, 안내 문구, 진단 기록은 멈추기 전에 물음, HMG-API 명령 없음, 관리 앱을 열지 않음, 진행 기록 없음)" \
   '[ "$(cat $T/ts.rc)" = 1 ] && grep -qxF "$NMMSG" $T/ts.out && grep -q DiagActivity $T/calls && ! grep -q "^hmgapid" $T/calls && ! grep -q StatusActivity $T/calls && [ ! -f $PG ] && [ ! -d $R/data/local/tmp/nx4-kor-usb ] && cmp -s $T/nm-nx4.json $HD/mods/nx4-kor/mod.json && grep -q "system/xbin/nemesis 있음: 설치하지 않음" $K/install.log' || { cat $T/ts.out; cat $T/calls; }
+# PR #76 리뷰 6: NEMESIS와 Korea Projection 폴더가 함께 있으면 NEMESIS 확인이 먼저 멈춘다(두 확인의 차례)
+mkdir -p $KPD
+ts $U
+rm -rf $R/data/nemesis
+check "  NEMESIS와 Korea Projection 폴더가 함께 있으면 NEMESIS 문구로 멈춤(Korea Projection 확인보다 앞)" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -qxF "$NMMSG" $T/ts.out && ! grep -qF "$KPMSG" $T/ts.out && ! grep -q "원본 Korea Projection 패키지가 있음" $K/install.log' || cat $T/ts.out
 : > $K/REINSTALL
 ts $U
 rm -f $K/REINSTALL
