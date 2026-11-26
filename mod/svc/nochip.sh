@@ -42,7 +42,13 @@ wait_driver() {
   while [ $_wi -le $((NOCHIP_MAX / NOCHIP_POLL + 1)) ]; do
     if chip_or_dongle; then echo "NX4 KOR: Wi-Fi 칩이나 USB Wi-Fi 동글이 있음: 할 일 없음"; return 1; fi
     boot_secs
-    if dhd_gave_up && { [ -z "$_U" ] || [ "$_U" -ge $NOCHIP_SETTLE ]; }; then return 0; fi
+    if dhd_gave_up && { [ -z "$_U" ] || [ "$_U" -ge $NOCHIP_SETTLE ]; }; then
+      # 정하기 전에 NX4_NOCHIP_RECHECK초 뒤 한 번 더 본다: 포트 전원을 껐다 켜는 때가 늦은 부팅에 밀려 그 틈(약 4초)에
+      # 걸렸으면 꽂힌 동글이 안 보인다(깨어날 때와 같음, PR #86 리뷰 7)
+      sleep $NOCHIP_RECHECK
+      if chip_or_dongle; then echo "NX4 KOR: Wi-Fi 칩이나 USB Wi-Fi 동글이 있음: 할 일 없음"; return 1; fi
+      return 0
+    fi
     [ -n "$_U" ] && [ "$_U" -ge $NOCHIP_MAX ] && break
     sleep $NOCHIP_POLL
     _wi=$((_wi+1))
