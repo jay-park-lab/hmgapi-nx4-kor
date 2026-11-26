@@ -99,7 +99,7 @@ HMG-API 설치기가 멈추면 USB의 `HMGAPI/install.log` 맨 아래 `FAIL:` �
 | 이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여… (`nowifipart`) | 이 차에서는 무선을 쓸 수 없습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로입니다. 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48), 2.2.0)을 기다립니다. 결과를 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적어 주세요 |
 | 무선 연결용 Wi-Fi를 켜는 중입니다 (`apwait`) | 1~2분 뒤 화면을 다시 엽니다. 부팅 뒤 5분 동안은 Wi-Fi 부품이 없는 차도 이렇게 나옵니다 |
 | 무선 연결용 Wi-Fi가 지금 꺼져 있습니다 (`apoff`) / HMG-API가 무선 연결용 Wi-Fi를 켜지 못했습니다·켜지 않았습니다 (`apfail`) | 폰을 연결해 보고, 안 되면 3분 뒤 재부팅합니다. 같으면 adb로 `/data/hmgapi/logs/hmgapi/wifi.log`를 봅니다 |
-| 지원하지 않는 HMG-API 버전입니다 (`oldhmgapi`) / HMG-API가 없습니다 (`nohmgapi`) | HMG-API(1.1.0-rc.10 이상)가 든 2.1.1 이후 릴리스 USB로 다시 누릅니다. 2.1.0을 쓰던 차(HMG-API rc.8)나 따로 rc.9를 넣은 차도 같은 방법으로 올립니다 |
+| 지원하지 않는 HMG-API 버전입니다 (`oldhmgapi`) / HMG-API가 없습니다 (`nohmgapi`) | HMG-API(1.1.0-rc.10 이상)가 든 2.1.1 이후 릴리스 USB로 다시 누릅니다. 2.1.0을 쓰던 차(HMG-API rc.8)나 따로 rc.9를 넣은 차도 같은 방법으로 올립니다. NEMESIS가 깔린 차는 이 저장소의 USB 대신 HMG-API 릴리스(NEMESIS Manager용 `hmgapi-<판>-nemesis.zip`, USB 묶음, update zip)로 올립니다([#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75): 2.1.2 이후 USB는 멈추고 2.1.1 USB는 NX4 KOR까지 설치함) |
 | 연결됨·준비됨(시안 글자)인데 폰이 붙지 않음 | USB를 뺐는지 봅니다. 폰의 Wi-Fi 설정에서 차 네트워크를 지우고 다시 연결해 봅니다 |
 
 ### HMG-API 앱을 열 수 없을 때
@@ -172,7 +172,7 @@ NEMESIS 1.17(LivePatch)이 깔린 차에서 다음 둘 중 하나가 일어나�
 2. **HMG-API까지 지우기**
    - ⚠️ **NEMESIS 1.17이 깔린 차는 HMG-API를 1.1.0-rc.10 이상으로 올린 뒤에만 지웁니다.** rc.8 이하를 지우면 재부팅 한두 번 뒤 Android가 뜨지 않을 수 있습니다. `FORCE`로 설치한 차는 rc.9로 올리기만 해도 그렇습니다(위 "HMG-API를 지운 뒤 Android가 뜨지 않을 때", [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397)).
      - 지울 때 도는 것은 그 HMG-API를 설치할 때 저장해 둔 삭제입니다. 그래서 새 판 HMG-API USB로 지워도 같습니다.
-     - 먼저 HMG-API 릴리스의 update zip(HMG-API 앱 "Check USB updates")이나 USB(`hmgapi-<판>-usb.zip`)로 rc.10 이상으로 올리고 재부팅합니다. NEMESIS Manager용 `hmgapi-<판>-nemesis.zip`도 됩니다. 이 저장소의 USB는 쓰지 않습니다(2.1.2 이후는 멈추고, 2.1.1 이전은 NX4 KOR까지 설치함, #75).
+     - 먼저 HMG-API 릴리스의 update zip(HMG-API 앱 "Check USB updates")이나 USB(`hmgapi-<판>-usb.zip`)로 rc.10 이상으로 올리고 두 번 재부팅합니다(HMG-API 1.1.0-rc.10 릴리스 노트의 NEMESIS 1.17 안내). NEMESIS Manager용 `hmgapi-<판>-nemesis.zip`도 됩니다. 이 저장소의 USB는 쓰지 않습니다(2.1.2 이후는 멈추고, 2.1.1 이전은 NX4 KOR까지 설치함, #75).
      - 판은 관리 앱 "자세히" 표의 HMG-API 칸에서 봅니다.
      - NEMESIS 1.16 이하나 NEMESIS가 없는 차는 해당하지 않습니다.
    - **NX4 KOR를 먼저 지운 뒤에** 합니다. HMG-API 삭제는 HMG-API를 통해 바꾼 것만 되돌리므로, 2.0.x를 쓰던 차에서 순서를 바꾸면 2.0.x의 Wi-Fi 잠금이 남습니다.
