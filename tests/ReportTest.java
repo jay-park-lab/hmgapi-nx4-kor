@@ -134,12 +134,13 @@ public class ReportTest {
             && row(Report.parse(GOOD.replace("bridge=on", "bridge=off")), "공식 무선 모드").contains("Wireless CarPlay 설정 꺼짐")
             && "-".equals(row(Report.parse(GOOD.replace("wm=yes\n", "")), "공식 무선 모드")));
         // #71: 이 모드의 한국 카플레이 길안내(훅·설정). 판정은 바꾸지 않고 표에만 보인다
-        Report koff = Report.parse(GOOD.replace("kor_hooks=on", "kor_hooks=off").replace("kor_hooks_why=", "kor_hooks_why=framework.navigation_cluster.update_lane_info isn't in this car's map"));
-        check("한국 카플레이 길안내 칸(#71): 켜짐, 진단 기록 켬, 설정으로 꺼 둠(훅이 켜졌어도), 훅이 안 켜짐(이유), 기록 없음 '-', 판정은 그대로",
+        Report koff = Report.parse(GOOD.replace("kor_hooks=on", "kor_hooks=off").replace("kor_hooks_why=", "kor_hooks_why=hook point framework.navigation_cluster.update_lane_info isn't mapped on this car (none): its hooks are off here, its other parts still apply"));
+        check("한국 카플레이 길안내 칸(#71): 켜짐, 진단 기록 켬, 설정으로 꺼 둠(훅이 켜졌어도), 훅이 안 켜짐(rc.10의 이유 그대로), HMG-API 훅 꺼짐이면 안 돎, 기록 없음 '-', 판정은 그대로",
             "켜짐".equals(row(r, "한국 카플레이 길안내"))
             && "켜짐 (진단 기록 켬)".equals(row(Report.parse(GOOD.replace("kor_tbt_log=off", "kor_tbt_log=on")), "한국 카플레이 길안내"))
             && "꺼 둠 (설정, 공식 모드 길안내로 동작)".equals(row(Report.parse(GOOD.replace("kor_tbt=on", "kor_tbt=off")), "한국 카플레이 길안내"))
-            && "훅이 안 켜짐 (공식 모드 길안내로 동작: framework.navigation_cluster.update_lane_info isn't in this car's map)".equals(row(koff, "한국 카플레이 길안내"))
+            && "훅이 안 켜짐 (공식 모드 길안내로 동작: hook point framework.navigation_cluster.update_lane_info isn't mapped on this car (none): its hooks are off here, its other parts still apply)".equals(row(koff, "한국 카플레이 길안내"))
+            && "안 돎 (HMG-API 훅 꺼짐)".equals(row(Report.parse(GOOD.replace("\nhooks=on", "\nhooks=off")), "한국 카플레이 길안내"))
             && "훅이 안 켜짐 (공식 모드 길안내로 동작)".equals(row(Report.parse(GOOD.replace("kor_hooks=on", "kor_hooks=off")), "한국 카플레이 길안내"))
             && "-".equals(row(Report.parse(GOOD.replace("kor_hooks=on\n", "").replace("kor_tbt=on\n", "")), "한국 카플레이 길안내"))
             && "ready".equals(koff.get("verdict")));
