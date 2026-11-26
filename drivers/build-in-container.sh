@@ -89,6 +89,26 @@ build_88x2bu() {
   # 에뮬레이션에서 컴파일러가 멈추면 이어서 다시 돌린다(lib.sh make_retry)
   make_retry $D.log $D -j$JOBS ARCH=arm CROSS_COMPILE=$TC/bin/arm-eabi- KSRC=$K KVER=$KREL ${MNAME:+USER_MODULE_NAME=$MNAME} \
     EXTRA_CFLAGS="-g -Wno-builtin-macro-redefined -include /tmp/pin.h" || die "드라이버 컴파일"
+  check_cflags $D
+}
+# 컴파일 옵션 확인. 커널 arch/arm/Makefile은 make마다 컴파일러로 -march=armv7-a를 되는지 물어(cc-option), 안 되면 조용히
+# -march=armv5t로 넘어간다. 에뮬레이션에서는 이 물음 중에 컴파일러가 멈춰 다른 옵션으로 컴파일된 적이 있다(PR #69 리뷰 14,
+# 572128e의 조용한 차이). 그래서 컴파일한 모든 오브젝트(.cmd 첫 줄이 arm-eabi-gcc)의 옵션(-m·-f·-W·-O·-g·-std·
+# -D__LINUX_ARM_ARCH__) 묶음이 서로 같고 -march=armv7-a이며 armv5t가 없는지 본다. 그 묶음의 sha256을 CFLAGS_SUM에 둔다
+check_cflags() {
+  _sets=/tmp/cflags.sets; : > $_sets
+  for _c in $(find $1 -name '.*.o.cmd'); do
+    head -1 "$_c" | grep -q 'arm-eabi-gcc' || continue
+    head -1 "$_c" | tr ' ' '\n' | grep -E '^-(m|f|W|O|g$|std|D__LINUX_ARM_ARCH__)' | grep -v -E '^-Wp,' | LC_ALL=C sort -u | tr '\n' ' ' >> $_sets
+    echo >> $_sets
+  done
+  [ -s $_sets ] || die "컴파일한 오브젝트의 .cmd를 찾지 못함"
+  [ "$(LC_ALL=C sort -u $_sets | grep -c .)" = 1 ] \
+    || die "오브젝트마다 컴파일 옵션이 다릅니다(에뮬레이션에서 kbuild cc-option 검사가 실패한 것으로 보임). 다시 돌려 주세요"
+  grep -q -- '-march=armv7-a ' $_sets && ! grep -q -- 'armv5t' $_sets \
+    || die "컴파일 옵션이 -march=armv7-a가 아닙니다(에뮬레이션에서 kbuild cc-option 검사가 실패한 것으로 보임). 다시 돌려 주세요"
+  CFLAGS_SUM=$(head -1 $_sets | sha256sum | cut -d' ' -f1)
+  echo "컴파일 옵션 확인: 오브젝트 $(grep -c . $_sets)개가 같음, -march=armv7-a ($CFLAGS_SUM)"
 }
 # 결과 정보: modinfo와 md5·sha256
 ko_info() {
@@ -131,11 +151,12 @@ case "$MODE" in
       echo "kernel linux-3.18.24 $KERNEL_SHA256"
       echo "car config $CARCFG_SHA256"
       echo "build date $BUILD_DATE $BUILD_TIME"
-      # 빌드한 PC의 CPU(scripts/build-driver.sh가 줌). x86_64가 아니면 에뮬레이션 빌드라 차에 넣지 않는다(drivers/README.md)
-      case "${HOST_ARCH:-}" in
-        x86_64|amd64) echo "build host $HOST_ARCH" ;;
-        "") echo "build host unknown" ;;
-        *) echo "build host $HOST_ARCH (emulated: check against CI, do not ship)" ;;
+      # 오브젝트 컴파일 옵션 묶음의 sha256(check_cflags). PC와 CI가 같아야 한다
+      echo "cflags $CFLAGS_SUM"
+      # 빌드한 곳(scripts/build-driver.sh가 줌: Docker VM의 CPU, OS·CPU)과 에뮬레이션인지(BUILD_EMU). 에뮬레이션 빌드는 차에 넣지 않는다(drivers/README.md)
+      case "${BUILD_EMU:-}" in
+        no) echo "build host ${HOST_ARCH:-unknown}" ;;
+        *) echo "build host ${HOST_ARCH:-unknown} (emulated: check against CI, do not ship)" ;;
       esac
       # 3.18의 모듈에는 modinfo name이 없다. 커널이 쓰는 이름(struct module의 name)은 .gnu.linkonce.this_module에 있다
       $TC/bin/arm-eabi-objcopy -O binary --only-section=.gnu.linkonce.this_module $O/bcmdhd.ko /tmp/this_module.bin

@@ -1374,7 +1374,7 @@ check "drivers/rtl88x2bu: 패치는 번호 차례(0001 KP 보호 패치, 0002 HA
   '[ "$(ls $B/drivers/rtl88x2bu/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-kp-protect.diff 0002-nx4-hal.diff " ] && ! grep -h "^+++ " $B/drivers/rtl88x2bu/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_88x2bu \$D bcmdhd" $B/drivers/build-in-container.sh && grep -q "module_param_named(iface_name, ifname" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "module_param_string(firmware_path" $B/drivers/rtl88x2bu/0002-nx4-hal.diff'
 check "drivers: README·NOTICE의 값(커널·툴체인·차 설정 값과 커밋, 드라이버 커밋, KP md5)이 inputs.sh와 같음" 'drv_docs_ok'
 check "drivers: 차에 넣을 .ko는 CI 것만 — build-driver.sh가 빌드한 CPU를 넘기고 x86_64가 아니면 알림, 정보 파일에 build host, README에 규칙" \
-  'grep -q -- "-e HOST_ARCH=\"\$HOST_ARCH\"" $B/scripts/build-driver.sh && grep -q "이 .ko는 차에 넣지 마세요" $B/scripts/build-driver.sh && grep -q "build host \$HOST_ARCH (emulated" $B/drivers/build-in-container.sh && grep -q "차에 넣을 \`.ko\`는 CI에서 만든 것만" $B/drivers/README.md'
+  'grep -q -- "-e HOST_ARCH=\"\$HOST_ARCH\" -e BUILD_EMU=\$EMU" $B/scripts/build-driver.sh && grep -q "docker info --format .{{.Architecture}}." $B/scripts/build-driver.sh && grep -q "hw.optional.arm64" $B/scripts/build-driver.sh && grep -q "이 .ko는 차에 넣지 마세요" $B/scripts/build-driver.sh && grep -q "(emulated: check against CI, do not ship)" $B/drivers/build-in-container.sh && grep -q "차에 넣을 \`.ko\`는 CI에서 만든 것만" $B/drivers/README.md'
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc
@@ -1402,6 +1402,23 @@ check "drivers/lib.sh make_retry: MAKE_TRIES(build-driver.sh NX4_DRV_TRIES, 기�
 mr err ok
 check "drivers/lib.sh make_retry: 다른 오류는 다시 돌리지 않고 바로 실패, 대상은 지우지 않음" \
   '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 1 ] && [ -e $MR/k/scripts/dtc/flattree.o ] && grep -q "error: something" $MR/out.txt' || cat $MR/out.txt
+check "drivers/kernel/prepare.sh: 커널 준비의 make(olddefconfig, modules_prepare)는 모두 make_retry로(리뷰 10·17)" \
+  'grep -q "^make_retry .*olddefconfig" $B/drivers/kernel/prepare.sh && grep -q "^make_retry .*modules_prepare" $B/drivers/kernel/prepare.sh && ! grep -q "^make " $B/drivers/kernel/prepare.sh'
+# build-in-container.sh check_cflags(리뷰 14): 가짜 .cmd(첫 줄이 컴파일 명령)로. 함수만 떼어 lib.sh와 함께 돌린다
+CF=$T/cf
+cfrun() { (bash -c '. "$1"; eval "$(sed -n "/^check_cflags() {/,/^}/p" "$2")"; check_cflags "$3"' x $B/drivers/lib.sh $B/drivers/build-in-container.sh $CF) > $CF.out 2>&1; echo $? > $CF.rc; }
+cfobj() { mkdir -p $CF/$1; printf 'cmd_%s/x.o := /work/tc/bin/arm-eabi-gcc -Wp,-MD,%s/.x.o.d -O2 %s -fno-common -Wall -c -o %s/x.o %s/x.c\n' $CF/$1 $CF/$1 "$2" $CF/$1 $CF/$1 > $CF/$1/.x.o.cmd; }
+rm -rf $CF; cfobj a "-march=armv7-a -mabi=aapcs-linux"; cfobj b "-march=armv7-a -mabi=aapcs-linux"
+printf 'cmd_%s/built-in.o := arm-eabi-ld -EL -r -o built-in.o a.o\n' $CF > $CF/.built-in.o.cmd
+cfrun
+check "drivers/build-in-container.sh check_cflags: 모든 오브젝트의 옵션이 같고 -march=armv7-a면 통과(링크 .cmd·-Wp 경로는 보지 않음)" \
+  '[ "$(cat $CF.rc)" = 0 ] && grep -q "오브젝트 2개가 같음, -march=armv7-a" $CF.out' || cat $CF.out
+cfobj b "-march=armv5t -Wa,-march=armv7-a -mabi=aapcs-linux"; cfrun
+check "drivers/build-in-container.sh check_cflags: 한 오브젝트라도 옵션이 다르면(cc-option이 armv5t로 넘어감) 실패" \
+  '[ "$(cat $CF.rc)" != 0 ] && grep -q "오브젝트마다 컴파일 옵션이 다릅니다" $CF.out' || cat $CF.out
+cfobj a "-march=armv5t -Wa,-march=armv7-a -mabi=aapcs-linux"; cfrun
+check "drivers/build-in-container.sh check_cflags: 모두 같아도 armv7-a가 아니면 실패" \
+  '[ "$(cat $CF.rc)" != 0 ] && grep -q "\-march=armv7-a가 아닙니다" $CF.out' || cat $CF.out
 
 # --- 끝까지: 빌드 → HMG-API 엔진에 설치(HMGAPI_SRC가 있을 때만) ---
 if [ -n "$HMGAPI_SRC" ]; then

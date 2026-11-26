@@ -6,7 +6,7 @@
 # 필요한 것: docker(linux/amd64를 돌릴 수 있어야 함. Apple Silicon은 colima 등의 qemu 에뮬레이션). 받은 자료와 준비한 커널은
 # Docker 볼륨 nx4kor-drivers에 두고 다시 쓴다(처음은 받기·커널 준비로 오래 걸림). 지우려면 docker volume rm nx4kor-drivers.
 # 빌드 날짜·시각(.ko에 문자열로 들어감)은 drivers/나 이 스크립트를 마지막으로 바꾼 커밋의 시각으로 고정한다. 그래서 같은
-# 커밋이면 PC와 CI가 같은 .ko를 만들고, 문서처럼 드라이버와 상관없는 커밋만 쌓여서는 .ko가 바뀌지 않는다(얕은 클론은 안 됨).
+# 커밋이면 같은 .ko가 나와야 하고(다르면 에뮬레이션 쪽을 의심), 문서처럼 드라이버와 상관없는 커밋만 쌓여서는 .ko가 바뀌지 않는다(얕은 클론은 안 됨).
 # 환경 변수: NX4_DRV_JOBS(make -j), NX4_DRV_TRIES(에뮬레이션 충돌 때 make를 모두 몇 번까지 돌릴지, 기본 8),
 #            NX4_DRV_VOLUME(볼륨 이름), NX4_DRV_IMAGE(이미지 이름)
 # 이 스크립트는 저장소의 다른 PC 스크립트처럼 AGPL-3.0이다. 컨테이너 안에서 도는 drivers/는 GPL-2.0(drivers/COPYING).
@@ -48,15 +48,21 @@ esac
 
 # 빌드한 곳의 CPU. x86_64가 아니면 linux/amd64 컨테이너는 에뮬레이션(qemu 등)으로 돈다. 에뮬레이션에서는 컴파일러가 멈추지
 # 않고도 다른 코드를 낸 적이 있다(PR #69, 572128e: 첫 빌드 md5 5035d662…, 다시 빌드하니 CI와 같은 aabf4de7…).
-# 그래서 차에 넣을 .ko는 리눅스 x86(CI·release 워크플로)에서 만든 것만 쓴다. 정보 파일에 남기고 끝에 알린다
-HOST_ARCH=$(uname -m)
+# 그래서 차에 넣을 .ko는 리눅스 x86(CI·release 워크플로)에서 만든 것만 쓴다. 정보 파일에 남기고 끝에 알린다.
+# 에뮬레이션인지는 Docker VM의 CPU(docker info)와 맥의 Apple Silicon 여부(hw.optional.arm64)로 본다. Rosetta로 돈 터미널에서는
+# uname -m이 x86_64라 그것만으로는 모른다(PR #69 리뷰 15)
+DARCH=$(docker info --format '{{.Architecture}}' 2>/dev/null || echo unknown)
+EMU=no
+case "$DARCH" in x86_64|amd64) ;; *) EMU=yes ;; esac
+[ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = 1 ] && EMU=yes
+HOST_ARCH="docker $DARCH, $(uname -s) $(uname -m)"
 docker run --rm --platform linux/amd64 \
   -v "$VOL":/work -v "$B/drivers":/src/drivers:ro -v "$OUT":/out \
   -e MODE=$MODE -e JOBS="${NX4_DRV_JOBS:-}" -e MAKE_TRIES="${NX4_DRV_TRIES:-8}" -e BUILD_DATE="$BDATE" -e BUILD_TIME="$BTIME" \
-  -e HOST_ARCH="$HOST_ARCH" \
+  -e HOST_ARCH="$HOST_ARCH" -e BUILD_EMU=$EMU \
   "$IMG" bash /src/drivers/build-in-container.sh
-case "$HOST_ARCH" in
-  x86_64|amd64) ;;
+case "$EMU" in
+  no) ;;
   *) echo "알림: 이 PC($HOST_ARCH)에서는 에뮬레이션으로 빌드했습니다. 에뮬레이션은 멈추지 않고도 다른 코드를 낼 수 있어, 이 .ko는 차에 넣지 마세요."
      echo "      확인용입니다. 같은 커밋의 CI(drivers 워크플로) md5와 견주고, 차에는 CI·release 워크플로가 만든 .ko를 씁니다(drivers/README.md)." ;;
 esac

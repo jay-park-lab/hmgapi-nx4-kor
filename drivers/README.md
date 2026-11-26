@@ -39,13 +39,14 @@ sh scripts/build-driver.sh
 - 받기는 잠깐의 오류(503 등)면 15초씩 쉬며 8번까지 다시 묻습니다. googlesource는 툴체인 묶음을 그때 만들어 주어 503을 낼 때가 있습니다.
 - 저장소가 Docker VM에 공유된 곳에 있어야 합니다. colima는 기본으로 홈 폴더와 `/tmp/colima`만 VM에 붙입니다(`/var/folders` 같은 `mktemp -d` 자리는 안 됨). 붙지 않은 곳이면 스크립트가 먼저 알리고 멈춥니다.
 - Docker가 이 셸의 프록시 설정을 이어받아 받기가 막히면, 프록시 변수를 뺀 셸에서 Docker(colima 등)를 다시 시작합니다.
-- GitHub Actions(`.github/workflows/drivers.yml`)도 `drivers/`나 이 스크립트가 바뀐 `feature/` 푸시·PR마다 같은 방법으로 빌드합니다(`--kp-check`, 그다음 우리 드라이버). md5는 실행 요약에, `.ko`는 artifact `drivers-tcc803x`에 있습니다. 같은 커밋이면 PC와 md5가 같아야 합니다.
+- GitHub Actions(`.github/workflows/drivers.yml`)도 `drivers/`나 이 스크립트가 바뀐 `feature/` 푸시·PR마다 같은 방법으로 빌드합니다(`--kp-check`, 그다음 우리 드라이버). md5는 실행 요약에, `.ko`는 artifact `drivers-tcc803x`에 있습니다. 같은 커밋이면 PC와 md5가 같아야 합니다(다르면 PC의 에뮬레이션 쪽을 의심합니다).
 
 ### 차에 넣을 `.ko`는 CI에서 만든 것만
 
 - **차에 넣는 `.ko`는 리눅스 x86에서 만든 것만 씁니다**(CI `drivers` 워크플로의 artifact, 4단계부터는 release 워크플로. 2026-11-26 결정).
 - 까닭: Apple Silicon 맥의 qemu 에뮬레이션에서 컴파일러가 **멈추지 않고도 다른 코드를 낸 적이 있습니다**. PR #69의 커밋 `572128e`를 PC에서 빌드했을 때 첫 빌드는 md5 `5035d662…`(`.text`가 다르고 여러 함수의 레지스터 배정·분기 배치가 다름)였습니다. 같은 커널 트리로 다시 빌드하니 CI와 같은 `aabf4de7…`가 나왔습니다. 충돌(Segmentation fault)은 알 수 있어 다시 돌리지만, 이런 조용한 차이는 빌드만으로는 알 수 없습니다.
-- 그래서 PC 빌드는 개발·확인용입니다. `scripts/build-driver.sh`는 PC가 x86_64가 아니면 끝에 알리고, `bcmdhd.ko.txt`에 `build host <CPU> (emulated: …)`를 적습니다. PC 결과를 쓰려면 같은 커밋의 CI md5와 같은지 먼저 봅니다.
+- 원인으로 보이는 것(PR #69 리뷰 14): 커널 `arch/arm/Makefile`은 make마다 컴파일러로 `-march=armv7-a`가 되는지 물어(`cc-option`) 안 되면 조용히 `-march=armv5t`로 넘어갑니다. 에뮬레이션에서 그 물음 중에 컴파일러가 멈추면 다른 옵션으로 컴파일됩니다. 그래서 빌드는 끝에 모든 오브젝트의 컴파일 옵션(`-m`·`-f`·`-W`·`-O` 등)이 서로 같고 `-march=armv7-a`인지 보고, 아니면 실패로 끝냅니다(`check_cflags`). 그 옵션 묶음의 sha256은 `bcmdhd.ko.txt`의 `cflags` 줄에 남아 PC와 CI를 견줄 수 있습니다.
+- 그래도 PC 빌드는 개발·확인용입니다. `scripts/build-driver.sh`는 Docker VM의 CPU가 x86_64가 아니거나 맥이 Apple Silicon이면(Rosetta 터미널 포함) 끝에 알리고, `bcmdhd.ko.txt`에 `build host <Docker VM CPU>, <OS CPU> (emulated: …)`를 적습니다. PC 결과를 쓰려면 같은 커밋의 CI md5와 같은지 먼저 봅니다.
 
 방법이 KP와 같은지 확인하려면:
 
