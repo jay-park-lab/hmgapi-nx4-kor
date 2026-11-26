@@ -133,8 +133,8 @@ HMG-API는 훅 때문에 내비가 제대로 뜨지 못한다고 보면 스스�
 한국 카플레이 길안내([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67), HMG-API 앱의 NX4 KOR 설정 `kor_tbt`)가 공식 무선 모드의 계기판·HUD 길안내를 덮어씁니다.
 
 1. 이상하게 보인 시각을 적고, 그때 폰 화면의 안내(예: "차선 유지", "약간 좌회전")를 함께 남깁니다.
-2. HMG-API 앱 Logs 탭(Everything)에서 그 시각 앞뒤의 `nx4-kor` 줄을 봅니다. `CarPlay: maneuver type … side … junction … exit …`가 받은 안내입니다(길·장소 이름은 남지 않음). 설정 `kor_tbt_log`가 켜져 있으면 곧 회전 판단, 계기판에 보낸 값, 보낸 HUD 목록(`CarPlay: hud list …`) 줄이 더 있습니다. 2.1.2-beta.2부터 기본으로 꺼져 있으니, 기록이 필요하면 HMG-API 앱의 NX4 KOR 설정에서 켜고 다시 시작합니다([#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)). 같은 시각의 `wireless-carplay-aa` 줄은 공식 모드의 것입니다.
-3. `route guidance reaches this listener` 줄이 한 번도 없으면 이 모드가 길안내를 받지 못한 것입니다. 그때는 공식 모드 혼자 보냅니다.
+2. HMG-API 앱 Logs 탭(Everything)에서 그 시각 앞뒤의 `nx4-kor` 줄을 봅니다. `CarPlay: maneuver type … side … junction … exit …`가 받은 안내입니다(길·장소 이름은 남지 않음). 설정 `kor_tbt_log`가 켜져 있으면 곧 회전 판단, 계기판에 보낸 값, 보낸 HUD 목록(`CarPlay: hud list …`) 줄이 더 있습니다. 2.1.2-beta.2부터 기본으로 꺼져 있으니, 기록이 필요하면 HMG-API 앱의 NX4 KOR 설정에서 켜고 다시 시작합니다([#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)). 같은 시각의 `wireless-carplay-aa` 줄은 공식 모드의 것입니다. 공식 모드의 `CarPlay: hud list type …` 줄은 그 모드가 계산한 값이고, 이 모드가 길안내를 하는 동안(`guidance on` 뒤)에는 계기판에 이 모드의 값이 갑니다. 2.1.2-beta.4부터는 길안내를 시작할 때도 공식 모드의 호출이 이 모드의 값을 잠깐(250ms까지) 기다립니다(`docs/design.md` "공식 호출 잠깐 붙잡기").
+3. `route guidance reaches this listener` 줄이 한 번도 없으면 이 모드가 길안내를 받지 못한 것입니다. 그때는 공식 모드 혼자 보냅니다. `giving way until it hears again` 줄이 있으면 그 뒤 이 모드가 다시 받을 때까지 공식 모드의 값이 그대로 갑니다. 공식 모드의 그림이 몇 초씩 보였다면 그 시각 앞뒤에 이 줄이나 `maneuver N unknown … asked again` 줄이 있는지도 적어 주세요.
 4. 공식 모드 그대로 쓰려면 HMG-API 앱에서 NX4 KOR의 `kor_tbt`를 끄고 변경 사항을 적용한 뒤 재부팅합니다. 공식 무선 모드의 `tbt`는 켜 둡니다.
 5. 기록과 시각을 [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)에 적어 주세요.
 
