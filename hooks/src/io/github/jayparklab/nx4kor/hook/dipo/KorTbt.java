@@ -3,6 +3,8 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 // the 1-second refresh and the Stop/Start restart follow the official Wireless CarPlay + Android Auto
 // mod's Dipo.java (Open-HMG/hmgapi-wireless-cp-aa v2.2.0-rc.9, VysseCodes, AGPL-3.0) and Korea
 // Projection's (StopDragon/HMG-API korea-build 6258357, AGPL-3.0). The cluster override is NX4 KOR's.
+// Modified by NX4 KOR, 2026-11-26 (2.1.2-beta.4, #67): an official mod's call this mod has nothing for yet waits
+//   briefly for this mod's thread (TbtGate.held), so a start no longer shows the official mod's first set.
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -11,6 +13,7 @@ import android.content.ServiceConnection;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.SystemClock;
 
 import com.tcc.iap2.IIap2Listener;
@@ -45,6 +48,11 @@ import hmgapi.hook.ModContext;
  *    show the same. With nothing from this listener (none of ours active), the official mod's
  *    calls pass as they are. If the official mod keeps calling while this listener hears nothing
  *    for 3 s, this mod gives way (its calls pass, ours stop resending) until it hears again.
+ *    The official mod has no resend timer, so at a start (or on again) its first set, drawn
+ *    before this thread had any of its own, stayed on the cluster until this thread sent: such a
+ *    call now waits up to TbtGate.HOLD_MS for this thread to finish the update this listener has
+ *    heard (or is about to), then carries this thread's arguments if there are any (held, not on
+ *    the main thread).
  * 3. A Stop of the phone's route guidance that isn't this mod's own clears ours 2 s later, unless
  *    the phone sends again meanwhile: the official mod asks again with Stop and Start (a source
  *    change, its watchdog), and only DiPO's own Stop (CarPlay ends) is followed by silence.
@@ -78,6 +86,20 @@ public final class KorTbt {
     static final TbtGate gate = new TbtGate();
     /** points whose first override was logged */
     static final Set<String> overrideLogged = Collections.synchronizedSet(new HashSet<String>());
+    /** points whose first held-then-overridden call was logged (only with kor_tbt_log) */
+    static final Set<String> heldLogged = Collections.synchronizedSet(new HashSet<String>());
+    /** a held call's clock and wait: elapsedRealtime, and Object.wait on the gate (TbtGate.done wakes it) */
+    static final TbtGate.Waits WAITS = new TbtGate.Waits() {
+        @Override
+        public long now() {
+            return SystemClock.elapsedRealtime();
+        }
+
+        @Override
+        public void await(Object lock, long ms) throws InterruptedException {
+            lock.wait(ms);
+        }
+    };
     /** set while this mod itself calls the iAP2 server (its restart), so its own Stop isn't DiPO's */
     static final ThreadLocal<Boolean> OWN = new ThreadLocal<Boolean>();
     static final Object RESTART_LOCK = new Object();
@@ -191,7 +213,10 @@ public final class KorTbt {
                 + (bound ? "binding" : "can't be bound"));
     }
 
-    /** a cluster call: remember ours, give the official mod's ours (TbtGate.forOther) */
+    /**
+     * a cluster call: remember ours, give the official mod's ours (TbtGate.forOther); one this mod has nothing for yet
+     * may wait for this thread first (TbtGate.held, at most TbtGate.HOLD_MS, never on the main thread)
+     */
     static void override(final String point) {
         mod.hook(null, "framework.navigation_cluster." + point, new MethodHook() {
             @Override
@@ -200,11 +225,23 @@ public final class KorTbt {
                     gate.ours(point, p.args);
                     return;
                 }
-                Object[] c = gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), mod.enabled());
+                boolean on = mod.enabled();
+                long at = SystemClock.elapsedRealtime();
+                Object[] c = gate.forOther(point, p.args.length, at, on);
+                boolean held = false;
+                if (c == null && on && Looper.myLooper() != Looper.getMainLooper()) {
+                    c = gate.held(point, p.args.length, on, WAITS);
+                    held = c != null;
+                }
                 if (c == null) return;
                 System.arraycopy(c, 0, p.args, 0, c.length);
                 if (overrideLogged.add(point)) {
                     log("CarPlay (NX4 KOR): " + point + " from the official mod replaced with ours (logged once per call)");
+                }
+                CpTurnsFit t = turns;
+                if (held && t != null && t.debug && heldLogged.add(point)) {
+                    log("CarPlay (NX4 KOR): " + point + " from the official mod held " + (SystemClock.elapsedRealtime() - at)
+                            + " ms for ours (debug, logged once per call)");
                 }
             }
         });
@@ -212,18 +249,30 @@ public final class KorTbt {
 
     /** runs r on the thread, then notes whether guidance is on (and forgets our calls when it goes off) */
     static void post(final Runnable r) {
+        post(r, 0L);
+    }
+
+    /** post, for the listener's update seq (TbtGate.heard): then a held official call looks again (TbtGate.done) */
+    static void post(final Runnable r, final long seq) {
         Handler h = handler;
-        if (h == null) return;
+        if (h == null) {
+            if (seq > 0L) gate.done(seq);
+            return;
+        }
         h.post(new Runnable() {
             @Override
             public void run() {
                 try {
-                    r.run();
-                } catch (Throwable x) {
-                    // #77: the first few only (one failing every update would fill the log with stacks)
-                    if (postErrors++ < 3) error("CarPlay (NX4 KOR) turn-by-turn", x);
+                    try {
+                        r.run();
+                    } catch (Throwable x) {
+                        // #77: the first few only (one failing every update would fill the log with stacks)
+                        if (postErrors++ < 3) error("CarPlay (NX4 KOR) turn-by-turn", x);
+                    }
+                    noteActive();
+                } finally {
+                    if (seq > 0L) gate.done(seq);
                 }
-                noteActive();
             }
         });
     }
@@ -335,7 +384,7 @@ public final class KorTbt {
                 wasOff = true;
                 return;
             }
-            gate.heard(SystemClock.elapsedRealtime());
+            final long seq = gate.heard(SystemClock.elapsedRealtime());
             if (refreshBackedOff) {
                 refreshBackedOff = false;
                 Handler h = handler;
@@ -363,7 +412,7 @@ public final class KorTbt {
                     else if (what == RG_MANEUVER) turns.maneuver(msg);
                     else turns.lanes(msg);
                 }
-            });
+            }, seq);
         }
     }
 }

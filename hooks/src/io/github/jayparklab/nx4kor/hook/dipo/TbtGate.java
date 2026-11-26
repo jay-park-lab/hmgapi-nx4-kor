@@ -1,5 +1,6 @@
 package io.github.jayparklab.nx4kor.hook.dipo;
 // NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-26 (#67, PR #68 review 1-4).
+// Modified by NX4 KOR, 2026-11-26 (2.1.2-beta.4, #67): the other sender's call held for this mod's (hold, held, done).
 
 import java.util.Arrays;
 import java.util.Map;
@@ -26,6 +27,19 @@ import java.util.concurrent.ConcurrentHashMap;
  *   and the official mod carried exactly those within CARRIED_MS (skipOurs). A call the
  *   official mod doesn't make (#67's stalled turn) or a resend while the phone is quiet
  *   (the official mod sends nothing then) still goes out.
+ * - Holding the other sender's call (2026-11-26, 2.1.2-beta.4, #67): both listeners get the
+ *   same update, and when the official mod's thread draws it first while this mod has
+ *   nothing for that call yet (its guidance not on yet: a start, or on again after a Stop,
+ *   a source change or the end of a route; or no value of its own for that call), that
+ *   whole set went to the cluster as the official mod's, and stayed there until this mod's
+ *   thread sent its own (the official mod has no resend timer). So such a call waits
+ *   (held), at most HOLD_MS, for this mod's thread to finish what its listener has heard;
+ *   if this mod then has its values, the call carries them. A listener that hasn't heard
+ *   the update yet gets HEAR_MS to hear it. If this mod still has nothing, the call passes
+ *   as before, and the next ones don't wait until its listener hears something new (one
+ *   wait per update at most, none for a listener that hears nothing: the official mod
+ *   alone). Only that call's thread waits (Object.wait, woken by done); this mod's thread
+ *   never waits for it.
  */
 final class TbtGate {
     static final long QUIET_MS = 3000L;
@@ -40,6 +54,13 @@ final class TbtGate {
      * ask-again. Both mods ask again with Stop, 200 ms, Start, so a real resend comes later (PR #68 review 12).
      */
     static final long STOP_RESEND_MIN_MS = 150L;
+    /**
+     * How long the other sender's call waits at most for this mod's thread (held): well under the phone's update
+     * (about a second) and the official mod's next call, long enough for this mod's thread to finish an update
+     */
+    static final long HOLD_MS = 250L;
+    /** Within HOLD_MS, how long it waits for this mod's listener to hear the update at all (it may be just behind) */
+    static final long HEAR_MS = 50L;
 
     private final Map<String, Object[]> last = new ConcurrentHashMap<String, Object[]>();
     /** per call: this mod's arguments (the very array in last) when the official mod last carried them, and when */
@@ -56,6 +77,8 @@ final class TbtGate {
     private volatile long otherLast = -1L;
     /** when another's Stop was seen and its clear is pending (-1: none) */
     private volatile long stopAt = -1L;
+    /** updates this mod's listener heard, the last one its thread finished, and heardSeq when a held call last passed */
+    private long heardSeq, doneSeq, passedSeq = -1L;
 
     /** a cluster call from this mod's thread */
     void ours(String point, Object[] args) {
@@ -119,11 +142,90 @@ final class TbtGate {
         return h < 0L || now - h >= QUIET_MS;
     }
 
-    /** this mod's listener heard the phone (120, 121, 122) */
-    void heard(long now) {
+    /** this mod's listener heard the phone (120, 121, 122): the update's number, for done once this mod's thread is through */
+    synchronized long heard(long now) {
         heardAt = now;
         otherSince = -1L;
         otherLast = -1L;
+        return ++heardSeq;
+    }
+
+    /** this mod's thread is through with update seq (and noted whether its guidance is on): held calls look again */
+    synchronized void done(long seq) {
+        if (seq > doneSeq) doneSeq = seq;
+        notifyAll();
+    }
+
+    /** time and waiting for a held call (KorTbt: elapsedRealtime and Object.wait; the PC tests their own) */
+    interface Waits {
+        long now();
+
+        /** waits on lock, whose monitor the caller holds, at most ms (or until done notifies) */
+        void await(Object lock, long ms) throws InterruptedException;
+    }
+
+    /** a held call: when it came, and the update of this mod's listener it waits for this mod's thread to be through with */
+    static final class Hold {
+        final long start, target;
+
+        Hold(long start, long target) {
+            this.start = start;
+            this.target = target;
+        }
+    }
+
+    /** this mod has nothing to give the other sender's call: its guidance is off, or it never made that call since */
+    private boolean lacks(String point) {
+        return !active || last.get(point) == null;
+    }
+
+    /**
+     * the other sender's call that forOther gave nothing: hold it (non-null) only when this mod lacks it (not when giving
+     * way, or for another argument count) and either its thread hasn't finished what its listener heard, or its listener
+     * may be just about to hear that update; not again after a held call passed, until the listener hears something new
+     */
+    synchronized Hold hold(String point, long now) {
+        if (!lacks(point) || passedSeq == heardSeq) return null;
+        return new Hold(now, doneSeq < heardSeq ? heardSeq : heardSeq + 1);
+    }
+
+    /**
+     * how much longer the held call waits (ms, 0: no longer): until this mod has its values, or its thread is through with
+     * the update waited for, at most HOLD_MS from the start, or HEAR_MS while the listener hasn't heard that update
+     */
+    synchronized long holdLeft(Hold h, String point, long now) {
+        if (!lacks(point) || doneSeq >= h.target) return 0L;
+        long limit = heardSeq >= h.target ? HOLD_MS : HEAR_MS;
+        return Math.max(0L, h.start + limit - now);
+    }
+
+    /** a held call passed after all: don't hold again until this mod's listener hears something new */
+    synchronized void holdPassed() {
+        passedSeq = heardSeq;
+    }
+
+    /**
+     * for a call forOther gave nothing: forOther again after waiting for this mod's thread, if hold says so. This mod's
+     * arguments for it, or null to let it pass as it is (also at once when there's nothing to wait for). Only the
+     * calling thread waits, without spinning (done wakes it).
+     */
+    Object[] held(String point, int argc, boolean enabled, Waits w) {
+        if (!enabled) return null;
+        Hold h = hold(point, w.now());
+        if (h == null) return null;
+        synchronized (this) {
+            for (long left; (left = holdLeft(h, point, w.now())) > 0L;) {
+                try {
+                    w.await(this, left);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        Object[] c = forOther(point, argc, w.now(), enabled);
+        if (c == null) holdPassed();
+        return c;
     }
 
     /** this mod's guidance on or off after a step: 1 turned on, -1 turned off (its calls forgotten), 0 the same */

@@ -128,8 +128,13 @@ assert pairs == CL, pairs
 assert "restart.run()" not in fit and fit.count("new Thread(restart, ") >= 1, "restart"
 assert "\"dipo.iap2_proxy.stop_route_guidance\"" in part
 # 판단은 TbtGate가 한다(아래 호스트 테스트): 우리 호출 기록, 남의 호출에 줄 인자, 남의 Stop 미루기, 비켜 주기, 앱에서 끔
-for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), mod.enabled())",
+for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, at, on)",
           "gate.stopSeen(", "gate.stopDue(", "gate.yielding(", "gate.heard(", "gate.setActive(turns.active())",
+          # 2.1.2-beta.4: a call ours has nothing for yet waits for this thread (TbtGate.held), never on the main thread;
+          # the listener numbers the update and its post says when this thread is through (done wakes the call)
+          "boolean on = mod.enabled();", "c = gate.held(point, p.args.length, on, WAITS);",
+          "Looper.myLooper() != Looper.getMainLooper()", "lock.wait(ms);", "final long seq = gate.heard(", "}, seq);",
+          "if (seq > 0L) gate.done(seq);",
           # 앱에서 끄면 받지 않고, 상태와 "그렸다" 표시를 비우고, 다시 켜면 길안내 전체를 다시 요청한다(PR #68 리뷰 2·11)
           "if (!mod.enabled()) {", "turns.reset();", "turns.shown = false;", "turns.hudShown = false;", "if (wasOff) {",
           # giving way: REFRESH waits for the way to end, hearing again brings it back (#77, PR #78 review 5·10)
@@ -141,7 +146,7 @@ if command -v javac >/dev/null 2>&1; then
   mkdir -p $T/gate
   javac --release 8 -Xlint:-options -nowarn -d $T/gate $HK/dipo/TbtGate.java $B/tests/tools/TbtGateTest.java > $T/gate.err 2>&1
   java -cp $T/gate io.github.jayparklab.nx4kor.hook.dipo.TbtGateTest > $T/gate.out 2>&1
-  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음), 공식 모드가 우리 최신 값을 900ms 안에 실어 보냈으면 같은 값의 우리 호출을 건너뜀(#77)" \
+  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음), 공식 모드가 우리 최신 값을 900ms 안에 실어 보냈으면 같은 값의 우리 호출을 건너뜀(#77), 우리 값이 아직 없는 공식 호출은 우리 스레드가 같은 갱신을 끝낼 때까지 250ms(못 들었으면 50ms)까지 기다려 우리 값을 실음(2.1.2-beta.4)" \
     'tail -n 1 $T/gate.out | grep -qx ok && ! grep -q "^FAIL" $T/gate.out' || cat $T/gate.err $T/gate.out
 else
   echo "skip TbtGate 테스트(javac 없음)"
