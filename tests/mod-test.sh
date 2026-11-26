@@ -1021,7 +1021,7 @@ for s in (b"NX4 Hotspot", b"CarPlayNX4", b"x", b"SECRETPW123"):
     d += struct.pack(">H", len(s)) + s
 open(sys.argv[1], "wb").write(d)
 PY
-# 준비된 차: HMG-API rc.9(훅 켜짐, map 확인됨), 공식 모드 2.2.0-rc.9가 켜지고 훅이 켜짐, 무선 기능·순정 핫스팟 기능 켜짐,
+# 준비된 차: HMG-API rc.10(훅 켜짐, map 확인됨), 공식 모드 2.2.0-rc.9가 켜지고 훅이 켜짐, 무선 기능·순정 핫스팟 기능 켜짐,
 # 프로젝션 AP 요청이 있고 이번 부팅에 떠서 netd(99)가 띄운 hostapd(1234)가 카플레이 SSID(S2)로 돎, Wi-Fi 칩을 본 기록
 streset() {
   rm -rf $SH $T/sw $T/sproc $T/sysnet $T/procnet $T/shlog $T/sprog $T/status.txt $T/ps.out $T/wifiseen $T/shook

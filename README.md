@@ -110,7 +110,8 @@
    - **HMG-API 1.1.0-rc.10 이상인 차:** 바로 아래 3으로 갑니다.
    - USB의 `HMGAPI/install.log`에 `isn't a known stock build`가 있으면, HMG-API가 이 차의 소프트웨어 판(`app_process`)을 아직 확인하지 않은 것입니다. 아무것도 바뀌지 않았습니다.
      - 1.1.0-rc.10부터는 `HMGAPI/FORCE`로 넘길 수 없습니다. [HMG-API 이슈](https://github.com/Open-HMG/HMG-API/issues/new/choose)에 그 줄과 차, 내비 소프트웨어 판을 올리면 HMG-API가 그 판을 더합니다.
-     - NX4 260902의 순정 `app_process`는 HMG-API가 아는 판입니다(2026-11-21 차에서 `FORCE` 없이 설치, [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)). 그래서 순정 차에서는 이 문구가 나오지 않습니다.
+     - 투싼 하이브리드(NX4HEV) 260902의 순정 `app_process`는 HMG-API가 아는 판입니다(2026-11-21 차에서 `FORCE` 없이 설치, [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
+     - 가솔린·디젤 NX4가 같은 파일인지는 아직 모릅니다. HMG-API rc.10은 현대 한국 260902 이미지(HMC KOR)를 아직 확인하지 않은 것으로 적습니다(`install/common/stock.txt`). 그런 차에서 이 문구가 나와도 차가 순정이 아니라는 뜻은 아니니, 위와 같이 HMG-API 이슈에 올립니다.
      - 2.1.0 묶음(rc.8)은 NEMESIS 1.17의 스크립트를 몰라 이 문구로 거절했고, 이 README는 그때 `FORCE`를 쓰라고 안내했습니다. 그렇게 설치한 차는 1.1.0-rc.9로 올리지 마세요. 2.1.1 이후 USB(rc.10)가 NEMESIS가 남긴 순정 파일로 다시 설치해 고칩니다([#397](https://github.com/Open-HMG/HMG-API/issues/397)).
    - `… is HMG-API's wrapper but its stock copy (app_process.hmgapi-stock) is gone …`이나 `… stock copy HMG-API's wrapper runs, is …`가 있으면 예전 HMG-API 삭제나 `FORCE` 설치가 남긴 상태입니다. 아무것도 바뀌지 않았습니다. **재부팅하지 말고** [`docs/troubleshooting.md`](docs/troubleshooting.md) "HMG-API를 지운 뒤 Android가 뜨지 않을 때"와 [#397](https://github.com/Open-HMG/HMG-API/issues/397)을 봅니다.
    - HMG-API 앱의 "Check USB updates"로 모드를 넣는 HMG-API 문서의 방법은 처음에는 쓸 수 없습니다. HMG-API에 NX4 map이 없어 HMG-API 앱 타일이 생기지 않기 때문입니다. 이 USB 설치기가 map을 만들어 줍니다.

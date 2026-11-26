@@ -265,7 +265,9 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - 모으는 데 얼마나 걸리는지. Car Report는 map 만들기와 같은 분석이라 1~2분을 어림합니다.
 - **DSP OTA 뒤 재부팅하지 않고 끝내도 되는지.** OTA 화면이 이상하게 남으면 관리 앱의 [지금 재부팅]이나 RESET을 쓰세요.
 - **DSP OTA 화면 위로 관리 앱이 열리는지**(`am start`). 안 열리면 재부팅 뒤 같은 USB로 Update OTA를 다시 누릅니다.
-- HMG-API 설치기가 NX4의 `app_process`를 아는지: **확인함**. 2026-11-21 NX4HEV 260902에서 `FORCE` 없이 설치됐습니다(`stock (Kia EV6 US 260507)`, md5 `33f79811…`, [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)). rc.10 `stock.txt`에도 같은 md5가 있습니다. rc.10부터 `HMGAPI/FORCE`가 없어져 모르는 판은 늘 거절하므로, 다른 판의 NX4가 나오면 HMG-API 이슈로 그 판을 더해야 합니다.
+- **HMG-API 설치기가 NX4의 `app_process`를 아는지.**
+  - 하이브리드(NX4HEV) 260902는 확인했습니다. 2026-11-21에 `FORCE` 없이 설치됐고(`stock (Kia EV6 US 260507)`, md5 `33f79811…`, [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)), rc.10 `stock.txt`에도 같은 md5가 있습니다.
+  - **가솔린·디젤 NX4(`NX4.KOR…260902`)는 아직 확인하지 않았습니다.** HMG-API rc.10 `stock.txt`는 HMC KOR 260902를 확인하지 않은 이미지로 적습니다. rc.10부터 `HMGAPI/FORCE`가 없어 모르는 판은 늘 거절합니다. 그런 차에서 `isn't a known stock build`가 나오면 그 줄로 HMG-API 이슈를 열어 판을 더해야 합니다. USB `HMGAPI/install.log`의 `app_process: stock (…)` 줄로 봅니다.
 - **Korea Projection이 설치된 차에서 USB 설치가 실제로 멈추는지**([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). Update OTA를 누르면 토스트 "NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다…"로 멈추고, 아무것도 바뀌지 않는지(HMG-API 설치·업데이트 없음, 진행 기록 없음) 봅니다. USB의 `NX4/install.log`에 `원본 Korea Projection 패키지가 있음(…)`이 남아야 합니다. 설치기가 그 폴더를 보지 못하면(경로가 다르거나 DSP OTA 프로세스에서 접근이 막힘) 조용히 지나가 예전처럼 설치합니다.
 - **NEMESIS에서 Korea Projection을 지우고 재부팅하면 `/data/nemesis/apps/korea.projection` 폴더가 없어지는지**([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). 지운 직후(재부팅 전)에도 없어지는지 함께 봅니다. USB 설치기는 그 폴더만 보고 멈추므로, 재부팅한 뒤에도 폴더가 남으면 계속 "NEMESIS에 Korea Projection이 설치되어 있어…"로 멈춥니다.
 - **Wi-Fi 부품이 없는 차에서 관리 앱이 "부품 없음"을 보이는지**(2026-11-23 NX4HEV 260902, 2.0.4-beta.1에서 순정 핫스팟 기능을 켜도 칩이 올라오지 않음, #38).
