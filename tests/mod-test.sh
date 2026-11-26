@@ -735,7 +735,25 @@ echo "Linux version 3.18.24-tcc (gcc version 4.7)" > $R/proc/version; echo "bcmd
 echo 1 > $R/sys/module/tcc_dwc_otg/parameters/vbus_control_enable
 printf 'CONFIG_CFG80211=y\nCONFIG_MODVERSIONS=n\n' > $T/kconfig; gzip -c $T/kconfig > $R/proc/config.gz
 printf 'dhd\nvermagic=3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8 \nlicense=GPL\n' > $R/system/wifi/bcmdhd.ko; echo fw > $R/system/wifi/fw_bcmdhd.bin
-printf 'wifi_load_driver\n/system/wifi/bcmdhd.ko\niface_name=\nunrelated text\n' > $R/system/lib/libhardware_legacy.so
+printf 'wifi_load_driver\n/system/wifi/bcmdhd.ko\niface_name=\nwifi_check_module_info\nunrelated text\n' > $R/system/lib/libhardware_legacy.so
+# #80 차 확인(mount.txt): init·이 설치기·system_server·HMG-API 프로세스의 mount 이름공간과 mountinfo, SELinux.
+# 이름공간 링크는 ls -l로 읽으므로 대상 이름만 가진 링크로 흉내 낸다. system_server는 다른 이름공간에 둔다
+for _p in 1 self 200 300 400; do mkdir -p $R/proc/$_p/ns; done
+ln -s 'mnt:[4026531840]' $R/proc/1/ns/mnt; ln -s 'mnt:[4026531840]' $R/proc/self/ns/mnt
+ln -s 'mnt:[4026532001]' $R/proc/200/ns/mnt; ln -s 'mnt:[4026531840]' $R/proc/300/ns/mnt
+echo init > $R/proc/1/comm; echo system_server > $R/proc/200/comm; echo app_process > $R/proc/300/comm; echo hmgapid > $R/proc/300/cmdline
+echo zygote > $R/proc/400/comm
+# 시작 시각: stat 22번째 칸(1/100초). system_server 12.34초, HMG-API 23.45초
+printf '200 (system_server) S %s1234 100 0\n' "$(printf '0 %.0s' $(seq 1 18))" > $R/proc/200/stat
+printf '300 (app_process) S %s2345 100 0\n' "$(printf '0 %.0s' $(seq 1 18))" > $R/proc/300/stat
+_mi='1 0 179:2 / / ro,relatime shared:1 - ext4 /dev/root ro
+20 1 179:3 / /system ro,relatime shared:2 - ext4 /dev/block/system ro
+21 1 179:4 / /data rw,nosuid shared:3 - ext4 /dev/block/data rw
+22 1 0:5 / /dev rw,nosuid shared:4 - tmpfs tmpfs rw'
+printf '%s\n' "$_mi" > $R/proc/1/mountinfo; printf '%s\n' "$_mi" > $R/proc/self/mountinfo; printf '%s\n' "$_mi" > $R/proc/300/mountinfo
+printf '%s\n' "$_mi" | sed 's/shared:\([0-9]\)/master:\1/' > $R/proc/200/mountinfo
+mkdir -p $R/sys/fs/selinux; echo 0 > $R/sys/fs/selinux/enforce
+printf '#!/bin/sh\necho Permissive\n' > $T/bin/getenforce; chmod +x $T/bin/getenforce
 printf 'driver=nl80211\n' > $R/system/bin/hostapd
 for f in idVendor:0bda idProduct:b812 speed:480 bMaxPower:500mA bDeviceClass:00 manufacturer:Realtek product:802.11ac_NIC serial:SERIALX; do echo ${f#*:} > $R/sys/bus/usb/devices/1-1/${f%%:*}; done
 for f in idVendor:1d6b idProduct:0002 speed:480; do echo ${f#*:} > $R/sys/bus/usb/devices/usb1/${f%%:*}; done
@@ -769,6 +787,8 @@ check "USB 설치기 진단 기록(동글 준비): /system/wifi 목록·md5, 순
   'grep -q "fw_bcmdhd.bin" $DG/system-wifi-ls.txt && grep -qx "$KO5  /system/wifi/bcmdhd.ko" $DG/system-wifi-md5.txt && grep -q "^/system/wifi/bcmdhd.ko: vermagic=3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8" $DG/ko-vermagic.txt && grep -qx "== /system/lib/libhardware_legacy.so" $DG/wifi-strings.txt && grep -qx "iface_name=" $DG/wifi-strings.txt && grep -qx "/system/wifi/bcmdhd.ko" $DG/wifi-strings.txt && grep -qx "driver=nl80211" $DG/wifi-strings.txt && ! grep -q "unrelated" $DG/wifi-strings.txt' || cat $DG/wifi-strings.txt $DG/ko-vermagic.txt
 check "USB 설치기 진단 기록(동글 준비): USB 장치(ID·속도·전력·제품), 드라이버에 붙은 인터페이스, 네트워크 장치, 커널 로그의 USB·Wi-Fi 줄. 일련번호·MAC은 넣지 않음" \
   'grep -q "^1-1 0bda:b812 speed=480 maxpower=500mA class=00 manufacturer=Realtek product=802.11ac_NIC$" $DG/usb.txt && grep -q "^usb1 1d6b:0002 " $DG/usb.txt && grep -q "1-1" $DG/usb-ls.txt && grep -qx "== rtl88x2bu" $DG/usb-drivers.txt && grep -qx "1-1:1.0" $DG/usb-drivers.txt && grep -q "wlan0" $DG/net-ls.txt && grep -q "new high-speed USB device" $DG/dmesg-usb-wifi.txt && grep -q "rtw_ndev_init(wlan0)" $DG/dmesg-usb-wifi.txt && ! grep -q "hmgapi-hook" $DG/dmesg-usb-wifi.txt && ! grep -rqi -e SERIALX -e MACX -e 11:22:33 -e aa:bb:cc -e dd-ee-ff -e 445566 -e 778899 $K/diag && grep -q "동글 준비 정보를 모음" $K/install.log' || cat $DG/usb.txt $DG/dmesg-usb-wifi.txt
+check "USB 설치기 진단 기록(동글 준비, #80): mount.txt에 SELinux(getenforce·enforce), init·설치기·system_server·HMG-API 프로세스의 mount 이름공간과 시작 시각, 그 /·/system·/data mountinfo 줄(전파 표시)" \
+  'grep -qx "selinux_getenforce: Permissive" $DG/mount.txt && grep -qx "selinux_enforce: 0" $DG/mount.txt && grep -qx "ns init(1): mnt:\[4026531840\]" $DG/mount.txt && grep -qx "ns self: mnt:\[4026531840\]" $DG/mount.txt && grep -qx "ns system_server(200): mnt:\[4026532001\] start=12.3s" $DG/mount.txt && grep -qx "ns hmgapi(300 app_process): mnt:\[4026531840\] start=23.4s" $DG/mount.txt && grep -qx "== mountinfo system_server(200)" $DG/mount.txt && grep -q "^20 1 179:3 / /system ro,relatime master:2 " $DG/mount.txt && grep -q "^21 1 179:4 / /data .*shared:3" $DG/mount.txt && ! grep -q " /dev rw" $DG/mount.txt && grep -qx "wifi_check_module_info" $DG/wifi-strings.txt' || cat $DG/mount.txt
 legon; rm -rf $R/data/nx4-kor/backup
 # 내비의 busybox에 strings·sha256sum·gunzip이 없으면 빈 값 대신 까닭을 적음(PR #66 리뷰 2)
 printf '#!/bin/sh\ncase "$1" in strings|sha256sum|gunzip) echo "$1: applet not found" >&2; exit 127 ;; esac\ncommand -v "$1" >/dev/null 2>&1 || exit 127\nexec "$@"\n' > $R/system/bin/busybox

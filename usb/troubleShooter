@@ -645,7 +645,55 @@ diag_bb() {
 #                       드라이버에 붙은 인터페이스
 #   net-ls.txt          네트워크 장치 이름과 경로(MAC은 넣지 않음)
 #   dmesg-usb-wifi.txt  커널 로그 중 USB·Wi-Fi 줄(SerialNumber 줄과 MAC이 든 줄은 뺌)
+#   mount.txt           두 동글 드라이버 중 하나를 순정 bcmdhd.ko 자리에 bind mount하는 안(#80)을 차에서 가르는 값. SELinux 모드,
+#                       mount 이름공간(init·이 설치기·system_server(Wi-Fi HAL이 insmod하는 곳)·HMG-API 프로세스)과 뒤 둘의 시작
+#                       시각(부팅 뒤 초), 그 프로세스들의 /·/system·/data mountinfo 줄(전파 표시 shared·master). busybox 없이
+#                       /proc만 읽는다
 # busybox에 gunzip·sha256sum·strings·grep이 없으면 빈 값 대신 그 까닭을 적는다(bbok)
+# mount 이름공간 이름(ls -l의 링크 대상, 예: mnt:[4026531840]). readlink가 없는 툴박스에서도 되게 ls로 읽는다
+diag_ns() { _nl=$(ls -l "$1" 2>/dev/null); case "$_nl" in *' -> '*) echo "${_nl##* -> }" ;; *) echo "없음" ;; esac; }
+# 프로세스가 부팅 뒤 몇 초에 시작했는지(/proc/<pid>/stat 22번째 칸 starttime, 단위 1/100초 USER_HZ). 순정 bcmdhd가 부팅 약
+# 9.7초에 올라가므로(#80), 부팅 서비스를 띄우는 HMG-API가 그보다 늦는지 본다
+diag_start() {
+  _sl=; read -r _sl < "$1/stat" 2>/dev/null || { echo "?"; return 0; }
+  set -- $_sl
+  [ $# -ge 22 ] || { echo "?"; return 0; }
+  shift 21
+  case "$1" in ''|*[!0-9]*) echo "?" ;; *) echo "$(($1 / 100)).$(($1 / 10 % 10))s" ;; esac
+}
+# mountinfo에서 마운트 지점이 /·/system·/data인 줄
+diag_mi() {
+  [ -f "$1" ] || { echo "(mountinfo 없음)"; return 0; }
+  while read -r _m1 _m2 _m3 _m4 _m5 _mr; do
+    case "$_m5" in /|/system|/data) echo "$_m1 $_m2 $_m3 $_m4 $_m5 $_mr" ;; esac
+  done < "$1"
+}
+# #80 차 확인 값(mount.txt). 프로세스는 /proc/<pid>/comm(이름)으로 찾는다: system_server, 이름이나 명령줄에 hmgapi가 든 것
+diag_mount() {
+  _ss=; _hg=; _hgn=
+  for _pd in $ROOT/proc/[0-9]*; do
+    [ -f $_pd/comm ] || continue
+    read -r _cm < $_pd/comm 2>/dev/null || continue
+    case "$_cm" in system_server) [ -n "$_ss" ] || _ss=${_pd##*/} ;; esac
+    if [ -z "$_hg" ]; then
+      _cl=; [ -f $_pd/cmdline ] && read -r _cl < $_pd/cmdline 2>/dev/null
+      case "$_cm $_cl" in *hmgapi*) _hg=${_pd##*/}; _hgn=$_cm ;; esac
+    fi
+  done
+  {
+    _se=$(getenforce 2>/dev/null) || _se=
+    echo "selinux_getenforce: ${_se:-없음}"
+    if [ -f $ROOT/sys/fs/selinux/enforce ]; then echo "selinux_enforce: $(cat $ROOT/sys/fs/selinux/enforce 2>/dev/null)"; else echo "selinux_enforce: 없음"; fi
+    echo "ns init(1): $(diag_ns $ROOT/proc/1/ns/mnt)"
+    echo "ns self: $(diag_ns $ROOT/proc/self/ns/mnt)"
+    if [ -n "$_ss" ]; then echo "ns system_server($_ss): $(diag_ns $ROOT/proc/$_ss/ns/mnt) start=$(diag_start $ROOT/proc/$_ss)"; else echo "ns system_server: 프로세스 없음"; fi
+    if [ -n "$_hg" ]; then echo "ns hmgapi($_hg $_hgn): $(diag_ns $ROOT/proc/$_hg/ns/mnt) start=$(diag_start $ROOT/proc/$_hg)"; else echo "ns hmgapi: 프로세스 없음"; fi
+    echo "== mountinfo init(1)"; diag_mi $ROOT/proc/1/mountinfo
+    echo "== mountinfo self"; diag_mi $ROOT/proc/self/mountinfo
+    if [ -n "$_ss" ]; then echo "== mountinfo system_server($_ss)"; diag_mi $ROOT/proc/$_ss/mountinfo; fi
+    if [ -n "$_hg" ]; then echo "== mountinfo hmgapi($_hg)"; diag_mi $ROOT/proc/$_hg/mountinfo; fi
+  } > "$1" 2>&1
+}
 diag_dongle() {
   _o=$1; _b=$2
   mkdir -p $_o || { log "진단 기록: 동글 준비 정보 폴더를 만들지 못함"; return 0; }
@@ -711,7 +759,8 @@ diag_dongle() {
     for _f in $ROOT/system/lib/libhardware_legacy.so $ROOT/system/bin/hostapd $ROOT/system/bin/wpa_supplicant $ROOT/system/bin/netd; do
       [ -f "$_f" ] || continue
       echo "== ${_f#$ROOT}"
-      $_b strings $_f 2>/dev/null | $_b grep -E 'bcmdhd|\.ko|iface_name|firmware_path|nvram_path|/system/wifi|nl80211|wlan0|add_ie|wifi\.interface|wlan\.driver|DRIVER_|insmod|rmmod|init_module'
+      # module_info·module_version·/proc/modules: HAL이 올린 모듈을 무엇으로 확인하는지(바꾼 .ko를 거절하는지, #80)
+      $_b strings $_f 2>/dev/null | $_b grep -E 'bcmdhd|\.ko|iface_name|firmware_path|nvram_path|/system/wifi|nl80211|wlan0|add_ie|wifi\.interface|wlan\.driver|DRIVER_|insmod|rmmod|init_module|module_info|module_version|/proc/modules'
     done > $_o/wifi-strings.txt 2>&1
   fi
   [ -n "$_b" ] || echo "busybox가 없어 md5·vermagic·문자열은 빠짐(이름·크기는 system-wifi-ls.txt)" > $_o/system-wifi-md5.txt
@@ -726,6 +775,7 @@ diag_dongle() {
     ls $_r
   done > $_o/usb-drivers.txt 2>&1
   ls -l $ROOT/sys/class/net > $_o/net-ls.txt 2>&1
+  diag_mount $_o/mount.txt
   # 일련번호와 MAC이 든 줄은 뺀다(bcmdhd "Broadcom Dongle Host Driver mac=…", Realtek "rtw_macaddr_cfg MAC Address = …",
   # "hwaddr …", 그 밖에 xx:xx:xx:xx:xx:xx·xx-xx-…·구분자 없는 12자리 꼴, PR #66 리뷰 1·3). 12자리 꼴은 같은 길이의 다른
   # 16진수·숫자 줄도 빼지만, 기록을 공개 이슈에 올리므로 덜 남기는 쪽을 고른다. mksh case 패턴이라 busybox가 필요 없다
