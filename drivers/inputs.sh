@@ -21,6 +21,12 @@ CARCFG_SHA256=d35af8a0e9d098a47720ea66de594f21691d3d9608ce388ed199e0a5f82f9913
 RTL88X2BU_GIT=https://github.com/cilynx/rtl88x2bu.git
 RTL88X2BU_COMMIT=fc158d1f71b9e5dfcd1fccaf4d28725b65086e3b
 
+# 오브젝트 컴파일 옵션 묶음의 지문(lib.sh check_cflags: -m·-f·-W·-O·-g·-std·-D__LINUX_ARM_ARCH__의 sha256). 커널은 make마다
+# 컴파일러에 물어(cc-option) 옵션을 정하므로, 에뮬레이션에서 물음이 실패하면 모든 오브젝트가 똑같이 다른 옵션으로 컴파일될 수
+# 있다. 그래서 리눅스 x86(CI)에서 나온 값으로 고정하고 다르면 실패한다(PR #69 리뷰 18). --kp-check와 기본 빌드가 같은 값이다.
+# 커널 설정·툴체인·드라이버 Makefile·EXTRA_CFLAGS를 바꾸면 CI의 "컴파일 옵션 확인" 줄의 값으로 함께 바꾼다
+EXPECTED_CFLAGS_SHA256=9390b42b0aba76a73b991d19ac512037d39bbc67d181ebfc4ba05367461d6af7
+
 # Korea Projection 1.8.0-beta.2 패키지의 tcc803x용 88x2bu.ko. 같은 방법으로 빌드되는지(빌드 날짜·시각을 KP 값으로
 # 고정하면 md5까지 같음) 확인하는 데 쓴다(build-driver.sh --kp-check)
 KP_88X2BU_MD5=e16ccc0208cb179586f71dfd67631edb

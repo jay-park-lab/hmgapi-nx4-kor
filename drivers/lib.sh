@@ -40,10 +40,13 @@ make_retry() {
   rm -f "$_log.try"
 }
 
-# 컴파일 옵션 확인. 커널 arch/arm/Makefile은 make마다 컴파일러로 -march=armv7-a를 되는지 물어(cc-option), 안 되면 조용히
-# -march=armv5t로 넘어간다. 에뮬레이션에서는 이 물음 중에 컴파일러가 멈춰 다른 옵션으로 컴파일된 적이 있다(PR #69 리뷰 14,
-# 572128e의 조용한 차이). 그래서 컴파일한 모든 오브젝트(.cmd 첫 줄이 arm-eabi-gcc)의 옵션(-m·-f·-W·-O·-g·-std·
-# -D__LINUX_ARM_ARCH__) 묶음이 서로 같고 -march=armv7-a이며 armv5t가 없는지 본다. 그 묶음의 sha256을 CFLAGS_SUM에 둔다
+# 컴파일 옵션 확인. 커널은 make마다 컴파일러에 물어(cc-option) 옵션을 정한다. arch/arm/Makefile은 -march=armv7-a가 안 되면
+# 조용히 -march=armv5t로 넘어가고, -fno-strict-overflow·-fconserve-stack 같은 옵션도 같은 식으로 붙는다. 에뮬레이션에서는 이
+# 물음 중에 컴파일러가 멈춰 다른 옵션으로 컴파일될 수 있다(PR #69 리뷰 14: 실제로 armv5t로 컴파일되어 rev16 어셈블러 오류).
+# 그래서 컴파일한 모든 오브젝트(.cmd 첫 줄이 arm-eabi-gcc)의 옵션(-m·-f·-W·-O·-g·-std·-D__LINUX_ARM_ARCH__) 묶음이
+#   1. 서로 같고(make를 이어 돌린 사이에 바뀌지 않음) 2. -march=armv7-a이며 armv5t가 없고
+#   3. EXPECTED_CFLAGS_SHA256(inputs.sh, CI 값)이 있으면 그 sha256과 같은지(한 번에 끝난 빌드에서 옵션 하나가 모두 똑같이
+#      빠진 경우, 리뷰 18) 본다. 그 묶음의 sha256을 CFLAGS_SUM에 둔다
 check_cflags() {
   _sets=/tmp/cflags.sets; : > $_sets
   for _c in $(find $1 -name '.*.o.cmd'); do
@@ -58,4 +61,8 @@ check_cflags() {
     || die "컴파일 옵션이 -march=armv7-a가 아닙니다(에뮬레이션에서 kbuild cc-option 검사가 실패한 것으로 보임). 다시 돌려 주세요"
   CFLAGS_SUM=$(head -1 $_sets | sha256sum | cut -d' ' -f1)
   echo "컴파일 옵션 확인: 오브젝트 $(grep -c . $_sets)개가 같음, -march=armv7-a ($CFLAGS_SUM)"
+  if [ -n "${EXPECTED_CFLAGS_SHA256:-}" ] && [ "$CFLAGS_SUM" != "$EXPECTED_CFLAGS_SHA256" ]; then
+    echo "옵션 묶음: $(head -1 $_sets)"
+    die "컴파일 옵션 지문이 고정한 값과 다릅니다($CFLAGS_SUM, 고정 $EXPECTED_CFLAGS_SHA256). 에뮬레이션이면 다시 돌리고, 커널 설정·툴체인·드라이버 Makefile을 바꿨으면 CI 값으로 inputs.sh를 고칩니다"
+  fi
 }

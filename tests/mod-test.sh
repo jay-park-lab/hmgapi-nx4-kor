@@ -1426,7 +1426,7 @@ DI=$B/drivers/inputs.sh
 drv_inputs_ok() (
   . $DI
   for u in "$KERNEL_URL" "$TOOLCHAIN_URL" "$CARCFG_URL" "$RTL88X2BU_GIT"; do case "$u" in https://*) ;; *) exit 1 ;; esac; done
-  for h in "$KERNEL_SHA256" "$TOOLCHAIN_TREE_SHA256" "$CARCFG_SHA256"; do echo "$h" | grep -qx '[0-9a-f]\{64\}' || exit 1; done
+  for h in "$KERNEL_SHA256" "$TOOLCHAIN_TREE_SHA256" "$CARCFG_SHA256" "$EXPECTED_CFLAGS_SHA256"; do echo "$h" | grep -qx '[0-9a-f]\{64\}' || exit 1; done
   echo "$RTL88X2BU_COMMIT" | grep -qx '[0-9a-f]\{40\}' && echo "$CARCFG_URL" | grep -q '/[0-9a-f]\{40\}/' \
     && echo "$TOOLCHAIN_URL" | grep -q '/+archive/[0-9a-f]\{40\}\.tar\.gz$' && echo "$KP_88X2BU_MD5" | grep -qx '[0-9a-f]\{32\}'
 )
@@ -1437,7 +1437,7 @@ drv_docs_ok() (
   . $DI
   _cc=$(echo "$CARCFG_URL" | grep -o '/[0-9a-f]\{40\}/' | tr -d /)
   _tc=$(echo "$TOOLCHAIN_URL" | grep -o '[0-9a-f]\{40\}')
-  for v in $(p8 $KERNEL_SHA256) $(p8 $TOOLCHAIN_TREE_SHA256) $(p8 $CARCFG_SHA256) $(p8 $_cc) $(p8 $_tc) $RTL88X2BU_COMMIT $KP_88X2BU_MD5; do
+  for v in $(p8 $KERNEL_SHA256) $(p8 $TOOLCHAIN_TREE_SHA256) $(p8 $CARCFG_SHA256) $(p8 $_cc) $(p8 $_tc) $(p8 $EXPECTED_CFLAGS_SHA256) $RTL88X2BU_COMMIT $KP_88X2BU_MD5; do
     grep -q "$v" $B/drivers/README.md || { echo "drivers/README.md에 없음: $v"; exit 1; }
   done
   grep -q "$RTL88X2BU_COMMIT" $B/NOTICE.md && grep -q "$(p8 $_tc)" $B/NOTICE.md
@@ -1451,7 +1451,7 @@ check "drivers/rtl88x2bu: 패치는 번호 차례(0001 KP 보호 패치, 0002 HA
   '[ "$(ls $B/drivers/rtl88x2bu/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-kp-protect.diff 0002-nx4-hal.diff " ] && ! grep -h "^+++ " $B/drivers/rtl88x2bu/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_88x2bu \$D bcmdhd" $B/drivers/build-in-container.sh && grep -q "module_param_named(iface_name, ifname" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "module_param_string(firmware_path" $B/drivers/rtl88x2bu/0002-nx4-hal.diff'
 check "drivers: README·NOTICE의 값(커널·툴체인·차 설정 값과 커밋, 드라이버 커밋, KP md5)이 inputs.sh와 같음" 'drv_docs_ok'
 check "drivers: 차에 넣을 .ko는 CI 것만 — build-driver.sh가 빌드한 CPU를 넘기고 x86_64가 아니면 알림, 정보 파일에 build host, README에 규칙" \
-  'grep -q -- "-e HOST_ARCH=\"\$HOST_ARCH\" -e BUILD_EMU=\$EMU" $B/scripts/build-driver.sh && grep -q "docker info --format .{{.Architecture}}." $B/scripts/build-driver.sh && grep -q "hw.optional.arm64" $B/scripts/build-driver.sh && grep -q "이 .ko는 차에 넣지 마세요" $B/scripts/build-driver.sh && grep -q "(emulated: check against CI, do not ship)" $B/drivers/build-in-container.sh && grep -q "차에 넣을 \`.ko\`는 CI에서 만든 것만" $B/drivers/README.md'
+  'grep -q -- "-e HOST_ARCH=\"\$HOST_ARCH\" -e BUILD_EMU=\$EMU" $B/scripts/build-driver.sh && grep -q "docker info --format .{{.Architecture}}." $B/scripts/build-driver.sh && grep -q "^\[ \"\$(sysctl -n hw.optional.arm64 2>/dev/null)\" = 1 \] && EMU=yes" $B/scripts/build-driver.sh && grep -q "^case \"\$DARCH\" in x86_64|amd64) ;; \*) EMU=yes ;; esac" $B/scripts/build-driver.sh && grep -q "이 .ko는 차에 넣지 마세요" $B/scripts/build-driver.sh && grep -q "(emulated: check against CI, do not ship)" $B/drivers/build-in-container.sh && grep -q "차에 넣을 \`.ko\`는 CI에서 만든 것만" $B/drivers/README.md'
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc
@@ -1483,13 +1483,21 @@ check "drivers/kernel/prepare.sh: 커널 준비의 make(olddefconfig, modules_pr
   'grep -q "^make_retry .*olddefconfig" $B/drivers/kernel/prepare.sh && grep -q "^make_retry .*modules_prepare" $B/drivers/kernel/prepare.sh && ! grep -q "^make " $B/drivers/kernel/prepare.sh'
 # lib.sh check_cflags(리뷰 14): 가짜 .cmd(첫 줄이 컴파일 명령)로
 CF=$T/cf
-cfrun() { (bash -c '. "$1"; check_cflags "$2"' x $B/drivers/lib.sh $CF) > $CF.out 2>&1; echo $? > $CF.rc; }
+cfrun() { (env $CFX bash -c '. "$1"; check_cflags "$2"' x $B/drivers/lib.sh $CF) > $CF.out 2>&1; echo $? > $CF.rc; }
 cfobj() { mkdir -p $CF/$1; printf 'cmd_%s/x.o := /work/tc/bin/arm-eabi-gcc -Wp,-MD,%s/.x.o.d -O2 %s -fno-common -Wall -c -o %s/x.o %s/x.c\n' $CF/$1 $CF/$1 "$2" $CF/$1 $CF/$1 > $CF/$1/.x.o.cmd; }
 rm -rf $CF; cfobj a "-march=armv7-a -mabi=aapcs-linux"; cfobj b "-march=armv7-a -mabi=aapcs-linux"
 printf 'cmd_%s/built-in.o := arm-eabi-ld -EL -r -o built-in.o a.o\n' $CF > $CF/.built-in.o.cmd
 cfrun
 check "drivers/lib.sh check_cflags: 모든 오브젝트의 옵션이 같고 -march=armv7-a면 통과(링크 .cmd·-Wp 경로는 보지 않음)" \
   '[ "$(cat $CF.rc)" = 0 ] && grep -q "오브젝트 2개가 같음, -march=armv7-a" $CF.out' || cat $CF.out
+# 고정한 지문(inputs.sh EXPECTED_CFLAGS_SHA256, 리뷰 18): 같으면 통과, 모든 오브젝트가 똑같이 옵션 하나가 빠져 다르면 실패
+CFS=$(sed -n 's/.*(\([0-9a-f]\{64\}\))$/\1/p' $CF.out)
+CFX=EXPECTED_CFLAGS_SHA256=$CFS; cfrun
+check "drivers/lib.sh check_cflags: 옵션 지문이 EXPECTED_CFLAGS_SHA256과 같으면 통과" '[ "$(cat $CF.rc)" = 0 ] && [ -n "$CFS" ]' || cat $CF.out
+cfobj a "-march=armv7-a -mabi=aapcs-linux -fno-strict-overflow"; cfobj b "-march=armv7-a -mabi=aapcs-linux -fno-strict-overflow"; cfrun; CFX=
+check "drivers/lib.sh check_cflags: 모든 오브젝트가 똑같이 옵션이 달라(서로는 같음) 지문이 고정 값과 다르면 실패하고 옵션 묶음을 보임" \
+  '[ "$(cat $CF.rc)" != 0 ] && grep -q "컴파일 옵션 지문이 고정한 값과 다릅니다" $CF.out && grep -q "옵션 묶음: .*-fno-strict-overflow" $CF.out' || cat $CF.out
+cfobj a "-march=armv7-a -mabi=aapcs-linux"; cfobj b "-march=armv7-a -mabi=aapcs-linux"
 cfobj b "-march=armv5t -Wa,-march=armv7-a -mabi=aapcs-linux"; cfrun
 check "drivers/lib.sh check_cflags: 한 오브젝트라도 옵션이 다르면(cc-option이 armv5t로 넘어감) 실패" \
   '[ "$(cat $CF.rc)" != 0 ] && grep -q "오브젝트마다 컴파일 옵션이 다릅니다" $CF.out' || cat $CF.out

@@ -44,8 +44,9 @@ sh scripts/build-driver.sh
 ### 차에 넣을 `.ko`는 CI에서 만든 것만
 
 - **차에 넣는 `.ko`는 리눅스 x86에서 만든 것만 씁니다**(CI `drivers` 워크플로의 artifact, 4단계부터는 release 워크플로. 2026-11-26 결정).
-- 까닭: Apple Silicon 맥의 qemu 에뮬레이션에서 컴파일러가 **멈추지 않고도 다른 코드를 낸 적이 있습니다**. PR #69의 커밋 `572128e`를 PC에서 빌드했을 때 첫 빌드는 md5 `5035d662…`(`.text`가 다르고 여러 함수의 레지스터 배정·분기 배치가 다름)였습니다. 같은 커널 트리로 다시 빌드하니 CI와 같은 `aabf4de7…`가 나왔습니다. 충돌(Segmentation fault)은 알 수 있어 다시 돌리지만, 이런 조용한 차이는 빌드만으로는 알 수 없습니다.
-- 원인으로 보이는 것(PR #69 리뷰 14): 커널 `arch/arm/Makefile`은 make마다 컴파일러로 `-march=armv7-a`가 되는지 물어(`cc-option`) 안 되면 조용히 `-march=armv5t`로 넘어갑니다. 에뮬레이션에서 그 물음 중에 컴파일러가 멈추면 다른 옵션으로 컴파일됩니다. 그래서 빌드는 끝에 모든 오브젝트의 컴파일 옵션(`-m`·`-f`·`-W`·`-O` 등)이 서로 같고 `-march=armv7-a`인지 보고, 아니면 실패로 끝냅니다(`check_cflags`). 그 옵션 묶음의 sha256은 `bcmdhd.ko.txt`의 `cflags` 줄에 남아 PC와 CI를 견줄 수 있습니다.
+- 까닭: Apple Silicon 맥의 qemu 에뮬레이션에서 컴파일러가 **멈추지 않고도 다른 코드를 낸 적이 있습니다**. PR #69의 커밋 `572128e`를 PC에서 빌드했을 때 첫 빌드는 md5 `5035d662…`(`.text`가 다르고 여러 함수의 레지스터 배정·분기 배치가 다름)였습니다. 같은 커널 트리로 다시 빌드하니 CI와 같은 `aabf4de7…`가 나왔습니다. 충돌(Segmentation fault)은 알 수 있어 다시 돌리지만, 이런 조용한 차이는 결과를 보기 전에는 알 수 없었습니다.
+- 알려진 원인 하나(PR #69 리뷰 14·18): 커널은 make마다 컴파일러에 물어(`cc-option`) 옵션을 정합니다. `arch/arm/Makefile`은 `-march=armv7-a`가 안 되면 조용히 `-march=armv5t`로 넘어가고, `-fno-strict-overflow`·`-fconserve-stack` 같은 옵션도 같은 식으로 붙습니다. 에뮬레이션에서 그 물음 중에 컴파일러가 멈추면 다른 옵션으로 컴파일됩니다. 리뷰 중에 실제로 `armv5t`로 컴파일되어 `rev16` 어셈블러 오류가 난 적이 있습니다. `572128e`의 조용한 차이는 충돌도 오류도 없어, 어느 옵션 때문이었는지(또는 이 까닭이었는지)는 확인하지 못했습니다.
+- 그래서 빌드는 끝에 모든 오브젝트의 컴파일 옵션 묶음(`-m`·`-f`·`-W`·`-O`·`-g`·`-std`·`-D__LINUX_ARM_ARCH__`)을 봅니다(`lib.sh` `check_cflags`). 서로 같고, `-march=armv7-a`이며, 그 sha256이 `inputs.sh`의 `EXPECTED_CFLAGS_SHA256`(CI 값 `9390b42b…`)과 같아야 합니다. 아니면 실패로 끝납니다. 그 sha256은 `bcmdhd.ko.txt`의 `cflags` 줄에도 남습니다. 커널 설정·툴체인·드라이버 Makefile·`EXTRA_CFLAGS`를 바꾸면 CI의 "컴파일 옵션 확인" 줄 값으로 `inputs.sh`를 함께 고칩니다.
 - 그래도 PC 빌드는 개발·확인용입니다. `scripts/build-driver.sh`는 Docker VM의 CPU가 x86_64가 아니거나 맥이 Apple Silicon이면(Rosetta 터미널 포함) 끝에 알리고, `bcmdhd.ko.txt`에 `build host <Docker VM CPU>, <OS CPU> (emulated: …)`를 적습니다. PC 결과를 쓰려면 같은 커밋의 CI md5와 같은지 먼저 봅니다.
 
 방법이 KP와 같은지 확인하려면:
