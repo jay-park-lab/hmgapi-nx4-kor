@@ -1,6 +1,7 @@
 package io.github.jayparklab.nx4kor.hook.dipo;
 // NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-26 (#67, PR #68 review 1-4).
-// Modified by NX4 KOR, 2026-11-26 (2.1.2-beta.4, #67): the other sender's call held for this mod's (hold, held, done).
+// Modified by NX4 KOR, 2026-11-26 (2.1.2-beta.4, #67): the other sender's call held for this mod's (hold, held, done);
+//   PR #85 review 1, 3, 4: waits for all the listener heard, no wait for a hear while guidance is on, argument count.
 
 import java.util.Arrays;
 import java.util.Map;
@@ -33,13 +34,19 @@ import java.util.concurrent.ConcurrentHashMap;
  *   a source change or the end of a route; or no value of its own for that call), that
  *   whole set went to the cluster as the official mod's, and stayed there until this mod's
  *   thread sent its own (the official mod has no resend timer). So such a call waits
- *   (held), at most HOLD_MS, for this mod's thread to finish what its listener has heard;
- *   if this mod then has its values, the call carries them. A listener that hasn't heard
- *   the update yet gets HEAR_MS to hear it. If this mod still has nothing, the call passes
- *   as before, and the next ones don't wait until its listener hears something new (one
- *   wait per update at most, none for a listener that hears nothing: the official mod
- *   alone). Only that call's thread waits (Object.wait, woken by done); this mod's thread
- *   never waits for it.
+ *   (held), at most HOLD_MS, for this mod's thread to finish all its listener has heard,
+ *   also what it hears meanwhile (PR #85 review 1: a 121 done while the 120 that turns
+ *   guidance on is still to come isn't the end); if this mod then has its values, the
+ *   call carries them. With this mod's guidance off, a listener that hasn't heard the
+ *   update yet gets HEAR_MS to hear it; with it on, a call this mod never made (lanes
+ *   from an app without lanes, the official mod's HUD clear) waits only for what was
+ *   already heard, not for an update that may not come (PR #85 review 3). If this mod
+ *   still has nothing, the call passes as before, and the next ones don't wait until its
+ *   listener hears something new (one wait per update at most, none for a listener that
+ *   hears nothing after the first HEAR_MS: the official mod alone). A call held for an
+ *   argument count other than this mod's passes after the wait (PR #85 review 4). Only
+ *   that call's thread waits (Object.wait, woken by done); this mod's thread never waits
+ *   for it.
  */
 final class TbtGate {
     static final long QUIET_MS = 3000L;
@@ -180,21 +187,25 @@ final class TbtGate {
     }
 
     /**
-     * the other sender's call that forOther gave nothing: hold it (non-null) only when this mod lacks it (not when giving
-     * way, or for another argument count) and either its thread hasn't finished what its listener heard, or its listener
-     * may be just about to hear that update; not again after a held call passed, until the listener hears something new
+     * the other sender's call that forOther gave nothing: hold it (non-null) only when this mod lacks it (its guidance is
+     * off, or it never made that call since: not when giving way, nor for another argument count while it has a value),
+     * and either its thread hasn't finished what its listener heard, or, with its guidance off, its listener may be just
+     * about to hear that update (PR #85 review 3: with it on, a call it never made isn't one it's about to make: no wait
+     * for a hear); not again after a held call passed, until the listener hears something new
      */
     synchronized Hold hold(String point, long now) {
         if (!lacks(point) || passedSeq == heardSeq) return null;
-        return new Hold(now, doneSeq < heardSeq ? heardSeq : heardSeq + 1);
+        if (doneSeq < heardSeq) return new Hold(now, heardSeq);
+        return active ? null : new Hold(now, heardSeq + 1);
     }
 
     /**
      * how much longer the held call waits (ms, 0: no longer): until this mod has its values, or its thread is through with
-     * the update waited for, at most HOLD_MS from the start, or HEAR_MS while the listener hasn't heard that update
+     * the update waited for and all its listener heard meanwhile (PR #85 review 1), at most HOLD_MS from the start, or
+     * HEAR_MS while the listener hasn't heard that update
      */
     synchronized long holdLeft(Hold h, String point, long now) {
-        if (!lacks(point) || doneSeq >= h.target) return 0L;
+        if (!lacks(point) || doneSeq >= Math.max(h.target, heardSeq)) return 0L;
         long limit = heardSeq >= h.target ? HOLD_MS : HEAR_MS;
         return Math.max(0L, h.start + limit - now);
     }
@@ -204,14 +215,22 @@ final class TbtGate {
         passedSeq = heardSeq;
     }
 
+    /** held, without telling how long it waited */
+    Object[] held(String point, int argc, boolean enabled, Waits w) {
+        return held(point, argc, enabled, w, null);
+    }
+
     /**
      * for a call forOther gave nothing: forOther again after waiting for this mod's thread, if hold says so. This mod's
-     * arguments for it, or null to let it pass as it is (also at once when there's nothing to wait for). Only the
-     * calling thread waits, without spinning (done wakes it).
+     * arguments for it, or null to let it pass as it is (also at once when there's nothing to wait for; and after the
+     * wait for an argument count other than this mod's). waited[0] (if given): ms it waited, or -1 when it wasn't held.
+     * Only the calling thread waits, without spinning (done wakes it).
      */
-    Object[] held(String point, int argc, boolean enabled, Waits w) {
+    Object[] held(String point, int argc, boolean enabled, Waits w, long[] waited) {
+        if (waited != null) waited[0] = -1L;
         if (!enabled) return null;
-        Hold h = hold(point, w.now());
+        long start = w.now();
+        Hold h = hold(point, start);
         if (h == null) return null;
         synchronized (this) {
             for (long left; (left = holdLeft(h, point, w.now())) > 0L;) {
@@ -223,7 +242,9 @@ final class TbtGate {
                 }
             }
         }
-        Object[] c = forOther(point, argc, w.now(), enabled);
+        long now = w.now();
+        if (waited != null) waited[0] = Math.max(0L, now - start);
+        Object[] c = forOther(point, argc, now, enabled);
         if (c == null) holdPassed();
         return c;
     }

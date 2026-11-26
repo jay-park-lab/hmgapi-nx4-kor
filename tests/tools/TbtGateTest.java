@@ -323,6 +323,65 @@ public class TbtGateTest {
                 "updates are numbered; a late done of an earlier one doesn't move back (waits for the next one)");
         is(o.holdLeft(hh, TBT, 1002 + TbtGate.HEAR_MS) == 0, "HEAR_MS after the call with nothing heard: no longer");
 
+        // PR #85 review 1: held on a 121 this mod's thread hasn't finished; meanwhile the listener hears the 120 that turns
+        // guidance on. The 121 done isn't the end: the call waits for the 120 too and carries ours
+        final TbtGate m = new TbtGate();
+        final long m1 = m.heard(1000);
+        final long[] m2 = { 0L };
+        w = new Waits(1000, 10, () -> {
+            m2[0] = m.heard(1010);
+            m.done(m1);
+        }, () -> {
+            m.ours(TBT, ours);
+            m.setActive(true);
+            m.done(m2[0]);
+        });
+        long[] waited = { 0L };
+        got = m.held(TBT, 9, true, w, waited);
+        is(got != null && (Integer) got[0] == 70 && w.waits == 2 && waited[0] == 20,
+                "review 1: the listener hears the 120 while the 121 is being done: the call waits for both and carries ours");
+        final TbtGate m3 = new TbtGate();
+        final long m31 = m3.heard(1000);
+        w = new Waits(1000, 10, () -> {
+            m3.heard(1010);
+            m3.done(m31);
+        });
+        is(m3.held(TBT, 9, true, w) == null && w.t == 1000 + TbtGate.HOLD_MS,
+                "review 1: and if that 120 isn't done within 250 ms, the call passes then");
+
+        // PR #85 review 3: guidance on, a call this mod never makes (lanes from an app without lanes, the official mod's
+        // HUD clear): no 50 ms wait for an update that may not come, on any update
+        final TbtGate q = new TbtGate();
+        q.ours(TBT, ours);
+        q.setActive(true);
+        q.done(q.heard(1000));
+        w = new Waits(1100, 0);
+        waited[0] = 0L;
+        is(q.held(LANE, 1, true, w, waited) == null && w.waits == 0 && waited[0] == -1L,
+                "review 3: guidance on, this mod's thread through, a call it never made: passes without waiting");
+        q.done(q.heard(2000));
+        w = new Waits(2100, 0);
+        is(q.held(LANE, 1, true, w) == null && w.waits == 0, "review 3: the next update too (not 50 ms each time)");
+        final long q3 = q.heard(3000);
+        w = new Waits(3000, 5, () -> q.done(q3));
+        is(q.held(LANE, 1, true, w) == null && w.waits == 1 && w.t == 3005,
+                "review 3: still waits for what the listener already heard (this mod's thread 5 ms behind), then passes");
+
+        // PR #85 review 4: an argument count other than this mod's isn't known before ours is there: held, then passes
+        final TbtGate k = new TbtGate();
+        final long k1 = k.heard(1000);
+        w = new Waits(1000, 10, () -> {
+            k.ours(TBT, ours);
+            k.setActive(true);
+            k.done(k1);
+        });
+        waited[0] = -1L;
+        is(k.held(TBT, 8, true, w, waited) == null && waited[0] == 10,
+                "review 4: another argument count while this mod had nothing: held 10 ms, then passes as it is");
+        w = new Waits(1020, 0);
+        is(k.held(TBT, 8, true, w, waited) == null && w.waits == 0 && waited[0] == -1L,
+                "review 4: once this mod has a value, another argument count passes without waiting");
+
         // real threads, KorTbt's way of waiting (Object.wait): done on this mod's thread wakes the held call well before
         // HOLD_MS, and that thread never waits for the held one
         final TbtGate r = new TbtGate();
