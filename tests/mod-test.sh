@@ -22,7 +22,8 @@ T=$(mktemp -d /tmp/nx4-kor-test.XXXXXX)
 if [ -n "$KEEP" ]; then echo "시험 폴더: $T"; else trap 'rm -rf $T' EXIT; fi
 fails=0
 ok() { echo "ok   $1"; }
-bad() { echo "FAIL $1"; fails=$((fails+1)); }
+# bad는 1을 돌려준다: check "…" '…' || cat <출력> 의 cat이 실패할 때만 돈다(PR #74 리뷰 7. 전에는 늘 0이라 돌지 않았음)
+bad() { echo "FAIL $1"; fails=$((fails+1)); return 1; }
 check() { if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 V=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' $PKG/mod.json | head -1)
 
@@ -1481,7 +1482,7 @@ if [ -n "$HMGAPI_SRC" ]; then
     check "  곧 회전 그림(KP 2.4.10) $(grep -c '^ok ' $T/fit.out)개: 회전교차로 32는 오른쪽 통행·출구 각도 있을 때만(들어가기 6은 그대로), 각도 없는 진입 램프는 오른쪽 진입 모양, 지하차도 46(좌·우)·고가 44(왼쪽만)는 시설 낱말이 있고 부정·옆길 낱말이 없을 때만, CpIcons" \
       'tail -n 1 $T/fit.out | grep -qx ok && ! grep -q "^FAIL" $T/fit.out' || cat $T/fit.out
   else
-    echo "skip hooks.jar 빌드(ANDROID_HOME 없음): 빌드 시험은 자리만 채운 hooks.jar로 봄"
+    echo "skip hooks.jar 빌드·곧 회전 그림 테스트(NearFitTest)(ANDROID_HOME 없음): 빌드 시험은 자리만 채운 hooks.jar로 봄"
     echo "placeholder hooks.jar" > $T/hooks.jar
   fi
   # 공식 무선 모드는 위 가짜 zip을 준다(받지 않음). 받는 길은 아래 NX4_WIRELESS_URL 테스트에서 본다
@@ -1603,7 +1604,7 @@ J
   java -cp $T/eh VerChk 2.0.3-beta.2 2.0.3 > $T/verchk.out 2>&1
   check "  정식 2.0.3이 들어간 차에는 2.0.3-beta.2가 낮은 판(그래서 새 방식은 2.0.4-beta.1부터)" 'grep -qx ok $T/verchk.out' || cat $T/verchk.out
 else
-  echo "skip 빌드·HMG-API 엔진 시험(HMGAPI_SRC 없음)"
+  echo "skip 빌드·HMG-API 엔진 시험·곧 회전 그림 테스트(NearFitTest)(HMGAPI_SRC 없음)"
 fi
 
 echo
