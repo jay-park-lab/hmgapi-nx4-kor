@@ -69,12 +69,16 @@ for k in ("parts", "feature_flags", "wifi", "conflicts", "requires", "logs", "pr
 PY'
 check "빠진 것: 한국 포크 무선 모드(레시피·libleafiaaac.so·patches.json, wireless/), 핫스팟 서비스(svc/ap.sh·hotspot.sh, scripts/post.sh), 만든 hooks.jar(빌드가 넣음)" \
   '[ ! -e $PKG/hooks.jar ] && [ ! -e $PKG/recipes ] && [ ! -e $PKG/files ] && [ ! -e $PKG/patches.json ] && [ ! -e $B/wireless ] && [ ! -e $PKG/svc/ap.sh ] && [ ! -e $PKG/svc/hotspot.sh ] && [ ! -e $PKG/scripts/post.sh ] && [ -f $PKG/svc/lib.sh ]'
-check "settings.json: 한국 길안내(kor_tbt)와 그 진단 줄(kor_tbt_log)만, 둘 다 켜기 기본·다시 시작해 적용" 'python3 - "$PKG" <<PY
+# kor_tbt_log(#77, 2026-11-26 사용자 결정): 켜고 끄는 설정으로 두고 기본은 끔(2.1.2-beta.2부터). KorTbt가 settingBoolean에
+# 주는 기본값도 settings.json과 같아야 한다(설정 파일이 없을 때 같은 뜻)
+check "settings.json: 한국 길안내(kor_tbt, 기본 켬)와 그 진단 줄(kor_tbt_log, 기본 끔)만, 다시 시작해 적용. KorTbt의 기본값도 끔" 'python3 - "$PKG" "$B/hooks/src/io/github/jayparklab/nx4kor/hook" <<PY
 import json, os, sys
 s = json.load(open(os.path.join(sys.argv[1], "settings.json")))
 assert s["version"] == 1
 got = [(x["key"], x["type"], x["default"], x["apply"]) for x in s["settings"]]
-assert got == [("kor_tbt", "toggle", True, "restart"), ("kor_tbt_log", "toggle", True, "restart")], got
+assert got == [("kor_tbt", "toggle", True, "restart"), ("kor_tbt_log", "toggle", False, "restart")], got
+part = open(os.path.join(sys.argv[2], "dipo", "KorTbt.java")).read()
+assert "settingBoolean(\"kor_tbt_log\", false)" in part
 for x in s["settings"]:
     assert x["title"] and x["description"], x
 PY'
@@ -94,19 +98,42 @@ m = json.load(open(sys.argv[1]))
 entry = open(sys.argv[2] + "/Nx4KorHooks.java").read()
 part = open(sys.argv[2] + "/dipo/KorTbt.java").read()
 assert "settingBoolean(\"kor_tbt\", true)" in entry
-assert "settingBoolean(\"kor_tbt_log\", true)" in part
+assert "settingBoolean(\"kor_tbt_log\", " in part   # its default is checked against settings.json above (#77)
+# #77: CpTurnsFit sends through ClusterOut, which skips a call the official mod already carried (TbtGate.skipOurs)
+fit = open(sys.argv[2] + "/dipo/CpTurnsFit.java").read()
+assert "final ClusterOut cluster;" in fit and "CpTurnsFit(Context context, ClusterOut cluster, Runnable restart)" in fit
+assert "new CpTurnsFit(app.context, new ClusterOut(c, gate)," in part
 assert "\"com.daudio.app.dipo\"" in entry and "\"io.github.jayparklab.nx4kor.hook.dipo.KorTbt\"" in entry
 assert "LISTENER_ROUTE_GUIDANCE = 4096" in part
 a = re.search(r"CLUSTER_POINTS = \{(.*?)\};", part, re.S).group(1)
 got = sorted(re.findall(r"\"(update_[a-z0-9_]+)\"", a))
 want = sorted(p.split(".")[-1] for p, v in m["hooks"]["points"].items() if v == "change")
 assert got == want, (got, want)
+# ClusterOut checks the same 8 calls, each by the point name the hook records ours under (#77)
+out = open(sys.argv[2] + "/dipo/ClusterOut.java").read()
+assert sorted(re.findall(r"if \(skip\(\"(update_[a-z0-9_]+)\"", out)) == got, out
+# and each method under the point the HMG-API Cluster calls for that method (rc.10 hook/Cluster.java), then that method
+# of Cluster, once (PR #78 review 2: two names swapped passed the line above)
+CL = {"tbtInfo": "update_tbt_info", "tbtSubInfo": "update_tbt_sub_info_b", "tbtSubInfo2C": "update_tbt_sub_info_2c",
+      "turnListNew": "update_tp_turn_list_new", "laneInfo": "update_lane_info", "destinationName": "update_tp_destination_name",
+      "crossroadName": "update_tp_crossroad_name", "turnList": "update_tp_turn_list"}
+pairs = {}
+for name, body in re.findall(r"\n    void (\w+)\((.*?)\n    }\n", out, re.S):
+    pts = re.findall(r"skip\(\"(update_[a-z0-9_]+)\"", body)
+    calls = re.findall(r"\bc\.(\w+)\(", body)
+    assert len(pts) == 1 and calls == [name], (name, pts, calls)
+    pairs[name] = pts[0]
+assert pairs == CL, pairs
+# CpTurnsFit starts the KorTbt restart on a thread of its own, so the restart runs it there (PR #78 review 6)
+assert "restart.run()" not in fit and fit.count("new Thread(restart, ") >= 1, "restart"
 assert "\"dipo.iap2_proxy.stop_route_guidance\"" in part
 # 판단은 TbtGate가 한다(아래 호스트 테스트): 우리 호출 기록, 남의 호출에 줄 인자, 남의 Stop 미루기, 비켜 주기, 앱에서 끔
 for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), mod.enabled())",
           "gate.stopSeen(", "gate.stopDue(", "gate.yielding(", "gate.heard(", "gate.setActive(turns.active())",
           # 앱에서 끄면 받지 않고, 상태와 "그렸다" 표시를 비우고, 다시 켜면 길안내 전체를 다시 요청한다(PR #68 리뷰 2·11)
-          "if (!mod.enabled()) {", "turns.reset();", "turns.shown = false;", "turns.hudShown = false;", "if (wasOff) {"):
+          "if (!mod.enabled()) {", "turns.reset();", "turns.shown = false;", "turns.hudShown = false;", "if (wasOff) {",
+          # giving way: REFRESH waits for the way to end, hearing again brings it back (#77, PR #78 review 5·10)
+          "refreshBackedOff = yielding && turns.active();", "h.post(RESUME);", "handler.removeCallbacks(REFRESH);"):
     assert s in part, s
 PY'
 # KorTbt의 판단(TbtGate: 덮어쓰기, 비켜 주기, 남의 Stop 미루기, 앱에서 끔. PR #68 리뷰 1~4)을 PC에서 돌린다
@@ -114,7 +141,7 @@ if command -v javac >/dev/null 2>&1; then
   mkdir -p $T/gate
   javac --release 8 -Xlint:-options -nowarn -d $T/gate $HK/dipo/TbtGate.java $B/tests/tools/TbtGateTest.java > $T/gate.err 2>&1
   java -cp $T/gate io.github.jayparklab.nx4kor.hook.dipo.TbtGateTest > $T/gate.out 2>&1
-  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음)" \
+  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음), 공식 모드가 우리 최신 값을 900ms 안에 실어 보냈으면 같은 값의 우리 호출을 건너뜀(#77)" \
     'tail -n 1 $T/gate.out | grep -qx ok && ! grep -q "^FAIL" $T/gate.out' || cat $T/gate.err $T/gate.out
 else
   echo "skip TbtGate 테스트(javac 없음)"
@@ -1632,6 +1659,19 @@ if [ -n "$HMGAPI_SRC" ]; then
   hpc $T/mod-nopoint.json
   check "  NX4 map에 없는 지점을 걸면 이 모드의 훅이 올라오지 않음(그래서 위 9점이 모두 map에 있어야 함)" \
     '[ "$(cat $T/hp.rc)" != 0 ] && grep -q "^hooks    nx4-kor won.t load: " $T/hp.out' || cat $T/hp.out
+  # ClusterOut(#77)의 메서드마다 건너뛰기에 쓰는 지점 이름이 HMG-API Cluster가 그 메서드로 부르는 지점과 같은지(PR #78 리뷰 2)
+  check "  ClusterOut의 메서드 8개가 HMG-API Cluster와 같은 지점 이름으로 건너뛰기를 봄" 'python3 - "$HS/core/runtime/java/hmgapi/hook/Cluster.java" "$B/hooks/src/io/github/jayparklab/nx4kor/hook/dipo/ClusterOut.java" <<PY
+import re, sys
+cl, out = open(sys.argv[1]).read(), open(sys.argv[2]).read()
+want = {}
+for name, body in re.findall(r"\n    public void (\w+)\((.*?)\n    }\n", cl, re.S):
+    pts = re.findall(r"call\(\"(update_[a-z0-9_]+)\"", body)
+    if pts: want[name] = pts[0]
+got = {}
+for name, body in re.findall(r"\n    void (\w+)\((.*?)\n    }\n", out, re.S):
+    got[name] = re.findall(r"skip\(\"(update_[a-z0-9_]+)\"", body)[0]
+assert got and all(want.get(k) == v for k, v in got.items()), (got, want)
+PY'
   # hooks.jar(#67): ANDROID_HOME이 있으면 scripts/build-hooks.sh로 진짜로 만든다. 없으면 빌드 시험은 자리만 채운 파일로 본다
   if [ -n "$ANDROID_HOME" ]; then
     (HMGAPI_SRC=$HS ANDROID_HOME=$ANDROID_HOME sh $B/scripts/build-hooks.sh $T/hooks.jar) > $T/hooks.out 2>&1; echo $? > $T/hooks.rc

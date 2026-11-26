@@ -102,6 +102,67 @@ public class TbtGateTest {
         is(y.forOther(TBT, 9, 9200, true) == null && y.yielding(9300), "the other calls again after 3 s: give way now");
         is(!y.yielding(12300), "the other went quiet for 3 s: this mod resends again");
 
+        // #77: this mod skips its own call when the official mod's call just carried its same, latest values
+        TbtGate k = new TbtGate();
+        k.setActive(true);
+        k.heard(1000);
+        Object[] a1 = { 70, 65535, 270f, 300f, 0, 0, 0, 15, -1 };
+        Object[] key1 = { 70, 65535, 270f, 300f, 0, 0, 0, 15, -1 };
+        is(!k.skipOurs(TBT, key1, 1000), "first call: goes out");
+        k.ours(TBT, a1);
+        is(!k.skipOurs(TBT, key1.clone(), 1100), "same values, the official mod hasn't carried them: goes out");
+        k.ours(TBT, a1);
+        is(k.forOther(TBT, 9, 1200, true) != null, "the official mod's call carries ours");
+        is(k.skipOurs(TBT, key1.clone(), 1500), "same values, carried 300 ms ago: skipped");
+        is(!k.skipOurs(TBT, key1.clone(), 1200 + TbtGate.CARRIED_MS), "same values, carried 900 ms ago: goes out (the resend)");
+        k.ours(TBT, a1);
+        Object[] key2 = { 70, 65535, 270f, 250f, 0, 0, 0, 15, -1 };
+        is(k.forOther(TBT, 9, 2200, true) != null && !k.skipOurs(TBT, key2, 2250), "new values: goes out though the official mod just called");
+        k.ours(TBT, new Object[] { 70, 65535, 270f, 250f, 0, 0, 0, 15, -1 });
+        is(!k.skipOurs(TBT, key2.clone(), 2300), "the official mod carried the older values, not the latest: goes out");
+        // byte frames compare by content
+        byte[] fr = { (byte) 0xF2, 1, 3, 0, 0 };
+        is(!k.skipOurs(LANE, new Object[] { fr.clone() }, 3000), "lane frame, first: goes out");
+        k.ours(LANE, new Object[] { fr.clone() });
+        is(k.forOther(LANE, 1, 3010, true) != null && k.skipOurs(LANE, new Object[] { fr.clone() }, 3100),
+                "the same lane frame (another array), carried: skipped");
+        // nothing carried while the official mod's call passes (mod off, guidance off, giving way): never skipped
+        TbtGate p = new TbtGate();
+        p.setActive(true);
+        p.heard(1000);
+        p.skipOurs(TBT, key1, 1000);
+        p.ours(TBT, a1);
+        is(p.forOther(TBT, 9, 1100, false) == null && !p.skipOurs(TBT, key1.clone(), 1200), "mod off: its call passes, ours still goes out");
+        p.setActive(false);
+        p.setActive(true);
+        is(!p.skipOurs(TBT, key1.clone(), 1300), "guidance off and on again: what was carried is forgotten");
+        // PR #78 review 4: giving way, the official call carries its own values: what it carried of ours before no longer stands
+        TbtGate y2 = new TbtGate();
+        y2.setActive(true);
+        y2.heard(1000);
+        y2.skipOurs(TBT, key1, 1000);
+        y2.ours(TBT, a1);
+        y2.forOther(TBT, 9, 5000, true);
+        y2.forOther(TBT, 9, 7500, true);
+        is(y2.forOther(TBT, 9, 8000, true) == null && !y2.skipOurs(TBT, key1.clone(), 8100),
+                "carried 600 ms before giving way: ours still goes out after (the cluster got the official mod's values)");
+        // the official mod stops calling for a turn it has no icon for (#67): ours always goes out
+        TbtGate q = new TbtGate();
+        q.setActive(true);
+        q.heard(1000);
+        q.skipOurs(TBT, key1, 1000);
+        q.ours(TBT, a1);
+        is(!q.skipOurs(TBT, key1.clone(), 1500) && !q.skipOurs(TBT, key1.clone(), 2500), "no call from the official mod: ours goes out every time");
+        // giving way: the next look is when the way ends unless the official mod calls again
+        TbtGate w = new TbtGate();
+        w.ours(TBT, ours);
+        w.setActive(true);
+        w.heard(1000);
+        w.forOther(TBT, 9, 5000, true);
+        w.forOther(TBT, 9, 8000, true);
+        is(w.yielding(8100) && w.yieldEndsIn(8100) == 2900, "giving way: ends 3 s after the official mod's last call");
+        is(w.yieldEndsIn(12000) == 0 && !w.yielding(12000), "the official mod quiet 3 s: the way has ended");
+
         System.out.println(n + " cases");
         System.out.println("ok");
     }
