@@ -148,7 +148,7 @@
   - 글꼴은 시스템 기본 글꼴입니다. 독점 글꼴 파일은 넣지 않습니다.
   - 재부팅 확인 창은 순정 팝업 모양을 몰라 Holo `AlertDialog` 그대로입니다.
 - 앱 메뉴 타일(`provides.launcher`)은 HMG-API가 이 모드를 올릴 때 런처 훅으로 넣습니다(rc.10 `hook/Mods.java` `loadOne`). HMG-API 훅이 꺼진 동안(이 차의 map이 없거나 부팅 보호)에는 타일이 없습니다(앱·서비스는 그대로). 그때는 같은 USB로 Update OTA를 다시 누르면 관리 앱이 열립니다.
-  - 2.1.0까지는 이 모드에 자기 훅이 없어 HMG-API 훅만 켜지면 타일이 생겼습니다. #67로 훅이 생긴 뒤로는 **HMG-API가 이 모드의 훅을 거절하면(지점이 이 차의 map에 없음, 다른 모드와 겹침) 타일도 없습니다.** HMG-API는 거절한 모드를 기록만 하고 건너뛰어 타일을 넣지 않기 때문입니다(`Mods.load`, PR #83 리뷰 2). 앱·서비스와 공식 모드의 무선·길안내는 그대로이고, 관리 앱은 같은 USB로 Update OTA를 다시 눌러 엽니다("한국 카플레이 길안내" 줄에 이유가 보임). 이 차의 map에는 이 모드의 지점 9곳이 모두 있습니다(`tests/fixtures/nx4-map-points.txt`). 그대로 둘지는 [#71](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/71)에 적었습니다.
+  - 2.1.0까지는 이 모드에 자기 훅이 없어 HMG-API 훅만 켜지면 타일이 생겼습니다. #67로 훅이 생긴 뒤로는 **HMG-API가 이 모드의 훅을 거절하면(지점이 이 차의 map에 없음, 이 차에서만 찾은 지점이라 `change`를 걸 수 없음, HMG-API가 모르는 지점, 다른 모드와 겹침) 타일도 없습니다.** HMG-API는 거절한 모드를 기록만 하고 건너뛰어 타일을 넣지 않기 때문입니다(`Mods.load`, PR #83 리뷰 2). 앱·서비스와 공식 모드의 무선·길안내는 그대로이고, 관리 앱은 같은 USB로 Update OTA를 다시 눌러 엽니다("한국 카플레이 길안내" 줄에 이유가 보임). 이 차의 map에는 이 모드의 지점 9곳이 모두 있습니다(`tests/fixtures/nx4-map-points.txt`). 그대로 둘지는 [#71](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/71)에 적었습니다.
 
 ## 설치·업데이트·지우기 (`usb/troubleShooter`)
 
@@ -352,7 +352,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - 순정 무선 카플레이가 있는 트림에서도 같은지
   - 이 갈래들은 `tests/mod-test.sh`가 가짜 `ps`·`/proc`·softap.conf로 봅니다. 실제 `hostapd`의 부모·설정 경로·SSID가 그 꼴인지는 차에서만 확인됩니다.
 - **HMG-API 부팅 보호의 기록이 rc.8 소스와 같은 꼴인지**([#18](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/18)). adb로 `dmesg`의 zygote 줄이 `hmgapi-hook: zygote, hooks on, start N (this boot M)`인지, `/data/hmgapi/hook/boot`가 `<boot_id> <횟수>`인지 봅니다. 관리 앱을 열 무렵 그 줄이 `dmesg`에 남아 있는지도 봅니다(없으면 관리 앱은 `hook/starts`·`hook/boot`로 판정합니다).
-- **부팅 보호 때 관리 앱 "자세히" 표의 훅 줄(HMG-API 훅, 공식 무선 모드의 훅)이 무엇으로 보이는지.** 판정은 "훅 꺼짐(부팅 보호)"이지만, `status.sh`(`hmg_hooks_load`)는 이 줄들을 HMG-API 기록의 마지막 `hook map: …, hooks on|off`·`mods: loaded …` 줄에서 읽습니다. 부팅 보호로 꺼진 시작에는 이 줄을 쓰는 훅 런타임이 올라오지 않아 앞 시작의 "켜짐"이 남을 것으로 봅니다(rc.8 소스로 추론, `tests/emu/scen.sh` `bootguard`도 그렇게 넣음). 상태 파일의 `hooks`·`wm_hooks`(함께 `ap`·`ap_boot`)를 적고, 엇갈림을 고칠지는 그 뒤에 정합니다.
+- **부팅 보호 때 관리 앱 "자세히" 표의 훅 줄(HMG-API 훅, 공식 무선 모드의 훅)이 무엇으로 보이는지.** 판정은 "훅 꺼짐(부팅 보호)"이지만, `status.sh`(`hmg_hooks_load`)는 이 줄들을 HMG-API 기록의 마지막 `hook map: …, hooks on|off`·`mods: loaded …` 줄에서 읽습니다. 부팅 보호로 꺼진 시작에는 이 줄을 쓰는 훅 런타임이 올라오지 않아 앞 시작의 "켜짐"이 남을 것으로 봅니다(rc.8 소스로 추론, `tests/emu/scen.sh` `bootguard`도 그렇게 넣음). 상태 파일의 `hooks`·`wm_hooks`·`kor_hooks`(함께 `ap`·`ap_boot`)를 적고, 엇갈림을 고칠지는 그 뒤에 정합니다. (HMG-API 훅이 꺼졌다는 `hook map:` 줄이 이번 부팅에 남으면 `wm_hooks`·`kor_hooks`는 빈 값이 되고 "한국 카플레이 길안내" 칸은 "안 돎"입니다. 부팅 보호는 그 줄도 남기지 않는 것으로 봐서 이 경우에 들지 않습니다, PR #83 리뷰 3)
 - **HMG-API rc.8에서 이 모드의 `launch` 서비스가 도는지.** rc.5부터 `hmgapid`는 모드 서비스를 실효 그룹 2950(`MOD_GID`)과 `ANDROID_DNS_MODE=local`로 돌립니다. 관리 앱을 열면 상태 파일이 새로 쓰이고(화면 아래 "확인 …" 시각이 바뀜), [지금 재부팅]이 받아지면 확인한 것으로 봅니다. 2026-11-25에 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
 - **한국 카플레이 길안내가 도는지**([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67), 위 "[한국 카플레이 길안내](#한국-카플레이-길안내-hooks-67)"). 결과는 #67에 적습니다. 확인할 때는 HMG-API 앱의 NX4 KOR 설정에서 `kor_tbt_log`를 켜고 다시 시작합니다(2.1.2-beta.2부터 기본 끔, #77. 곧 회전 판단과 보낸 값의 `CarPlay diag: …` 줄, HUD 목록 줄은 켜야 남음).
   - HMG-API 기록(Everything)에 `nx4-kor`의 `CarPlay (NX4 KOR): Iap2SvcInit(NX4KOR_RG, 0x1000) = true`, 길안내를 시작하면 `route guidance reaches this listener`가 남는지(리스너 둘이 함께 받는지). 공식 모드의 `CarPlay: hud list type …` 줄도 함께 늘어나는지
