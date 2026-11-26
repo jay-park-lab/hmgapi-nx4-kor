@@ -258,7 +258,7 @@
     | 파일 | 내용 |
     |---|---|
     | `kernel.txt`, `modules.txt` | 커널 판(`osrelease`, `/proc/version`), 모듈 적재 조건(`modules_disabled`, `sig_enforce`), `cfg80211`이 있는지, USB 포트 전원 매개변수(`/sys/module/*/parameters/vbus*`), `boot_id`(시동 끄고 켜기가 새 부팅인지 견줌), `wifi.interface`·`wlan.driver.status`, `/proc/modules` |
-    | `config.gz`, `config.txt`, `config-sum.txt` | 차 커널 설정(`/proc/config.gz`)과 푼 것, gz의 md5와 푼 것의 md5·sha256. 드라이버 빌드에 쓰고 Korea Projection 빌드의 설정(sha256 `d35af8a0…`, 출처 저장소가 404)과 견줍니다. 없으면 그렇다고 적습니다 |
+    | `config.gz`, `config.txt`, `config-sum.txt` | 차 커널 설정(`/proc/config.gz`)과 푼 것, gz의 md5와 푼 것의 md5·sha256. 드라이버 빌드의 커널 설정과 같은지 PC에서 견줍니다(`sh drivers/config-sum.sh config.txt`, `drivers/README.md` "커널 준비"). 없으면 그렇다고 적습니다 |
     | `system-wifi-ls.txt`, `system-wifi-md5.txt`, `ko-vermagic.txt` | `/system/wifi`(순정 `bcmdhd.ko` 등)의 목록·md5, `/system/wifi`·`/system/lib/modules`의 `.ko`마다 vermagic |
     | `wifi-strings.txt` | 순정 HAL(`libhardware_legacy.so`)·`hostapd`·`wpa_supplicant`·`netd`에서 드라이버 관련 문자열만(모듈 이름, insmod 인자 `iface_name` 등, `nl80211`, `add_ie`) |
     | `usb.txt`, `usb-ls.txt`, `usb-drivers.txt` | USB 장치의 ID·속도·전력·종류·제조사·제품 이름(일련번호는 넣지 않음), 버스·컨트롤러 경로, 드라이버에 붙은 인터페이스 |
@@ -312,7 +312,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - [모으기] 뒤 `NX4/diag/<시각>/`가 생기고 `system-lib-md5.txt`에 md5가 있는지(`info.txt`의 `md5_busybox`가 무엇인지).
   - `car-report.txt`가 HMG-API의 "usage:"가 아니라 보고서인지(`engine report`가 없는 HMG-API 판이면 빠짐).
   - 모으는 데 얼마나 걸리는지. Car Report는 map 만들기와 같은 분석이라 1~2분을 어림합니다.
-  - `dongle/`에 차 커널 설정(`config.gz`·`config.txt`)이 있는지, `config-sum.txt`의 sha256이 Korea Projection 빌드의 값(`d35af8a0…`)과 같은지, `wifi-strings.txt`에 HAL이 올리는 모듈 이름·insmod 인자가 보이는지. DSP OTA 프로세스에서 `/proc/config.gz`·`/sys`를 읽을 수 있는지도 여기서 드러납니다. 결과는 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적습니다.
+  - `dongle/`에 차 커널 설정(`config.gz`·`config.txt`)이 있는지, `config.txt`가 드라이버 빌드의 커널 설정과 같은지(`sh drivers/config-sum.sh config.txt`가 "같음"), `wifi-strings.txt`에 HAL이 올리는 모듈 이름·insmod 인자가 보이는지. DSP OTA 프로세스에서 `/proc/config.gz`·`/sys`를 읽을 수 있는지도 여기서 드러납니다. 결과는 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적습니다.
 - **DSP OTA 뒤 재부팅하지 않고 끝내도 되는지.** OTA 화면이 이상하게 남으면 관리 앱의 [지금 재부팅]이나 RESET을 쓰세요. 2026-11-25에 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
 - **DSP OTA 화면 위로 관리 앱이 열리는지**(`am start`). 안 열리면 재부팅 뒤 같은 USB로 Update OTA를 다시 누릅니다. 2026-11-25에 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
 - **HMG-API 설치기가 NX4의 `app_process`를 아는지.**

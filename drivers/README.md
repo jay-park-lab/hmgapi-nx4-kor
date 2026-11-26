@@ -1,0 +1,168 @@
+# USB Wi-Fi 동글 드라이버
+
+투싼 NX4 한국 내비(tcc803x, 커널 `3.18.24-tcc`)에서 쓸 USB Wi-Fi 동글 드라이버를 만드는 곳입니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48) 2단계). 아직 모드에 넣지 않았고, 차에서 확인하지 않았습니다.
+
+- 지금은 **RTL88x2BU**(ipTIME A3000MINI `0bda:b812`, TP-Link Archer T3U `2357:012d` 등) 하나입니다. RTL8831BU(`0bda:b831`)는 3단계입니다.
+- 이 폴더(`drivers/`)의 패치·스크립트는 **GPL-2.0**입니다(드라이버와 커널이 GPL-2.0이기 때문, 전문은 `COPYING`). 저장소의 다른 부분은 AGPL-3.0이고, 이 폴더를 Docker로 돌리는 `scripts/build-driver.sh`도 AGPL-3.0입니다. 출처는 아래 "출처와 라이선스"에 있습니다.
+
+## 한눈에
+
+```
+kernel.org linux-3.18.24 (빌드 뼈대)
+  + 현대모비스 GPL 공개 소스의 내비 커널 폴더 AVNT5W_TCC803XKK_kernel/ (우리 릴리스 자산으로 받음)
+  + 모비스 defconfig를 차 설정과 같게 맞춤 → modules_prepare           ← drivers/kernel/prepare.sh
+  → 모비스 소스에 든 GCC 4.7로 cilynx/rtl88x2bu + 우리 패치 2개 컴파일   ← drivers/build-in-container.sh
+  → bcmdhd.ko (vermagic 3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8)
+```
+
+## 드라이버를 순정 HAL 자리에 맞추기
+
+순정 Wi-Fi HAL이 Wi-Fi를 켤 때마다 `/system/wifi/bcmdhd.ko`를 `bcmdhd`라는 이름으로 올립니다(11-23 진단 기록 `nochip-wifi.txt`). 그래서 동글 드라이버를 그 자리에 둘 수 있게 만듭니다(#48 갈래 A).
+- 모듈 이름을 `bcmdhd`로 빌드합니다(드라이버 Makefile의 `USER_MODULE_NAME`). HAL은 `/proc/modules`에서 이 이름으로 올라왔는지 보고, 내릴 때도 이 이름을 씁니다.
+- 순정 HAL이 주는 인자를 받습니다(`rtl88x2bu/0002-nx4-hal.diff`).
+  - `iface_name`: 첫 인터페이스 이름입니다. 드라이버의 `ifname`과 같은 값으로 씁니다. 동시 모드는 켜지 않아(드라이버 기본 플랫폼 설정) 인터페이스는 `wlan0` 하나입니다.
+  - `firmware_path`, `nvram_path`: 순정 `bcmdhd`의 매개변수입니다. 받아 두기만 합니다. AOSP는 AP를 켜기 전에 `/sys/module/bcmdhd/parameters/firmware_path`에 쓰고, 실패하면 AP를 켜지 않습니다[추정: 이 차 HAL·netd의 문자열은 USB 진단 기록 `dongle/wifi-strings.txt`로 확인].
+  - HAL이 이 밖의 인자를 더 주어도 커널 3.18은 "unknown parameter … ignored"를 남기고 그대로 올립니다(`kernel/module.c` `unknown_module_param_cb`).
+
+## 보호 패치(`rtl88x2bu/0001-nx4-protect.diff`)
+
+동글을 쓰다 뽑거나 동글이 망가졌을 때 내비 커널이 멈추지 않게 하는 패치입니다. 이 저장소가 드라이버 원본(`fc158d1f`)을 읽고 새로 썼습니다. **차에서 아직 확인하지 않았습니다**(#48 차 확인: 꽂은 채 뽑기, Wi-Fi 끄고 켜기, 수신이 멈춘 뒤 Wi-Fi 끄고 켜기, 오래 쓰기). 기록은 dmesg의 `nx4-protect:` 줄입니다(드라이버의 `RTW_PRINT`는 디버그 빌드에서만 찍혀 `printk`를 씁니다).
+
+| 곳 | 원본의 문제 | 패치 |
+|---|---|---|
+| 뽑힘 `rtw_dev_remove` | 장치가 떨어졌다는 표시(surprise removed)를 네트워크 장치를 내린 **뒤에** 합니다. 그 사이 닫기가 없는 장치의 레지스터를 읽고 쓰며 기다릴 수 있습니다 | USB 장치가 이미 떨어졌으면(`USB_STATE_NOTATTACHED`) 네트워크 장치를 내리기 **전에** 표시합니다. `rmmod`처럼 장치가 붙어 있으면 그대로 둡니다 |
+| 정리 `rtw_usb_primary_adapter_deinit` | 수신·송신 tasklet을 끝내지 않고 어댑터 메모리를 풉니다 | USB 요청을 거둔 뒤(`rtw_dev_unload`) 두 tasklet을 `tasklet_kill`로 끝내고 풉니다 |
+| 열기 `netdev_open` | 아직 올리지 않은 어댑터(`bup`이 거짓)면 열기가 surprise removed 표시를 지우고 하드웨어를 초기화합니다. 내리는 중이거나 없는 장치에도 그렇게 합니다 | 내리는 중이거나 USB 장치가 떨어졌으면 `-ENODEV`로 열지 않습니다 |
+| 수신 완료 `usb_read_port_complete`(두 수신 방식) | 오류로 끝나면 수신 요청을 곧바로 다시 겁니다. 연속 오류 세기는 한 번 성공하면 0이 되어, 오류와 성공이 섞이면 멈추지 않고 돕니다 | 성공과 상관없이 1초 안에 100번을 넘으면 surprise removed·drv stopped로 두고 다시 걸지 않습니다. 되살리려면 모듈을 다시 올립니다(Wi-Fi 끄고 켜기: 순정 HAL이 `bcmdhd`를 내렸다 올림, 재부팅, 동글 다시 꽂기). 인터페이스를 내렸다 올려서는 되살아나지 않습니다(`netdev_close`가 `rtw_dev_unload`를 부르지 않아 `bup`이 참으로 남고, 열기는 `bup`이 거짓일 때만 표시를 지움) |
+
+`0002-nx4-hal.diff`보다 먼저 넣습니다(파일 이름 차례).
+
+## 커널 준비(빌드 방법)
+
+### 왜 차와 같은 커널 트리가 필요한가
+
+`.ko`는 그것을 빌드한 커널 트리의 구조체 배치와 설정을 그대로 씁니다. 내비 커널은 kernel.org 3.18.24를 Telechips·현대모비스가 고친 것이라, kernel.org 트리로만 빌드하면 순정 커널에만 있는 구조체 필드와 tcc803x 기계 코드(`arch/arm/mach-tcc803x`, `plat-tcc`)가 빠져 배치가 어긋나거나 빌드가 되지 않습니다(kernel.org만으로는 `mach/io.h`가 없어 `modules_prepare`에서 멈춤).
+
+### 내비 커널 소스: 현대모비스 GPL 공개 소스
+
+- 현대모비스가 GPL에 따라 공개한 오픈소스 묶음 중 **AVNT STD G50 WIDE(R9)** 를 씁니다(https://www.mobis.com/kr/tech/rnd.do#open, 플랫폼 "AVNT STD G50 WIDE"). 묶음 sha256 `e7533517…`(628,620,694바이트), 커널은 그 안의 `AVNT5W_TCC803XKK_kernel/`(파일 30,048개)입니다.
+- 이 폴더가 tcc803x 내비 커널입니다: `arch/arm/mach-tcc803x`, `arch/arm/plat-tcc`, defconfig(`tcc803x_wide_pe_common_defconfig` 등), 모비스 빌드 스크립트 `mobis_widenew_kernel_build.sh`(그 defconfig와 `toolchain/arm-eabi-4.7`로 빌드), 툴체인 묶음 `toolchain/arm-eabi-4.7.tar.gz`.
+- 같은 페이지의 고지 묶음(`OSB_202606110414354220.zip`, sha256 `6afbc835…`, 안에 `Open Source S_W License Notice_AVNT5W_R9.html`)은 Linux Kernel을 GPL-2.0으로, 저작권자를 Hyundai Mobis·Telechips 등으로 적습니다.
+- 이 폴더에는 빌드 뼈대가 빠져 있습니다: 맨 위 `Makefile`·`Kconfig`·`Kbuild`, `scripts/`, `Documentation/`, `tools/`, `samples/` 등. 모비스는 이 폴더를 자기 빌드 환경 안의 `kernel/`로 두고 빌드합니다. 그래서 빠진 뼈대를 같은 판의 kernel.org 3.18.24로 채웁니다.
+
+### 단계(`kernel/prepare.sh`)
+
+1. kernel.org `linux-3.18.24`를 풉니다(빌드 뼈대).
+2. 그 위에 모비스 커널 폴더를 **고치지 않고 그대로** 덮습니다. 같은 경로의 파일은 모비스 것이 됩니다(tcc803x 기계 코드, 순정 커널의 구조체·Kconfig·Makefile). `toolchain/`은 덮지 않습니다(툴체인으로 따로 풂). kernel.org에서 링크인 곳이 모비스 쪽에서는 폴더라(`arch/arm/boot/dts/include/dt-bindings`) `cp`가 아닌 `tar`로 덮습니다.
+3. 커널 설정: 모비스 defconfig `tcc803x_wide_pe_common_defconfig`(모비스 빌드 스크립트가 쓰는 것)를 차 설정과 같게 맞춥니다.
+   - 모비스 defconfig는 차의 `/proc/config.gz`와 **USB 네트워크 드라이버 3개만** 다릅니다(`USB_NET_CDC_NCM`, `USB_NET_CDC_SUBSET`과 그 아래 `USB_ARMLINUX`·`USB_BELKIN`, `USB_NET_NET1080`이 모비스 쪽에만 켜져 있음). 차대로 끕니다.
+   - 차 커널은 `-fstack-protector-strong`(GCC 4.9부터)으로 빌드됐지만 차의 모듈과 모비스 툴체인은 GCC 4.7이라, `REGULAR`로 바꿉니다(같은 `__stack_chk_*` 기호를 씀).
+   - `olddefconfig` 뒤 설정 값(`lib.sh` `kconfig_sum`: 값이 있는 `CONFIG_` 줄을 정렬한 것의 sha256, `STRONG`은 `REGULAR`로 봄)이 `inputs.sh`의 `KCONFIG_SUM`(`b2d52267…`)과 같아야 합니다. 이 값은 tcc803x 내비 차의 `/proc/config.gz`를 같은 식으로 센 값입니다(값이 있는 줄 1,122개가 모두 같음).
+4. `modules_prepare`를 하고 `kernel.release`가 `3.18.24-tcc`인지 봅니다(설정의 `LOCALVERSION="-tcc"`).
+
+준비한 커널 트리는 Docker 볼륨에 두고, 바깥 자료와 `kernel/`의 파일이 같으면 다시 씁니다(`kernel/`의 파일을 바꾸면 다시 준비함).
+
+### 툴체인
+
+모비스 커널 폴더에 든 `toolchain/arm-eabi-4.7.tar.gz`(sha256 `76960066…`)를 풀어 씁니다. 순정 모듈이 "GNU C 4.7"로 빌드되어 있습니다. 안의 파일 107개는 AOSP `prebuilts/gcc/linux-x86/arm/arm-eabi-4.7`과 모두 같습니다(`bin/arm-eabi-gcc` sha256 `89a07707…`).
+
+### 우리 차와 같은지
+
+- 위 3의 차 설정 값은 같은 내비 플랫폼(tcc803x) 차에서 꺼낸 `/proc/config.gz`입니다. 우리 차(NX4HEV 260902)의 것은 USB 진단 기록 `dongle/config.txt`로 받아 PC에서 견줍니다.
+
+  ```sh
+  sh drivers/config-sum.sh <진단 기록>/dongle/config.txt
+  ```
+
+  "같음"(0)이면 그대로 씁니다. "다름"(3)이면 다른 줄을 보고 `prepare.sh`의 조정과 `KCONFIG_SUM`을 우리 차 것에 맞춥니다(#48). `sha256sum`이 없는 PC는 `shasum -a 256`으로 세고, 둘 다 없거나 설정 파일이 아니면 견주지 않고 멈춥니다(1).
+- 빌드한 `.ko`의 vermagic이 순정 모듈의 것(`dongle/ko-vermagic.txt`)과 같은지도 봅니다.
+
+## 커널 소스 자산
+
+모비스 원본 묶음은 628MB이고 커널 말고 다른 것도 들어 있어, 빌드할 때마다 받지 않도록 **커널 폴더만 고치지 않고 묶어** 이 저장소의 릴리스 자산으로 올려 두었습니다. 빌드는 이것을 받습니다.
+
+| 항목 | 값 |
+|---|---|
+| 릴리스 | [`src-mobis-avnt5w-r9`](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases/tag/src-mobis-avnt5w-r9)(모드 배포가 아님. 시험판·최신 아님으로 둠) |
+| 파일 | `mobis-avnt5w-r9-kernel.tar.xz`(102,365,660바이트, sha256 `f72306a8…`) |
+| 안의 것 | `AVNT5W_TCC803XKK_kernel/` 그대로(파일 30,048개, 툴체인 묶음 포함) |
+| 원본과 같은지 | 푼 폴더의 값(`lib.sh` `tree_sum`: 모든 파일의 sha256과 경로)이 원본 묶음에서 푼 것과 같은 `14aa37f7…`. 빌드는 받을 때마다 이 값을 봅니다 |
+| 함께 올린 것 | 모비스 고지 원본 `OSB_202606110414354220.zip`(그대로), 출처를 적은 릴리스 설명 |
+| 라이선스 | GPL-2.0(Linux Kernel). 원본 저작권은 Hyundai Mobis·Telechips 등에게 있습니다 |
+
+자산은 원본에서 다시 만들 수 있습니다(누구나 원본과 같은지 확인할 수 있게).
+
+```sh
+sh scripts/build-driver.sh --src-asset
+```
+
+- 모비스 원본 묶음을 받아 sha256(`e7533517…`)을 확인하고, `AVNT5W_TCC803XKK_kernel/`만 꺼내 폴더 값을 확인한 뒤, 이름 차례·시각·소유자를 고정해 묶습니다(`tar --sort=name`, `xz -9` 한 스레드). 결과는 `out/drivers/src/`입니다.
+- 자산을 바꿀 일이 생기면(모비스가 새 판을 냄 등) 새 태그로 올리고 `inputs.sh`의 `MOBIS_*` 값과 이 표를 고칩니다. 올린 자산은 바꾸지 않습니다.
+
+  ```sh
+  gh release create src-mobis-avnt5w-r9 out/drivers/src/mobis-avnt5w-r9-kernel.tar.xz <고지 zip> --target <커밋> --prerelease --latest=false --title "<제목>" --notes-file <설명>
+  ```
+
+- `v*`가 아닌 태그라 release 워크플로(모드 배포)는 돌지 않습니다. 다만 모드 릴리스의 `--generate-notes`가 바로 앞 릴리스부터 변경을 세므로, 이 자산 뒤 첫 모드 릴리스의 노트 범위를 확인합니다([`docs/release.md`](../docs/release.md)).
+
+## 빌드
+
+Docker가 필요합니다(linux/amd64. Apple Silicon 맥은 colima 등이 qemu로 돌림). 저장소 맨 위에서:
+
+```sh
+sh scripts/build-driver.sh
+```
+
+- 결과: `out/drivers/tcc803x/rtl88x2bu/bcmdhd.ko`와 `bcmdhd.ko.txt`(드라이버 커밋, 패치 sha256, 커널·커널 소스 자산·설정·툴체인 값, 빌드 날짜, 컴파일 옵션 지문, 매개변수, USB 별칭, md5·sha256, vermagic)
+- 받은 자료와 준비한 커널은 Docker 볼륨 `nx4kor-drivers`에 두고 다음 빌드에 다시 씁니다. 처음에는 받기·커널 준비로 오래 걸립니다(qemu 에뮬레이션이면 수십 분). 지우려면 `docker volume rm nx4kor-drivers`.
+- 드라이버는 컴파일 날짜·시각(`__DATE__`, `__TIME__`)을 문자열로 넣습니다. `drivers/`나 `scripts/build-driver.sh`를 마지막으로 바꾼 커밋의 시각(UTC, 달 이름은 로캘과 상관없이 영어)으로 고정합니다. 그래서 같은 커밋이면 같은 `.ko`가 다시 만들어지고, 드라이버와 상관없는 커밋만 쌓여서는 `.ko`가 바뀌지 않습니다. 기록이 다 있어야 하므로 얕은 클론에서는 멈춥니다. 커널 트리 경로(`/work/k/linux-3.18.24`)와 툴체인 경로(`/work/tc`)도 `.ko`에 들어가 고정입니다.
+- 컨테이너는 `drivers/`의 사본으로 돕니다. 빌드 중에 파일을 고쳐도 그 빌드는 바뀌지 않습니다.
+- Apple Silicon 맥의 qemu 에뮬레이션에서는 컴파일러·어셈블러·커널의 호스트 도구가 가끔 `Segmentation fault`(`internal compiler error`)로 멈춥니다. 커널 준비와 드라이버 컴파일 모두, 그때만 `make`를 이어서 다시 돌립니다(모두 8번까지, `NX4_DRV_TRIES`로 바꿈, `lib.sh` `make_retry`). 다시 돌리기 전에 make가 실패로 적은 대상을 지웁니다(커널 3.18의 kbuild에는 `.DELETE_ON_ERROR`가 없어 반쯤 쓴 파일이 남을 수 있음). 다 된 것은 다시 만들지 않아 결과는 같습니다. 충돌이 없으면 한 번에 끝나므로(CI) 횟수를 늘려도 잃는 것이 없습니다. 이 맥에서는 세 번 연속 충돌도 여러 번 있었습니다. 끝까지 멈추면 빌드는 실패로 끝나고, 스크립트를 다시 돌리면 커널 준비를 마친 트리는 다시 쓰고 드라이버는 처음부터 다시 컴파일합니다. 동시 작업 수(`NX4_DRV_JOBS`)를 줄여도 충돌은 날 수 있습니다.
+- 받기는 잠깐의 오류(503 등)면 15초씩 쉬며 8번까지 다시 묻습니다.
+- 저장소가 Docker VM에 공유된 곳에 있어야 합니다. colima는 기본으로 홈 폴더와 `/tmp/colima`만 VM에 붙입니다(`/var/folders` 같은 `mktemp -d` 자리는 안 됨). 붙지 않은 곳이면 스크립트가 먼저 알리고 멈춥니다.
+- Docker가 이 셸의 프록시 설정을 이어받아 받기가 막히면, 프록시 변수를 뺀 셸에서 Docker(colima 등)를 다시 시작합니다.
+- GitHub Actions(`.github/workflows/drivers.yml`)도 `drivers/`나 이 스크립트가 바뀐 `feature/` 푸시·PR마다 같은 방법으로 빌드합니다. md5는 실행 요약에, `.ko`는 artifact `drivers-tcc803x`에 있습니다. 같은 커밋이면 PC와 md5가 같아야 합니다(다르면 PC의 에뮬레이션 쪽을 의심합니다).
+
+### 차에 넣을 `.ko`는 CI에서 만든 것만
+
+- **차에 넣는 `.ko`는 리눅스 x86에서 만든 것만 씁니다**(CI `drivers` 워크플로의 artifact, 4단계부터는 release 워크플로. 2026-11-26 결정).
+- 까닭: Apple Silicon 맥의 qemu 에뮬레이션에서 컴파일러가 **멈추지 않고도 다른 코드를 낸 적이 있습니다**. PR #69의 커밋 `572128e`를 PC에서 빌드했을 때 첫 빌드는 md5 `5035d662…`(`.text`가 다르고 여러 함수의 레지스터 배정·분기 배치가 다름)였습니다. 같은 커널 트리로 다시 빌드하니 CI와 같은 `aabf4de7…`가 나왔습니다. 충돌(Segmentation fault)은 알 수 있어 다시 돌리지만, 이런 조용한 차이는 결과를 보기 전에는 알 수 없었습니다.
+- 알려진 원인 하나(PR #69 리뷰 14·18): 커널은 make마다 컴파일러에 물어(`cc-option`) 옵션을 정합니다. `arch/arm/Makefile`은 `-march=armv7-a`가 안 되면 조용히 `-march=armv5t`로 넘어가고, `-fno-strict-overflow`·`-fconserve-stack` 같은 옵션도 같은 식으로 붙습니다. 에뮬레이션에서 그 물음 중에 컴파일러가 멈추면 다른 옵션으로 컴파일됩니다. 리뷰 중에 실제로 `armv5t`로 컴파일되어 `rev16` 어셈블러 오류가 난 적이 있습니다. `572128e`의 조용한 차이는 충돌도 오류도 없어, 어느 옵션 때문이었는지(또는 이 까닭이었는지)는 확인하지 못했습니다.
+- 그래서 빌드는 끝에 모든 오브젝트의 컴파일 옵션 묶음(`-m`·`-f`·`-W`·`-O`·`-g`·`-std`·`-D__LINUX_ARM_ARCH__`)을 봅니다(`lib.sh` `check_cflags`). 서로 같고, `-march=armv7-a`이며, 그 sha256이 `inputs.sh`의 `EXPECTED_CFLAGS_SHA256`(CI 값 `d81069ca…`)과 같아야 합니다. 아니면 실패로 끝납니다. 그 sha256은 `bcmdhd.ko.txt`의 `cflags` 줄에도 남습니다. 커널 소스·설정·툴체인·드라이버 Makefile·`EXTRA_CFLAGS`를 바꾸면 CI의 "컴파일 옵션 확인" 줄 값으로 `inputs.sh`를 함께 고칩니다.
+- 그래도 PC 빌드는 개발·확인용입니다. `scripts/build-driver.sh`는 Docker VM의 CPU가 x86_64가 아니거나 맥이 Apple Silicon이면(Rosetta 터미널 포함) 끝에 알리고, `bcmdhd.ko.txt`에 `build host <Docker VM CPU>, <OS CPU> (emulated: …)`를 적습니다. PC 결과를 쓰려면 같은 커밋의 CI md5와 같은지 먼저 봅니다.
+
+## 바깥 자료(`inputs.sh`)
+
+받은 뒤 아래 값으로 같은 파일인지 확인합니다. 저장소에는 넣지 않습니다.
+
+| 자료 | 위치 | 확인 |
+|---|---|---|
+| 커널 뼈대 | kernel.org `linux-3.18.24.tar.xz` | sha256 `ed54cf8c…7f8c1b` |
+| 내비 커널 소스 | 이 저장소 릴리스 `src-mobis-avnt5w-r9`의 `mobis-avnt5w-r9-kernel.tar.xz`(원본: 현대모비스 AVNT STD G50 WIDE R9 묶음, sha256 `e7533517…`) | 파일 sha256 `f72306a8…`, 푼 폴더 값 `14aa37f7…` |
+| 커널 설정 | 내비 커널 소스의 `tcc803x_wide_pe_common_defconfig`를 조정 | 설정 값 `b2d52267…`(차 설정과 같음) |
+| 툴체인 | 내비 커널 소스의 `toolchain/arm-eabi-4.7.tar.gz` | sha256 `76960066…` |
+| 드라이버 | [cilynx/rtl88x2bu](https://github.com/cilynx/rtl88x2bu) | 커밋 `fc158d1f71b9e5dfcd1fccaf4d28725b65086e3b` |
+
+## 출처와 라이선스
+
+| 파일 | 출처 | 라이선스 |
+|---|---|---|
+| `rtl88x2bu/0001-nx4-protect.diff`, `rtl88x2bu/0002-nx4-hal.diff` | 이 저장소(드라이버 원본에 대는 패치) | GPL-2.0 |
+| `kernel/prepare.sh`, `build-in-container.sh`, `lib.sh`, `config-sum.sh`, `Dockerfile`, `inputs.sh`, `README.md` | 이 저장소 | GPL-2.0 |
+| `COPYING` | GPL-2.0 전문(드라이버 원본 저장소의 `LICENSE`와 같음) | — |
+
+`drivers/` 밖의 `scripts/build-driver.sh`(Docker를 부르는 PC 스크립트)와 `.github/workflows/drivers.yml`은 저장소의 다른 부분처럼 AGPL-3.0입니다.
+
+- 드라이버 원본: cilynx/rtl88x2bu(Realtek 드라이버, GPL-2.0)
+- 내비 커널 소스: 현대모비스 AVNT STD G50 WIDE(R9) 오픈소스(Linux Kernel, GPL-2.0). 위 "커널 소스 자산"
+- 커널 뼈대: kernel.org Linux 3.18.24(GPL-2.0)
+- 모드에 `.ko`를 넣어 내보낼 때는 이 폴더, 드라이버 원본 커밋, 커널 소스 자산·kernel.org 위치를 함께 냅니다(GPL-2.0 대응 소스, #48 4단계).
+
+## 차에서 확인할 것
+
+[#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48) 체크리스트에 있습니다. 이 빌드에 걸린 것:
+- 우리 차 커널 설정이 빌드의 설정과 같은지(`sh drivers/config-sum.sh dongle/config.txt`)
+- 빌드한 `.ko`의 vermagic이 순정 모듈의 것과 같은지(`dongle/ko-vermagic.txt`)
+- 순정 HAL이 주는 insmod 인자와 `bcmdhd` 매개변수 이름(`dongle/wifi-strings.txt`)
+- HAL이 바꿔 둔 `bcmdhd.ko`를 올렸을 때 `wlan0`이 생기고 HMG-API가 AP를 띄우는지(149번 채널 포함)
+- 보호 패치: 쓰는 중에 동글을 뽑아도 내비가 멈추지 않는지, Wi-Fi를 끄고 켜도 되는지, 수신 오류로 멈춘(`nx4-protect: … rx stopped`) 뒤 Wi-Fi를 끄고 켜면 AP가 돌아오는지, dmesg의 `nx4-protect:` 줄
