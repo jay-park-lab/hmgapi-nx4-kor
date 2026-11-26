@@ -1,13 +1,13 @@
 #!/bin/sh
 # USB Wi-Fi 동글 드라이버(.ko)를 Docker로 빌드한다(#48, drivers/README.md). PC에서만 돈다. 내비에는 아무것도 하지 않는다.
 # 쓰는 법(저장소 맨 위에서):
-#   sh scripts/build-driver.sh               이 저장소의 드라이버 → out/drivers/tcc803x/
+#   sh scripts/build-driver.sh               이 저장소의 드라이버 둘 → out/drivers/tcc803x/{rtl88x2bu,rtl8831bu}/
 #   sh scripts/build-driver.sh --src-asset   모비스 원본 묶음에서 커널 소스 자산을 만든다 → out/drivers/src/(drivers/README.md "커널 소스 자산")
 # 필요한 것: docker(linux/amd64를 돌릴 수 있어야 함. Apple Silicon은 colima 등의 qemu 에뮬레이션). 받은 자료와 준비한 커널은
 # Docker 볼륨 nx4kor-drivers에 두고 다시 쓴다(처음은 받기·커널 준비로 오래 걸림). 지우려면 docker volume rm nx4kor-drivers.
 # 빌드 날짜·시각(.ko에 문자열로 들어감)은 drivers/나 이 스크립트를 마지막으로 바꾼 커밋의 시각으로 고정한다. 그래서 같은
 # 커밋이면 같은 .ko가 나와야 하고(다르면 에뮬레이션 쪽을 의심), 문서처럼 드라이버와 상관없는 커밋만 쌓여서는 .ko가 바뀌지 않는다(얕은 클론은 안 됨).
-# 환경 변수: NX4_DRV_JOBS(make -j), NX4_DRV_TRIES(에뮬레이션 충돌 때 make를 모두 몇 번까지 돌릴지, 기본 8),
+# 환경 변수: NX4_DRV_JOBS(make -j), NX4_DRV_TRIES(에뮬레이션 충돌 때 make를 모두 몇 번까지 돌릴지, 기본 30),
 #            NX4_DRV_VOLUME(볼륨 이름), NX4_DRV_IMAGE(이미지 이름)
 # 이 스크립트는 저장소의 다른 PC 스크립트처럼 AGPL-3.0이다. 컨테이너 안에서 도는 drivers/는 GPL-2.0(drivers/COPYING).
 set -eu
@@ -58,7 +58,7 @@ case "$DARCH" in x86_64|amd64) ;; *) EMU=yes ;; esac
 HOST_ARCH="docker $DARCH, $(uname -s) $(uname -m)"
 docker run --rm --platform linux/amd64 \
   -v "$VOL":/work -v "$B/drivers":/src/drivers:ro -v "$OUT":/out \
-  -e MODE=$MODE -e JOBS="${NX4_DRV_JOBS:-}" -e MAKE_TRIES="${NX4_DRV_TRIES:-8}" -e BUILD_DATE="$BDATE" -e BUILD_TIME="$BTIME" \
+  -e MODE=$MODE -e JOBS="${NX4_DRV_JOBS:-}" -e MAKE_TRIES="${NX4_DRV_TRIES:-30}" -e BUILD_DATE="$BDATE" -e BUILD_TIME="$BTIME" \
   -e HOST_ARCH="$HOST_ARCH" -e BUILD_EMU=$EMU \
   "$IMG" bash /src/drivers/build-in-container.sh
 case "$MODE $EMU" in

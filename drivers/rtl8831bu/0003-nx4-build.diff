@@ -1,0 +1,30 @@
+nx4-build: 이 차 커널(3.18.24-tcc)과 GCC 4.7에 맞추는 빌드 고침(이 저장소, GPL-2.0).
+대상: hyeondg/rtl8831bu fed914c8.
+  1. Makefile: 디버그 로그를 끈다(CONFIG_RTW_DEBUG = n)
+  2. osdep_service_linux.c: rtw_warn_on_cnt(u16)를 ATOMIC_T로 바꿔 ATOMIC_INC에 넘기던 것을 보통 더하기로(GCC 4.7 컴파일 오류)
+
+--- a/Makefile
++++ b/Makefile
+@@ -151,7 +151,8 @@
+ endif
+ 
+ ########################## Debug ###########################
+-CONFIG_RTW_DEBUG = y
++# nx4-build: 디버그 로그를 끈다(순정 시스템의 dmesg·CPU 부하를 줄임. RTL88x2BU도 끈 채로 빌드됨)
++CONFIG_RTW_DEBUG = n
+ # default log level is _DRV_INFO_ = 4,
+ # please refer to "How_to_set_driver_debug_log_level.doc" to set the available level.
+ CONFIG_RTW_LOG_LEVEL = 4
+--- a/os_dep/osdep_service_linux.c
++++ b/os_dep/osdep_service_linux.c
+@@ -883,7 +883,9 @@
+ void rtw_warn_on(bool condition){
+ 	if(condition){
+ 		WARN_ON(condition);
+-		ATOMIC_INC((ATOMIC_T *)&rtw_warn_on_cnt);
++		/* nx4-build: u16 변수를 ATOMIC_T(4바이트)로 바꿔 ATOMIC_INC에 넘기면 GCC 4.7이 ARM 인라인 어셈블리를 받지 않는다
++		 * ("output number 2 not directly addressable"). 남의 2바이트까지 쓰는 것이기도 하다. 세기만 하는 카운터라 보통 더하기로 */
++		rtw_warn_on_cnt++;
+ 	}
+ }
+ 

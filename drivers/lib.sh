@@ -22,14 +22,14 @@ tree_sum() {
 }
 
 # make를 돌리되, qemu 에뮬레이션(Apple Silicon 맥)에서 컴파일러·어셈블러·호스트 도구가 Segmentation fault로 멈추면
-# 이어서 다시 돌린다(모두 MAKE_TRIES번까지, 기본 8). make는 이어서 하므로 다 된 것은 다시 만들지 않아 결과는 같다.
+# 이어서 다시 돌린다(모두 MAKE_TRIES번까지, 기본 30. RTL8831BU는 오브젝트가 379개라 한 빌드에서 8번 넘게 충돌함). make는 이어서 하므로 다 된 것은 다시 만들지 않아 결과는 같다.
 # 다른 오류는 바로 멈춘다.
 # 커널 3.18의 kbuild에는 .DELETE_ON_ERROR가 없어 멈춘 단계가 반쯤 쓴 파일을 남길 수 있다. 다시 돌리기 전에 make가 실패로
 # 적은 대상([scripts/Makefile.<무엇>:<줄>: <대상>])을 지운다. 상대 경로는 make를 돈 폴더 기준이다.
 #   make_retry <기록 파일> <make를 돈 폴더(-C)> make 인자...
 make_retry() {
   _log=$1; _dir=$2; shift 2
-  _n=1; _max=${MAKE_TRIES:-8}
+  _n=1; _max=${MAKE_TRIES:-30}
   : > "$_log"
   until make -C "$_dir" "$@" > "$_log.try" 2>&1; do
     cat "$_log.try" >> "$_log"
@@ -54,9 +54,12 @@ make_retry() {
 # 물음 중에 컴파일러가 멈춰 다른 옵션으로 컴파일될 수 있다(PR #69 리뷰 14: 실제로 armv5t로 컴파일되어 rev16 어셈블러 오류).
 # 그래서 컴파일한 모든 오브젝트(.cmd 첫 줄이 arm-eabi-gcc)의 옵션(-m·-f·-W·-O·-g·-std·-D__LINUX_ARM_ARCH__) 묶음이
 #   1. 서로 같고(make를 이어 돌린 사이에 바뀌지 않음) 2. -march=armv7-a이며 armv5t가 없고
-#   3. EXPECTED_CFLAGS_SHA256(inputs.sh, CI 값)이 있으면 그 sha256과 같은지(한 번에 끝난 빌드에서 옵션 하나가 모두 똑같이
-#      빠진 경우, 리뷰 18) 본다. 그 묶음의 sha256을 CFLAGS_SUM에 둔다
+#   3. 고정한 지문이 있으면 그 sha256과 같은지(한 번에 끝난 빌드에서 옵션 하나가 모두 똑같이 빠진 경우, 리뷰 18) 본다.
+#      지문은 둘째 인자로 받고(드라이버마다 다름: inputs.sh EXPECTED_CFLAGS_SHA256, EXPECTED_CFLAGS_SHA256_8831BU), 없으면
+#      EXPECTED_CFLAGS_SHA256을 쓴다. 그 묶음의 sha256을 CFLAGS_SUM에 둔다
+#   check_cflags <드라이버 폴더> [고정한 지문]
 check_cflags() {
+  _cexp=${2:-${EXPECTED_CFLAGS_SHA256:-}}
   _sets=/tmp/cflags.sets; : > $_sets
   for _c in $(find $1 -name '.*.o.cmd'); do
     head -1 "$_c" | grep -q 'arm-eabi-gcc' || continue
@@ -70,8 +73,8 @@ check_cflags() {
     || die "컴파일 옵션이 -march=armv7-a가 아닙니다(에뮬레이션에서 kbuild cc-option 검사가 실패한 것으로 보임). 다시 돌려 주세요"
   CFLAGS_SUM=$(head -1 $_sets | sha256sum | cut -d' ' -f1)
   echo "컴파일 옵션 확인: 오브젝트 $(grep -c . $_sets)개가 같음, -march=armv7-a ($CFLAGS_SUM)"
-  if [ -n "${EXPECTED_CFLAGS_SHA256:-}" ] && [ "$CFLAGS_SUM" != "$EXPECTED_CFLAGS_SHA256" ]; then
+  if [ -n "$_cexp" ] && [ "$CFLAGS_SUM" != "$_cexp" ]; then
     echo "옵션 묶음: $(head -1 $_sets)"
-    die "컴파일 옵션 지문이 고정한 값과 다릅니다($CFLAGS_SUM, 고정 $EXPECTED_CFLAGS_SHA256). 에뮬레이션이면 다시 돌리고, 커널 설정·툴체인·드라이버 Makefile을 바꿨으면 CI 값으로 inputs.sh를 고칩니다"
+    die "컴파일 옵션 지문이 고정한 값과 다릅니다($CFLAGS_SUM, 고정 $_cexp). 에뮬레이션이면 다시 돌리고, 커널 설정·툴체인·드라이버 Makefile을 바꿨으면 CI 값으로 inputs.sh를 고칩니다"
   fi
 }
