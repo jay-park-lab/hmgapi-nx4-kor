@@ -1483,6 +1483,10 @@ check "  부팅 때 동글일 수 있는 USB 장치(0bda:b812)가 있으면 아�
 # 43~44초에 다시 보임): 41초에 줄이 있고 동글이 안 보이다가, 1.5초 뒤 동글이 보이고 51초가 됨
 ncreset; echo "41.00 10.00" > $T/nuptime; (/bin/sleep 1.5; usbdev $T/nusb 2-1 0bda b831; echo "51.00 10.00" > $T/nuptime) & _ncw=$!; ncrun; wait $_ncw
 check "  부팅 뒤 50초 전이면 기다리고(포트 전원을 껐다 켜는 틈), 그사이 동글이 보이면 아무것도 쓰지 않음" '[ ! -e $T/nnochip ] && [ ! -e $NH/wifi/ap.boot ] && grep -q "동글이 있음" $T/nc.out' || cat $T/nc.out
+# 부팅 때도 정하기 전에 NX4_NOCHIP_RECHECK초 뒤 한 번 더 본다(포트 전원을 껐다 켜는 때가 늦게 밀린 부팅, PR #86 리뷰 7): 60초에 줄이
+# 있고 동글이 안 보이다가 0.5초 뒤 보임
+ncreset; (/bin/sleep 0.5; usbdev $T/nusb 2-1 0bda b812) & _ncw=$!; ncrun NX4_NOCHIP_RECHECK=1; wait $_ncw
+check "  부팅 때도 정하기 전에 NX4_NOCHIP_RECHECK초 뒤 한 번 더 보고, 그때 동글이 보이면 아무것도 쓰지 않음(PR #86 리뷰 7)" '[ ! -e $T/nnochip ] && [ ! -e $NH/wifi/ap.boot ] && grep -q "동글이 있음" $T/nc.out' || cat $T/nc.out
 ncreset; : > $T/nseen; ncrun
 check "  칩을 본 적이 있으면(public/wifi-chip) 아무것도 쓰지 않음" '[ ! -e $T/nnochip ] && [ ! -e $NH/wifi/ap.boot ] && grep -q "Wi-Fi 칩이나 USB Wi-Fi 동글이 있음: 할 일 없음" $T/nc.out' || cat $T/nc.out
 ncreset; mkdir -p $T/nsysnet/wlan0; ncrun
