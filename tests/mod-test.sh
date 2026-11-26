@@ -128,11 +128,14 @@ assert pairs == CL, pairs
 assert "restart.run()" not in fit and fit.count("new Thread(restart, ") >= 1, "restart"
 assert "\"dipo.iap2_proxy.stop_route_guidance\"" in part
 # 판단은 TbtGate가 한다(아래 호스트 테스트): 우리 호출 기록, 남의 호출에 줄 인자, 남의 Stop 미루기, 비켜 주기, 앱에서 끔
-for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, at, on)",
+for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), on)",
           "gate.stopSeen(", "gate.stopDue(", "gate.yielding(", "gate.heard(", "gate.setActive(turns.active())",
           # 2.1.2-beta.4: a call ours has nothing for yet waits for this thread (TbtGate.held), never on the main thread;
           # the listener numbers the update and its post says when this thread is through (done wakes the call)
-          "boolean on = mod.enabled();", "c = gate.held(point, p.args.length, on, WAITS);",
+          "boolean on = mod.enabled();", "c = gate.held(point, p.args.length, on, WAITS, waited);",
+          # PR #85 리뷰 2: 붙잡은 호출은 kor_tbt_log일 때만, 우리 값·그대로 통과 모두, 시작마다 HELD_LOGS_MAX줄까지
+          "waited[0] >= 0L && t != null && t.debug && heldLogs.getAndIncrement() < HELD_LOGS_MAX",
+          "static final int HELD_LOGS_MAX = 100;",
           "Looper.myLooper() != Looper.getMainLooper()", "lock.wait(ms);", "final long seq = gate.heard(", "}, seq);",
           "if (seq > 0L) gate.done(seq);",
           # 앱에서 끄면 받지 않고, 상태와 "그렸다" 표시를 비우고, 다시 켜면 길안내 전체를 다시 요청한다(PR #68 리뷰 2·11)
@@ -140,13 +143,20 @@ for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, at, o
           # giving way: REFRESH waits for the way to end, hearing again brings it back (#77, PR #78 review 5·10)
           "refreshBackedOff = yielding && turns.active();", "h.post(RESUME);", "handler.removeCallbacks(REFRESH);"):
     assert s in part, s
+# PR #85 리뷰 5: post(r, seq)에서 done(seq)는 noteActive() 다음, finally 안(붙잡힌 공식 호출은 이 스레드가 길안내가
+# 켜졌는지 적은 뒤에 다시 봄. 앞에 오면 우리 값이 생기기 전에 깨어 공식 값으로 통과)
+body = part[part.index("static void post(final Runnable r, final long seq)"):]
+body = body[:body.index("\n    }\n")]
+assert re.search(r"noteActive\(\);\s*\}\s*finally\s*\{\s*if \(seq > 0L\) gate\.done\(seq\);", body), body
+run = body[body.index("h.post(new Runnable()"):]
+assert run.count("gate.done(") == 1 and run.index("noteActive();") < run.index("gate.done(seq);"), run
 PY'
 # KorTbt의 판단(TbtGate: 덮어쓰기, 비켜 주기, 남의 Stop 미루기, 앱에서 끔. PR #68 리뷰 1~4)을 PC에서 돌린다
 if command -v javac >/dev/null 2>&1; then
   mkdir -p $T/gate
   javac --release 8 -Xlint:-options -nowarn -d $T/gate $HK/dipo/TbtGate.java $B/tests/tools/TbtGateTest.java > $T/gate.err 2>&1
   java -cp $T/gate io.github.jayparklab.nx4kor.hook.dipo.TbtGateTest > $T/gate.out 2>&1
-  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음), 공식 모드가 우리 최신 값을 900ms 안에 실어 보냈으면 같은 값의 우리 호출을 건너뜀(#77), 우리 값이 아직 없는 공식 호출은 우리 스레드가 같은 갱신을 끝낼 때까지 250ms(못 들었으면 50ms)까지 기다려 우리 값을 실음(2.1.2-beta.4)" \
+  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음), 공식 모드가 우리 최신 값을 900ms 안에 실어 보냈으면 같은 값의 우리 호출을 건너뜀(#77), 우리 값이 아직 없는 공식 호출은 우리 스레드가 들은 것을 모두 끝낼 때까지 250ms(길안내가 꺼져 있고 못 들었으면 50ms)까지 기다려 우리 값을 실음(2.1.2-beta.4, PR #85 리뷰 1·3·4)" \
     'tail -n 1 $T/gate.out | grep -qx ok && ! grep -q "^FAIL" $T/gate.out' || cat $T/gate.err $T/gate.out
 else
   echo "skip TbtGate 테스트(javac 없음)"

@@ -4,7 +4,8 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 // mod's Dipo.java (Open-HMG/hmgapi-wireless-cp-aa v2.2.0-rc.9, VysseCodes, AGPL-3.0) and Korea
 // Projection's (StopDragon/HMG-API korea-build 6258357, AGPL-3.0). The cluster override is NX4 KOR's.
 // Modified by NX4 KOR, 2026-11-26 (2.1.2-beta.4, #67): an official mod's call this mod has nothing for yet waits
-//   briefly for this mod's thread (TbtGate.held), so a start no longer shows the official mod's first set.
+//   briefly for this mod's thread (TbtGate.held), so a start no longer shows the official mod's first set;
+//   PR #85 review 2: with kor_tbt_log, every held call is logged (ours or passed), up to HELD_LOGS_MAX.
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -24,6 +25,7 @@ import com.tcc.iap2.Iap2NotiMsg;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import hmgapi.hook.Car;
 import hmgapi.hook.Cluster;
@@ -50,9 +52,10 @@ import hmgapi.hook.ModContext;
  *    for 3 s, this mod gives way (its calls pass, ours stop resending) until it hears again.
  *    The official mod has no resend timer, so at a start (or on again) its first set, drawn
  *    before this thread had any of its own, stayed on the cluster until this thread sent: such a
- *    call now waits up to TbtGate.HOLD_MS for this thread to finish the update this listener has
- *    heard (or is about to), then carries this thread's arguments if there are any (held, not on
- *    the main thread).
+ *    call now waits up to TbtGate.HOLD_MS for this thread to finish all this listener has heard
+ *    (or, with guidance off, is about to hear), then carries this thread's arguments if there are
+ *    any (held, not on the main thread; with kor_tbt_log, each held call is logged, up to
+ *    HELD_LOGS_MAX per start).
  * 3. A Stop of the phone's route guidance that isn't this mod's own clears ours 2 s later, unless
  *    the phone sends again meanwhile: the official mod asks again with Stop and Start (a source
  *    change, its watchdog), and only DiPO's own Stop (CarPlay ends) is followed by silence.
@@ -86,8 +89,12 @@ public final class KorTbt {
     static final TbtGate gate = new TbtGate();
     /** points whose first override was logged */
     static final Set<String> overrideLogged = Collections.synchronizedSet(new HashSet<String>());
-    /** points whose first held-then-overridden call was logged (only with kor_tbt_log) */
-    static final Set<String> heldLogged = Collections.synchronizedSet(new HashSet<String>());
+    /**
+     * held official calls logged, ours or passed as they were (only with kor_tbt_log, up to HELD_LOGS_MAX per start, as
+     * CpTurnsFit's diagnosis and HUD lines: PR #85 review 2)
+     */
+    static final AtomicInteger heldLogs = new AtomicInteger();
+    static final int HELD_LOGS_MAX = 100;
     /** a held call's clock and wait: elapsedRealtime, and Object.wait on the gate (TbtGate.done wakes it) */
     static final TbtGate.Waits WAITS = new TbtGate.Waits() {
         @Override
@@ -226,22 +233,22 @@ public final class KorTbt {
                     return;
                 }
                 boolean on = mod.enabled();
-                long at = SystemClock.elapsedRealtime();
-                Object[] c = gate.forOther(point, p.args.length, at, on);
-                boolean held = false;
+                Object[] c = gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), on);
                 if (c == null && on && Looper.myLooper() != Looper.getMainLooper()) {
-                    c = gate.held(point, p.args.length, on, WAITS);
-                    held = c != null;
+                    long[] waited = { -1L };
+                    c = gate.held(point, p.args.length, on, WAITS, waited);
+                    // PR #85 review 2: with kor_tbt_log, each held call either way (passed: the official mod's values went
+                    // to the cluster), up to HELD_LOGS_MAX per start; nothing more without it
+                    CpTurnsFit t = turns;
+                    if (waited[0] >= 0L && t != null && t.debug && heldLogs.getAndIncrement() < HELD_LOGS_MAX) {
+                        log("CarPlay (NX4 KOR): " + point + " from the official mod held " + waited[0] + " ms, "
+                                + (c != null ? "carries ours" : "passed as it was") + " (debug)");
+                    }
                 }
                 if (c == null) return;
                 System.arraycopy(c, 0, p.args, 0, c.length);
                 if (overrideLogged.add(point)) {
                     log("CarPlay (NX4 KOR): " + point + " from the official mod replaced with ours (logged once per call)");
-                }
-                CpTurnsFit t = turns;
-                if (held && t != null && t.debug && heldLogged.add(point)) {
-                    log("CarPlay (NX4 KOR): " + point + " from the official mod held " + (SystemClock.elapsedRealtime() - at)
-                            + " ms for ours (debug, logged once per call)");
                 }
             }
         });
