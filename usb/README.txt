@@ -20,10 +20,10 @@ HMG-API 1.1.0-rc.10 이상이 필요합니다(2.1.1부터. 2.1.0은 rc.8 이상)
 - HMGAPI 폴더가 있으면 HMG-API가 함께 들어 있는 묶음입니다(이 저장소의 릴리스 묶음).
   HMG-API가 없거나 1.1.0-rc.10보다 낮으면(2.1.0을 쓰던 차의 rc.8, rc.9 포함) 첫 번째 Update OTA가 HMG-API를 설치(또는 업데이트)하고
   재부팅합니다. rc.10으로 올리는 업데이트는 NEMESIS 1.17에서도 안전합니다(예전에 FORCE로 설치한 차 포함).
-  다만 NEMESIS가 깔린 차에서는 이 USB가 HMG-API도 설치·업데이트하지 않습니다(아래 "NEMESIS가 깔린 차").
   부팅이 끝나면 바로 같은 USB로 Update OTA를 한 번 더 누르면 나머지가 설치됩니다.
   설치기가 HMG-API가 준비될 때까지 스스로 기다립니다(최대 약 5분, "HMG-API가 준비되기를 기다리는 중" 토스트).
   그동안 USB를 빼지 마세요.
+- NEMESIS가 깔린 차에서는 이 USB가 HMG-API도 설치·업데이트하지 않습니다(아래 "NEMESIS가 깔린 차").
 - HMG-API가 들어 있지 않은 묶음이면 HMG-API USB(hmgapi-<버전>-usb.zip)로 먼저 설치하고 재부팅한 뒤 이 USB를 씁니다.
   HMG-API가 낮은 판인데 이 USB에 HMG-API가 없으면 설치기가 아무것도 바꾸지 않고 멈춥니다.
 
@@ -53,16 +53,19 @@ NEMESIS가 깔린 차
   설치기가 "NEMESIS가 깔린 차에는 NX4 KOR를 설치하지 않습니다"로 멈추고 아무것도 바꾸지 않습니다.
   같은 판 다시 설치·업데이트도 하지 않고, HMG-API도 설치·업데이트하지 않습니다. 지우기(UNINSTALL)는 막지 않습니다.
   쓰려면 NEMESIS를 지우고 내비를 재부팅한 뒤 다시 누릅니다. NEMESIS를 지우기 전에:
-  - HMG-API가 있으면 그대로 둔 채 지웁니다. HMG-API를 먼저 지우지 마세요(아래 "!!" 안내).
-  - HMGAPI/FORCE로 설치한 차(NEMESIS 1.17)는 아래 #397 주소를 먼저 봅니다.
+  - HMG-API가 있으면 그것은 지우지 말고 둔 채 NEMESIS를 지우세요(아래 "!!" 안내).
+  - 그 HMG-API가 1.1.0-rc.10보다 낮으면 NEMESIS를 지우기 전에 HMG-API 릴리스로 rc.10 이상으로 올리고 두 번 재부팅합니다.
+    HMGAPI/FORCE로 설치한 차(NEMESIS 1.17)는 꼭 이렇게 합니다(rc.9를 거치지 않음, HMG-API 1.1.0-rc.10 릴리스 노트).
   - Android가 뜨지 않는 차에서는 NEMESIS를 지우지 마세요.
-  NEMESIS가 깔린 차에서 HMG-API를 올리거나 다시 설치할 때는 이 USB 대신 HMG-API 릴리스의 USB(hmgapi-<버전>-usb.zip)나
-  update zip(HMG-API 앱 "Check USB updates")을 씁니다(1.1.0-rc.10 이상).
+  NEMESIS가 깔린 차에서 HMG-API를 올리거나 다시 설치할 때는 HMG-API 릴리스의 hmgapi-<버전>-nemesis.zip(NEMESIS Manager),
+  USB 묶음(hmgapi-<버전>-usb.zip)이나 update zip(HMG-API 앱 "Check USB updates")을 씁니다(1.1.0-rc.10 이상).
+  이 저장소의 USB는 쓰지 않습니다. 2.1.2 이후는 멈추고, 2.1.1 이전은 HMG-API를 올린 뒤 NX4 KOR까지 설치합니다.
 
 관리 앱을 다시 열기
   HMG-API 훅이 켜지면 앱 메뉴에 NX4 KOR 타일이 생깁니다.
   타일이 없을 때(설정 전, 또는 HMG-API가 이 차에서 훅을 켜지 못했을 때)는 같은 USB로 Update OTA를 다시 누르면
   관리 앱이 먼저 열립니다(같은 판은 다시 설치하지 않음. HMG-API가 응답해야 합니다).
+  NEMESIS가 깔린 차에서는 열리지 않고 설치기가 멈춥니다(위 "NEMESIS가 깔린 차").
 
 지우기
   NX4 폴더에 빈 파일 UNINSTALL을 만들고 Update OTA를 누릅니다. NX4 KOR를 되돌린 뒤 재부팅합니다.
@@ -75,11 +78,12 @@ NEMESIS가 깔린 차
 
   !! NEMESIS 1.17이 깔린 차에서는 HMG-API를 1.1.0-rc.10 이상으로 올리기 전에 지우지 마세요.
   HMG-API 1.1.0-rc.8 이하를 지우면 재부팅 한두 번 뒤 Android가 뜨지 않습니다.
-  HMGAPI/FORCE로 설치한 차(NEMESIS 1.17)는 1.1.0-rc.9로 올리기만 해도 Android가 뜨지 않습니다. 이 USB는 rc.10을 넣습니다.
+  HMGAPI/FORCE로 설치한 차(NEMESIS 1.17)는 1.1.0-rc.9로 올리기만 해도 Android가 뜨지 않으니 rc.10으로 바로 올립니다.
   한번 Android가 뜨지 않으면 미리 켜 둔 adb나 대리점이 필요할 수 있습니다(NEMESIS 비상 USB는 아직 차에서 된 적이 없음).
   지울 때 도는 것은 그 HMG-API를 설치할 때 저장해 둔 삭제라서, 새 판 HMG-API USB의 HMGAPI/UNINSTALL로 지워도 같습니다.
   먼저 HMG-API를 1.1.0-rc.10 이상으로 올리고 재부팅한 뒤 지웁니다. 이 USB는 NEMESIS가 깔린 차에서 HMG-API를 올리지 않으므로
-  HMG-API 릴리스의 USB(hmgapi-<버전>-usb.zip)나 update zip(HMG-API 앱 "Check USB updates")으로 올립니다.
+  HMG-API 릴리스의 USB(hmgapi-<버전>-usb.zip)나 update zip(HMG-API 앱 "Check USB updates")으로 올립니다
+  (NEMESIS가 깔린 차는 NEMESIS Manager로 hmgapi-<버전>-nemesis.zip도 됩니다. 2.1.1 이전의 이 USB는 쓰지 않습니다).
   NEMESIS 1.16 이하나 NEMESIS가 없는 차는 해당하지 않습니다.
   이미 지웠고 Android가 아직 뜬다면, 다시 재부팅하기 전에 HMG-API 릴리스의 USB(1.1.0-rc.10 이상)로 HMG-API를 새로 설치합니다
   (이 USB는 NEMESIS가 깔린 차에서 HMG-API를 설치하지 않습니다. UNINSTALL-PURGE로 지웠으면 아래 주소를 봅니다).

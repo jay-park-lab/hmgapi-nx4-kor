@@ -176,7 +176,7 @@
    - **NEMESIS**([#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75), 2026-11-26 사용자 결정): NEMESIS의 실행 파일(`/system/xbin/nemesis`, HMG-API `engine/NemesisSync.java`가 NEMESIS가 있다고 보는 기준과 같음)이 있으면 아무것도 바꾸지 않고 멈춥니다(`NMS_MSG`: "NEMESIS가 깔린 차에는 NX4 KOR를 설치하지 않습니다. NEMESIS를 지우기 전에 USB의 README.txt를 꼭 읽어 주세요."). 이 모드는 순정 시스템에 KP 모드보다 부하를 덜 주는 것을 목표로 하므로 NEMESIS와 함께 쓰지 않습니다.
      - 새 설치·업데이트·같은 판 다시 설치(`REINSTALL` 포함)를 모두 거절하고, HMG-API도 설치·업데이트하지 않습니다. 지우기(`UNINSTALL`·`UNINSTALL-ALL`)는 막지 않습니다.
      - USB 설치기만 봅니다(사용자 결정). HMG-API 앱으로 모드 zip을 직접 넣었거나 이미 NEMESIS와 함께 쓰던 차에서 관리 앱과 길안내 훅은 그대로 돕니다.
-     - NEMESIS 1.17 차에서 HMG-API를 rc.10으로 올리거나 지운 뒤 다시 설치하는 길(#397)은 이 USB가 아니라 HMG-API 릴리스의 USB·update zip으로 안내합니다(README "HMG-API를 지울 때", `usb/README.txt` "NEMESIS가 깔린 차"). NEMESIS를 지우는 차례도 그 안내를 따릅니다(HMG-API를 둔 채 NEMESIS를 먼저 지움, `FORCE` 차는 #397).
+     - NEMESIS 1.17 차에서 HMG-API를 rc.10으로 올리거나 지운 뒤 다시 설치하는 길(#397)은 이 USB가 아니라 HMG-API 릴리스의 USB·update zip으로 안내합니다(README "HMG-API를 지울 때", `usb/README.txt` "NEMESIS가 깔린 차"). NEMESIS를 지우는 차례도 그 안내를 따릅니다. HMG-API를 둔 채 NEMESIS를 지우고, 그 HMG-API가 rc.10보다 낮으면 먼저 HMG-API 릴리스로 rc.10 이상으로 올립니다(`FORCE` 차는 반드시, HMG-API 1.1.0-rc.10 릴리스 노트, PR #76 리뷰 3).
      - 차례와 진단 기록 묻기는 아래 Korea Projection 패키지와 같고, 그보다 앞에서 봅니다.
    - **Korea Projection 패키지**([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13), 2026-11-24 사용자 결정): NEMESIS의 Korea Projection 패키지 폴더(`/data/nemesis/apps/korea.projection`, KP 1.8.0 `NEMESIS.data`의 `id=korea.projection`)가 있으면 아무것도 바꾸지 않고 멈춥니다(`KORPROJ_MSG`: "NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다. NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤 다시 해 주세요."). 그 패키지의 `hostapd`가 HMG-API 프로젝션 AP와 Wi-Fi를 다투기 때문입니다.
      - 재부팅까지 안내하는 것은 패키지 폴더가 재부팅 때 없어지거나 그 `hostapd`가 재부팅 전까지 남는 차가 있을 수 있어서입니다(PR #57 리뷰 1). 토스트, README, `usb/README.txt`, `docs/troubleshooting.md`의 안내가 모두 같은 뜻입니다.
@@ -225,7 +225,7 @@
 - `NX4/UNINSTALL-ALL`: 위와 같고, 그 뒤 공식 무선 모드도 `engine remove`하고 계획이 되돌리기뿐이면 적용합니다. 공식 무선 모드만 남은 차에서도 됩니다(그때 결과 문구는 "공식 무선 모드를 지웠습니다"). 계획에 다른 변경이 있으면 적용하지 않고 "HMG-API 앱에서 변경 사항을 적용해 주세요(무선 모드 삭제)"로 알립니다. HMG-API와 map은 남깁니다(2026-11-23 사용자 결정).
 - 설치기는 HMG-API를 지우지 않습니다(`UNINSTALL`·`UNINSTALL-ALL` 모두). HMG-API를 지우라고 하는 안내에는 모두 NEMESIS 1.17 경고를 둡니다: README "HMG-API를 지울 때", `troubleshooting.md` "되돌리기" 2, USB `README.txt` "지우기".
   - HMG-API 1.1.0-rc.8 이하를 NEMESIS 1.17에서 지우면 재부팅 한두 번 뒤 Android가 뜨지 않습니다([Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397)).
-  - 지울 때 도는 것은 그 판을 설치할 때 저장한 삭제입니다. 그래서 먼저 rc.10 이상으로 올린 뒤 지우라고 안내합니다. 2.1.2부터 이 USB는 NEMESIS가 깔린 차에서 HMG-API를 올리지 않으므로(#75) 올리는 길은 HMG-API 릴리스의 USB·update zip(또는 2.1.1 USB)으로 안내합니다.
+  - 지울 때 도는 것은 그 판을 설치할 때 저장한 삭제입니다. 그래서 먼저 rc.10 이상으로 올린 뒤 지우라고 안내합니다. 2.1.2부터 이 USB는 NEMESIS가 깔린 차에서 HMG-API를 올리지 않으므로(#75) 올리는 길은 HMG-API 릴리스(NEMESIS Manager용 `hmgapi-<판>-nemesis.zip`, USB 묶음, update zip)로 안내합니다. 2.1.1 이전의 이 USB는 HMG-API를 올린 뒤 NX4 KOR까지 설치하므로 NEMESIS가 깔린 차에는 안내하지 않습니다(PR #76 리뷰 1).
   - `FORCE`로 설치한 NEMESIS 1.17 차는 rc.9로 올리기만 해도 Android가 뜨지 않으므로, rc.9로 올리지 말라는 것도 함께 적습니다.
   - #397의 비상 USB 복구는 차에서 된 적이 없다는 것도 함께 적습니다.
 - 관리 앱에는 지우기 버튼을 두지 않습니다(2026-11-24 사용자 결정, [#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)).
