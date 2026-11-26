@@ -1614,12 +1614,17 @@ check "drivers: 빌드는 드라이버마다 nm -u로 커널 심볼을 확인하
 DX=$T/dx; mkdir -p $DX/bin
 printf '#!/bin/sh\necho "ctx=${DOCKER_CONTEXT:-none}" >> %s/calls\nexit 1\n' $DX > $DX/bin/docker; chmod +x $DX/bin/docker
 printf 'NX4_DRV_DOCKER_CONTEXT=ctx-from-file\n' > $DX/env
-dxrun() { rm -f $DX/calls; (env -u DOCKER_CONTEXT PATH=$DX/bin:$PATH "$@" sh $B/scripts/build-driver.sh) > $DX/out 2>&1; echo $? > $DX/rc; }
+# 셸에 export된 값을 물려받지 않게 세 변수를 뺀다(리뷰 81-9)
+dxrun() { rm -f $DX/calls; (env -u DOCKER_CONTEXT -u NX4_DRV_DOCKER_CONTEXT -u DOCKER_HOST PATH=$DX/bin:$PATH "$@" sh $B/scripts/build-driver.sh) > $DX/out 2>&1; echo $? > $DX/rc; }
 dxrun NX4_ENV_FILE=$DX/env; cp $DX/calls $DX/calls.file 2>/dev/null; cp $DX/out $DX/out.file
 dxrun NX4_ENV_FILE=$DX/env NX4_DRV_DOCKER_CONTEXT=ctx-cmd; cp $DX/calls $DX/calls.cmd 2>/dev/null
 dxrun NX4_ENV_FILE=; cp $DX/calls $DX/calls.none 2>/dev/null
-check "scripts/build-driver.sh: .env.local의 NX4_DRV_DOCKER_CONTEXT를 이 빌드의 docker에만 DOCKER_CONTEXT로 줌(명령 앞 값이 앞섬, 없으면 셸 기본), 알림에 context" \
-  'grep -qx "ctx=ctx-from-file" $DX/calls.file && grep -q "Docker context: ctx-from-file" $DX/out.file && grep -q "context ctx-from-file" $DX/out.file && grep -qx "ctx=ctx-cmd" $DX/calls.cmd && grep -qx "ctx=none" $DX/calls.none && ! grep -q "docker context use" $B/scripts/build-driver.sh && grep -q "^# NX4_DRV_DOCKER_CONTEXT=" $B/.env.example' || cat $DX/out.file $DX/calls.file
+# 리뷰 81-7: DOCKER_HOST가 있으면 docker가 DOCKER_CONTEXT보다 먼저 쓰므로, context를 쓸 때는 알리고 멈춘다(docker를 부르지 않음).
+# context가 없으면 DOCKER_HOST를 그대로 둔다
+dxrun NX4_ENV_FILE=$DX/env DOCKER_HOST=unix:///nx4-test.sock; cp $DX/rc $DX/rc.host; cp $DX/out $DX/out.host; [ -e $DX/calls ] && cp $DX/calls $DX/calls.host
+dxrun NX4_ENV_FILE= DOCKER_HOST=unix:///nx4-test.sock; cp $DX/calls $DX/calls.hostonly 2>/dev/null
+check "scripts/build-driver.sh: .env.local의 NX4_DRV_DOCKER_CONTEXT를 이 빌드의 docker에만 DOCKER_CONTEXT로 줌(명령 앞 값이 앞섬, 없으면 셸 기본), 알림에 context, DOCKER_HOST가 있으면 알리고 멈춤" \
+  '[ "$(cat $DX/rc.host)" = 1 ] && grep -q "DOCKER_HOST(unix:///nx4-test.sock)가 있어 NX4_DRV_DOCKER_CONTEXT(ctx-from-file)가 무시됩니다" $DX/out.host && [ ! -e $DX/calls.host ] && grep -qx "ctx=none" $DX/calls.hostonly && grep -qx "ctx=ctx-from-file" $DX/calls.file && grep -q "Docker context: ctx-from-file" $DX/out.file && grep -q "context ctx-from-file" $DX/out.file && grep -qx "ctx=ctx-cmd" $DX/calls.cmd && grep -qx "ctx=none" $DX/calls.none && ! grep -q "docker context use" $B/scripts/build-driver.sh && grep -q "^# NX4_DRV_DOCKER_CONTEXT=" $B/.env.example' || cat $DX/out.file $DX/calls.file
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc

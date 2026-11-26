@@ -26,6 +26,14 @@ command -v docker >/dev/null 2>&1 || { echo "docker가 없습니다"; exit 1; }
 . "$B/scripts/local-env.sh"
 nx4_env "$B" NX4_DRV_DOCKER_CONTEXT || exit 1
 if [ -n "${NX4_DRV_DOCKER_CONTEXT:-}" ]; then
+  # docker CLI는 DOCKER_HOST를 DOCKER_CONTEXT보다 먼저 본다. 그대로 두면 이 context가 조용히 무시되고 다른 VM에서 빌드된다
+  # (PR #81 리뷰 7). 어느 쪽을 쓸지 사람이 정하게 멈춘다
+  if [ -n "${DOCKER_HOST:-}" ]; then
+    echo "셸에 DOCKER_HOST($DOCKER_HOST)가 있어 NX4_DRV_DOCKER_CONTEXT($NX4_DRV_DOCKER_CONTEXT)가 무시됩니다."
+    echo "DOCKER_HOST를 빼고 돌리거나(env -u DOCKER_HOST sh scripts/build-driver.sh), DOCKER_HOST를 쓰려면 .env.local을 읽지 않게"
+    echo "NX4_ENV_FILE= 를 명령 앞에 주세요(이 스크립트는 .env.local에서 이 값만 읽음. 셸에 export했다면 env -u NX4_DRV_DOCKER_CONTEXT)"
+    exit 1
+  fi
   DOCKER_CONTEXT=$NX4_DRV_DOCKER_CONTEXT
   export DOCKER_CONTEXT
   echo "Docker context: $DOCKER_CONTEXT (NX4_DRV_DOCKER_CONTEXT)"
