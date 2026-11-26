@@ -1,14 +1,14 @@
 {
   "id": "nx4-kor",
   "name": "NX4 KOR: Tucson NX4 (Korea)",
-  "version": "2.1.0",
-  "hmgapi": ">=1.1.0-rc.8",
+  "version": "2.1.1",
+  "hmgapi": ">=1.1.0-rc.10",
   "authors": [
     "parkjoos",
     "StopDragon"
   ],
   "license": "AGPL-3.0",
-  "description": "HMG-API add-on for the Korean Tucson NX4 (260902) with a manager app. The app shows the USB install progress and checks HMG-API and the official Wireless CarPlay + Android Auto mod (wireless-carplay-aa) on this car (versions, boot guard, hooks and map, the projection Wi-Fi AP and Wi-Fi part, other Wi-Fi packages), says what blocks wireless projection and what to do, and counts CarPlay connections. It can request a reboot, held back while installing or near the HMG-API boot guard, and asks before the USB installer collects a diagnostic log.",
+  "description": "HMG-API add-on for the Korean Tucson NX4 (260902) with a manager app. The app shows the USB install progress and checks HMG-API and the official Wireless CarPlay + Android Auto mod (wireless-carplay-aa) on this car (versions, boot guard, hooks and map, the projection Wi-Fi AP and Wi-Fi part, other Wi-Fi packages), says what blocks wireless projection and what to do, and counts CarPlay connections. It can request a reboot, held back while installing or near the HMG-API boot guard, and asks before the USB installer collects a diagnostic log. Beside the official mod, it fits CarPlay turn-by-turn on the cluster and HUD to the Korean car (Korea Projection's fit with HMG-Seogaemo's lane glyphs: an arrow for every maneuver, the near-turn view and distance bar, a resend every second), so the cluster no longer stops on a maneuver the official table has no icon for.",
   "system": {
     "model": [
       "NX4",
@@ -27,6 +27,21 @@
       "package": "io.github.jayparklab.nx4kor"
     }
   ],
+  "hooks": {
+    "jar": "hooks.jar",
+    "entry": "io.github.jayparklab.nx4kor.hook.Nx4KorHooks",
+    "points": {
+      "dipo.iap2_proxy.stop_route_guidance": "observe",
+      "framework.navigation_cluster.update_tbt_info": "change",
+      "framework.navigation_cluster.update_tbt_sub_info_b": "change",
+      "framework.navigation_cluster.update_tbt_sub_info_2c": "change",
+      "framework.navigation_cluster.update_tp_turn_list_new": "change",
+      "framework.navigation_cluster.update_lane_info": "change",
+      "framework.navigation_cluster.update_tp_destination_name": "change",
+      "framework.navigation_cluster.update_tp_crossroad_name": "change",
+      "framework.navigation_cluster.update_tp_turn_list": "change"
+    }
+  },
   "services": [
     {
       "name": "launch",

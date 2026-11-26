@@ -9,13 +9,14 @@
    - 태그의 판(`v`를 뗀 것)이 `mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`과 같은지 봅니다. 베타는 `-beta.<n>`까지 같아야 합니다(`v2.0.4-beta.2` ↔ `2.0.4-beta.2`, `git-flow.md` 규칙 4). 숫자에 앞자리 0이 있는 태그(`v2.0.4-beta.02`)는 받지 않습니다. 2.0.3-beta.1까지는 꼬리를 빼고 비교했습니다.
    - 정식 태그의 커밋이 `main`에 있는지, 베타 태그의 커밋이 `release/` 브랜치나 `main`에 있는지 봅니다.
    - 같은 태그의 릴리스가 이미 있는지 봅니다(아래 "같은 태그로 다시 만들지 않습니다").
-   - JDK 21(Temurin), HMG-API `v1.1.0-rc.8`(커밋 `939484e`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
+   - JDK 21(Temurin), HMG-API `v1.1.0-rc.10`(커밋 `daa0837`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
+     - `ANDROID_HOME`은 비웁니다. 러너 이미지에 미리 있는 SDK(판을 고정하지 않음)로 `hooks.jar`를 만들지 않으려는 것입니다. 그래서 이 job의 빌드 시험은 자리만 채운 `hooks.jar`로 보고, `hooks.jar`를 진짜로 만드는 시험(`scripts/build-hooks.sh`, 덱스 클래스 확인)은 건너뜁니다(`skip hooks.jar 빌드`). 진짜 `hooks.jar`는 4의 `build` job이 고정한 SDK로 만듭니다. PC에서는 `.env.local`의 `ANDROID_HOME`으로 그 시험까지 돕니다.
      - mksh는 러너의 apt로 설치합니다. apt가 멈출 때가 있어(v2.1.0-beta.1 첫 실행이 20분 멈춰 취소됨) 저장소에서 받는 명령(목록 갱신, 내려받기)마다 90초까지만 기다리고, 모두 3번까지 시도합니다. 설치 자체는 끊지 않습니다. 실패하면 어느 명령이 왜 실패했는지 경고로 남습니다. 그래도 이 단계가 실패하면 러너의 apt 저장소 쪽 문제일 수 있으니 실행을 다시 돌립니다(Actions의 **Re-run jobs**, 또는 `gh run rerun <실행 id>`). 릴리스가 아직 올라가지 않았으므로 같은 태그로 다시 돌려도 됩니다.
 3. Actions의 release 실행이 `production` 승인을 기다립니다. 실행 화면의 **Review deployments**에서 아래 "승인하기 전에"를 확인하고 승인합니다.
 4. `build` job(배포 키 있음, 저장소 읽기만)이 돕니다.
    - JDK 21, Android SDK(`build-tools;37.0.0`, `platforms;android-19`), HMG-API 소스를 준비합니다.
    - 키를 꺼내기 전에 공식 무선 모드(아래 "공식 무선 모드를 USB 묶음에 함께"), HMG-API USB 묶음(아래 "HMG-API를 USB 묶음에 함께")과 busybox(아래 "busybox")를 받아 확인합니다.
-   - 배포 키를 러너 임시 폴더의 파일로 꺼내고(umask 077), `scripts/build-app.sh`, `scripts/build.sh`를 돌립니다.
+   - 배포 키를 러너 임시 폴더의 파일로 꺼내고(umask 077), `scripts/build-app.sh`, `scripts/build.sh`를 돌립니다. `build.sh`는 같은 SDK(`ANDROID_HOME`)로 `scripts/build-hooks.sh`를 불러 `hooks.jar`(한국 카플레이 길안내, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67))를 만들어 넣습니다.
    - 다음을 봅니다. 하나라도 다르면 멈춥니다.
      - 앱 서명 인증서가 `.github/release/app-cert.sha256`과 같은지
      - 모드가 `.github/release/mod.key.pub`의 UUID로 서명됐는지
@@ -24,6 +25,7 @@
      - 공식 무선 모드 zip(`NX4/wireless/wireless-carplay-aa.zip`)이 `NOTICE.md`의 SHA-256과 같고, 그 `mod.json`과 `WIRELESS-SOURCE.txt`가 들었는지
      - 옛 2.0.x 되돌리기 스크립트(`NX4/legacy-2.0/`)가 들었는지. `build.sh`가 태그 `v2.0.4-beta.1`에서 꺼내므로 `build` job도 저장소를 태그까지 받습니다(`fetch-depth: 0`)
      - 묶음의 nx4-kor(`payload/mod.json`)가 공식 무선 모드와 충돌을 선언하지 않는지(옛 2.0.x 꼴이면 2.1.0 설치기가 멈춤). 그래서 nx4-kor 2.1.0(PR #50)이 합쳐지기 전의 커밋으로는 릴리스를 낼 수 없습니다
+     - 묶음의 nx4-kor에 `mod.json`이 선언한 `hooks.jar`가 있고 비지 않았는지(없으면 HMG-API가 이 모드의 훅을 올리지 못함)
    - 키 파일을 지우고, 두 zip만 다음 job에 넘깁니다.
 5. `publish` job(배포 키 없음, 저장소 쓰기)이 릴리스를 만들어 두 파일을 올립니다. 릴리스 글에는 다음이 들어갑니다.
    - 파일 설명
@@ -261,6 +263,8 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
   - `release.yml`의 `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`(같은 판의 `hmgapi-<판>-usb.zip`)
   - 이 문서
   - `mod/mod.json` `hmgapi`
+  - 최소 판까지 올리면 `usb/troubleShooter` `HMG_MIN`, `mod/svc/lib.sh` `HMG_MIN`, 관리 앱 `Report.MIN_HMGAPI`, 이를 보는 테스트(`tests/mod-test.sh`, `tests/ReportTest.java`), 에뮬레이터 시나리오(`tests/emu/scen.sh`)와 문서의 판 언급도 함께 바꿉니다. 2.1.1에서 rc.10으로 올린 까닭(NEMESIS 1.17, [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397))은 [`design.md`](design.md) "2.1.0 모드 구성"의 `hmgapi`
+  - 2.1.1은 처음에 rc.9로 고정했는데, PR #70 리뷰 중(2026-11-25) HMG-API가 rc.10을 내며 rc.9 릴리스를 지워 주소가 404가 됐습니다. 태그를 달기 직전에 아래 `curl` 확인을 꼭 돌립니다.
 - `HMGAPI_USB_SHA256`은 HMG-API 릴리스의 `SHA256SUMS`나 GitHub이 기록한 파일 digest에서 읽습니다. 받은 파일로 `shasum -a 256`을 돌려 같은지도 봅니다.
 
   ```sh

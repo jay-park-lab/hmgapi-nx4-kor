@@ -20,15 +20,17 @@ concurrency:
 env:
   # CI에는 .env.local이 없다. 스크립트는 step의 환경 변수만 읽는다
   NX4_ENV_FILE: ''
-  # HMG-API v1.1.0-rc.8 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도).
-  # 2.1.0의 USB 설치기와 공식 무선 모드 2.2.0-rc.9가 rc.8 이상을 요구한다(usb/troubleShooter HMG_MIN)
-  HMGAPI_COMMIT: 939484edfc7cbfe5d9f1f1bc3b321056dadb41a6
+  # HMG-API v1.1.0-rc.10 (태그는 옮길 수 있으므로 커밋으로 고정한다. 바꾸면 docs/release.md도).
+  # 2.1.1의 USB 설치기와 nx4-kor가 rc.10 이상을 요구한다(usb/troubleShooter HMG_MIN, mod/mod.json). 공식 무선 모드 2.2.0-rc.9는
+  # rc.8 이상. rc.8 이하는 NEMESIS 1.17에서 지우면 Android가 뜨지 않을 수 있고, rc.9는 FORCE로 설치한 NEMESIS 1.17 차를
+  # 올리면 Android가 뜨지 않는다(https://github.com/Open-HMG/HMG-API/issues/397). rc.9 릴리스는 rc.10이 나오며 지워졌다
+  HMGAPI_COMMIT: daa083717f07565ba16dc8a4d26291b7d68d3bf4
   # 같은 판의 HMG-API USB 묶음. USB 묶음에 함께 넣어, HMG-API가 없는 차는 그것부터 설치한다(scripts/build.sh).
   # 릴리스 파일은 바뀔 수 있으므로 SHA-256으로 고정한다. 판은 위 커밋의 판과 같아야 한다(build job이 확인).
   # HMG-API는 예전 시험판 릴리스를 지운다(rc.4가 지워져 v2.0.0-beta.2가 여기서 멈춤). 받지 못하면 그때 있는 판으로
   # 이 셋을 함께 옮긴다(docs/release.md "HMG-API를 USB 묶음에 함께", https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/14)
-  HMGAPI_USB_URL: https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0-rc.8/hmgapi-1.1.0-rc.8-usb.zip
-  HMGAPI_USB_SHA256: fd5e18c43b4cede7110ba1d195dece1563edc4cb7fcaafd648a9965c1e95766e
+  HMGAPI_USB_URL: https://github.com/Open-HMG/HMG-API/releases/download/v1.1.0-rc.10/hmgapi-1.1.0-rc.10-usb.zip
+  HMGAPI_USB_SHA256: 164e005bf774c1b1a4cfa1d702c96259646bb71cd22fd98244fbbad8a7bf0af9
 
 jobs:
   check:
@@ -105,7 +107,7 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: HMG-API 소스 (v1.1.0-rc.8)
+      - name: HMG-API 소스 (v1.1.0-rc.10)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Open-HMG/HMG-API
@@ -139,10 +141,13 @@ jobs:
           echo "::error::mksh를 설치하지 못했습니다. 러너의 apt 저장소 문제일 수 있으니 실행을 다시 돌려 주세요(docs/release.md)"
           exit 1
 
-      # 시험의 빌드는 임시 키로 한다. 이 job에는 배포 키가 없다
+      # 시험의 빌드는 임시 키로 한다. 이 job에는 배포 키가 없다.
+      # ANDROID_HOME은 비운다: 러너 이미지의 SDK(판을 고정하지 않음)로 hooks.jar를 만들지 않고, 빌드 시험은 자리만 채운
+      # hooks.jar로 본다. 진짜 hooks.jar는 build job이 고정한 SDK(build-tools 37.0.0, android-19)로 만들고 묶음에서 확인한다
       - name: PC 시험 (빌드·HMG-API 엔진 시험 포함)
         env:
           HMGAPI_SRC: ${{ github.workspace }}/hmgapi
+          ANDROID_HOME: ""
         run: sh tests/mod-test.sh
 
   build:
@@ -201,7 +206,7 @@ jobs:
           done
           ls "$SDK/build-tools" "$SDK/platforms"
 
-      - name: HMG-API 소스 (v1.1.0-rc.8)
+      - name: HMG-API 소스 (v1.1.0-rc.10)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Open-HMG/HMG-API
@@ -312,6 +317,8 @@ jobs:
         env:
           HMGAPI_SRC: ${{ github.workspace }}/hmgapi
           NX4_MOD_KEY: ${{ runner.temp }}/keys/mod.key
+          # hooks.jar(한국 카플레이 길안내, #67): build.sh가 scripts/build-hooks.sh로 만든다(d8, android.jar)
+          ANDROID_HOME: ${{ runner.temp }}/android-sdk
         run: |
           set -eu
           # 커밋한 그대로 만든다(docs/git-flow.md 규칙 7)
@@ -357,6 +364,9 @@ jobs:
           # 묶음의 nx4-kor가 옛 2.0.x 꼴(공식 무선 모드와 충돌 선언)이면 2.1.0 설치기가 아무것도 하지 않고 멈춘다. 그런 묶음은 내지 않는다
           python3 -c 'import json, sys; sys.exit("wireless-carplay-aa" in json.load(open(sys.argv[1])).get("conflicts", []))' "$D/NX4/install/payload/mod.json" \
             || { echo "::error::USB 묶음의 nx4-kor(mod.json)가 공식 무선 모드와 충돌을 선언합니다(옛 2.0.x 꼴). nx4-kor 2.1.0이 합쳐진 뒤에 냅니다"; exit 1; }
+          # 한국 카플레이 길안내(#67): mod.json이 선언한 hooks.jar가 들었는지(없으면 HMG-API가 이 모드의 훅을 올리지 못한다)
+          python3 -c 'import json, os, sys; m=json.load(open(sys.argv[1]+"/mod.json")); j=m["hooks"]["jar"]; sys.exit(not os.path.getsize(os.path.join(sys.argv[1], j)))' "$D/NX4/install/payload" \
+            || { echo "::error::USB 묶음의 nx4-kor에 mod.json이 선언한 hooks.jar가 없거나 비었습니다(scripts/build-hooks.sh)"; exit 1; }
           # busybox와 그 라이선스 안내가 모드와 USB 맨 위에 들어갔는지(build.sh는 NX4_BUSYBOX를 받으면 늘 넣는다)
           [ -f "$D/NX4/install/payload/bin/busybox" ] && [ -f "$D/NX4/install/payload/bin/busybox-LICENSE.txt" ] && [ -f "$D/BUSYBOX-LICENSE.txt" ] \
             || { echo "::error::USB 묶음에 busybox나 그 라이선스 안내가 없습니다"; exit 1; }

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "settings": [
+    {
+      "key": "kor_tbt",
+      "type": "toggle",
+      "default": true,
+      "apply": "restart",
+      "title": "Korean CarPlay turn-by-turn on the cluster and HUD",
+      "description": "Korea Projection's fit, beside the official Wireless CarPlay + Android Auto mod (keep its Turn-by-turn on): an arrow for every maneuver, the near-turn view and distance bar as the car's own navigation draws them, lanes, rerouting text, and a resend every second. While it has guidance, the official mod's cluster calls in DiPO get its values. Off: the official mod's turn-by-turn as it is."
+    },
+    {
+      "key": "kor_tbt_log",
+      "type": "toggle",
+      "default": true,
+      "apply": "restart",
+      "title": "Log the CarPlay turn-by-turn diagnosis",
+      "description": "Adds Korea Projection's diagnosis lines: the near-turn decision (lanes, distance, D), what was sent to the cluster, lanes, and the navigation app's first name. Numbers otherwise, when they change, a few hundred lines at most per start. Off, these are still logged: the maneuver values received (type, side, junction, angle, up to 300 lines), the HUD list sent, a change of navigation app (both app names) and turn-by-turn cleared. No road or place names either way."
+    }
+  ]
+}
