@@ -32,7 +32,7 @@
 |---|---|
 | `system` | `NX4`·`NX4HEV`, `KOR`, `260902`에만 설치됩니다 |
 | `hmgapi` | `>=1.1.0-rc.10`(2.1.1부터, 2026-11-25·26 사용자 결정. 2.1.0은 공식 무선 모드 2.2.0-rc.9가 요구하는 rc.8이었음). rc.8 이하는 NEMESIS 1.17(LivePatch)을 몰라, 그 위에서 지우면 재부팅 한두 번 뒤 Android가 뜨지 않고, 업데이트도 zygote 래퍼를 실제로 바꾸지 못하며, NEMESIS 1.17이 먼저 깔린 차에는 설치를 거절합니다(rc.9 `install/common/lib.sh` `nemesis_livepatch`가 고침). rc.9는 그 거절을 `FORCE`로 넘겨 설치한 차를 올리면 마지막 순정 파일을 덮어써 Android가 뜨지 않습니다(rc.10이 고침, HMG-API 1.1.0-rc.10 릴리스 노트). 근거는 [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397). 처음에 rc.9로 정했다가, 리뷰 중 rc.10이 나오며 rc.9 릴리스가 지워져 rc.10으로 올렸습니다(PR #70). 최소 판을 올려 두면 USB 설치기가 rc.8·rc.9 차의 HMG-API를 스틱의 rc.10으로 먼저 올립니다(업데이트는 안전). 2.1.2부터 NEMESIS가 깔린 차에서는 설치기가 HMG-API도 올리지 않고 멈추므로, 그런 차는 HMG-API 릴리스의 USB·update zip으로 올립니다([#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75)). `svc/lib.sh` `HMG_MIN`, 관리 앱 `Report.MIN_HMGAPI`, 설치기 `HMG_MIN`도 같은 판 |
-| `services` | `launch`(`svc/launch.sh`, root, 앱이 부를 때만) 하나 |
+| `services` | `launch`(`svc/launch.sh`, root, 앱이 부를 때만), `nochip`(`svc/nochip.sh`, root, 부팅 때 한 번, 2.1.2-beta.4부터. 아래 "[Wi-Fi 칩이 없는 차](#wi-fi-칩이-없는-차의-hmg-api-다시-시도-멈추기-svcnochipsh)"). `car_events`는 쓰지 않습니다(쓰면 HMG-API 차량 서비스가 새로 뜸) |
 | `apps`, `provides.launcher` | 관리 앱(`app/NX4KOR.apk`)과 앱 메뉴 타일. 타일 그림은 `icons/`의 순정 꼴 넷(낮·밤, 모드를 껐을 때의 회색 낮·밤)이고, 저장소의 `art/tile.svg`를 HMG-API `tools/mkicon.sh`로 만든 것입니다([#47](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/47)) |
 | `hooks` | 한국 카플레이 길안내(#67): `hooks.jar`(저장소의 `hooks/src`를 `scripts/build-hooks.sh`로 만듦), 진입 클래스 `io.github.jayparklab.nx4kor.hook.Nx4KorHooks`, 훅 지점 9곳. DiPO 안 계기판 호출 `framework.navigation_cluster.*` 8곳은 `change`, DiPO의 길안내 멈춤 `dipo.iap2_proxy.stop_route_guidance`는 `observe`. `replace`는 쓰지 않습니다 |
 | `settings.json` | `kor_tbt`(한국 카플레이 길안내, 기본 켬), `kor_tbt_log`(그 진단 줄, 2.1.2-beta.2부터 기본 끔, [#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)). 둘 다 HMG-API 앱에서 바꾸고 다시 시작하면 적용됩니다 |
@@ -45,8 +45,9 @@
 | 파일 | 하는 일 |
 |---|---|
 | `svc/env.sh` | 위치(`NX4_APP` 모드 폴더, `NX4_ROOT=/data/nx4-kor`, `APLOG`). `BK`는 2.0.x의 백업 폴더 이름(설치기가 옛 판을 알아보는 데 씀) |
-| `svc/lib.sh` | 관리 앱과 지우기가 함께 쓰는 함수(busybox 고르기, 판 비교, 프로젝션 AP·Wi-Fi 칩 상태 읽기, 카플레이 연결 수, 재부팅 요청 받기). 2.0.x의 `svc/hotspot.sh`를 줄인 것입니다 |
+| `svc/lib.sh` | 관리 앱·`nochip` 서비스·지우기가 함께 쓰는 함수(busybox 고르기, 판 비교, 프로젝션 AP·Wi-Fi 칩 상태 읽기, 이번 부팅에 칩이 없는지, 카플레이 연결 수, 재부팅 요청 받기). 2.0.x의 `svc/hotspot.sh`를 줄인 것입니다 |
 | `svc/launch.sh` → `bin/status.sh` | 상태 파일(`/data/local/tmp/nx4-kor-status.txt`)과 재부팅 요청 감시자 |
+| `svc/nochip.sh` | 칩이 없는 부팅이면 HMG-API Wi-Fi 지기의 다시 시도를 멈춤(칩 없음 기록 `/data/local/tmp/nx4-kor-nochip.txt`, HMG-API `wifi/ap.boot`) |
 | `bin/uninstall.sh` → `scripts/preun.sh` | 지우기(`engine remove`)·업데이트 전 정리 |
 
 - **지우기**(`bin/uninstall.sh`): 관리 앱의 감시자를 멈추고 작업 파일을 지운 뒤 `hmgapid engine remove nx4-kor`를 합니다. HMG-API는 그때 앱·서비스 목록(`state/apps.txt`·`services.txt`)을 다시 써서 관리 앱과 서비스를 내립니다(rc.8 `Packages.remove` → `LiveState.publish`). 이 모드는 적용할 것이 없으므로 계획을 보거나 적용하지 않습니다. 그다음 기록 폴더 `/data/nx4-kor`를 지웁니다.
@@ -54,22 +55,52 @@
   - `--update`(새 판으로 바꾸기 전)는 감시자와 작업 파일만 정리합니다. 설치 진행 기록은 USB 설치기가 쓰는 파일이라 두고, 지울 때만 지웁니다.
   - 2.0.x가 바꾼 것(Wi-Fi 설정 잠금, 무선 권한 파일, 순정 AP 저장값, 한국 포크 무선 기능)은 2.1.0의 지우기가 되돌리지 않습니다. USB 설치기가 2.1.0을 넣기 전에 옛 판 자신의 `bin/uninstall.sh`로 정리합니다.
 
+### Wi-Fi 칩이 없는 차의 HMG-API 다시 시도 멈추기 (`svc/nochip.sh`)
+
+2026-11-26 차(NX4HEV 260902, 2.1.2-beta.3)의 진단 기록과 HMG-API rc.10 소스로, 칩이 없는 차에서 HMG-API Wi-Fi 지기가 운전 내내 프로젝션 AP를 다시 띄우려 하는 것을 찾았습니다. 순정 시스템에 걸리는 부하라서 이 모드가 멈춥니다(2026-11-26 사용자 결정, 2.1.2-beta.4).
+
+- **원인:** 지기(`engine/HomeWifi.java`, 서비스 `hmgapi wifi`)는 공식 모드의 `"wifi": {"projection": true}` 요청으로 부팅마다 AP를 띄웁니다.
+  - 못 띄우면 약 2초마다 30번, 그 뒤로는 부팅이 끝날 때까지 30초마다 다시 시도합니다. 시도마다 `app_process`(Dalvik)를 하나 띄웁니다(`tool ensure-projection`).
+  - QuickBoot에서 깨어나면(`woke`) 처음부터 다시 합니다.
+  - 칩이 없는 차에서는 이 시도가 하나도 성공하지 못합니다.
+- **멈추는 법:** 지기는 `wifi/ap.boot`에 이번 부팅 id가 있으면 시도하지 않습니다(`ap_keep`). `nochip` 서비스(start `boot`, `restart` false)가 칩이 없는 부팅이면 그 id를 씁니다.
+  1. 순정 Wi-Fi 드라이버의 결과를 기다립니다(부팅 뒤 약 20초. 5초마다, 부팅 뒤 120초까지). 포기한 줄이 있어도 부팅 뒤 50초까지는 기다려 USB Wi-Fi 동글이 올라올 틈을 둡니다. 이 차는 부팅 약 40초에 앞쪽 USB 포트 전원을 껐다 켜서(`dwc_otg_vbus_set` OFF→ON), 꽂힌 장치가 43~44초에야 다시 보이기 때문입니다(11-26 진단 기록 4개, 동글 세션 지적). 정하기 전에 5초 뒤 한 번 더 보고, 그때 동글이 보이면 아무것도 쓰지 않습니다(포트 전원을 껐다 켜는 때가 늦은 부팅에 밀린 경우, PR #86 리뷰 7).
+  2. 칩이 없는 부팅인지 봅니다(`lib.sh` `nochip_now`). 이 내비에서 칩을 본 적이 없고(HMG-API `public/wifi-chip`, SDIO 장치), `wlan0`이 없고, USB Wi-Fi 동글일 수 있는 장치(`lib.sh` `dongle_present`: Realtek `0bda`·TP-Link `2357`, 동글 드라이버가 받는 `0bda:b812`·`2357:012d`·`0bda:b831`·`0bda:b851`의 만든 곳)가 없고, 커널 기록에 `failed to power up DHD generic adapter, max retry reached`가 있어야 합니다. 그 부팅에는 드라이버를 다시 올리지 않아 칩이 올라오지 않습니다(11-26 진단: 부팅 뒤 19분 동안 그 줄은 부팅 때 한 번뿐).
+  3. 순정 핫스팟 기능 권한 파일(`/system/etc/permissions/com.hkmc.software.wifihotspot.xml`)과 프로젝션 AP 요청이 있을 때만, 이번 부팅 id를 이 모드의 기록 `/data/local/tmp/nx4-kor-nochip.txt`(관리 앱 판정·진단용)와 HMG-API `wifi/ap.boot`에 씁니다.
+  4. 그 뒤 `wifi` 폴더에서 파일이 지워질 때만 깨어나는 `inotifyd`(함께 넣은 busybox 1.36.1)를 띄워 둡니다. 지기가 깨어남에 `ap.boot`를 지우면 다시 씁니다. 주기적으로 깨지 않습니다. 그때 칩·`wlan0`·동글이 보이면(나중에 꽂은 동글을 켜려고 `ap.boot`를 지운 경우 등) 다시 쓰지 않고, 칩 없음 기록을 지운 뒤 `inotifyd`를 멈추고 끝냅니다. 안 보여도 5초 뒤 한 번 더 보고 씁니다(포트 전원을 껐다 켜는 4초쯤에는 꽂힌 동글이 안 보임). 그래서 깨어날 때마다 지기의 시도는 두어 번 남습니다. `inotifyd`가 없는 busybox면 3까지만 합니다.
+- **차 이벤트를 쓰지 않는 까닭:** HMG-API `car_events`의 `wake`로도 깨어남을 받을 수 있습니다. 하지만 하나라도 쓰면 hmgapid가 HMG-API 차량 서비스(`hmgapi.vehicle.Hub`, 상주 Dalvik)를 띄웁니다(rc.10 `ModRuntime`). 이 차에서는 지금 그것을 쓰는 모드가 없어 돌지 않습니다.
+- **하지 않는 차:** 칩이 있는 차, 순정 핫스팟 기능이 없는 차, USB Wi-Fi 동글을 꽂은 차([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)·[#80](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/80)). 그때는 아무것도 쓰지 않고 끝납니다(상주 없음).
+  - 동글을 꽂은 부팅에도 순정 드라이버가 먼저 올라 포기한 줄과 "`wlan0` 없음"이 생기고, 그 뒤에 동글 드라이버가 순정 자리에 올라 `wlan0`이 생깁니다(2.2.0 계획, #80 동글 세션 지적). 그래서 커널 줄과 `wlan0`만으로는 동글 차를 가르지 못해 USB 장치를 봅니다.
+  - Realtek·TP-Link의 다른 USB 장치(카드 읽개 등)가 꽂혀 있어도 물러납니다. 잘못 동글로 보면 예전처럼 다시 시도할 뿐이고, 잘못 칩 없음으로 보면 동글 AP를 막으므로 넓게 잡습니다.
+- **위험:** HMG-API rc.10의 내부 파일(`wifi/ap.boot`)에 기댑니다. HMG-API가 이 파일을 바꾸면 효과만 없어지고 예전처럼 다시 시도합니다. rc.10에서 이 파일을 읽는 곳은 지기 자신과 이 모드의 관리 앱뿐입니다. 관리 앱은 이 모드가 쓴 `ap.boot`를 "떴다가 꺼짐"(`apoff`)으로 보지 않습니다.
+- **끄기·지우기:** 이 모드를 끄거나 지우면 hmgapid가 서비스의 프로세스 묶음(setsid)을 함께 내립니다. 칩 없음 기록은 지울 때 지우고 업데이트 때는 둡니다. `ap.boot`는 부팅마다 바뀌는 HMG-API 파일이라 둡니다.
+- **기록:** 줄은 hmgapid 서비스 기록 `logs/nx4-kor/nochip.log`(USB 진단 기록 `logs/service/`)에 남습니다. 지기의 기록 `wifi.log`도 2.1.2-beta.4부터 진단 기록 `logs/hmgapi-wifi.log`로 모읍니다.
+
 ### 한국 카플레이 길안내 (`hooks/`, #67)
 
 공식 무선 모드 2.2.0-rc.9는 카플레이가 보낸 안내 중 자기 아이콘 표에 없는 것(차선 유지, 각도 없는 "약간 좌·우회전", 각도가 딱 맞지 않는 회전 등)이나 내용(iAP2 121)을 받지 못한 안내를 계기판에 보내지 않습니다. 그러면 계기판에는 앞 안내(예: 좌회전 0 m)가 남습니다(2026-11-25 차, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)). Korea Projection(KP)과 HMG-Seogaemo가 같은 문제를 이미 고쳤으므로, 그 코드를 이 모드로 가져와 공식 모드 옆에서 돌립니다(2026-11-25 사용자 결정 A2).
 
-- **공식 모드의 `tbt`는 켠 채로 둡니다.** 공식 모드가 계속 하는 일: 아이폰에 "이 차는 길안내를 받는다"고 알리기(`iap2.init_info`), 순정 내비가 계기판에 끼어드는 것 막기(순정 내비 프로세스의 `framework.navigation_cluster.*` `replace`), 안드로이드 오토 계기판 길안내, 무선 전환 뒤 길안내 다시 요청.
+- **공식 모드의 `tbt`는 켠 채로 둡니다.** 공식 모드가 계속 하는 일: 아이폰에 "이 차는 길안내를 받는다"고 알리기(`iap2.init_info`), 순정 내비가 계기판에 끼어드는 것 막기(순정 내비 프로세스의 `framework.navigation_cluster.*` `replace`), 안드로이드 오토 계기판 길안내, 무선 전환 뒤 길안내 다시 요청. 그래서 `tbt`를 끄면 아이폰이 길안내를 보내지 않아 이 모드의 길안내도 멈출 것으로 봅니다(공식 코드 근거, 차에서 확인하지 않음).
+  - 공식 모드의 `tbt_standard`("Turns in the car's own format", 기본 끔, 재시작해야 적용)는 회전까지 약 457 m(1,500 ft, `CpTurns.GUIDE_WINDOW`) 안에서 공식 모드도 순정 내비 형식(회전 종류·각도·거리 막대, AR HUD 애니메이션)으로 보내게 합니다. 그보다 멀면 공식 모드도 프로젝션 아이콘입니다. 카플레이는 이 모드가 길안내 중 공식 모드의 계기판 값을 바꾸므로 그 설정과 상관없이 이 모드의 기준(일반 350 m, 고속도로 출구 1,050 m)으로 그려집니다. 그 설정이 보이는 것은 공식 값이 그대로 나가는 때뿐입니다. 안내 시작·재개 순간(아래 "공식 호출 잠깐 붙잡기"), 이 모드가 그리지 못한 안내(이 모드의 리스너만 내용 121을 놓쳐 붙잡아도 이 모드의 값이 생기지 않음, 다시 요청해 받을 때까지 3~5초), 이 모드가 비켜 주는 동안(이 모드의 리스너가 3초 넘게 못 들음, `giving way`), 그리고 안드로이드 오토(이 모드가 손대지 않음)입니다. 켜 두어도 이 모드와 겹치는 곳은 없습니다(2026-11-26, 공식 모드 2.2.0-rc.9 소스로 확인).
 - **이 모드가 하는 일**(DiPO 프로세스 안, `hooks/src/.../hook/dipo/KorTbt.java`):
   1. iAP2 서버에 자기 길안내 리스너(`NX4KOR_RG`, 종류 4096, 공식 모드의 `HMGAPI_RG`와 같은 종류)를 등록해 120·121·122를 받습니다.
   2. KP의 `CpTurnsFit`(seogaemo 차선 그림 포함)으로 계기판·HUD에 보낼 값을 정해 HMG-API `Cluster` API로 보냅니다. 표에 없는 안내도 가까운 화살표로 보내고, 길안내 중에는 1초마다 다시 보냅니다(KP `refresh`). 내용(121)을 3초 넘게 못 받으면 길안내를 다시 요청합니다(KP 2.4.7).
-  3. DiPO 안 계기판 호출 8곳을 `change`로 겁니다. 이 모드의 스레드가 보낸 값을 기억하고, 길안내가 켜진 동안 다른 스레드(공식 모드)가 부르면 인자를 이 모드의 마지막 값으로 바꿉니다. 그래서 두 엔진이 계기판에서 다투지 않습니다. 이 모드의 길안내가 꺼져 있으면(리스너가 받은 것이 없거나 안내가 끝남) 공식 모드의 호출은 그대로 갑니다.
+  3. DiPO 안 계기판 호출 8곳을 `change`로 겁니다. 이 모드의 스레드가 보낸 값을 기억하고, 길안내가 켜진 동안 다른 스레드(공식 모드)가 부르면 인자를 이 모드의 마지막 값으로 바꿉니다. 그래서 두 엔진이 계기판에서 다투지 않습니다. 이 모드의 길안내가 꺼져 있으면(리스너가 받은 것이 없거나 안내가 끝남) 공식 모드의 호출은 그대로 갑니다. 다만 이 모드의 리스너가 같은 갱신을 막 받았거나 곧 받을 때는 아래 "공식 호출 잠깐 붙잡기"처럼 이 모드의 값을 잠깐 기다립니다.
      - **중복 호출 줄이기**([#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77), 2026-11-26): 공식 모드의 호출이 이 모드의 값을 실어 가므로, 계기판은 같은 지점을 두 번 받습니다(폰 갱신 하나에 공식 5회와 이 모드 4회, KP는 4회). `change` 훅은 공식 모드의 호출을 건너뛸 수 없어(HMG-API가 되돌림), 이 모드 쪽을 줄입니다. 보낼 값이 이 모드가 마지막에 보낸 것과 같고, 공식 모드의 호출이 900ms 안에 그 최신 값을 실어 갔으면 이 모드의 호출을 건너뜁니다(`ClusterOut`, `TbtGate.skipOurs`). 공식 모드가 보내지 않는 안내(위 #67의 0 m 멈춤)와 폰이 조용할 때의 1초 다시 보내기(공식 모드는 다시 보내지 않음)는 그대로 나갑니다. 이름·회전 목록은 이 모드의 입력 값으로 견줍니다(공식 모드 호출의 인자는 견줄 수 없는 프레임워크 객체).
      - **비켜 주기:** 공식 모드는 3초 넘게 계속 부르는데(마지막 호출도 3초 안) 이 모드의 리스너는 3초 넘게 아무것도 받지 못하면(폰은 보내는데 이 모드만 못 받음), 공식 모드의 호출을 그대로 보내고 이 모드의 1초 다시 보내기도 멈춥니다. 이 모드가 다시 받거나 공식 모드도 3초 조용하면 돌아옵니다(로그 `giving way until it hears again`). 신호 대기처럼 폰이 아무에게도 보내지 않는 동안이나, 공식 모드가 한 번 부르고 모두 조용해진 때는 비켜 주지 않습니다(PR #68 리뷰 3·13). 비켜 주는 동안은 1초마다 깨지 않고 비키기가 끝날 시각(공식 모드의 마지막 호출 3초 뒤)에 다시 봅니다(#77).
+     - **공식 호출 잠깐 붙잡기**(2.1.2-beta.4, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)): 두 리스너는 같은 갱신을 따로 받습니다. 이 모드가 아직 그린 것이 없을 때(길안내 시작, 멈춤·앱 바뀜·안내 끝 뒤 다시 시작) 공식 모드의 스레드가 먼저 그리면, 그 한 묶음(화살표·길 이름·HUD 목록·2C·남은 거리·다음 회전)이 공식 모드 값 그대로 계기판에 갔습니다. 공식 모드에는 다시 보내기 타이머가 없어, 그 그림은 이 모드의 스레드가 보낼 때까지 남았습니다(2026-11-26 차 기록: 공식 모드의 `CarPlay: hud list type 70 next 0`이 이 모드의 `guidance on`보다 먼저 나옴). 이제 이 모드가 줄 값이 없는 공식 호출(길안내 꺼짐, 또는 그 지점을 이 모드가 아직 부르지 않음)은 이 모드의 리스너가 받은 것을 이 모드의 스레드가 모두 끝낼 때까지 최대 250ms(`TbtGate.HOLD_MS`) 기다렸다가, 그사이 이 모드의 값이 생기면 그 값을 싣습니다. 기다리는 사이 리스너가 더 받은 것도 끝날 때까지 기다립니다(앞의 121만 끝나고 길안내를 켤 120이 아직이면 끝난 것이 아님, PR #85 리뷰 1).
+       - 이 모드의 길안내가 꺼져 있고 리스너가 그 갱신을 아직 받지 않았으면(공식 모드 쪽이 먼저 받음) 받기까지 50ms(`TbtGate.HEAR_MS`)만 기다립니다.
+       - 길안내가 켜져 있는데 이 모드가 부르지 않는 지점(차로를 보내지 않는 앱의 차로, 공식 모드의 HUD 지우기 등)은 이미 받은 것만 끝나길 기다리고, 오지 않을 수도 있는 갱신을 50ms씩 기다리지는 않습니다. 켜져 있으면 화살표·이름·HUD 같은 주된 값은 이미 이 모드 것이라, 이 모드가 부르지 않는 지점은 곧 부를 지점이 아닐 때가 많기 때문입니다(PR #85 리뷰 3).
+       - 그래도 값이 없으면 지금처럼 그대로 보내고, 리스너가 새 갱신을 받기 전에는 다시 기다리지 않습니다. 그래서 갱신 하나에 많아야 한 번 기다리고, 아무것도 받지 못하는 리스너면 처음 한 번 50ms 뒤로는 기다리지 않습니다(공식 모드 혼자).
+       - 앱에서 이 모드를 껐을 때, 비켜 주는 동안, 메인 스레드의 호출, 이 모드의 값이 있는데 인자 개수만 다른 호출은 기다리지 않습니다. 이 모드의 값이 아직 없을 때는 인자 개수를 알 수 없어 기다린 뒤, 개수가 다르면 그대로 보냅니다(PR #85 리뷰 4).
+       - 공식 모드의 스레드만 `Object.wait`로 기다리고(바쁜 반복 없음), 이 모드의 스레드가 갱신을 끝내면 깨웁니다(`TbtGate.done`, `noteActive` 다음). 이 모드의 스레드는 공식 모드를 기다리지 않습니다.
+       - 이 모드가 그 갱신으로도 그리지 못하면(내용 121을 못 받은 회전 등) 공식 모드의 값이 그대로 가는 것은 전과 같습니다.
+       - 기록 줄은 기본으로 늘지 않습니다. `kor_tbt_log`를 켜면 붙잡은 호출마다 `<지점> from the official mod held N ms, carries ours`(우리 값을 실음) 또는 `…, passed as it was`(기다렸지만 공식 값 그대로)가 남습니다(PR #85 리뷰 2). 줄 수는 모두 100줄(`TbtGate.HELD_LOGS_MAX`), 한 지점 20줄(`HELD_LOGS_PER_POINT`)까지이고, 이 모드의 길안내가 꺼질 때(`guidance off`)와 연결이 끝날 때 다시 셉니다. 그래서 다음 길안내 시작의 붙잡기는 늘 남고, 길안내 중 이 모드가 부르지 않는 지점(출발 화면에서 공식 모드의 HUD 지우기가 보내는 차로 등)이 줄을 다 쓰지 못합니다(PR #85 리뷰 6. 다른 기록 한도는 프로세스마다 한 번이지만, 이 줄은 시작 때 보려는 것이라 길안내마다 셈).
   4. 이 모드 것이 아닌 길안내 멈춤(`dipo.iap2_proxy.stop_route_guidance`, `observe`)을 보면 2초 뒤에 이 모드의 안내를 지웁니다. 그 사이 폰이 다시 보내면 지우지 않습니다. 멈춤 뒤 150ms 안에 온 것은 멈춤 전에 폰이 보낸 것이므로 세지 않습니다(다시 요청은 멈춤, 200ms, 시작이라 그보다 늦게 옴, 리뷰 12). 공식 모드도 같은 길로 다시 요청(멈춤 뒤 시작: 길안내 앱 이름이 바뀔 때, 무선에서 감시가 다시 요청할 때)을 하므로, 바로 지우면 계기판이 깜빡이기 때문입니다. DiPO가 정말로 멈추면(카플레이 끝남) 폰이 더 보내지 않아 2초 뒤 지워집니다. 이 모드 자신의 다시 요청은 처음부터 뺍니다(PR #68 리뷰 1).
   5. HMG-API 앱에서 NX4 KOR를 재시작 없이 끄면 HMG-API가 이 모드의 훅을 통과시키고, 이 모드도 받기·다시 보내기를 멈추고 상태와 "그렸다" 표시를 비웁니다(지우지는 않음: 공식 모드가 이어 그림). 다시 켜면 처음 받을 때 폰에 길안내 전체를 다시 요청합니다(폰은 갱신을 항목마다 보내, 상태 항목이 없는 갱신만으로는 "안내 끝"으로 읽히기 때문, PR #68 리뷰 2·11). 그 다시 요청의 멈춤에 공식 모드가 HUD(거리·차선·목록)를 비우므로, 다시 켠 직후 HUD가 1초 안팎 빌 수 있습니다. 계기판 화살표는 그대로입니다(리뷰 14, 재시작 없이 다시 켤 때만).
-  - 3·4·5의 판단과 중복 호출 줄이기는 `TbtGate.java`에 따로 두고 `tests/mod-test.sh`가 PC에서 돌립니다(`tests/tools/TbtGateTest.java`).
+  - 3·4·5의 판단, 중복 호출 줄이기, 공식 호출 잠깐 붙잡기는 `TbtGate.java`에 따로 두고 `tests/mod-test.sh`가 PC에서 돌립니다(`tests/tools/TbtGateTest.java`. 붙잡기는 가짜 시계·대기로, 깨우기는 실제 스레드 둘로 테스트).
   - KP 2.4.10에서 더해진 곧 회전 그림 판단(아래 "가져온 것과 바꾼 것"), `CpIcons`, 곧 회전 거리(`near()`를 직접 불러 일반 600 m·나갈 때 650 m·고속도로 출구 1,050 m, `dynamicD`·`bar`)는 `tests/tools/NearFitTest.java`로 돌립니다. `hooks/src` 전체를 `scripts/build-hooks.sh`와 같은 클래스 경로로 컴파일해야 해서, `HMGAPI_SRC`와 `ANDROID_HOME`이 있을 때만 돕니다(없으면 skip 줄에 나옴).
-- **설정:** `kor_tbt`를 끄면 위 일을 하나도 하지 않아 공식 모드 그대로입니다. `kor_tbt_log`는 KP의 진단 줄(곧 회전 판단의 차로 수·거리·D, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)과 보낸 HUD 목록 줄(`CarPlay: hud list …`, 시작마다 300줄까지, #77. 공식 모드도 자기 것을 남김)을 HMG-API 기록에 더 남깁니다. 2.1.2-beta.2부터 기본으로 끕니다(2026-11-26 사용자 결정, #77: 켜고 끄는 설정으로 두고 기본은 끔). 기록이 필요하면 HMG-API 앱의 NX4 KOR 설정에서 켜고 다시 시작합니다. HMG-API 앱은 설정 하나를 바꿀 때 그 모드의 모든 값을 함께 저장하므로, 2.1.2-beta.1까지 설정을 바꾼 적이 있는 차는 켜진 채 남습니다(그때의 기본이 켬). 꺼도 받은 안내의 숫자 줄(`CarPlay: maneuver type … side … junction … exit …`, 시작마다 300줄까지), 길안내 앱이 바뀐 줄(`route guidance source changed from <앱> to <앱>`), 지운 줄(`turn-by-turn cleared`)은 남습니다. 길 이름·장소 이름은 어느 쪽이든 남기지 않습니다. 줄 머리는 공식 모드처럼 `CarPlay:`이고, HMG-API 앱 기록에서 출처가 `nx4-kor`로 나옵니다.
+- **설정:** `kor_tbt`를 끄면 위 일을 하나도 하지 않아 공식 모드 그대로입니다. `kor_tbt_log`는 KP의 진단 줄(곧 회전 판단의 차로 수·거리·D, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)과 보낸 HUD 목록 줄(`CarPlay: hud list …`, 시작마다 300줄까지, #77. 공식 모드도 자기 것을 남김), 붙잡은 공식 호출 줄(`… from the official mod held N ms, …`, 길안내·연결마다 100줄, 한 지점 20줄까지, 위 "공식 호출 잠깐 붙잡기")을 HMG-API 기록에 더 남깁니다. 2.1.2-beta.2부터 기본으로 끕니다(2026-11-26 사용자 결정, #77: 켜고 끄는 설정으로 두고 기본은 끔). 기록이 필요하면 HMG-API 앱의 NX4 KOR 설정에서 켜고 다시 시작합니다. HMG-API 앱은 설정 하나를 바꿀 때 그 모드의 모든 값을 함께 저장하므로, 2.1.2-beta.1까지 설정을 바꾼 적이 있는 차는 켜진 채 남습니다(그때의 기본이 켬). 꺼도 받은 안내의 숫자 줄(`CarPlay: maneuver type … side … junction … exit …`, 시작마다 300줄까지), 길안내 앱이 바뀐 줄(`route guidance source changed from <앱> to <앱>`), 지운 줄(`turn-by-turn cleared`)은 남습니다. 길 이름·장소 이름은 어느 쪽이든 남기지 않습니다. 줄 머리는 공식 모드처럼 `CarPlay:`이고, HMG-API 앱 기록에서 출처가 `nx4-kor`로 나옵니다.
 - **가져온 것과 바꾼 것**(`NOTICE.md`):
   - KP `StopDragon/HMG-API` `korea-build` `ebca56f`(무선 모드 2.4.10, Korea Projection 1.8.1): `CpTurnsFit.java`·`CpTbt.java`(그대로, 패키지·로그만 바꿈), `CpTurns.java`의 `exactIcon`·`distStrState`(`CpIcons.java`). `CpTurnsFit`의 seogaemo 출처 줄은 그대로 둡니다. 처음(2026-11-25)에는 `6258357`(2.4.9)에서 가져왔고, 2026-11-26에 2.4.10에서 다시 가져왔습니다.
   - 2.4.10에서 더해진 카플레이 곧 회전 그림(KP도 차에서 아직 확인하지 않음):
@@ -114,17 +145,18 @@
   | 14 | `aphotspot` | AP가 일반 핫스팟 SSID(softap.conf의 S1)로 떠 있음 |
   | 15 | `ready` | AP가 떠 있음(프로젝션 AP는 카플레이 SSID S2) |
   | 16 | `wificlient` | AP 없이 Wi-Fi 클라이언트(`wpa_supplicant`, HMG-API 집 Wi-Fi 포함)가 돎. HMG-API는 이때 라디오를 건드리지 않음 |
-  | 17 | `apoff` | 이번 부팅에 떴다가 지금 꺼짐(`wifi/ap.boot`) |
-  | 18 | `apwait` | 부팅 뒤 5분 전이고 AP가 아직 없음(`wifi/ap.fail`이 있어도). HMG-API 지기는 첫 시도가 실패하면 바로 `ap.fail`을 쓰고 다시 시도하며, 칩이 SDIO에 늦게 올라오는 첫 부팅도 있어 이 사이에는 "부품 없음"·"못 켬"으로 굳히지 않습니다 |
-  | 19 | `nowifipart` | **Wi-Fi 부품이 없는 차**: 부팅 뒤 5분이 지났고, 순정 핫스팟 기능(칩 전원)은 켜졌는데 칩이 SDIO에 한 번도 안 보였고(HMG-API `public/wifi-chip`도 없음), `wlan0`이 없고, HMG-API가 이번 부팅에 AP를 띄우지 못함(`wifi/ap.fail`만). 2026-11-23 NX4HEV 260902가 이랬습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로라 "안 됨"으로 끝내지 않고(노랑), 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다 |
-  | 20 | `apfail` | 부팅 뒤 5분이 지나도 AP를 띄우지 못함(`wifi/ap.fail`, 또는 기록 없음). USB 동글처럼 `wlan0`이 있는 차도 여기로 옵니다 |
+  | 17 | `nowifipart` | **이번 부팅에 칩이 없음**(`nochip`): `nochip` 서비스의 기록이 이번 부팅 것이거나 지금 커널 기록으로 그렇게 보이고(위 "Wi-Fi 칩이 없는 차"), 순정 핫스팟 기능이 켜짐. 그 부팅에는 칩이 올라오지 않으므로 부팅 뒤 5분(`apwait`)을 기다리지 않습니다(2.1.2-beta.4) |
+  | 18 | `apoff` | 이번 부팅에 떴다가 지금 꺼짐(`wifi/ap.boot`). `nochip` 서비스가 쓴 `ap.boot`(`nochip_mark`)는 뜬 것이 아니므로 빼고 봅니다 |
+  | 19 | `apwait` | 부팅 뒤 5분 전이고 AP가 아직 없음(`wifi/ap.fail`이 있어도). HMG-API 지기는 첫 시도가 실패하면 바로 `ap.fail`을 쓰고 다시 시도하며, 칩이 SDIO에 늦게 올라오는 첫 부팅도 있어 이 사이에는 "부품 없음"·"못 켬"으로 굳히지 않습니다. 문구는 켜는 것이 HMG-API임을 밝힙니다 |
+  | 20 | `nowifipart` | **Wi-Fi 부품이 없는 차**(17을 못 본 경우: 커널 줄이 밀려남 등): 부팅 뒤 5분이 지났고, 순정 핫스팟 기능(칩 전원)은 켜졌는데 칩이 SDIO에 한 번도 안 보였고(HMG-API `public/wifi-chip`도 없음), `wlan0`이 없고, HMG-API가 이번 부팅에 AP를 띄우지 못함(`wifi/ap.fail`만). 2026-11-23 NX4HEV 260902가 이랬습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로라 "안 됨"으로 끝내지 않고(노랑), 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다 |
+  | 21 | `apfail` | 부팅 뒤 5분이 지나도 AP를 띄우지 못함(`wifi/ap.fail`, 또는 기록 없음). USB 동글처럼 `wlan0`이 있는 차도 여기로 옵니다 |
 
   - 부팅 보호의 근거는 HMG-API rc.6 이후 `core/zygote/zygote.c`입니다([#18](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/18)). 2.1.0은 HMG-API 1.1.0-rc.8 이상만 받으므로 rc.4의 규칙(`starts` 3에서 끔)은 두지 않습니다.
     - zygote가 시작할 때마다 `hook/starts`(120초를 버티지 못한 시작이 재부팅을 넘어 이어진 횟수)와 `hook/boot`(`<boot_id> <이번 커널 부팅 안의 횟수>`)를 1씩 올립니다. 올리기 전 값으로 이번 부팅 횟수가 3 이상이거나 `starts`가 6 이상이면 그 시작의 훅을 끕니다. 훅이 켜진 시작이 120초를 버티면 두 값을 지웁니다(HMG-API 설치도 지움). boot_id가 없으면 모든 시작을 한 부팅으로 셉니다.
     - 관리 앱이 읽는 값은 이번 시작이 올린 뒤 값입니다. 커널 줄이 없으면 이번 부팅 횟수 4 이상, 또는 이번 부팅에 센 기록이 있고 `starts` 7 이상일 때 꺼진 것으로 봅니다. `hook/boot`가 다른 부팅 것이거나 없으면 `starts`는 지난 값이라 그것만으로 보지 않습니다.
     - 재부팅은 새 커널 부팅이라 다음 시작은 `starts`만 봅니다. 그래서 노랑·빨강을 `starts` 6에서 나눕니다.
-  - HMG-API의 프로젝션 AP 기록은 HMG-API Wi-Fi 지기(rc.8 `engine/HomeWifi.java`, 서비스 `hmgapi wifi`)의 것입니다. 부팅마다 Android Wi-Fi 서비스가 뜨자마자 한 번 띄우고, 이번 부팅 id를 `wifi/ap.boot`(떴거나 이미 떠 있었음, Wi-Fi 클라이언트가 켜져 있어 두었음)나 `wifi/ap.fail`(다시 시도 중)에 씁니다. 그 줄은 `/data/hmgapi/logs/hmgapi/wifi.log`에 남습니다. 차가 나중에 끈 AP는 지기가 다시 켜지 않고, 폰이 붙을 때 공식 모드가 다시 켭니다(rc.8 `hmgapi.hook.Wifi.projectionAp`).
-  - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `kor_hooks`·`kor_hooks_why`·`kor_tbt`·`kor_tbt_log`(이 모드의 한국 카플레이 길안내, 아래), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
+  - HMG-API의 프로젝션 AP 기록은 HMG-API Wi-Fi 지기(rc.8 `engine/HomeWifi.java`, 서비스 `hmgapi wifi`)의 것입니다. 부팅마다 Android Wi-Fi 서비스가 뜨자마자 한 번 띄우고, 이번 부팅 id를 `wifi/ap.boot`(떴거나 이미 떠 있었음, Wi-Fi 클라이언트가 켜져 있어 두었음)나 `wifi/ap.fail`(다시 시도 중)에 씁니다. 그 줄은 `/data/hmgapi/logs/hmgapi/wifi.log`에 남습니다. 차가 나중에 끈 AP는 지기가 다시 켜지 않고, 폰이 붙을 때 공식 모드가 다시 켭니다(rc.8 `hmgapi.hook.Wifi.projectionAp`). 칩이 없는 부팅이면 이 모드의 `nochip` 서비스가 `ap.boot`를 써서 지기의 다시 시도를 멈춥니다(위).
+  - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `kor_hooks`·`kor_hooks_why`·`kor_tbt`·`kor_tbt_log`(이 모드의 한국 카플레이 길안내, 아래), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `nochip`·`nochip_mark`(이번 부팅에 칩이 없음, `nochip` 서비스가 `ap.boot`를 씀. 그때 `ap_boot`·`ap_fail`은 `no`로 내보냄), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
   - **한국 카플레이 길안내 줄**([#71](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/71), 2026-11-26): "자세히" 표의 "한국 카플레이 길안내" 칸에 HMG-API가 이 모드의 훅(#67)을 올렸는지 보입니다. DiPO 안에서 길안내를 시작했는지는 아닙니다(stepofspec 999 이상, 계기판 서비스 없음, 앱 부분 실패면 "켜짐"이어도 돌지 않음. HMG-API 앱 Logs 탭의 `CarPlay (NX4 KOR): … stays off`·`didn't start` 줄로 봄, PR #83 리뷰 4).
     - `kor_hooks`는 공식 모드의 `wm_hooks`와 같은 HMG-API 기록 줄(`mods: loaded nx4-kor …` / `mods: nx4-kor not loaded: <이유>`)에서, 같은 한 번의 읽기로 정합니다. 이유는 HMG-API 영문 그대로(지점·모드 이름뿐) `kor_hooks_why`에 200자까지 둡니다. rc.10의 지점 이유는 `hook point <지점> isn't mapped on this car (…)`, `… is mapped on this car only, which is enough for observe hooks: a change hook needs it …`(이 모드의 계기판 지점 8곳은 `change`), `… isn't one HMG-API has …`입니다(`engine/HookPlan.java`, PR #83 리뷰 1).
     - 부팅마다 그 부팅의 `hook map:` 줄이 `mods:` 줄보다 먼저 옵니다. 훅이 꺼진 부팅은 `mods:` 줄이 없으므로 `hook map:` 줄에서 두 모드의 값을 비웁니다(지난 부팅의 "loaded"가 남지 않음). 관리 앱은 HMG-API 훅이 꺼졌으면 이 칸을 "안 돎 (HMG-API 훅 꺼짐)"으로 보입니다(PR #83 리뷰 3).
@@ -265,7 +297,7 @@
     | `features.txt`, `permissions-ls.txt`, `featurexml-<onebin>.cfg` | 지금 켜진 순정 기능(`pm list features`), `/system/etc/permissions` 목록, 기능을 지우는 순정 설정 사본. Wi-Fi 칩 전원이 달린 순정 핫스팟 기능이 켜졌는지 봅니다(2.0.x 자동 설정의 "핫스팟 기능을 먼저 켜는 갈래") |
     | `hmgapi-status.txt` | `hmgapid engine status`. HMG-API가 바꾼 파일마다 순정·기대·지금 md5가 있어, 모드가 적용된 뒤에도 순정 md5를 압니다 |
     | `car-report.txt`, `car-report-*.json`·`.md` | `hmgapid engine report`(HMG-API Car Report)의 출력과 보고서 파일. 이 차에서 찾은 훅 지점(`map_car`), map 확인, 기능, 모드, 오류가 들어 있습니다. HMG-API가 VIN·일련번호를 넣지 않고 기록 줄을 가립니다 |
-    | `logs/` | 이 모드의 `ap.log`, 서비스 기록(`/data/hmgapi/logs/nx4-kor/`), `/data/local/tmp/nx4-kor/*.txt`(map 만들기·확인·계획·적용 결과), `/data/local/tmp/nx4-kor-*.txt`(상태 파일), HMG-API 설치 기록 |
+    | `logs/` | 이 모드의 `ap.log`, 서비스 기록(`/data/hmgapi/logs/nx4-kor/`, `nochip.log` 포함), `/data/local/tmp/nx4-kor/*.txt`(map 만들기·확인·계획·적용 결과), `/data/local/tmp/nx4-kor-*.txt`(상태 파일, 칩 없음 기록), HMG-API 설치 기록, HMG-API Wi-Fi 지기 기록(`hmgapi-wifi.log`, 2.1.2-beta.4부터) |
     | `dongle/` | USB Wi-Fi 동글 드라이버를 이 차 커널에 맞춰 빌드하고 순정 HAL 자리에 잇는 데 필요한 것([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48) 1단계). 아래 표 |
 
   - `dongle/`(설치기 `diag_dongle`, 읽기만 함):
@@ -278,6 +310,7 @@
     | `wifi-strings.txt` | 순정 HAL(`libhardware_legacy.so`)·`hostapd`·`wpa_supplicant`·`netd`에서 드라이버 관련 문자열만(모듈 이름, insmod 인자 `iface_name` 등, `nl80211`, `add_ie`) |
     | `usb.txt`, `usb-ls.txt`, `usb-drivers.txt` | USB 장치의 ID·속도·전력·종류·제조사·제품 이름(일련번호는 넣지 않음), 버스·컨트롤러 경로, 드라이버에 붙은 인터페이스 |
     | `net-ls.txt`, `dmesg-usb-wifi.txt` | 네트워크 장치 이름과 경로(MAC은 넣지 않음), 커널 로그 중 USB·Wi-Fi 줄. `SerialNumber` 줄과 MAC이 든 줄(`mac=`, `MAC Address`, `macaddr`, `hwaddr`, `xx:xx:xx:xx:xx:xx`·`xx-xx-…`·구분자 없는 12자리 꼴)은 뺌(PR #66 리뷰 1·3). 12자리 꼴은 같은 길이의 다른 16진수·숫자가 든 줄도 빼지만, 공개 이슈에 올릴 기록이라 덜 남기는 쪽을 골랐습니다 |
+    | `mount.txt` | 두 동글 드라이버 중 하나를 순정 `bcmdhd.ko` 자리에 bind mount하는 안([#80](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/80))을 가르는 값. SELinux 모드(`getenforce`, `/sys/fs/selinux/enforce`), init·이 설치기·`system_server`(Wi-Fi HAL이 insmod하는 곳)와 이름에 `hmgapi`가 든 프로세스 모두의 ppid·시작 시각(부팅 뒤 초, 순정 bcmdhd는 약 9.7초에 올라감)·mount 이름공간(`/proc/<pid>/ns/mnt`)·SELinux 도메인(`attr/current`). HMG-API 쪽은 데몬(comm `hmgapid`, ppid 1)에 "데몬"을 붙입니다. 부팅 서비스는 데몬이 띄우므로 데몬의 시작 시각을 봅니다. 요청 worker·클라이언트(`hmgapid`)와 차량 서비스(`hmgapi.vehicle`)도 함께 적힙니다. init과 mount 이름공간이 다른 프로세스 목록(앞 100줄), init·설치기·`system_server`·데몬의 `/`·`/system`·`/data` mountinfo 줄(전파 표시 `shared`·`master`), 커널 기록의 `avc:` 줄(앞 50줄, MAC 꼴은 뺌). 이름공간 링크가 있는데 대상을 못 읽으면(거절, 차의 툴박스 `ls`는 이때 아무것도 찍지 않음) "링크는 있음"으로, 링크가 없으면 `ls`의 오류 문구로 적어 둘을 가릅니다. busybox 없이 `/proc`와 커널 기록만 읽습니다. `wifi-strings.txt`도 HAL의 모듈 확인 문자열(`module_info`·`module_version`·`/proc/modules`)을 찾습니다 |
 
     md5·압축 풀기·문자열은 busybox로 합니다. busybox가 없으면 `config.gz` 복사와 목록만 남기고 그렇다고 적습니다. 고른 busybox에 `gunzip`·`sha256sum`·`strings`(또는 `grep -m`·`-E`)가 없으면 빈 값 대신 그 까닭을 적고(`config-sum.txt`, `ko-vermagic.txt`, `wifi-strings.txt`, PR #66 리뷰 2), `config.gz`는 PC에서 풉니다. `config-sum.txt` 첫 줄에 쓴 busybox를 적습니다. 동글을 꽂은 채 모으면 그 동글의 ID와 경로도 담깁니다.
 
@@ -327,7 +360,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - [모으기] 뒤 `NX4/diag/<시각>/`가 생기고 `system-lib-md5.txt`에 md5가 있는지(`info.txt`의 `md5_busybox`가 무엇인지).
   - `car-report.txt`가 HMG-API의 "usage:"가 아니라 보고서인지(`engine report`가 없는 HMG-API 판이면 빠짐).
   - 모으는 데 얼마나 걸리는지. Car Report는 map 만들기와 같은 분석이라 1~2분을 어림합니다.
-  - `dongle/`에 차 커널 설정(`config.gz`·`config.txt`)이 있는지, `config.txt`가 드라이버 빌드의 커널 설정과 같은지(`sh drivers/config-sum.sh config.txt`가 "같음"), `wifi-strings.txt`에 HAL이 올리는 모듈 이름·insmod 인자가 보이는지. DSP OTA 프로세스에서 `/proc/config.gz`·`/sys`를 읽을 수 있는지도 여기서 드러납니다. 결과는 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적습니다.
+  - `dongle/`에 차 커널 설정(`config.gz`·`config.txt`)이 있는지, `config.txt`가 드라이버 빌드의 커널 설정과 같은지(`sh drivers/config-sum.sh config.txt`가 "같음"), `wifi-strings.txt`에 HAL이 올리는 모듈 이름·insmod 인자가 보이는지. `mount.txt`에서 `system_server`의 mount 이름공간이 HMG-API 데몬과 같은지(다르면 mountinfo의 `shared`·`master`로 bind mount가 전해지는지), init과 이름공간이 다른 프로세스가 있는지, SELinux 모드와 데몬·`system_server`의 도메인, `avc:` 줄, HMG-API 데몬이 순정 bcmdhd(약 9.7초)보다 늦게 뜨는지([#80](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/80)). DSP OTA 프로세스에서 `/proc/config.gz`·`/sys`를 읽을 수 있는지도 여기서 드러납니다. 결과는 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적습니다.
 - **DSP OTA 뒤 재부팅하지 않고 끝내도 되는지.** OTA 화면이 이상하게 남으면 관리 앱의 [지금 재부팅]이나 RESET을 쓰세요. 2026-11-25에 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
 - **DSP OTA 화면 위로 관리 앱이 열리는지**(`am start`). 안 열리면 재부팅 뒤 같은 USB로 Update OTA를 다시 누릅니다. 2026-11-25에 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
 - **HMG-API 설치기가 NX4의 `app_process`를 아는지.**
@@ -336,11 +369,13 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - **NEMESIS가 깔린 차에서 USB 설치가 실제로 멈추는지**([#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75), 2.1.2부터). Update OTA를 누르면 토스트 "NEMESIS가 깔린 차에는 NX4 KOR를 설치하지 않습니다…"로 멈추고, 아무것도 바뀌지 않는지(HMG-API 설치·업데이트 없음, 진행 기록 없음) 봅니다. USB의 `NX4/install.log`에 `…/system/xbin/nemesis 있음: 설치하지 않음`이 남아야 합니다. DSP OTA 프로세스가 `/system/xbin/nemesis`를 보지 못하면 조용히 지나가 예전처럼 설치합니다. 테스트 차는 NEMESIS가 없어, NEMESIS 차를 가진 사용자의 기록으로 확인합니다.
 - **Korea Projection이 설치된 차에서 USB 설치가 실제로 멈추는지**([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). Update OTA를 누르면 토스트 "NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다…"로 멈추고, 아무것도 바뀌지 않는지(HMG-API 설치·업데이트 없음, 진행 기록 없음) 봅니다. USB의 `NX4/install.log`에 `원본 Korea Projection 패키지가 있음(…)`이 남아야 합니다. 설치기가 그 폴더를 보지 못하면(경로가 다르거나 DSP OTA 프로세스에서 접근이 막힘) 조용히 지나가 예전처럼 설치합니다.
 - **NEMESIS에서 Korea Projection을 지우고 재부팅하면 `/data/nemesis/apps/korea.projection` 폴더가 없어지는지**([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). 지운 직후(재부팅 전)에도 없어지는지 함께 봅니다. USB 설치기는 그 폴더만 보고 멈추므로, 재부팅한 뒤에도 폴더가 남으면 계속 "NEMESIS에 Korea Projection이 설치되어 있어…"로 멈춥니다.
-- **Wi-Fi 부품이 없는 차에서 관리 앱이 "부품 없음"을 보이는지**(2026-11-23 NX4HEV 260902, 2.0.4-beta.1에서 순정 핫스팟 기능을 켜도 칩이 올라오지 않음, #38).
-  - 공식 모드를 적용하고 재부팅한 뒤 HMG-API 기록 `/data/hmgapi/logs/hmgapi/wifi.log`에 `projection AP: not up yet, trying again (…)`이 남고, 관리 앱 판정이 `nowifipart`(노랑, "Wi-Fi 부품이 없는 것으로 보여…")인지. 표의 "Wi-Fi 칩"이 "안 보임", "순정 핫스팟 기능"이 "예"인지
-  - 부팅 뒤 5분 동안은 `apwait`("켜는 중")이고 그 뒤 `nowifipart`로 바뀌는지(첫 시도 실패로 `ap.fail`이 먼저 생겨도 5분 전에는 "부품 없음"이 나오지 않아야 함)
-  - 유선 카플레이·안드로이드 오토와 계기판 길안내(공식 모드)가 그대로인지. HMG-API 지기가 부팅마다 AP를 다시 시도하면서(약 1분, 그 뒤 30초마다) 유선 연결이 끊기는지도 봅니다
-  - 2026-11-25 2.1.0-beta.3에서 `apwait` 뒤 `nowifipart`로 바뀌는 것을 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)). 유선 연결과 계기판 길안내는 [#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64), 동글로 무선을 보는 일은 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적습니다.
+- **Wi-Fi 부품이 없는 차에서 관리 앱이 "부품 없음"을 보이고 HMG-API의 다시 시도가 멈추는지**(2026-11-23 NX4HEV 260902, 2.0.4-beta.1에서 순정 핫스팟 기능을 켜도 칩이 올라오지 않음, #38. 다시 시도 멈추기는 2.1.2-beta.4부터).
+  - 재부팅 뒤 USB 진단 기록 `logs/service/nochip.log`에 "Wi-Fi 칩 없음(순정 드라이버가 이번 부팅에 칩 켜기를 포기함): HMG-API의 프로젝션 AP 다시 시도를 이번 부팅에 멈춤"이 남고, `logs/nx4-kor-nochip.txt`가 그 부팅 id인지. 상태 파일은 `nochip=yes`, `nochip_mark=yes`
+  - 관리 앱 판정이 부팅 직후부터 `nowifipart`(노랑, "Wi-Fi 부품이 없는 것으로 보여…")인지(5분 동안 "켜는 중"이 나오지 않아야 함). 표의 "Wi-Fi 칩"이 "안 보임", "순정 핫스팟 기능"이 "예"인지
+  - 다시 시도가 멈췄는지는 기록으로 직접 볼 수 없습니다. rc.10 지기는 `projection AP: not up yet, trying again (…)`을 부팅마다 처음 실패할 때 한 줄만 남기고 그 뒤 시도는 남기지 않습니다(고치기 전에도 한 줄, PR #86 리뷰 2). 그래서 `nochip.log`의 줄과 `nochip_mark=yes`, adb가 있으면 `/data/hmgapi/wifi/ap.boot`가 그 부팅 id인지로 봅니다(지기는 그 파일이 이번 부팅 것이면 시도하지 않음). 상태 파일의 `ap_boot`·`ap_fail`은 이때 `no`입니다
+  - 차를 1분 넘게 껐다가 QuickBoot로 다시 켰을 때 `hmgapi-wifi.log`에 `back from a suspend`, `nochip.log`에 "HMG-API가 ap.boot를 지움(QuickBoot에서 깨어남): 다시 씀"이 한 줄씩 남는지
+  - 유선 카플레이·안드로이드 오토와 계기판 길안내(공식 모드)가 그대로인지
+  - 2026-11-25 2.1.0-beta.3과 11-26 2.1.2-beta.3에서는 부팅 뒤 5분 동안 `apwait`였다가 `nowifipart`로 바뀌었습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23), 11-26 진단 기록 `launch.log`). 결과와 유선 연결·계기판 길안내는 [#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64), 동글로 무선을 보는 일은 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적습니다.
 - **함께 넣은 busybox가 NX4에서 도는지.** NX4 내비에 `/system/bin/busybox`가 없으면 관리 앱이 부르는 스크립트는 모드의 `bin/busybox`(`/data/hmgapi/mods/nx4-kor/bin/busybox`)만 쓸 수 있습니다. 관리 앱이 "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함)"를 보이지 않아야 합니다. 2026-11-25 진단 기록 `info.txt`가 `system_busybox: no`, `md5_busybox: /data/hmgapi/mods/nx4-kor/bin/busybox`였고(내비에 busybox가 없어 모드의 것을 씀), 관리 앱이 이 문구 없이 판정을 보여 확인한 것으로 봅니다.
 - **HMG-API가 없는 차에서 릴리스 USB 하나로 설치되는지.** 첫 Update OTA에서 NX4 KOR 설치기가 스틱의 HMG-API 설치기(`NX4/hmgapi/troubleShooter`)로 넘겨 HMG-API가 설치되고 재부팅되는지, 두 번째 Update OTA에서 NX4 KOR가 설치되는지(USB의 `HMGAPI/install.log`, `NX4/install.log`). 2026-11-21에 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
 - **HMG-API가 이 모드의 최소 판(1.1.0-rc.10, 2.1.0은 rc.8)보다 낮은 차에서 HMG-API를 먼저 올리는지.** 첫 Update OTA가 따로 설치한 무선 모드(`wireless-carplay-aa`)를 지우지 않고 HMG-API 설치기의 업데이트 갈래로 HMG-API를 올린 뒤 재부팅하는지, 두 번째에 NX4 KOR가 설치되는지. HMG-API 설치기를 `/storage/upgrade`가 아니라 스틱의 `NX4/hmgapi`에서 `exec`로 돌리는 길은 차에서 처음 돕니다. NEMESIS로 설치한 HMG-API라면 NEMESIS 목록의 판도 함께 봅니다. 2026-11-25 rc.7에서 rc.8로 올리고 재부팅한 뒤 두 번째에 설치되는 것을 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)).
@@ -361,6 +396,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - 길안내 중 `guidance on: the official mod's cluster calls get ours`, 끝나면 `guidance off` 줄이 나오는지. 카플레이를 끊거나 길안내를 끝낸 뒤 2초쯤 안에 계기판의 화살표가 지워지는지
   - 길안내 앱을 바꾸거나(애플 지도 ↔ 네이버 지도) 애플 지도로 갈 때 계기판이 비었다 돌아오는 깜빡임이 없는지(남의 멈춤 2초 미루기)
   - `giving way until it hears again` 줄이 나오는지(나오면 이 모드의 리스너만 끊긴 것: 그 앞뒤 기록을 #67에)
+  - 길안내를 시작하거나 앱을 바꾼 직후 계기판에 공식 모드의 그림(곧 회전 큰 그림 대신 작은 화살표 등)이 잠깐 나왔다 바뀌지 않는지(2.1.2-beta.4, 위 "공식 호출 잠깐 붙잡기"). `kor_tbt_log`를 켜면 `… from the official mod held N ms, carries ours`(붙잡아 우리 값을 실음)·`…, passed as it was`(기다렸지만 공식 값 그대로) 줄로 붙잡은 결과가 보입니다. `passed as it was`가 시작 때 자주 나오면 그 N과 앞뒤 기록을 #67에 적습니다(250·50ms가 짧은지 봄). 그래도 공식 그림이 몇 초씩 나오면 그때 `maneuver N unknown … asked again`·`giving way` 줄이 있는지 함께 #67에 적습니다
   - 차선 정보를 보내는 앱(애플 지도 등)으로 차선 안내가 나오는 교차로에서 차선 그림이 나오는지(카카오내비는 차선을 보내지 않음)
   - 일반 도로 곧 회전 거리 600 m(2.1.2-beta.4부터, 그 전은 350 m). `kor_tbt_log`를 켜면 `CarPlay diag: … d 600 -> near (in-d)`로 보입니다.
     - 떨어진 회전: 회전 약 600 m 전부터 큰 도로 그림과 거리 막대가 나오고, 막대가 60 m마다 한 칸씩 끝까지 자연스럽게 줄어드는지. 나갈 때는 650 m를 넘어야 먼 회전으로 돌아갑니다

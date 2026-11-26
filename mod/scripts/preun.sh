@@ -1,6 +1,7 @@
 #!/system/bin/sh
 # 지우기 전 정리(bin/uninstall.sh가 부른다). 2.1.0의 이 모드가 바꾸는 것은 HMG-API에 선언한 것(관리 앱·앱 메뉴 타일·
-# launch 서비스)과 관리 앱의 작업 파일뿐이다. 시스템 파일·Wi-Fi 설정은 바꾸지 않으므로 되돌릴 것도 그것뿐이다.
+# launch·nochip 서비스, 한국 길안내 훅)과 관리 앱의 작업 파일, 칩 없음 기록뿐이다. 시스템 파일·Wi-Fi 설정은 바꾸지 않으므로
+# 되돌릴 것도 그것뿐이다. nochip 서비스는 hmgapid가 내린다(아래 2).
 #   1. 관리 앱이 띄운 대기(status.sh --wait)·감시자(--watch)를 멈추고 작업 폴더·상태 파일을 지운다. NX4_UPDATE=1(새 판으로
 #      바꾸기 전)이면 여기서 끝난다. 설치 진행 기록은 USB 설치기가 쓰는 파일이라 업데이트 때는 두고, 지울 때만 지운다.
 #   2. HMG-API에서 이 모드를 뺀다(engine remove). HMG-API(rc.8 Packages.remove → LiveState.publish)는 그때 앱·서비스 목록
@@ -35,9 +36,11 @@ if [ "$NX4_UPDATE" = 1 ]; then
   echo "NX4 KOR 업데이트: 이전 판 정리"
   exit 0
 fi
-# 지울 때만: 설치 진행 기록, 재부팅 결과 파일(status.sh rb_result), 알림 기록. 관리 앱도 함께 지워진다
+# 지울 때만: 설치 진행 기록, 재부팅 결과 파일(status.sh rb_result), 알림 기록, 칩 없음 기록(svc/nochip.sh). 관리 앱도 함께
+# 지워진다. 칩 없음 기록은 업데이트 때 두어 이번 부팅의 판정을 잇는다(새 판의 nochip 서비스가 다음 부팅에 다시 쓴다).
+# nochip.sh가 쓴 HMG-API의 wifi/ap.boot는 부팅 id만 든 HMG-API의 부팅마다의 파일이라 두고, 다음 부팅부터는 HMG-API 지기가 다시 시도한다
 RBRES=${RBRES:-/data/local/tmp/nx4-kor-reboot-result.txt}
-rm -f $PROG $PROG.tmp $RBRES $RBRES.tmp $NOTICE $NOTICE.tmp
+rm -f $PROG $PROG.tmp $RBRES $RBRES.tmp $NOTICE $NOTICE.tmp $NOCHIP $NOCHIP.nx4
 modmsg=""
 # HMG-API를 먼저 지웠는가: hmgapid 명령도, 설치 기록(installed.txt, HMG-API 삭제가 지운다)도 없다.
 # 그때 HMG-API 삭제가 이 모드의 앱·서비스를 이미 내렸다(남은 모드 폴더·앱은 uninstall.sh가 지운다).
