@@ -66,7 +66,7 @@
           - `-x`가 원래 커밋을 메시지에 남깁니다.
           - `$M^1..$M^2`는 `feature/` PR에 씁니다. `hotfix/`의 고침을 진행 중인 `release/`로 옮길 때는 범위로 옮기지 않습니다(PR #79 리뷰 6·7). hotfix 브랜치에는 판 올리기 커밋과 `develop`·`main`을 합친 커밋이 섞여 있고, 범위가 `main`에만 있는 커밋까지 잡을 수 있습니다. 2.1.1의 PR #72를 범위로 옮기면 첫 커밋에서 충돌로 멈춥니다.
             - 고침 커밋만 골라 하나씩 옮깁니다: `git cherry-pick -x <고침 커밋>`. 판 올리기 커밋("Release <판>: bump the version")과 merge 커밋은 옮기지 않습니다. 판은 `release/`의 다음 베타로 둡니다.
-            - 충돌하면 고침 내용은 hotfix 쪽, 판 세 곳(`version`, `versionName`, `versionCode`)은 `release/` 쪽으로 풀고 `git cherry-pick --continue` 합니다. 어느 쪽인지 가르기 어려우면 `git cherry-pick --abort` 하고 사용자에게 묻습니다.
+            - 충돌하면 `release/` 쪽을 남기고 그 위에 hotfix의 고침만 얹습니다. 판 세 곳(`version`, `versionName`, `versionCode`)은 `release/` 쪽 그대로입니다. 그다음 `git cherry-pick --continue` 합니다. hotfix 커밋은 `main` 위에서 썼으므로, 충돌한 곳을 hotfix 쪽으로 통째로 풀면 `main`의 옛 내용이 돌아오고 `release/`에 든 것이 지워집니다(PR #79 리뷰 9. 2.1.1을 `develop`에 되돌려 합친 `6ea7198`도 이렇게 풂). 고침만 가려내기 어려우면 `git cherry-pick --abort` 하고 사용자에게 묻습니다.
         - 옮긴 뒤 옮긴 커밋 목록이 그 PR의 커밋과 같은지 봅니다(`git log --oneline $M^1..$M^2 --no-merges`와 옮긴 커밋의 `cherry picked from` 줄). 다음 판의 merge commit이 조상이 아닌지(`git merge-base --is-ancestor <다음 판의 합친 커밋> HEAD`가 실패)도 봅니다. 복사된 커밋은 이 확인에 걸리지 않으므로 목록 대조가 먼저입니다.
         - 그다음 테스트하고 판을 다음 베타로 올립니다. 판이 이미 태그 없는 다음 베타면(먼저 올려 둔 경우, 2.1.2-beta.2의 `41c4026`) 그대로 둡니다(리뷰 5).
         - 정식으로 낸 뒤 `release/<판>`을 `develop`으로 되돌려 합칠 때는 같은 변경이 원래 커밋과 체리픽으로 두 벌 있습니다. 내용이 같아 대개 그대로 합쳐집니다. 겹친 변경이 충돌하면 `develop` 쪽을 따르되, 판 세 곳(`version`, `versionName`, `versionCode`)은 `release/` 쪽을 따릅니다(2.1.1의 `6ea7198`와 같음, 리뷰 4).
