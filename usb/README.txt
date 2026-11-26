@@ -81,7 +81,7 @@ NEMESIS가 깔린 차
   HMGAPI/FORCE로 설치한 차(NEMESIS 1.17)는 1.1.0-rc.9로 올리기만 해도 Android가 뜨지 않으니 rc.10으로 바로 올립니다.
   한번 Android가 뜨지 않으면 미리 켜 둔 adb나 대리점이 필요할 수 있습니다(NEMESIS 비상 USB는 아직 차에서 된 적이 없음).
   지울 때 도는 것은 그 HMG-API를 설치할 때 저장해 둔 삭제라서, 새 판 HMG-API USB의 HMGAPI/UNINSTALL로 지워도 같습니다.
-  먼저 HMG-API를 1.1.0-rc.10 이상으로 올리고 재부팅한 뒤 지웁니다. 이 USB는 NEMESIS가 깔린 차에서 HMG-API를 올리지 않으므로
+  먼저 HMG-API를 1.1.0-rc.10 이상으로 올리고 두 번 재부팅한 뒤 지웁니다. 이 USB는 NEMESIS가 깔린 차에서 HMG-API를 올리지 않으므로
   HMG-API 릴리스의 USB(hmgapi-<버전>-usb.zip)나 update zip(HMG-API 앱 "Check USB updates")으로 올립니다
   (NEMESIS가 깔린 차는 NEMESIS Manager로 hmgapi-<버전>-nemesis.zip도 됩니다. 2.1.1 이전의 이 USB는 쓰지 않습니다).
   NEMESIS 1.16 이하나 NEMESIS가 없는 차는 해당하지 않습니다.
