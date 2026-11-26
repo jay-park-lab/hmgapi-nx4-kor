@@ -180,8 +180,8 @@ public class ReportTest {
         check("  15분 넘게 새로 쓰이지 않은 기록은 멈춘 것으로 봄, 한참 미래 시각도", pr.progRunning("abc-123", 1100 + 900) && !pr.progRunning("abc-123", 1100 + 901)
             && !pr.progRunning("abc-123", 1100 - 901));
         check("  진행 중이면 판정을 바꾸지 않음", pr.progVerdict("abc-123") == null);
-        Report rb = Report.parse(PR.replace("state=run", "state=reboot").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=내비를 3분 후 재부팅해 주세요."));
-        check("  재부팅 필요 → 그 문구가 판정, 노랑", "내비를 3분 후 재부팅해 주세요.".equals(rb.progVerdict("abc-123")) && rb.progLevel() == 1);
+        Report rb = Report.parse(PR.replace("state=run", "state=reboot").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=무선 카플레이 설정을 마쳤습니다. [지금 재부팅]을 눌러 내비를 재부팅해 주세요."));
+        check("  재부팅 필요 → 그 문구가 판정, 노랑", "무선 카플레이 설정을 마쳤습니다. [지금 재부팅]을 눌러 내비를 재부팅해 주세요.".equals(rb.progVerdict("abc-123")) && rb.progLevel() == 1);
         Report rf = Report.parse(PR.replace("state=run", "state=fail").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=HMG-API가 없습니다."));
         check("  실패 → 그 문구가 판정, 빨강", "HMG-API가 없습니다.".equals(rf.progVerdict("abc-123")) && rf.progLevel() == 2);
         check("  준비됨(done)은 판정을 바꾸지 않음", Report.parse(PR.replace("state=run", "state=done")).progVerdict("abc-123") == null);

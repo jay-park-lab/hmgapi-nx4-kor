@@ -91,7 +91,7 @@ P_ON=0
 ST_OPEN=0
 
 # 끝 문구(진행 기록 stage). 상태 판정이 문장으로 가르므로 바꾸면 mod/bin/status.sh도 함께 본다
-DONE_REBOOT_MSG="무선 카플레이 설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요."
+DONE_REBOOT_MSG="무선 카플레이 설정을 마쳤습니다. [지금 재부팅]을 눌러 내비를 재부팅해 주세요."
 DONE_MSG="무선 카플레이 설정이 끝나 있습니다."
 OTHERPLAN_MSG="HMG-API에 다른 모드의 바뀐 내용이 함께 있어 자동으로 적용하지 않았습니다. 차를 세운 뒤 HMG-API 앱에서 변경 사항을 적용하고 내비를 재부팅해 주세요."
 HOOKS_MSG="HMG-API 계획에 켜지지 않는 훅이나 문제가 있어 적용하지 않았습니다. HMG-API 앱에서 변경 사항을 확인해 주세요."
@@ -575,7 +575,8 @@ old_revert() {
 #   hmgapi-status.txt   HMG-API가 바꾼 파일마다 순정·기대·지금 md5(hmgapid engine status). 모드가 적용된 뒤에도 순정 md5를 안다
 #   car-report*         HMG-API Car Report(hmgapid engine report: 이 차에서 찾은 훅 지점, map 확인, 기능, 오류).
 #                       HMG-API가 VIN·일련번호를 넣지 않고 기록 줄을 가린다
-#   logs/               이 모드의 기록(ap.log, 서비스 기록, map 만들기·확인·계획·적용 결과, 상태 파일)과 HMG-API 설치 기록
+#   logs/               이 모드의 기록(ap.log, 서비스 기록, map 만들기·확인·계획·적용 결과, 상태 파일)과 HMG-API 설치 기록,
+#                       HMG-API Wi-Fi 지기 기록(hmgapi-wifi.log: 프로젝션 AP를 띄웠는지·다시 시도하는지·깨어났는지)
 #   dongle/             USB Wi-Fi 동글 드라이버를 이 차 커널에 맞춰 빌드하고 순정 HAL에 잇는 데 필요한 것(#48, 아래 diag_dongle)
 # HMG-API 명령은 HMG-API가 응답할 때만 돌린다. 비밀번호가 든 Wi-Fi 설정 파일(softap.conf·hostapd-nx4.conf·
 # wpa_supplicant.conf)과 이 모드의 백업 폴더($NX4_ROOT/backup)는 넣지 않는다. 못 모은 것은 기록만 하고 넘어간다.
@@ -797,6 +798,7 @@ diag() {
   [ -f $NX4_ROOT/logs/ap.log ] && cp $NX4_ROOT/logs/ap.log $_d/logs/ap.log
   [ -d $HMGDATA/logs/$MOD ] && cp -r $HMGDATA/logs/$MOD $_d/logs/service
   [ -f $HMGDATA/install.log ] && cp $HMGDATA/install.log $_d/logs/hmgapi-install.log
+  [ -f $HMGDATA/logs/hmgapi/wifi.log ] && cp $HMGDATA/logs/hmgapi/wifi.log $_d/logs/hmgapi-wifi.log
   for _f in $ROOT/data/local/tmp/nx4-kor-*.txt $ROOT/data/local/tmp/nx4-kor/*.txt; do
     [ -f "$_f" ] && cp "$_f" $_d/logs/
   done
