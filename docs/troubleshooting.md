@@ -7,7 +7,7 @@ USB로 설치하다 멈추거나, 설치 뒤 관리 앱이 빨강·노랑일 때
 > - 상태 판정(`mod/bin/status.sh`, 2.1.0: HMG-API + 공식 무선 모드 구조)과 지우기(`mod/bin/uninstall.sh`)
 > - HMG-API 1.1.0-rc.7의 문서(`wiki/Troubleshooting.md`, `wiki/Uninstalling.md`)와 설치기(`install/common/install.sh`). NEMESIS 1.17에서 HMG-API를 지우거나 올리는 일은 HMG-API [1.1.0-rc.10 릴리스 노트](https://github.com/Open-HMG/HMG-API/releases/tag/v1.1.0-rc.10), [1.1.0-rc.9 릴리스 노트](https://github.com/Open-HMG/HMG-API/blob/v1.1.0-rc.9/.github/release-notes/v1.1.0-rc.9.md)(릴리스는 지워짐, 태그의 파일), [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397)과 rc.10 설치기(`install/common/install.sh`)
 >
-> 차에서 다르게 동작하면 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적어 주세요.
+> 차에서 다르게 동작하면 [GitHub 이슈](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues)에 적어 주세요(무선·동글은 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)).
 
 설치 순서는 [README](../README.md) "설치", 차에서 확인할 일은 [`design.md`](design.md) "차에서 확인할 것"에 있습니다.
 
@@ -25,7 +25,7 @@ USB로 설치하다 멈추거나, 설치 뒤 관리 앱이 빨강·노랑일 때
 |---|---|---|
 | USB `NX4/install.log` | NX4 KOR 설치기가 한 일. 누를 때마다 아래에 이어 씁니다(앞의 시도도 남음). 이번 시도는 **맨 아래**, 마지막 "NX4 KOR USB 설치기 시작" 줄부터입니다 | 아니오 |
 | USB `HMGAPI/install.log` | HMG-API 설치기가 한 일 | 아니오 |
-| USB `NX4/diag/<시각>/` | 누를 때 뜨는 확인 창에서 [모으기]를 고르면, 설치기가 아무것도 바꾸기 전에 모은 진단 기록. 아래 adb 줄의 기록(`logs/`), HMG-API Car Report와 상태, `/system/lib` 파일의 이름·md5, 내비 판 등입니다. 담는 것은 [`design.md`](design.md) "진단 기록" | 아니오 |
+| USB `NX4/diag/<시각>/` | 누를 때 뜨는 확인 창에서 [모으기]를 고르면, 설치기가 아무것도 바꾸기 전에 모은 진단 기록. 아래 adb 줄의 기록(`logs/`), HMG-API Car Report와 상태, `/system/lib` 파일의 이름·md5, 내비 판, 동글 준비 정보(커널 설정·USB 장치, `dongle/`) 등입니다. 담는 것은 [`design.md`](design.md) "진단 기록" | 아니오 |
 | 관리 앱 화면 | 오른쪽 칸의 판정·안내와 왼쪽 칸의 요약·상태표. 사진으로 남겨 두면 좋습니다. 앱 메뉴의 NX4 KOR 타일로 엽니다. 타일이 없으면 같은 USB로 Update OTA를 다시 누릅니다(다시 설치하지 않고 관리 앱만 엶) | 아니오 |
 | `/data/nx4-kor/logs/ap.log` | 관리 앱 감시자([지금 재부팅] 요청)의 기록 | 예 |
 | `/data/hmgapi/logs/hmgapi/wifi.log` | HMG-API가 무선 연결용 Wi-Fi(프로젝션 AP)를 띄운 기록(`projection AP: …` 줄) | 예 |
@@ -95,7 +95,7 @@ HMG-API 설치기가 멈추면 USB의 `HMGAPI/install.log` 맨 아래 `FAIL:` �
 | 다른 Wi-Fi 패키지가 Wi-Fi를 쓰고 있어… (`otherwifi`) | NEMESIS의 Korea Projection이나 다른 무선·핫스팟 패키지를 지우고 재부팅합니다([`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때") |
 | 내비 Wi-Fi가 일반 핫스팟으로 켜져 있어… (`aphotspot`) | 순정 핫스팟을 끄고 재부팅합니다 |
 | 내비가 일반 Wi-Fi에 접속하는 중이라… (`wificlient`) | HMG-API 앱의 Home Wi-Fi를 쓰면 주차를 풀 때 돌아옵니다. 계속 그렇다면 Home Wi-Fi를 끕니다 |
-| 이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여… (`nowifipart`) | 이 차에서는 무선을 쓸 수 없습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로입니다. 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다. 결과를 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 적어 주세요 |
+| 이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여… (`nowifipart`) | 이 차에서는 무선을 쓸 수 없습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로입니다. 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48), 2.2.0)을 기다립니다. 결과를 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적어 주세요 |
 | 무선 연결용 Wi-Fi를 켜는 중입니다 (`apwait`) | 1~2분 뒤 화면을 다시 엽니다. 부팅 뒤 5분 동안은 Wi-Fi 부품이 없는 차도 이렇게 나옵니다 |
 | 무선 연결용 Wi-Fi가 지금 꺼져 있습니다 (`apoff`) / HMG-API가 무선 연결용 Wi-Fi를 켜지 못했습니다·켜지 않았습니다 (`apfail`) | 폰을 연결해 보고, 안 되면 3분 뒤 재부팅합니다. 같으면 adb로 `/data/hmgapi/logs/hmgapi/wifi.log`를 봅니다 |
 | 지원하지 않는 HMG-API 버전입니다 (`oldhmgapi`) / HMG-API가 없습니다 (`nohmgapi`) | HMG-API(1.1.0-rc.10 이상)가 든 2.1.1 이후 릴리스 USB로 다시 누릅니다. 2.1.0을 쓰던 차(HMG-API rc.8)나 따로 rc.9를 넣은 차도 같은 방법으로 올립니다 |
@@ -125,6 +125,16 @@ HMG-API는 훅 때문에 내비가 제대로 뜨지 못한다고 보면 스스�
 3. 재부팅하고 3분 넘게 켜 둡니다.
 
 관리 앱의 [지금 재부팅]도 이 횟수를 봅니다. `hook/starts`가 5·6이면(2분을 버티지 못한 시작이 이번 것까지 5·6번 이어짐) 다음이나 그다음 시작에 훅이 꺼지므로, 이번 시작이 2분을 넘길 때까지(켠 지 3~5분) 재부팅을 거절하고 "… 3~5분 뒤에 다시 눌러 주세요."를 보입니다.
+
+## 카플레이 계기판 길안내가 이상할 때
+
+한국 카플레이 길안내([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67), HMG-API 앱의 NX4 KOR 설정 `kor_tbt`)가 공식 무선 모드의 계기판·HUD 길안내를 덮어씁니다.
+
+1. 이상하게 보인 시각을 적고, 그때 폰 화면의 안내(예: "차선 유지", "약간 좌회전")를 함께 남깁니다.
+2. HMG-API 앱 Logs 탭(Everything)에서 그 시각 앞뒤의 `nx4-kor` 줄을 봅니다. `CarPlay: maneuver type … side … junction … exit …`가 받은 안내, `CarPlay: hud list …`가 보낸 HUD 목록입니다(길·장소 이름은 남지 않음). 설정 `kor_tbt_log`가 켜져 있으면 곧 회전 판단과 계기판에 보낸 값 줄이 더 있습니다. 같은 시각의 `wireless-carplay-aa` 줄은 공식 모드의 것입니다.
+3. `route guidance reaches this listener` 줄이 한 번도 없으면 이 모드가 길안내를 받지 못한 것입니다. 그때는 공식 모드 혼자 보냅니다.
+4. 공식 모드 그대로 쓰려면 HMG-API 앱에서 NX4 KOR의 `kor_tbt`를 끄고 변경 사항을 적용한 뒤 재부팅합니다. 공식 무선 모드의 `tbt`는 켜 둡니다.
+5. 기록과 시각을 [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)에 적어 주세요.
 
 ## 내비가 재부팅을 반복하거나 화면이 이상할 때
 
@@ -182,4 +192,4 @@ NEMESIS 1.17(LivePatch)이 깔린 차에서 다음 둘 중 하나가 일어나�
 - 몇 번째 Update OTA에서, 어떤 메시지가 떴는지
 - 내비 소프트웨어 판(`NX4.KOR.….260902`), 설치 전 HMG-API 판, 순정 무선 카플레이 트림인지
 
-[GitHub 이슈](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues)에 올려 주세요. 차에서 처음 확인하는 결과는 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)에 모읍니다.
+[GitHub 이슈](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues)에 올려 주세요. 2.1.0의 첫 차 확인 기록은 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)(닫음)에 있고, 무선·동글 결과는 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 모읍니다.

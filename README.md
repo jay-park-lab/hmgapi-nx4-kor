@@ -1,13 +1,15 @@
 > 🧪 **실험 중인 프로젝트입니다.** 일반 차주가 쓰기를 권하지 않습니다.
-> - **2.1.0부터 구조를 다시 짭니다**(2026-11-23 결정, [#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38), 할 일 [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)). 아래 "[방향: 2.1.0](#방향-210)"을 보세요.
-> - 이 아래의 안내(모드 구성, 관리 앱, USB 설치기, 삭제)는 2.1.0 코드 기준이고, 2.1.0 첫 베타부터 들어갑니다. 2.0.x는 정식으로 내지 않고 끝냅니다. 베타 묶음(`v2.0.0-beta.*`~`v2.0.4-beta.1`)은 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에 그대로 둡니다.
-> - 그래서 구성, 설치 방법, 판 번호가 예고 없이 크게 바뀔 수 있습니다.
+> - **2.1.1을 정식으로 냈습니다**(2026-11-26, [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases/tag/v2.1.1)). 2.1.0에 HMG-API 1.1.0-rc.10과 NEMESIS 1.17 경고를 더한 판입니다. 구조는 아래 "[2.1.0 구조](#210-구조)"를 보세요([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38)).
+> - 2.1.0은 2026-11-25에 태그(`v2.1.0`)만 달렸고 릴리스 묶음은 없습니다. 묶음을 만들기 전에 HMG-API가 rc.8 릴리스를 지워, 빌드가 HMG-API USB 묶음을 받지 못하고 멈췄습니다(배포 키는 쓰이지 않음).
+> - 2.0.x는 정식으로 내지 않고 끝냈습니다. 베타 묶음(`v2.0.0-beta.*`~`v2.0.4-beta.1`)은 릴리스에 그대로 둡니다.
+> - **무선 카플레이·안드로이드 오토는 차에서 아직 확인하지 못했습니다.** 테스트한 차(NX4HEV 260902)는 내비에 Wi-Fi 칩이 없습니다. USB Wi-Fi 동글 지원은 2.2.0에서 합니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48), [#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60)).
+> - 구성, 설치 방법, 판 번호가 예고 없이 바뀔 수 있습니다.
 > - ⚠️ **NEMESIS 1.17이 깔린 차에서는 HMG-API를 1.1.0-rc.10 이상으로 올리기 전에 지우지 마세요**([Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397)).
 >   - rc.8 이하를 지우면 재부팅 한두 번 뒤 Android가 뜨지 않을 수 있습니다.
 >   - 2.1.0 안내대로 `HMGAPI/FORCE`로 HMG-API를 설치한 NEMESIS 1.17 차는 **1.1.0-rc.9로 올리면** Android가 뜨지 않습니다.
 >   - 어느 쪽이든 2.1.1 이후 USB(HMG-API 1.1.0-rc.10)로 먼저 올립니다. 아래 "[HMG-API를 지울 때](#hmg-api를-지울-때)".
 
-## 방향: 2.1.0
+## 2.1.0 구조
 
 2.1.0은 다음 셋으로 됩니다.
 - **HMG-API**(1.1.0-rc.10 이상. 2.1.0은 rc.8 이상이었고 2.1.1에서 올림)
@@ -16,25 +18,18 @@
 
 | 일 | 맡는 곳 |
 |---|---|
-| 무선 카플레이·안드로이드 오토 훅, 계기판·HUD 길안내 | 공식 무선 모드. 한국 계기판 맞춤이 필요하면 공식 모드에 기여합니다(같은 훅 지점을 `replace`하는 모드 둘은 함께 켜지지 않음, [#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)) |
+| 무선 카플레이·안드로이드 오토 훅, 계기판·HUD 길안내 | 공식 무선 모드. 카플레이 계기판·HUD 길안내는 이 저장소의 모드가 한국 차에 맞춰 덮어씁니다(Korea Projection·HMG-Seogaemo 보정, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)). 공식 모드와 같은 훅 지점은 `change`·`observe`로만 겁니다(`replace` 둘은 함께 켜지지 않음, [#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)). 그 밖의 한국 맞춤도 이 저장소의 모드에 넣습니다([#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64)) |
 | 핫스팟(프로젝션 AP), 순정 핫스팟 기능 | HMG-API(공식 모드가 `"wifi": {"projection": true}`로 요청) |
 | HMG-API 설치·업데이트, 공식 모드 설치, NX4 map 만들기·확인, 진단, 되돌리기(옛 NX4 KOR 2.0.x 정리 포함. 2.0.x는 공식 모드와 함께 설 수 없음, `conflicts`) | 이 저장소의 USB 설치기 |
 | 설치 진행·판정 화면 | 이 저장소의 관리 앱. 지금 UI를 그대로 둡니다(지우기 버튼은 두지 않음, [#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)) |
-| USB Wi-Fi 동글 | 이 저장소(나중에). Wi-Fi 부품이 없는 차를 위한 길 |
+| USB Wi-Fi 동글 | 이 저장소(2.2.0, [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)). Wi-Fi 부품이 없는 차를 위한 길 |
 
-- 뺀 것: 한국 포크 무선 모드 2.4.5(`hooks.jar`·레시피·`libleafiaaac.so`·`patches.json`·`settings.json`과 저장소의 `wireless/`), 순정 칩용 핫스팟 서비스(서비스 `ap`, `svc/hotspot.sh`의 핫스팟·칩 깨우기·Wi-Fi 잠금·자동 설정). `nx4-kor` 모드에는 관리 앱과 그 서비스만 남았습니다(아래 "무엇을 하나").
-- 판 번호: 베타도 판에 꼬리를 붙입니다. `2.0.4-beta.1`부터 그렇게 했고, 2.1.0의 첫 베타는 `2.1.0-beta.1`입니다([`docs/git-flow.md`](docs/git-flow.md) 규칙 4).
-- 2.0.x의 마지막 `release/2.0.4`(`v2.0.4-beta.1`)는 `main`에 합치지 않고 지웁니다. 끝 커밋은 태그가 남깁니다.
+- 뺀 것: 한국 포크 무선 모드 2.4.5(`hooks.jar`·레시피·`libleafiaaac.so`·`patches.json`·`settings.json`과 저장소의 `wireless/`), 순정 칩용 핫스팟 서비스(서비스 `ap`, `svc/hotspot.sh`의 핫스팟·칩 깨우기·Wi-Fi 잠금·자동 설정). `nx4-kor` 모드에는 관리 앱과 그 서비스가 남았고, 한국 카플레이 길안내 훅을 더했습니다(아래 "무엇을 하나", [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)).
+- 판 번호: 베타는 판에 꼬리를 붙이고(`2.1.0-beta.1`~`2.1.0-beta.3`), 정식에서 뗍니다([`docs/git-flow.md`](docs/git-flow.md) 규칙 4).
 
-**지금까지 차에서 본 것**(2026-11-23, NX4HEV 260902, [#23 기록](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23#issuecomment-7101713033))
-- USB 설치·업데이트, HMG-API map 만들기·확인(훅 지점 393/393), 자동 설정, 관리 앱과 [지금 재부팅], 진단은 동작했습니다.
-- 2.0.4-beta.1까지의 자동 설정은 HMG-API rc.7 계획의 새 설명 줄을 변경으로 봐서, 다 적용된 뒤에도 부팅마다 "적용할 것 있음"으로 갑니다.
-  - Wi-Fi 칩이 없는 이 차에서는 부팅마다 Wi-Fi 깨우기 쪽으로 갑니다.
-  - 칩이 있는 차라면 부팅마다 무선 기능을 다시 적용하고 "설정을 마쳤습니다. 재부팅해 주세요"를 띄웁니다. PC 시험에서 이 차의 계획 기록으로 재현했습니다.
-  - 2.1.0에서는 자동 설정이 모드에서 빠지고 map·적용은 USB 설치기가 맡습니다. 2.1.0 설치기는 이 설명 줄을 변경으로 보지 않습니다([#52](https://github.com/jay-park-lab/hmgapi-nx4-kor/pull/52), [`docs/design.md`](docs/design.md) "설치·업데이트·지우기" 6).
-- 이 차는 Wi-Fi 부품이 없는 것으로 봅니다.
-  - 순정 핫스팟 기능을 켜도(2.0.4-beta.1) 드라이버가 칩 전원을 넣지 못했습니다(`failed to power up DHD generic adapter`).
-  - 그래서 무선은 이 차에서 확인하지 못했고, 동글로 시험할 예정입니다.
+**차에서 본 것**(2026-11-25, 2.1.0-beta.3, NX4HEV 260902, [#23 기록](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23#issuecomment-7157758896))
+- 동작함: USB 설치기(HMG-API rc.7에서 rc.8로 올리기, 옛 2.0.x 되돌리기, 공식 무선 모드 설치), map 확인(훅 지점 393/393), 적용, 관리 앱과 [지금 재부팅], 재부팅 뒤 HMG-API 훅과 공식 모드 훅 켜짐, 진단 기록.
+- 이 차는 Wi-Fi 부품이 없습니다. 관리 앱 판정은 "켜는 중"(`apwait`) 뒤 "부품 없음"(`nowifipart`)으로 바뀌었고, HMG-API도 칩이 없다고 봅니다(`wifi_chip=false`). 그래서 무선은 동글로 확인합니다.
 
 이 저장소는 [StopDragon/korea-projection](https://github.com/StopDragon/korea-projection)의 포크입니다. 원본과 다른 점은 다음과 같습니다.
 
@@ -45,19 +40,20 @@
   - rc.9는 `FORCE`로 설치한 NEMESIS 1.17 차를 올리면 Android가 뜨지 않습니다.
 - **이 차의 map은 HMG-API가 차에서 만들어** `state/local-map.json`에 둡니다.
 - **제보 기능을 뺐습니다.** 제보 파일, QR, 이슈 자동 분류가 없습니다.
-- **무선은 차에서 아직 확인하지 못했습니다**(위 "지금까지 차에서 본 것"). 시험판 묶음은 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에 있고, 직접 만들 수도 있습니다([만들기와 시험](#만들기와-시험)).
+- **무선은 차에서 아직 확인하지 못했습니다**(위 "차에서 본 것"). 묶음은 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에 있고, 직접 만들 수도 있습니다([만들기와 시험](#만들기와-시험)).
 
 > ⚠️ 차량 소프트웨어를 바꾸는 일입니다. 모든 책임은 설치하신 차주 본인에게 있습니다.
 
 ## 무엇을 하나
 
-한국 현대·기아 내비(Gen5W 헤드유닛)는 Wi-Fi 칩을 켜지 않아 무선 카플레이와 무선 안드로이드 오토를 쓸 수 없습니다. 2.1.0에서는 HMG-API가 순정 핫스팟 기능을 켜고 무선 연결용 Wi-Fi(프로젝션 AP)를 띄우며, 공식 무선 모드가 무선 카플레이·안드로이드 오토 훅과 계기판·HUD 길안내를 겁니다. NX4 KOR는 이 차에 그것들을 넣고(USB 설치기) 제대로 됐는지 보여 줍니다(관리 앱).
+한국 현대·기아 내비(Gen5W 헤드유닛)는 Wi-Fi 칩을 켜지 않아 무선 카플레이와 무선 안드로이드 오토를 쓸 수 없습니다. 2.1.0에서는 HMG-API가 순정 핫스팟 기능을 켜고 무선 연결용 Wi-Fi(프로젝션 AP)를 띄우며, 공식 무선 모드가 무선 카플레이·안드로이드 오토 훅과 계기판·HUD 길안내를 겁니다. NX4 KOR는 이 차에 그것들을 넣고(USB 설치기) 제대로 됐는지 보여 주며(관리 앱), 카플레이 계기판 길안내를 한국 차에 맞춥니다(한국 카플레이 길안내).
 
 | 구성 | 내용 |
 |---|---|
 | HMG-API(1.1.0-rc.10 이상) | 훅, 이 차의 map, 순정 핫스팟 기능, 프로젝션 AP |
 | 공식 무선 모드 `wireless-carplay-aa`(2.2.0-rc.9 이상) | 무선 카플레이·안드로이드 오토, 계기판·HUD 길안내. 고치지 않고 NX4에는 "Install anyway"(`--any-car`)로 넣습니다 |
-| HMG-API 모드 `nx4-kor` | 관리 앱과 서비스 `launch`(화면이 열릴 때 `bin/status.sh`로 상태 파일을 새로 씀) 하나. 훅을 걸지 않고 시스템 파일·Wi-Fi 설정을 바꾸지 않습니다 |
+| HMG-API 모드 `nx4-kor` | 관리 앱과 서비스 `launch`(화면이 열릴 때 `bin/status.sh`로 상태 파일을 새로 씀) 하나, 한국 카플레이 길안내 훅(`hooks.jar`, DiPO 안에서만). 시스템 파일·Wi-Fi 설정을 바꾸지 않습니다 |
+| 한국 카플레이 길안내 | 공식 무선 모드는 카플레이 안내 중 자기 아이콘 표에 없는 것(차선 유지, 각도 없는 "약간 좌회전" 등)을 계기판에 보내지 않아, 앞 안내(예: 좌회전 0 m)에서 멈출 수 있습니다. 이 모드가 Korea Projection의 보정(HMG-Seogaemo 차선 그림 포함)으로 모든 안내에 화살표를 주고 1초마다 다시 보내, 공식 모드가 보내는 값을 그것으로 바꿉니다([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67), [`docs/design.md`](docs/design.md) "한국 카플레이 길안내") |
 | 관리 앱 | "NX4 KOR"(`io.github.jayparklab.nx4kor`). 앱 메뉴에 타일이 생깁니다 |
 | USB 설치기 | `usb/troubleShooter` |
 
@@ -86,7 +82,7 @@
 - **HMG-API는 1.1.0-rc.10 이상**이어야 합니다(2.1.1부터. USB 설치기와 이 모드가 요구). 이미 있는 HMG-API가 이보다 낮으면(2.1.0을 쓰던 차의 rc.8, rc.9 포함) USB 묶음의 HMG-API로 먼저 올립니다(아래 "설치" 2).
   - rc.10으로 올리는 업데이트는 NEMESIS 1.17에서도 안전합니다. 예전에 `FORCE`로 설치한 차도 rc.10이 NEMESIS가 남긴 순정 파일로 다시 설치합니다.
   - 그런 차를 1.1.0-rc.9로 올리면 안 됩니다(HMG-API 1.1.0-rc.10 릴리스 노트).
-- 무선을 쓰려면 내비에 Wi-Fi 부품이 있어야 합니다. 2026-11-23에 본 NX4HEV는 부품이 없었습니다(위 "지금까지 차에서 본 것").
+- 무선을 쓰려면 내비에 Wi-Fi 부품이 있어야 합니다. 2026-11-23과 11-25에 본 NX4HEV는 부품이 없었습니다(위 "차에서 본 것").
 - FAT32로 포맷한 USB(32GB 이하 권장).
 
 ## 설치
@@ -128,7 +124,7 @@
 
 - **업데이트:** 새 판 USB로 같은 방법으로 합니다. 같은 판이면 다시 설치하지 않고 map 확인과 적용할 것만 봅니다("설정이 끝나 있습니다"). 같은 판을 다시 설치하려면 `NX4/REINSTALL` 빈 파일을 만듭니다(같은 판의 공식 무선 모드도 다시 설치).
 - **차주가 넣은 공식 무선 모드:** 같거나 높은 판이면 그대로 쓰고, 낮으면 USB의 판으로 올립니다. 꺼 두었으면 켭니다.
-- **진단 기록:** 관리 앱이 있으면 누를 때마다 설치기가 먼저 "진단 기록 모으기" 확인 창을 띄웁니다. [모으기]를 고르면 아무것도 바꾸기 전에 내비의 기록, HMG-API Car Report, `/system/lib` 파일의 이름·md5를 USB의 `NX4/diag/<시각>/`에 모읍니다(1~2분, 그동안 USB를 빼지 마세요). [건너뛰기]를 고르거나 60초 동안 고르지 않으면 모으지 않고 이어집니다. 담는 것은 [`docs/design.md`](docs/design.md) "진단 기록"에 있습니다.
+- **진단 기록:** 관리 앱이 있으면 누를 때마다 설치기가 먼저 "진단 기록 모으기" 확인 창을 띄웁니다. [모으기]를 고르면 아무것도 바꾸기 전에 내비의 기록, HMG-API Car Report, `/system/lib` 파일의 이름·md5, USB Wi-Fi 동글 드라이버를 만드는 데 쓸 커널 설정과 USB 장치 목록([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 USB의 `NX4/diag/<시각>/`에 모읍니다(1~2분, 그동안 USB를 빼지 마세요). [건너뛰기]를 고르거나 60초 동안 고르지 않으면 모으지 않고 이어집니다. 담는 것은 [`docs/design.md`](docs/design.md) "진단 기록"에 있습니다.
 - USB를 꽂아 둔 채로 두면 유선 안드로이드 오토가 시작되어 무선이 붙지 않을 수 있습니다. 끝나면 빼 주세요.
 - **문제가 생기면:** 설치기와 관리 앱의 문구별 할 일, 부팅 보호, 되돌리는 길은 [`docs/troubleshooting.md`](docs/troubleshooting.md)에 있습니다.
 
@@ -148,9 +144,16 @@
 
 ## HMG-API 앱의 설정
 
-NX4 KOR에는 설정이 없습니다. 무선 기능의 설정은 HMG-API 앱의 "Wireless CarPlay + Android Auto"(공식 무선 모드)에 있습니다. 그중 `bridge`(Wireless CarPlay)를 끄면 무선 카플레이가 되지 않고 관리 앱이 `bridgeoff`를 보입니다. 계기판·HUD 길안내는 `tbt`(`tbt_standard`는 차의 순정 꼴)입니다. 설정을 바꾼 뒤에는 HMG-API 앱에서 변경 사항을 적용하고 재부팅합니다.
+NX4 KOR("NX4 KOR: Tucson NX4 (Korea)")의 설정은 둘입니다.
 
-2.0.x의 `nx4-kor` 설정(`tbt_fit`, `aa_ready_resend`, `aa_name_hold`, `star_popup_skip` 등 한국 포크 기능)은 없어졌습니다. 공식 모드에 기여할지는 [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)에서 차 테스트 뒤 정합니다.
+| 설정 | 기본 | 하는 일 |
+|---|---|---|
+| `kor_tbt` "Korean CarPlay turn-by-turn on the cluster and HUD" | 켬 | 한국 카플레이 길안내(위 "무엇을 하나"). 끄면 공식 무선 모드의 길안내 그대로입니다 |
+| `kor_tbt_log` "Log the CarPlay turn-by-turn diagnosis" | 켬 | Korea Projection의 진단 줄(곧 회전 판단, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)을 HMG-API 기록에 더 남깁니다. 꺼도 받은 안내의 숫자(종류·각도, 시작마다 300줄까지), 보낸 HUD 목록 줄, 길안내 앱이 바뀐 줄(두 앱 이름), 지운 줄은 남습니다. 길·장소 이름은 어느 쪽이든 남기지 않습니다. 계기판이 이상하게 보였을 때 원인을 찾는 데 씁니다 |
+
+무선 기능의 설정은 HMG-API 앱의 "Wireless CarPlay + Android Auto"(공식 무선 모드)에 있습니다. 그중 `bridge`(Wireless CarPlay)를 끄면 무선 카플레이가 되지 않고 관리 앱이 `bridgeoff`를 보입니다. 계기판·HUD 길안내는 `tbt`입니다. 한국 카플레이 길안내도 공식 모드의 `tbt`가 켜져 있어야 합니다(아이폰에 길안내를 받는다고 알리고, 순정 내비가 계기판에 끼어드는 것을 막는 일은 공식 모드가 합니다). 설정을 바꾼 뒤에는 HMG-API 앱에서 변경 사항을 적용하고 재부팅합니다.
+
+2.0.x의 `nx4-kor` 설정(`tbt_fit`, `aa_ready_resend`, `aa_name_hold`, `star_popup_skip` 등 한국 포크 기능)은 없어졌습니다. `tbt_fit`에 해당하는 카플레이 보정은 `kor_tbt`로 다시 넣었고([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)), 나머지를 이 모드에 넣을지는 [#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64)에서 정합니다.
 
 ## 알아 두실 점
 
@@ -218,11 +221,12 @@ NX4 KOR에는 설정이 없습니다. 무선 기능의 설정은 HMG-API 앱의 
 
 | 위치 | 내용 |
 |---|---|
-| `mod/` | HMG-API 모드 그대로: `mod.json`, 서비스·공용 함수(`svc/`), 상태·삭제(`bin/`), 삭제 전 정리(`scripts/`), 앱 메뉴 타일 그림(`icons/`) |
+| `mod/` | HMG-API 모드 그대로: `mod.json`, `settings.json`, 서비스·공용 함수(`svc/`), 상태·삭제(`bin/`), 삭제 전 정리(`scripts/`), 앱 메뉴 타일 그림(`icons/`) |
+| `hooks/` | 한국 카플레이 길안내(`hooks.jar`) 소스(`src/`)와 컴파일용 DiPO iAP2 스텁(`stubs/`). `scripts/build-hooks.sh`가 만들고 `build.sh`가 모드에 넣습니다 |
 | `art/` | 앱 메뉴 타일 모양의 원본(`tile.svg`). `mod/icons/`의 그림 넷은 이것을 HMG-API `tools/mkicon.sh`로 만든 것입니다 |
 | `app/` | 관리 앱 소스 |
 | `usb/` | USB 설치기(`troubleShooter`)와 USB 안내(`README.txt`) |
-| `scripts/` | `build-app.sh`(관리 앱), `build.sh`(서명한 모드 zip과 USB 묶음) |
+| `scripts/` | `build-app.sh`(관리 앱), `build-hooks.sh`(`hooks.jar`), `build.sh`(서명한 모드 zip과 USB 묶음) |
 | `docs/design.md` | 설계와 차에서 확인할 것 |
 | `docs/flow.md` | 설치부터 무선 연결·관리 앱·지우기까지의 처리 흐름 그림(mermaid) |
 | `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때 |
@@ -254,6 +258,7 @@ java -cp out/engine-host hmgapi.engine.Signing keygen <NX4_MOD_KEY에 적은 경
 #    단 mod/bin/busybox가 있으면 그것을 확인 없이 먼저 씁니다. 예전에 둔 것이 있으면 지우고 만듭니다(docs/release.md "busybox")
 #    공식 무선 모드 zip은 공식 릴리스에서 받아 넣습니다(scripts/fetch-wireless.sh, 인터넷 필요. 고정한 판, NOTICE.md의 SHA-256과 같을 때만).
 #    인터넷 없이 만들 때는 받아 둔 파일을 .env.local의 NX4_WIRELESS_ZIP으로 가리킵니다
+#    hooks.jar(한국 카플레이 길안내)는 build.sh가 scripts/build-hooks.sh로 만듭니다(ANDROID_HOME과 HMGAPI_SRC 필요)
 #    선택: .env.local에 HMGAPI_USB_ZIP(hmgapi-버전-usb.zip)
 sh scripts/build.sh
 

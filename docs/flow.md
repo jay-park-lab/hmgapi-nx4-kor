@@ -2,7 +2,7 @@
 
 2.1.0에서 설치부터 무선 연결, 관리 앱, 지우기까지 무엇이 어떤 차례로 도는지 그림으로 모았습니다. 자세한 규칙과 근거는 [`design.md`](design.md)에 있고, 이 문서는 그 요약입니다. 둘이 다르면 `design.md`와 코드가 맞습니다.
 
-> ⚠️ 2.1.0 흐름은 차에서 아직 확인하지 않았습니다. PC 테스트(`tests/mod-test.sh`)와 HMG-API 1.1.0-rc.8 엔진(PC, 2.1.1은 rc.10)에서만 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23), [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)).
+> 2.1.0 흐름은 2026-11-25 차(2.1.0-beta.3)에서 무선을 빼고 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)). 테스트한 차는 Wi-Fi 부품이 없어 "재부팅 뒤 무선 연결"은 `nowifipart` 갈래만 봤고, 무선 연결은 동글로 확인합니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)). PC 테스트의 HMG-API 엔진은 2.1.1부터 1.1.0-rc.10입니다.
 
 ## 1. 누가 무엇을 하나
 
@@ -11,7 +11,7 @@
 | USB 설치기(`usb/troubleShooter`, root) | HMG-API 확인·업데이트 넘기기, 옛 2.0.x 되돌리기, 공식 무선 모드 설치(`--any-car`), nx4-kor 설치, NX4 map 만들기·확인, 적용, 진행 기록, 지우기 |
 | HMG-API(`hmgapid`, 엔진, zygote 훅) | 모드 설치·계획·적용, map, 부팅 때 훅 올리기, 프로젝션 AP 지기(Wi-Fi), 앱·서비스·타일 |
 | 공식 무선 모드(`wireless-carplay-aa`, 고치지 않음) | 무선 카플레이·안드로이드 오토 훅, 계기판·HUD 길안내, 프로젝션 AP 요청(`"wifi": {"projection": true}`) |
-| nx4-kor 모드(이 저장소) | 관리 앱과 앱 메뉴 타일, 앱이 부르는 `launch` 서비스(`bin/status.sh`). 훅·시스템 파일·Wi-Fi 설정은 건드리지 않음 |
+| nx4-kor 모드(이 저장소) | 관리 앱과 앱 메뉴 타일, 앱이 부르는 `launch` 서비스(`bin/status.sh`), 한국 카플레이 길안내(DiPO 안 `hooks.jar`: 자기 iAP2 길안내 리스너로 받아 KP 보정으로 계기판·HUD에 보내고, 공식 모드가 보내는 값을 `change` 훅으로 그것으로 바꿈, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)). 시스템 파일·Wi-Fi 설정은 건드리지 않음 |
 
 ```mermaid
 flowchart LR

@@ -5,13 +5,15 @@
 #                                        + 임시 키로 scripts/build.sh를 끝까지 돌리고, 만든 모드를 HMG-API 엔진
 #                                          (PC JVM)에 설치해 서비스·앱 등록과 차종 제한(NX4.KOR 260902만)을 본다
 #                                          (HMGAPI_SRC는 .env.local에 적어도 된다)
+#                                          ANDROID_HOME(.env.local에 적어도 됨)이 있으면 hooks.jar도 진짜로 만든다(#67).
+#                                          없으면 빌드 시험은 자리만 채운 hooks.jar로 본다
 # 가짜 도구: hmgapid, pm, am, getprop, settings, svc, sleep. 서비스 래퍼는 가짜 스크립트를 부르게 해서 넘기는 값을 보고,
 # preun.sh·status.sh(svc/lib.sh)는 진짜를 돌린다.
 B=$(cd "$(dirname "$0")/.." && pwd)
-# .env.local에서는 HMGAPI_SRC만 읽는다. 시험이 부르는 build.sh는 .env.local을 읽지 않게 한다
+# .env.local에서는 HMGAPI_SRC·ANDROID_HOME만 읽는다. 시험이 부르는 build.sh는 .env.local을 읽지 않게 한다
 # (NX4_BUSYBOX 같은 개인 설정이 섞이면 시험 결과가 PC마다 달라진다)
 . "$B/scripts/local-env.sh"
-nx4_env "$B" HMGAPI_SRC
+nx4_env "$B" HMGAPI_SRC ANDROID_HOME
 NX4_ENV_FILE=
 export NX4_ENV_FILE
 PKG=$B/mod
@@ -31,8 +33,8 @@ for f in $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/usb/troubleShooter $B/
   for KSH in $KSHS; do check "구문 검사 $(basename $KSH): ${f#$B/}" '$KSH -n $f'; done
 done
 
-# --- mod.json: NX4 KOR 모드(2.1.0: 관리 앱과 그 서비스만. 무선은 HMG-API와 공식 무선 모드 wireless-carplay-aa가 맡음) ---
-check "mod.json: launch 서비스·앱·런처만, NX4.KOR 260902만, HMG-API 1.1.0-rc.10 이상, 훅·무선 부분·Wi-Fi 요청·충돌·requires 없음" 'python3 - "$PKG" <<PY
+# --- mod.json: NX4 KOR 모드(관리 앱과 그 서비스, 한국 카플레이 길안내 훅 #67. 무선은 HMG-API와 공식 무선 모드 wireless-carplay-aa가 맡음) ---
+check "mod.json: launch 서비스·앱·런처, 한국 길안내 훅(DiPO), NX4.KOR 260902만, HMG-API 1.1.0-rc.10 이상, 무선 부분·Wi-Fi 요청·충돌·requires 없음" 'python3 - "$PKG" "$B" <<PY
 import json, os, sys
 d = sys.argv[1]
 m = json.load(open(os.path.join(d, "mod.json")))
@@ -47,12 +49,71 @@ assert m["system"] == {"model": ["NX4", "NX4HEV"], "region": ["KOR"], "firmware"
 assert list(m["provides"]) == ["launcher"] and len(m["provides"]["launcher"]) == 1, m["provides"]
 t = m["provides"]["launcher"][0]
 assert {k: t[k] for k in t if not k.startswith("icon")} == {"package": "io.github.jayparklab.nx4kor", "class": ".StatusActivity"}, t
-# 공식 무선 모드와 같은 훅을 걸지 않는다(#17). requires로 걸면 공식 모드가 없거나 꺼질 때 HMG-API가 이 모드의 앱·서비스까지 멈춘다
-for k in ("hooks", "parts", "feature_flags", "wifi", "conflicts", "requires", "logs", "probe", "network"):
+# 한국 길안내 훅(#67): DiPO의 계기판 호출 8곳은 change(공식 모드의 replace와 함께 걸림, #17), DiPO의 길안내 Stop은 observe.
+# replace는 쓰지 않는다(id가 앞이라 공식 모드와 겹치면 공식 모드가 꺼진다). requires로 걸면 공식 모드가 없거나 꺼질 때
+# HMG-API가 이 모드의 앱·서비스까지 멈춘다
+h = m["hooks"]
+assert h["jar"] == "hooks.jar" and h["entry"] == "io.github.jayparklab.nx4kor.hook.Nx4KorHooks", h
+nc = ["update_tbt_info", "update_tbt_sub_info_b", "update_tbt_sub_info_2c", "update_tp_turn_list_new", "update_lane_info",
+      "update_tp_destination_name", "update_tp_crossroad_name", "update_tp_turn_list"]
+want = {"dipo.iap2_proxy.stop_route_guidance": "observe"}
+want.update({"framework.navigation_cluster." + p: "change" for p in nc})
+assert h["points"] == want, h["points"]
+assert set(h) == {"jar", "entry", "points"}, h
+assert "replace" not in h["points"].values()
+e = os.path.join(sys.argv[2], "hooks", "src", *h["entry"].split(".")) + ".java"
+assert os.path.isfile(e), e
+for k in ("parts", "feature_flags", "wifi", "conflicts", "requires", "logs", "probe", "network"):
     assert k not in m, k
 PY'
-check "빠진 것: 한국 포크 무선 모드(hooks.jar·레시피·libleafiaaac.so·patches.json·settings.json, wireless/), 핫스팟 서비스(svc/ap.sh·hotspot.sh, scripts/post.sh)" \
-  '[ ! -e $PKG/hooks.jar ] && [ ! -e $PKG/recipes ] && [ ! -e $PKG/files ] && [ ! -e $PKG/patches.json ] && [ ! -e $PKG/settings.json ] && [ ! -e $B/wireless ] && [ ! -e $PKG/svc/ap.sh ] && [ ! -e $PKG/svc/hotspot.sh ] && [ ! -e $PKG/scripts/post.sh ] && [ -f $PKG/svc/lib.sh ]'
+check "빠진 것: 한국 포크 무선 모드(레시피·libleafiaaac.so·patches.json, wireless/), 핫스팟 서비스(svc/ap.sh·hotspot.sh, scripts/post.sh), 만든 hooks.jar(빌드가 넣음)" \
+  '[ ! -e $PKG/hooks.jar ] && [ ! -e $PKG/recipes ] && [ ! -e $PKG/files ] && [ ! -e $PKG/patches.json ] && [ ! -e $B/wireless ] && [ ! -e $PKG/svc/ap.sh ] && [ ! -e $PKG/svc/hotspot.sh ] && [ ! -e $PKG/scripts/post.sh ] && [ -f $PKG/svc/lib.sh ]'
+check "settings.json: 한국 길안내(kor_tbt)와 그 진단 줄(kor_tbt_log)만, 둘 다 켜기 기본·다시 시작해 적용" 'python3 - "$PKG" <<PY
+import json, os, sys
+s = json.load(open(os.path.join(sys.argv[1], "settings.json")))
+assert s["version"] == 1
+got = [(x["key"], x["type"], x["default"], x["apply"]) for x in s["settings"]]
+assert got == [("kor_tbt", "toggle", True, "restart"), ("kor_tbt_log", "toggle", True, "restart")], got
+for x in s["settings"]:
+    assert x["title"] and x["description"], x
+PY'
+# 한국 길안내 소스(#67): KP·seogaemo·공식 모드에서 가져온 파일은 출처 줄을 남기고, 진입 클래스·DiPO 부분이 설정 이름과 같은 이름을 쓴다
+HK=$B/hooks/src/io/github/jayparklab/nx4kor/hook
+check "hooks 소스: KP(korea-build 6258357)에서 온 CpTurnsFit·CpTbt·CpIcons·PhoneBarOut, 공식 모드 스텁 4개에 출처·바꾼 것 줄" \
+  'for f in CpTurnsFit CpTbt CpIcons PhoneBarOut; do grep -q "6258357" $HK/dipo/$f.java && grep -q "Modified by NX4 KOR" $HK/dipo/$f.java || exit 1; done; for f in IIap2Listener IIap2Service Iap2ListenerInfo Iap2NotiMsg; do head -n 1 $B/hooks/stubs/com/tcc/iap2/$f.java | grep -q "hmgapi-wireless-cp-aa v2.2.0-rc.9" || exit 1; done; grep -q "HMG-Seogaemo" $HK/dipo/CpTurnsFit.java'
+check "hooks 소스: 설정 kor_tbt·kor_tbt_log, DiPO 패키지, 앱 파트 클래스 이름, 리스너 종류 4096, 계기판 호출 8곳이 mod.json과 같음" 'python3 - "$PKG/mod.json" "$HK" <<PY
+import json, re, sys
+m = json.load(open(sys.argv[1]))
+entry = open(sys.argv[2] + "/Nx4KorHooks.java").read()
+part = open(sys.argv[2] + "/dipo/KorTbt.java").read()
+assert "settingBoolean(\"kor_tbt\", true)" in entry
+assert "settingBoolean(\"kor_tbt_log\", true)" in part
+assert "\"com.daudio.app.dipo\"" in entry and "\"io.github.jayparklab.nx4kor.hook.dipo.KorTbt\"" in entry
+assert "LISTENER_ROUTE_GUIDANCE = 4096" in part
+a = re.search(r"CLUSTER_POINTS = \{(.*?)\};", part, re.S).group(1)
+got = sorted(re.findall(r"\"(update_[a-z0-9_]+)\"", a))
+want = sorted(p.split(".")[-1] for p, v in m["hooks"]["points"].items() if v == "change")
+assert got == want, (got, want)
+assert "\"dipo.iap2_proxy.stop_route_guidance\"" in part
+# 판단은 TbtGate가 한다(아래 호스트 테스트): 우리 호출 기록, 남의 호출에 줄 인자, 남의 Stop 미루기, 비켜 주기, 앱에서 끔
+for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), mod.enabled())",
+          "gate.stopSeen(", "gate.stopDue(", "gate.yielding(", "gate.heard(", "gate.setActive(turns.active())",
+          # 앱에서 끄면 받지 않고, 상태와 "그렸다" 표시를 비우고, 다시 켜면 길안내 전체를 다시 요청한다(PR #68 리뷰 2·11)
+          "if (!mod.enabled()) {", "turns.reset();", "turns.shown = false;", "turns.hudShown = false;", "if (wasOff) {"):
+    assert s in part, s
+PY'
+# KorTbt의 판단(TbtGate: 덮어쓰기, 비켜 주기, 남의 Stop 미루기, 앱에서 끔. PR #68 리뷰 1~4)을 PC에서 돌린다
+if command -v javac >/dev/null 2>&1; then
+  mkdir -p $T/gate
+  javac --release 8 -Xlint:-options -nowarn -d $T/gate $HK/dipo/TbtGate.java $B/tests/tools/TbtGateTest.java > $T/gate.err 2>&1
+  java -cp $T/gate io.github.jayparklab.nx4kor.hook.dipo.TbtGateTest > $T/gate.out 2>&1
+  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음)" \
+    'tail -n 1 $T/gate.out | grep -qx ok && ! grep -q "^FAIL" $T/gate.out' || cat $T/gate.err $T/gate.out
+else
+  echo "skip TbtGate 테스트(javac 없음)"
+fi
+check "hooks 소스: 순정 내비 쪽 막대 방송(PhoneBarOut)은 보내지 않음, KP의 순정 층(CpTurns)은 옮기지 않음" \
+  '! grep -q "sendBroadcast" $HK/dipo/PhoneBarOut.java && [ ! -e $HK/dipo/CpTurns.java ] && ! grep -qE "new CpTurns\(|[^/ ]CpTurns\.[A-Za-z]+\(" $HK/dipo/*.java'
 check "lib.sh: 모드 id·HMG-API 최소 판이 mod.json과 같음, 공식 무선 모드 최소 판, env.sh의 NX4_MOD_ID도 같음, 앱 Report의 최소 판도 같음" \
   'grep -q "^MOD_ID=\${NX4_MOD_ID:-nx4-kor}$" $PKG/svc/lib.sh && grep -q "^HMG_MIN=1.1.0-rc.10$" $PKG/svc/lib.sh && grep -q "^WM_ID=wireless-carplay-aa$" $PKG/svc/lib.sh && grep -q "^WM_MIN=2.2.0-rc.9$" $PKG/svc/lib.sh && grep -q "^NX4_MOD_ID=nx4-kor$" $PKG/svc/env.sh && grep -q "MIN_HMGAPI = \"1.1.0-rc.10\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java && grep -q "MIN_WIRELESS = \"2.2.0-rc.9\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java'
 check "launch 서비스 이름 = 앱이 부르는 이름" 'grep -q "\"service-start\", \"launch\"" $B/app/java/io/github/jayparklab/nx4kor/StatusActivity.java'
@@ -628,20 +689,61 @@ echo "wpa_passphrase=SECRETPW" > $R/data/misc/wifi/softap.conf; echo SECRETPW > 
 mkdir -p $R/system/etc/permissions $R/system/onebin/nx4hev_kr; : > $R/system/etc/permissions/com.hkmc.software.wifi.module.xml
 echo "-/system/etc/permissions/com.hkmc.software.wifihotspot.xml" > $R/system/onebin/nx4hev_kr/featurexml.cfg
 echo "feature:com.hkmc.software.wifi.module" > $T/features
+# 동글 준비 정보(#48): 커널(/proc, /sys/module), 차 커널 설정, 순정 Wi-Fi 드라이버·HAL·hostapd, USB 장치, 네트워크 장치, 커널 로그.
+# 일련번호·MAC은 들어가지 않아야 한다(SERIALX, MACX)
+mkdir -p $R/proc/sys/kernel $R/sys/module/module/parameters $R/sys/module/tcc_dwc_otg/parameters $R/sys/module/cfg80211 $R/system/wifi \
+  $R/sys/bus/usb/devices/1-1 $R/sys/bus/usb/devices/usb1 $R/sys/bus/usb/drivers/rtl88x2bu/1-1:1.0 $R/sys/class/net/wlan0
+echo 3.18.24-tcc > $R/proc/sys/kernel/osrelease; echo 0 > $R/proc/sys/kernel/modules_disabled; echo N > $R/sys/module/module/parameters/sig_enforce
+echo "Linux version 3.18.24-tcc (gcc version 4.7)" > $R/proc/version; echo "bcmdhd 1234 0 - Live 0x00000000" > $R/proc/modules
+echo 1 > $R/sys/module/tcc_dwc_otg/parameters/vbus_control_enable
+printf 'CONFIG_CFG80211=y\nCONFIG_MODVERSIONS=n\n' > $T/kconfig; gzip -c $T/kconfig > $R/proc/config.gz
+printf 'dhd\nvermagic=3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8 \nlicense=GPL\n' > $R/system/wifi/bcmdhd.ko; echo fw > $R/system/wifi/fw_bcmdhd.bin
+printf 'wifi_load_driver\n/system/wifi/bcmdhd.ko\niface_name=\nunrelated text\n' > $R/system/lib/libhardware_legacy.so
+printf 'driver=nl80211\n' > $R/system/bin/hostapd
+for f in idVendor:0bda idProduct:b812 speed:480 bMaxPower:500mA bDeviceClass:00 manufacturer:Realtek product:802.11ac_NIC serial:SERIALX; do echo ${f#*:} > $R/sys/bus/usb/devices/1-1/${f%%:*}; done
+for f in idVendor:1d6b idProduct:0002 speed:480; do echo ${f#*:} > $R/sys/bus/usb/devices/usb1/${f%%:*}; done
+echo MACX > $R/sys/class/net/wlan0/address
+# MAC이 든 줄(순정 bcmdhd, Realtek, 대시 꼴)은 빠져야 한다(PR #66 리뷰 1)
+printf '%s\n' "<6>[   30.1] usb 1-1: new high-speed USB device number 2 using ehci-tcc" "<6>[   30.2] usb 1-1: SerialNumber: SERIALX" "<6>[   31.0] hmgapi-hook: something else" \
+  "<4>[   32.0] dhd_attach: Broadcom Dongle Host Driver mac=00:90:4c:11:22:33" "<4>[   33.0] RTW: rtw_macaddr_cfg MAC Address  = 00:e0:4c:aa:bb:cc" \
+  "<4>[   34.0] wlan0: link up 00-e0-4c-dd-ee-ff" "<4>[   35.0] RTW: rtw_ndev_init(wlan0) if1" \
+  "<4>[   36.0] rtl88x2bu: hwaddr 00e04c445566" "<4>[   37.0] rtl88x2bu: probe 00E04C778899 done" > $T/ddmesg
 # 이 회는 진단 기록만 본다. backup이 있어 설치기가 2.0.x 되돌리기 길을 타지 않게 legacy-2.0을 치워(가드에서 아무것도 바꾸지 않고 멈춤)
 # 진단 기록에 백업 폴더가 들어가지 않는지만 본다(PR #52 리뷰 10). 끝나면 backup을 지운다
 rm -rf $K/diag; legoff
-ts $U
+TSX="NX4_DMESG=$T/ddmesg"; ts $U; TSX=
 check "USB 설치기 진단 기록: 순정 기능(pm list features), /system/etc/permissions 목록, onebin마다 featurexml.cfg 사본" \
   'grep -qx "feature:com.hkmc.software.wifi.module" $(dg)/features.txt && grep -q "com.hkmc.software.wifi.module.xml" $(dg)/permissions-ls.txt && grep -q "wifihotspot.xml" $(dg)/featurexml-nx4hev_kr.cfg' || ls $(dg)
 rm -f $T/features
 CORE5=$(md5sum < $R/system/lib/libCarPlayCore.so | cut -d" " -f1)
 check "USB 설치기 진단 기록: NX4/diag/<시각>/에 /system/lib 아래 모든 파일(하위 폴더·링크 포함)의 md5와 경로, ls -lR" \
-  '[ "$(ls $K/diag | wc -l)" -eq 1 ] && grep -q "^$CORE5  .*/system/lib/libCarPlayCore.so$" $(dg)/system-lib-md5.txt && grep -q "^$CORE5  .*/system/lib/liblink.so$" $(dg)/system-lib-md5.txt && grep -q "  .*/system/lib/hw/gralloc.so$" $(dg)/system-lib-md5.txt && [ "$(wc -l < $(dg)/system-lib-md5.txt)" -eq 3 ] && grep -q "liblink.so -> libCarPlayCore.so" $(dg)/system-lib-ls.txt' || cat $(dg)/system-lib-md5.txt
+  '[ "$(ls $K/diag | wc -l)" -eq 1 ] && grep -q "^$CORE5  .*/system/lib/libCarPlayCore.so$" $(dg)/system-lib-md5.txt && grep -q "^$CORE5  .*/system/lib/liblink.so$" $(dg)/system-lib-md5.txt && grep -q "  .*/system/lib/hw/gralloc.so$" $(dg)/system-lib-md5.txt && [ "$(wc -l < $(dg)/system-lib-md5.txt)" -eq 4 ] && grep -q "liblink.so -> libCarPlayCore.so" $(dg)/system-lib-ls.txt' || cat $(dg)/system-lib-md5.txt
 check "USB 설치기 진단 기록: info.txt(판·공식 무선 모드 판·getprop·내비 busybox 유무·wifi_ap_on), HMG-API 상태·Car Report 복사, 이 모드와 HMG-API 기록" \
   'grep -qx "installed_mod: $V" $(dg)/info.txt && grep -qx "usb_mod: $V" $(dg)/info.txt && grep -qx "installed_wireless: $WV" $(dg)/info.txt && grep -qx "usb_wireless: $WV" $(dg)/info.txt && grep -q "^ro.build.product: NX4.KOR" $(dg)/info.txt && grep -qx "system_busybox: yes" $(dg)/info.txt && grep -qx "md5_busybox: $R/system/bin/busybox" $(dg)/info.txt && grep -qx "wifi_ap_on: 1" $(dg)/info.txt && grep -qx "hmgapid engine status" $T/calls && [ -f $(dg)/hmgapi-status.txt ] && grep -q "^saved: " $(dg)/car-report.txt && [ -f $(dg)/car-report-test.json ] && [ -f $(dg)/car-report-test.md ] && grep -qx aplog $(dg)/logs/ap.log && grep -qx svclog $(dg)/logs/service/ap.log && grep -qx hmgapi-install $(dg)/logs/hmgapi-install.log && grep -qx mapcar $(dg)/logs/map-car.txt && grep -qx status $(dg)/logs/nx4-kor-status.txt && grep -q "진단 기록을 모음: NX4/diag/" $K/install.log' || cat $(dg)/info.txt
 check "USB 설치기 진단 기록: 비밀번호가 든 파일(softap.conf, 백업 폴더)은 넣지 않음(이 회는 설치기가 아무것도 바꾸지 않음)" '! grep -rq SECRETPW $K/diag && ! engcalls'
+DG=$(dg)/dongle
+check "USB 설치기 진단 기록(동글 준비, #48): kernel.txt(커널 판·modules_disabled·sig_enforce·cfg80211·vbus 매개변수·boot_id), /proc/modules" \
+  'grep -qx "osrelease: 3.18.24-tcc" $DG/kernel.txt && grep -q "^version: Linux version 3.18.24-tcc" $DG/kernel.txt && grep -qx "modules_disabled: 0" $DG/kernel.txt && grep -qx "sig_enforce: N" $DG/kernel.txt && grep -qx "cfg80211: yes" $DG/kernel.txt && grep -qx "tcc_dwc_otg/parameters/vbus_control_enable: 1" $DG/kernel.txt && grep -qx "boot_id: test-boot-id" $DG/kernel.txt && grep -q "^bcmdhd " $DG/modules.txt' || cat $DG/kernel.txt
+KCG5=$(md5sum < $R/proc/config.gz | cut -d" " -f1); KCS=$(sha256sum < $T/kconfig | cut -d" " -f1)
+check "USB 설치기 진단 기록(동글 준비): 차 커널 설정(/proc/config.gz) 사본과 푼 것, gz의 md5와 푼 것의 sha256" \
+  'cmp -s $R/proc/config.gz $DG/config.gz && cmp -s $T/kconfig $DG/config.txt && grep -qx "config.gz md5: $KCG5" $DG/config-sum.txt && grep -qx "config.txt sha256: $KCS" $DG/config-sum.txt' || cat $DG/config-sum.txt
+KO5=$(md5sum < $R/system/wifi/bcmdhd.ko | cut -d" " -f1)
+check "USB 설치기 진단 기록(동글 준비): /system/wifi 목록·md5, 순정 bcmdhd.ko의 vermagic, HAL·hostapd의 드라이버 문자열(관계없는 줄은 뺌)" \
+  'grep -q "fw_bcmdhd.bin" $DG/system-wifi-ls.txt && grep -qx "$KO5  /system/wifi/bcmdhd.ko" $DG/system-wifi-md5.txt && grep -q "^/system/wifi/bcmdhd.ko: vermagic=3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8" $DG/ko-vermagic.txt && grep -qx "== /system/lib/libhardware_legacy.so" $DG/wifi-strings.txt && grep -qx "iface_name=" $DG/wifi-strings.txt && grep -qx "/system/wifi/bcmdhd.ko" $DG/wifi-strings.txt && grep -qx "driver=nl80211" $DG/wifi-strings.txt && ! grep -q "unrelated" $DG/wifi-strings.txt' || cat $DG/wifi-strings.txt $DG/ko-vermagic.txt
+check "USB 설치기 진단 기록(동글 준비): USB 장치(ID·속도·전력·제품), 드라이버에 붙은 인터페이스, 네트워크 장치, 커널 로그의 USB·Wi-Fi 줄. 일련번호·MAC은 넣지 않음" \
+  'grep -q "^1-1 0bda:b812 speed=480 maxpower=500mA class=00 manufacturer=Realtek product=802.11ac_NIC$" $DG/usb.txt && grep -q "^usb1 1d6b:0002 " $DG/usb.txt && grep -q "1-1" $DG/usb-ls.txt && grep -qx "== rtl88x2bu" $DG/usb-drivers.txt && grep -qx "1-1:1.0" $DG/usb-drivers.txt && grep -q "wlan0" $DG/net-ls.txt && grep -q "new high-speed USB device" $DG/dmesg-usb-wifi.txt && grep -q "rtw_ndev_init(wlan0)" $DG/dmesg-usb-wifi.txt && ! grep -q "hmgapi-hook" $DG/dmesg-usb-wifi.txt && ! grep -rqi -e SERIALX -e MACX -e 11:22:33 -e aa:bb:cc -e dd-ee-ff -e 445566 -e 778899 $K/diag && grep -q "동글 준비 정보를 모음" $K/install.log' || cat $DG/usb.txt $DG/dmesg-usb-wifi.txt
 legon; rm -rf $R/data/nx4-kor/backup
+# 내비의 busybox에 strings·sha256sum·gunzip이 없으면 빈 값 대신 까닭을 적음(PR #66 리뷰 2)
+printf '#!/bin/sh\ncase "$1" in strings|sha256sum|gunzip) echo "$1: applet not found" >&2; exit 127 ;; esac\ncommand -v "$1" >/dev/null 2>&1 || exit 127\nexec "$@"\n' > $R/system/bin/busybox
+rm -rf $K/diag; ts $U; DG=$(dg)/dongle
+check "USB 설치기 진단 기록(동글 준비): busybox에 gunzip·sha256sum·strings가 없으면 config.gz md5는 남기고, 풀지 못함·vermagic·문자열을 못 읽음을 적음" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "config.gz md5: $KCG5" $DG/config-sum.txt && grep -q "^config.txt: busybox로 풀지 못함" $DG/config-sum.txt && [ ! -f $DG/config.txt ] && grep -q "strings나 grep" $DG/ko-vermagic.txt && grep -q "strings나 grep" $DG/wifi-strings.txt && grep -qx "$KO5  /system/wifi/bcmdhd.ko" $DG/system-wifi-md5.txt && grep -q "strings·grep이 없어" $K/install.log' || cat $DG/config-sum.txt $DG/ko-vermagic.txt
+# gunzip은 있고 sha256sum만 없으면 sha256 줄에 까닭을 적음
+printf '#!/bin/sh\ncase "$1" in sha256sum) exit 127 ;; esac\ncommand -v "$1" >/dev/null 2>&1 || exit 127\nexec "$@"\n' > $R/system/bin/busybox
+rm -rf $K/diag; ts $U; DG=$(dg)/dongle
+check "USB 설치기 진단 기록(동글 준비): sha256sum만 없으면 config.txt와 md5는 남기고 sha256 줄에 까닭을 적음" \
+  'cmp -s $T/kconfig $DG/config.txt && grep -q "^config.txt md5: " $DG/config-sum.txt && grep -qx "config.txt sha256: busybox에 sha256sum이 없음(PC에서 셈)" $DG/config-sum.txt && grep -q "vermagic=3.18.24-tcc" $DG/ko-vermagic.txt' || cat $DG/config-sum.txt
+cp $T/bin/bb $R/system/bin/busybox
 # md5를 셀 busybox: 내비에 없으면 설치된 모드의 것, 그것도 없으면 스틱의 것을 /data로 복사해 쓰고 지움. 모두 없으면 그렇다고 적음
 rm $R/system/bin/busybox; cp $T/bin/bb $HD/mods/nx4-kor/bin/busybox
 ts $U
@@ -655,6 +757,12 @@ rm -rf $K/diag $K/install/payload/bin/busybox
 ts $U
 check "USB 설치기 진단 기록: md5를 셀 busybox가 없으면 그렇다고 적고(이름·크기는 ls -lR) 설치기는 그대로 끝남" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "md5_busybox: none" $(dg)/info.txt && grep -q "busybox가 없음" $(dg)/system-lib-md5.txt && grep -q "libCarPlayCore.so" $(dg)/system-lib-ls.txt && grep -q "busybox가 없어" $K/install.log'
+check "USB 설치기 진단 기록(동글 준비): busybox가 없어도 커널 설정(config.gz)은 복사하고, md5·문자열이 빠졌다고 적음" \
+  'cmp -s $R/proc/config.gz $(dg)/dongle/config.gz && [ ! -f $(dg)/dongle/config.txt ] && grep -q "busybox가 없음" $(dg)/dongle/config-sum.txt && grep -q "busybox가 없어" $(dg)/dongle/system-wifi-md5.txt && grep -q "0bda:b812" $(dg)/dongle/usb.txt'
+rm -f $R/proc/config.gz; rm -rf $K/diag; ts $U
+check "USB 설치기 진단 기록(동글 준비): /proc/config.gz가 없으면 그렇다고 적고 설치기는 그대로 끝남" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "config.gz 없음" $(dg)/dongle/config-sum.txt && grep -q "/proc/config.gz가 없음" $K/install.log'
+rm -rf $R/proc $R/sys
 # 확인 창에서 모으지 않는 경우: 진단 폴더를 만들지 않고 HMG-API 명령도 부르지 않으며, 설치기는 그대로 이어짐(같은 판: 관리 앱)
 dno() { rm -rf $K/diag; ts $U; [ "$(cat $T/ts.rc)" = 0 ] && [ ! -d $K/diag ] && ! grep -q "engine report" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && grep -q "이미 설치되어" $T/ts.out && grep -q "$1" $K/install.log; }
 echo no > $T/diag.reply
@@ -1325,22 +1433,57 @@ if [ -n "$HMGAPI_SRC" ]; then
   python3 -c 'import tarfile,sys; t=tarfile.open(sys.argv[1],"w"); t.add(sys.argv[2],"troubleShooter"); t.close()' $T/hu/ota_package.tar $T/hu/troubleShooter
   printf '[nemesis]\n' > $T/hu/NEMESIS.data; echo hmgapi > $T/hu/README.txt; rm $T/hu/troubleShooter
   (cd $T/hu && zip -q -r $T/hmgapi-usb.zip .)
+  # HMG-API 엔진의 훅 계획(#67): 이 모드와 공식 무선 모드 v2.2.0-rc.9(그 훅 선언, tests/fixtures)를 NX4 map(차에서 만든 393점)에 함께 올린다.
+  # 같은 지점을 둘 다 replace할 때만 뒤쪽이 꺼지므로(HookPlan), 우리 change·observe는 공식 모드와 함께 올라와야 한다
+  javac --release 8 -Xlint:-options -nowarn -cp $T/eh -d $T/eh $B/tests/tools/HookPlanCheck.java 2>/dev/null
+  hpc() { java -cp $T/eh HookPlanCheck "$1" $B/tests/fixtures/wireless-carplay-aa-2.2.0-rc.9-hooks.json $B/tests/fixtures/nx4-map-points.txt > $T/hp.out 2>&1; echo $? > $T/hp.rc; }
+  hpc $PKG/mod.json
+  check "HMG-API 훅 계획: NX4 map에서 이 모드와 공식 무선 모드 rc.9가 함께 올라옴(거부 없음, 순서 nx4-kor 다음 wireless-carplay-aa, 계기판 8곳 change와 replace 함께, Stop은 observe 둘)" \
+    '[ "$(cat $T/hp.rc)" = 0 ] && grep -qx "order \[nx4-kor, wireless-carplay-aa\]" $T/hp.out && [ "$(grep -c "^hooks    framework.navigation_cluster.update_[a-z0-9_]*: nx4-kor (change), wireless-carplay-aa (replace) share it$" $T/hp.out)" = 8 ] && grep -qx "hooks    dipo.iap2_proxy.stop_route_guidance: nx4-kor (observe), wireless-carplay-aa (observe) share it" $T/hp.out && ! grep -q "won.t load" $T/hp.out' || cat $T/hp.out
+  # 이 테스트가 막아야 할 것을 막는지: 우리가 계기판 한 곳을 replace로 걸면 공식 모드가 통째로 꺼진다
+  python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); m["hooks"]["points"]["framework.navigation_cluster.update_tbt_info"]="replace"; json.dump(m, open(sys.argv[2],"w"))' $PKG/mod.json $T/mod-replace.json
+  hpc $T/mod-replace.json
+  check "  우리가 한 곳이라도 replace로 걸면 공식 무선 모드가 꺼짐(HookPlan이 거부, 이 테스트가 잡음)" \
+    '[ "$(cat $T/hp.rc)" != 0 ] && grep -q "^hooks    wireless-carplay-aa won.t load: .*both replace" $T/hp.out' || cat $T/hp.out
+  # 이 차의 map에 없는 지점을 걸면 우리 훅이 올라오지 않는다(map에 있는지는 위 393점으로 본다)
+  python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); m["hooks"]["points"]["dipo.no_such_point"]="observe"; json.dump(m, open(sys.argv[2],"w"))' $PKG/mod.json $T/mod-nopoint.json
+  hpc $T/mod-nopoint.json
+  check "  NX4 map에 없는 지점을 걸면 이 모드의 훅이 올라오지 않음(그래서 위 9점이 모두 map에 있어야 함)" \
+    '[ "$(cat $T/hp.rc)" != 0 ] && grep -q "^hooks    nx4-kor won.t load: " $T/hp.out' || cat $T/hp.out
+  # hooks.jar(#67): ANDROID_HOME이 있으면 scripts/build-hooks.sh로 진짜로 만든다. 없으면 빌드 시험은 자리만 채운 파일로 본다
+  if [ -n "$ANDROID_HOME" ]; then
+    (HMGAPI_SRC=$HS ANDROID_HOME=$ANDROID_HOME sh $B/scripts/build-hooks.sh $T/hooks.jar) > $T/hooks.out 2>&1; echo $? > $T/hooks.rc
+    check "build-hooks: hooks.jar를 만듦(hooks/src를 HMG-API 런타임에 대고 컴파일, d8)" '[ "$(cat $T/hooks.rc)" = 0 ] && [ -s $T/hooks.jar ]' || cat $T/hooks.out
+    DD=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -t/ -k1 -V | tail -n 1)dexdump
+    if [ -x "$DD" ]; then
+      "$DD" $T/hooks.jar 2>/dev/null | sed -n "s/^ *Class descriptor *: '\(.*\)'$/\1/p" > $T/hooks.classes
+      check "  hooks.jar 덱스에는 우리 클래스만(HMG-API 런타임·iAP2 스텁 없음), 진입 클래스와 DiPO 부분이 있음" \
+        '[ -s $T/hooks.classes ] && ! grep -v "^Lio/github/jayparklab/nx4kor/hook/" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/Nx4KorHooks;" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/dipo/KorTbt;" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/dipo/CpTurnsFit;" $T/hooks.classes' || cat $T/hooks.classes
+    fi
+  else
+    echo "skip hooks.jar 빌드(ANDROID_HOME 없음): 빌드 시험은 자리만 채운 hooks.jar로 봄"
+    echo "placeholder hooks.jar" > $T/hooks.jar
+  fi
   # 공식 무선 모드는 위 가짜 zip을 준다(받지 않음). 받는 길은 아래 NX4_WIRELESS_URL 테스트에서 본다
-  bld() { (HMGAPI_SRC=$HS NX4_MOD_KEY=$T/test-mod.key NX4_APK=$T/test.apk HMGAPI_USB_ZIP=$T/hmgapi-usb.zip NX4_WIRELESS_ZIP=$WZF "$@" sh $B/scripts/build.sh) > $T/build.out 2>&1; echo $? > $T/build.rc; }
+  bld() { (HMGAPI_SRC=$HS NX4_MOD_KEY=$T/test-mod.key NX4_APK=$T/test.apk NX4_HOOKS_JAR=$T/hooks.jar HMGAPI_USB_ZIP=$T/hmgapi-usb.zip NX4_WIRELESS_ZIP=$WZF "$@" sh $B/scripts/build.sh) > $T/build.out 2>&1; echo $? > $T/build.rc; }
+  # hooks.jar를 받지 않았고 만들 수도 없으면(ANDROID_HOME 없음) 묶음을 만들지 않는다
+  bld env -u NX4_HOOKS_JAR -u ANDROID_HOME NX4_BUSYBOX=$T/test-bb OUT=$T/out-nohooks
+  check "빌드: hooks.jar를 만들지 못하면(ANDROID_HOME 없음) 묶음을 만들지 않음" \
+    '[ "$(cat $T/build.rc)" != 0 ] && grep -q "hooks.jar를 만들지 못했습니다" $T/build.out && [ ! -f $T/out-nohooks/hmgapi-nx4-kor-$V.zip ]' || cat $T/build.out
   # busybox(GPL-2.0)를 넣는데 그 라이선스 안내가 없으면 만들지 않는다
   bld env NX4_BUSYBOX=$T/test-bb OUT=$T/out-nolic
   check "빌드: busybox를 넣는데 라이선스 안내가 없으면 만들지 않음" '[ "$(cat $T/build.rc)" != 0 ] && grep -q "라이선스 안내" $T/build.out && [ ! -f $T/out-nolic/hmgapi-nx4-kor-$V-usb.zip ]'
   echo "BusyBox GPL-2.0 test notice" > $T/test-bb-LICENSE.txt
   bld env NX4_BUSYBOX=$T/test-bb OUT=$T/out
-  check "빌드: 모드 zip과 USB 묶음을 만듦" '[ "$(cat $T/build.rc)" = 0 ] && [ -f $T/out/hmgapi-nx4-kor-$V.zip ] && [ -f $T/out/hmgapi-nx4-kor-$V-usb.zip ]' || cat $T/build.out
+  check "빌드: 모드 zip과 USB 묶음을 만듦, 받은 hooks.jar(NX4_HOOKS_JAR)를 넣었다고 찍음" '[ "$(cat $T/build.rc)" = 0 ] && [ -f $T/out/hmgapi-nx4-kor-$V.zip ] && [ -f $T/out/hmgapi-nx4-kor-$V-usb.zip ] && grep -q "hooks.jar는 NX4_HOOKS_JAR($T/hooks.jar)를 넣었습니다" $T/build.out' || cat $T/build.out
   rm -rf $T/ux; mkdir -p $T/ux; (cd $T/ux && unzip -q $T/out/hmgapi-nx4-kor-$V-usb.zip)
   check "USB 묶음: HMG-API 앱용 업데이트·공식 모드 묶음(HMGAPI/updates)은 넣지 않음, HMGAPI-SOURCE.txt에 뺀 것을 적음" \
     '[ ! -e $T/ux/HMGAPI/updates ] && grep -q "HMGAPI/updates" $T/ux/HMGAPI-SOURCE.txt'
   check "USB 묶음: ota_package.tar = 우리 troubleShooter(0755, root), HMG-API 설치기는 NX4/hmgapi로, NEMESIS.data 뺌, README 판 채움" \
     'python3 -c "import tarfile,sys; t=tarfile.open(sys.argv[1]); m=t.getmembers(); assert [x.name for x in m]==[\"troubleShooter\"] and m[0].mode==0o755 and m[0].uid==0; assert t.extractfile(\"troubleShooter\").read()==open(sys.argv[2],\"rb\").read()" $T/ux/ota_package.tar $B/usb/troubleShooter && grep -q "HMG-API troubleShooter" $T/ux/NX4/hmgapi/troubleShooter && [ ! -f $T/ux/NEMESIS.data ] && [ -d $T/ux/HMGAPI/install/payload ] && grep -q "NX4 KOR $V" $T/ux/README.txt'
   P=$T/ux/NX4/install/payload
-  check "USB 묶음: payload = 서명된 모드를 푼 것(mod.json, 스크립트, 앱, busybox, 서명), 한국 포크 무선 부분(훅·레시피·패치·설정)과 핫스팟 서비스 없음" \
-    '[ -f $P/mod.json ] && [ -f $P/svc/launch.sh ] && [ -f $P/svc/lib.sh ] && [ -f $P/bin/status.sh ] && [ -f $P/bin/uninstall.sh ] && [ -f $P/scripts/preun.sh ] && [ -f $P/app/NX4KOR.apk ] && [ -f $P/bin/busybox ] && [ -d $P/META-HMGAPI ] && [ ! -e $P/hooks.jar ] && [ ! -e $P/recipes ] && [ ! -e $P/files ] && [ ! -e $P/patches.json ] && [ ! -e $P/settings.json ] && [ ! -e $P/svc/ap.sh ] && [ ! -e $P/svc/hotspot.sh ] && [ ! -d $P/hmgapi ] && [ ! -d $P/patches ]'
+  check "USB 묶음: payload = 서명된 모드를 푼 것(mod.json, settings.json, 스크립트, 앱, hooks.jar, busybox, 서명), 훅 소스·한국 포크 무선 부분(레시피·패치)·핫스팟 서비스 없음" \
+    '[ -f $P/mod.json ] && cmp -s $P/settings.json $PKG/settings.json && [ -f $P/svc/launch.sh ] && [ -f $P/svc/lib.sh ] && [ -f $P/bin/status.sh ] && [ -f $P/bin/uninstall.sh ] && [ -f $P/scripts/preun.sh ] && [ -f $P/app/NX4KOR.apk ] && cmp -s $P/hooks.jar $T/hooks.jar && [ -f $P/bin/busybox ] && [ -d $P/META-HMGAPI ] && [ ! -e $P/src ] && [ ! -e $P/stubs ] && [ ! -e $P/recipes ] && [ ! -e $P/files ] && [ ! -e $P/patches.json ] && [ ! -e $P/svc/ap.sh ] && [ ! -e $P/svc/hotspot.sh ] && [ ! -d $P/hmgapi ] && [ ! -d $P/patches ]'
   check "라이선스: 모드에 LICENSE·NOTICE.md·bin/busybox-LICENSE.txt, USB 맨 위에 LICENSE·NOTICE.md·BUSYBOX-LICENSE.txt(저장소와 같은 내용)" \
     'cmp -s $P/LICENSE $B/LICENSE && cmp -s $P/NOTICE.md $B/NOTICE.md && cmp -s $P/bin/busybox-LICENSE.txt $T/test-bb-LICENSE.txt && cmp -s $T/ux/LICENSE $B/LICENSE && cmp -s $T/ux/NOTICE.md $B/NOTICE.md && cmp -s $T/ux/BUSYBOX-LICENSE.txt $T/test-bb-LICENSE.txt'
   check "USB 묶음: 공식 무선 모드 zip 그대로(NX4/wireless/wireless-carplay-aa.zip)와 그 mod.json, WIRELESS-SOURCE.txt(판·SHA-256·대응 소스·AGPL-3.0)" \
@@ -1380,7 +1523,7 @@ PY'
       '[ "$(cat $T/build.rc)" != 0 ] && grep -q "NOTICE.md" $T/build.out && grep -q "다릅니다" $T/build.out && [ ! -f $T/out-fetch/busybox/busybox ] && [ ! -f $T/out-fetch/hmgapi-nx4-kor-$V-usb.zip ]' || cat $T/build.out
   fi
   # NX4_BUSYBOX=none이면 busybox 없이 만들고, 그 안내도 없다(HMG-API도 함께 넣지 않으면 HMGAPI-SOURCE.txt도 없다)
-  (HMGAPI_SRC=$HS NX4_MOD_KEY=$T/test-mod.key NX4_APK=$T/test.apk NX4_BUSYBOX=none NX4_WIRELESS_ZIP=$WZF OUT=$T/out-nobb sh $B/scripts/build.sh) > $T/build.out 2>&1; echo $? > $T/build.rc
+  (HMGAPI_SRC=$HS NX4_MOD_KEY=$T/test-mod.key NX4_APK=$T/test.apk NX4_HOOKS_JAR=$T/hooks.jar NX4_BUSYBOX=none NX4_WIRELESS_ZIP=$WZF OUT=$T/out-nobb sh $B/scripts/build.sh) > $T/build.out 2>&1; echo $? > $T/build.rc
   rm -rf $T/ux2; mkdir -p $T/ux2; (cd $T/ux2 && unzip -q $T/out-nobb/hmgapi-nx4-kor-$V-usb.zip 2>/dev/null)
   check "라이선스: NX4_BUSYBOX=none·HMG-API 없이 만들면 busybox·BUSYBOX-LICENSE.txt·HMGAPI-SOURCE.txt 없음, LICENSE·NOTICE.md는 있음" \
     '[ "$(cat $T/build.rc)" = 0 ] && grep -q "NX4_BUSYBOX=none" $T/build.out && [ ! -f $T/ux2/NX4/install/payload/bin/busybox ] && [ ! -f $T/ux2/BUSYBOX-LICENSE.txt ] && [ ! -f $T/ux2/NX4/install/payload/bin/busybox-LICENSE.txt ] && [ ! -f $T/ux2/HMGAPI-SOURCE.txt ] && [ -f $T/ux2/LICENSE ] && [ -f $T/ux2/NOTICE.md ]' || cat $T/build.out
@@ -1400,8 +1543,8 @@ PY'
     bad "HMG-API 엔진 설치 시험: HMGAPI_SRC의 HMG-API($HSV)가 이 모드의 최소 판($MV)보다 낮아 설치·계획을 볼 수 없음. HMGAPI_SRC를 v$MV 이상으로 올려 주세요"
   else
   # hmgapid는 상대 경로를 /data/hmgapi/mods/<모드>/ 아래로 푼다(svc_start): sh /data/hmgapi/mods/nx4-kor/svc/launch.sh
-  check "HMG-API 엔진($HSV): NX4.KOR 260902에 설치됨(서명 확인), 서비스는 launch(root, manual) 하나, 앱이 등록됨, 훅·무선 파일 없음" \
-    '[ "$(cat $T/eng.rc)" = 0 ] && grep -q "installed nx4-kor $V (author key" $T/eng.out && [ "$(grep -c "^nx4-kor " $ER/data/hmgapi/state/services.txt)" = 1 ] && grep -q "^nx4-kor launch root manual " $ER/data/hmgapi/state/services.txt && grep -qx "io.github.jayparklab.nx4kor nx4-kor" $ER/data/hmgapi/state/apps.txt && [ ! -e $ER/data/hmgapi/mods/nx4-kor/hooks.jar ] && [ ! -e $ER/data/hmgapi/mods/nx4-kor/recipes ]' || { cat $T/eng.out; cat $ER/data/hmgapi/state/services.txt; }
+  check "HMG-API 엔진($HSV): NX4.KOR 260902에 설치됨(서명 확인), 서비스는 launch(root, manual) 하나, 앱이 등록됨, hooks.jar·settings.json이 있음, 무선 파일 없음" \
+    '[ "$(cat $T/eng.rc)" = 0 ] && grep -q "installed nx4-kor $V (author key" $T/eng.out && [ "$(grep -c "^nx4-kor " $ER/data/hmgapi/state/services.txt)" = 1 ] && grep -q "^nx4-kor launch root manual " $ER/data/hmgapi/state/services.txt && grep -qx "io.github.jayparklab.nx4kor nx4-kor" $ER/data/hmgapi/state/apps.txt && cmp -s $ER/data/hmgapi/mods/nx4-kor/hooks.jar $T/hooks.jar && [ -f $ER/data/hmgapi/mods/nx4-kor/settings.json ] && [ ! -e $ER/data/hmgapi/mods/nx4-kor/recipes ]' || { cat $T/eng.out; cat $ER/data/hmgapi/state/services.txt; }
   engp() { (HMGAPI_ROOT=$ER HMGAPI_HOST=1 HMGAPI_PRODUCT=NX4.KOR.0000.V039.001.260902 java -cp $T/eh hmgapi.engine.Engine $1) > $T/engp.out 2>&1; echo $? > $T/engp.rc; }
   # 참고: $1은 따옴표 없이 넘겨 "remove nx4-kor"처럼 두 낱말도 받는다
   # 계획에는 지금 켜진 것의 설명 줄(app·service, HMG-API 기본 network  no cellular [nx4-kor] 등)만 나오고, 적용하면 할 것이 없다
