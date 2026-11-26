@@ -79,8 +79,12 @@ for x in s["settings"]:
 PY'
 # 한국 길안내 소스(#67): KP·seogaemo·공식 모드에서 가져온 파일은 출처 줄을 남기고, 진입 클래스·DiPO 부분이 설정 이름과 같은 이름을 쓴다
 HK=$B/hooks/src/io/github/jayparklab/nx4kor/hook
-check "hooks 소스: KP(korea-build 6258357)에서 온 CpTurnsFit·CpTbt·CpIcons·PhoneBarOut, 공식 모드 스텁 4개에 출처·바꾼 것 줄" \
-  'for f in CpTurnsFit CpTbt CpIcons PhoneBarOut; do grep -q "6258357" $HK/dipo/$f.java && grep -q "Modified by NX4 KOR" $HK/dipo/$f.java || exit 1; done; for f in IIap2Listener IIap2Service Iap2ListenerInfo Iap2NotiMsg; do head -n 1 $B/hooks/stubs/com/tcc/iap2/$f.java | grep -q "hmgapi-wireless-cp-aa v2.2.0-rc.9" || exit 1; done; grep -q "HMG-Seogaemo" $HK/dipo/CpTurnsFit.java'
+check "hooks 소스: KP(korea-build ebca56f, 모드 2.4.10)에서 온 CpTurnsFit·CpTbt·CpIcons와 6258357 꼴의 PhoneBarOut, 공식 모드 스텁 4개에 출처·바꾼 것 줄" \
+  '( for f in CpTurnsFit CpTbt CpIcons; do grep -q "korea-build ebca56f3824a2234e48b336abda927d7a635e243" $HK/dipo/$f.java && grep -q "Modified by NX4 KOR" $HK/dipo/$f.java || exit 1; done
+     grep -q "6258357" $HK/dipo/PhoneBarOut.java && grep -q "Modified by NX4 KOR" $HK/dipo/PhoneBarOut.java || exit 1
+     grep -q "static int distStrState" $HK/dipo/CpIcons.java && grep -q "CpIcons.distStrState" $HK/dipo/CpTurnsFit.java || exit 1
+     for f in IIap2Listener IIap2Service Iap2ListenerInfo Iap2NotiMsg; do head -n 1 $B/hooks/stubs/com/tcc/iap2/$f.java | grep -q "hmgapi-wireless-cp-aa v2.2.0-rc.9" || exit 1; done
+     grep -q "HMG-Seogaemo" $HK/dipo/CpTurnsFit.java )'
 check "hooks 소스: 설정 kor_tbt·kor_tbt_log, DiPO 패키지, 앱 파트 클래스 이름, 리스너 종류 4096, 계기판 호출 8곳이 mod.json과 같음" 'python3 - "$PKG/mod.json" "$HK" <<PY
 import json, re, sys
 m = json.load(open(sys.argv[1]))
