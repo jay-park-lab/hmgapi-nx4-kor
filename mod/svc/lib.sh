@@ -1,8 +1,10 @@
 #!/system/bin/sh
-# NX4 KOR 공용 함수: 관리 앱 쪽(bin/status.sh)과 지우기 전 정리(scripts/preun.sh)가 ". svc/lib.sh"로 읽는다(혼자 돌지 않음).
+# NX4 KOR 공용 함수: 관리 앱 쪽(bin/status.sh), 칩 없는 차의 nochip 서비스(svc/nochip.sh), 지우기 전 정리(scripts/preun.sh)가
+# ". svc/lib.sh"로 읽는다(혼자 돌지 않음).
 # 2.1.0부터 무선 카플레이·안드로이드 오토는 HMG-API(2.1.1부터 1.1.0-rc.10 이상)와 공식 무선 모드 wireless-carplay-aa(2.2.0-rc.9 이상)가
 # 맡는다. 프로젝션 AP는 HMG-API가 공식 모드의 "wifi": {"projection": true} 요청으로 띄운다. 이 모드는 핫스팟을 띄우지 않고
-# 시스템 파일·Wi-Fi 설정도 바꾸지 않는다. 여기에는 상태를 읽는 함수와 관리 앱의 요청을 받는 데 쓰는 함수만 있다.
+# 시스템 파일·Wi-Fi 설정도 바꾸지 않는다. 여기에는 상태를 읽는 함수, 관리 앱의 요청을 받는 데 쓰는 함수, 이번 부팅에 칩이
+# 없는지 보는 함수(nochip.sh가 HMG-API 지기의 다시 시도를 멈출 때 씀)가 있다.
 # 2.0.x의 svc/hotspot.sh(순정 hostapd·dnsmasq 핫스팟, Wi-Fi 잠금, 칩 깨우기, 자동 설정 setup_hmgapi)를 줄인 것이다.
 # map 만들기·확인과 적용은 USB 설치기(usb/troubleShooter)가 한다.
 # 시험: BB, SRC, W, BK, PROC, BOOT_ID, UPTIME, HMGDATA 등을 밖에서 정해 두면 그대로 쓴다.
@@ -63,6 +65,14 @@ WIFI_SEEN=${WIFI_SEEN:-$HMGDATA/public/wifi-chip}
 #   wifi/ap.fail    이번 부팅에 띄우지 못하고 다시 시도하는 중: 부팅 id. 기록 줄은 logs/hmgapi/wifi.log
 HMGWIFI=${HMGWIFI:-$HMGDATA/wifi}
 WIFIASKS=${WIFIASKS:-$HMGDATA/state/wifi.txt}
+# 이 모드가 "이번 부팅에는 Wi-Fi 칩이 없다"고 본 기록(svc/nochip.sh가 씀, 644): 부팅 id 한 줄. 지울 때 preun.sh가 지운다
+NOCHIP=${NOCHIP:-/data/local/tmp/nx4-kor-nochip.txt}
+# 순정 핫스팟 기능의 권한 파일. Wi-Fi 칩 전원이 이 기능에 달려 있다(한국 내비는 꺼진 채로 나옴, 1669c1d). HMG-API가 공식 모드의
+# 프로젝션 AP 요청으로 넣는다. 부팅 때(pm이 뜨기 전)는 이 파일이 있는지로 기능이 켜졌는지 본다
+HOTSPOT_XML=${HOTSPOT_XML:-/system/etc/permissions/com.hkmc.software.wifihotspot.xml}
+# 순정 Wi-Fi 드라이버(bcmdhd)가 이번 부팅에 칩 켜기를 포기한 커널 줄. 2026-11-23·26 NX4HEV 260902는 부팅 9~18초에
+# "failed to power up DHD generic adapter, 3 retry left"~"0 retry left" 뒤 이 줄을 남겼다(USB 진단 dongle/dmesg-usb-wifi.txt)
+DHD_GAVEUP='failed to power up DHD generic adapter, max retry reached'
 # 설치 진행 기록(USB 설치기가 쓰고 관리 앱이 1초마다 읽음, 644, 비밀값 없음). 한 줄에 key=value:
 #   pct, state(run 진행 중|done 준비됨|reboot 재부팅 필요|fail 실패), stage(지금 단계·실패 이유, 한국어), start·t(시각 초),
 #   boot(부팅 id), step(N/M), ust·ut(부팅 뒤 초). 관리 앱은 이번 부팅의 기록만 본다
@@ -272,6 +282,31 @@ proj_asked() {
   done < $WIFIASKS
   return 1
 }
+# 이번 부팅 커널 기록. NX4_DMESG는 PC 테스트용
+klog() { if [ -n "$NX4_DMESG" ]; then cat $NX4_DMESG; else dmesg; fi; }
+# 순정 Wi-Fi 드라이버가 이번 부팅에 칩 켜기를 포기했는가(커널 줄). 링 버퍼가 넘쳐 그 줄이 밀려났으면 못 본 것으로 둔다
+dhd_gave_up() { klog 2>/dev/null | $BB grep -q "$DHD_GAVEUP"; }
+# USB Wi-Fi 동글(#48·#80, 2.2.0)일 수 있는 USB 장치(idVendor:idProduct, case 패턴, 공백으로 나눔). 동글 드라이버가 받는 것
+# (drivers/README.md: RTL88x2BU 0bda:b812·2357:012d, RTL8831BU 0bda:b831·0bda:b851)의 만든 곳(Realtek 0bda, TP-Link 2357)이면
+# 모두 동글로 본다. 동글을 꽂은 부팅에도 순정 드라이버가 먼저 올라 칩 켜기를 포기한 줄과 "wlan0 없음"이 생긴 뒤에 동글 드라이버가
+# 순정 자리에 올라 wlan0이 생기므로(#80, 동글 세션 지적), 동글이 있으면 칩 없음으로 보지 않는다. 잘못 동글로 보면 HMG-API가
+# 예전처럼 다시 시도할 뿐이고, 잘못 칩 없음으로 보면 동글 AP를 막으므로 넓게 잡는다
+DONGLE_USB=${DONGLE_USB:-'0bda:* 2357:*'}
+USBDEV=${USBDEV:-/sys/bus/usb/devices}
+dongle_present() {
+  for _ud in $USBDEV/*; do
+    [ -r "$_ud/idVendor" ] && [ -r "$_ud/idProduct" ] || continue
+    car_in "$(cat "$_ud/idVendor" 2>/dev/null):$(cat "$_ud/idProduct" 2>/dev/null)" "$DONGLE_USB" && return 0
+  done
+  return 1
+}
+# Wi-Fi 칩이나 동글이 있는가: 이 내비에서 칩을 본 적이 있음(SDIO, HMG-API public/wifi-chip), wlan0이 있음, 동글일 수 있는 USB 장치
+chip_or_dongle() { wifi_chip_seen || [ -d $SYSNET/$WIF ] || dongle_present; }
+# 이번 부팅에는 Wi-Fi 칩이 없다고 볼 수 있는가: 칩·wlan0·동글이 없고, 순정 드라이버가 이번 부팅에 칩 켜기를 포기했다. 그 부팅에는
+# 순정 드라이버를 다시 올리지 않아 칩이 올라오지 않는다(11-26 진단: 부팅 뒤 19분 동안 커널 줄은 부팅 때 한 번뿐)
+nochip_now() { ! chip_or_dongle && dhd_gave_up; }
+# svc/nochip.sh의 칩 없음 기록이 이번 부팅 것이고 지금도 칩·wlan0·동글이 없는가(그 뒤 동글을 꽂았으면 기록을 믿지 않는다)
+nochip_mark() { this_boot $NOCHIP && ! chip_or_dongle; }
 
 # mod.json 꼴 파일($1, 없으면 이 모드의 mod.json)의 "version" 값. 못 읽으면 빈 값
 mod_ver() {

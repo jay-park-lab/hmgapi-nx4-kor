@@ -126,7 +126,7 @@ done
 | `ready` | `verdict=ready`, 진행 100% | 시안 세로 표시와 시안 글자 "무선 카플레이·안드로이드 오토 준비됨."(띠 없음), [지금 재부팅]. 왼쪽 칸에 설치 "끝남", 무선 Wi-Fi "켜짐(HMG-API)", 폰 연결 "지금 연결된 폰 없음", "자세히" 표(공식 무선 모드 "2.2.0-rc.9, 켜짐", 한국 카플레이 길안내 "켜짐"(#71), 무선 연결용 Wi-Fi "켜짐") |
 | `connected` | `cp_conn=1`, `verdict=connected` | 시안 표시와 시안 "무선 카플레이 연결됨", 왼쪽 칸 폰 연결 "카플레이 1대 연결됨" |
 | `installing` | 진행 `pct=55`, `step=3/5`, `state=run` | 결과 화면 대신 설치 진행 화면(가운데 정렬): "NX4 KOR 2.0.0 설치 중", "단계 3/5 · map을 확인하는 중입니다", 시안 막대 55%, 시안 "55%"와 회색 "경과 2분 02초", 회색 "보통 5분 안에 끝납니다 …", 맨 아래 [닫기] 블록 |
-| `reboot` | `verdict=reboot` | 노란 띠 "내비를 3분 후 재부팅해 주세요." |
+| `reboot` | `verdict=reboot` | 노란 띠 "[지금 재부팅]을 눌러 내비를 재부팅해 주세요." |
 | `failed` | `verdict=failed`(설치기가 쓴 실패 문장), `hookmap=mismatch` | 빨간 띠(설치기 문장), 왼쪽 칸 설치 "안 됨(오른쪽 안내를 보세요)" |
 | `nowireless` | `verdict=nowireless`, `wm=no` | 빨간 띠 "공식 무선 모드(Wireless CarPlay + Android Auto)가 설치되어 있지 않습니다 …", 표의 공식 무선 모드 "없음 (설치 필요)" |
 | `nowifipart` | `verdict=nowifipart`(수준 1), `chip=no`, `ap_fail=yes` | 노란 띠 "이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 …"(지우는 법 줄 없음), 왼쪽 칸 무선 Wi-Fi "부품 없음(USB 동글 필요)", 표의 Wi-Fi 칩 "안 보임" |

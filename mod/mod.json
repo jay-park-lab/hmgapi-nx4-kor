@@ -8,7 +8,7 @@
     "StopDragon"
   ],
   "license": "AGPL-3.0",
-  "description": "HMG-API add-on for the Korean Tucson NX4 (260902) with a manager app. The app shows the USB install progress and checks HMG-API and the official Wireless CarPlay + Android Auto mod (wireless-carplay-aa) on this car (versions, boot guard, hooks and map, the projection Wi-Fi AP and Wi-Fi part, other Wi-Fi packages), says what blocks wireless projection and what to do, and counts CarPlay connections. It can request a reboot, held back while installing or near the HMG-API boot guard, and asks before the USB installer collects a diagnostic log. Beside the official mod, it fits CarPlay turn-by-turn on the cluster and HUD to the Korean car (Korea Projection's fit with HMG-Seogaemo's lane glyphs: an arrow for every maneuver, the near-turn view and distance bar, a resend every second), so the cluster no longer stops on a maneuver the official table has no icon for.",
+  "description": "HMG-API add-on for the Korean Tucson NX4 (260902) with a manager app. The app shows the USB install progress and checks HMG-API and the official Wireless CarPlay + Android Auto mod (wireless-carplay-aa) on this car (versions, boot guard, hooks and map, the projection Wi-Fi AP and Wi-Fi part, other Wi-Fi packages), says what blocks wireless projection and what to do, and counts CarPlay connections. It can request a reboot, held back while installing or near the HMG-API boot guard, and asks before the USB installer collects a diagnostic log. Beside the official mod, it fits CarPlay turn-by-turn on the cluster and HUD to the Korean car (Korea Projection's fit with HMG-Seogaemo's lane glyphs: an arrow for every maneuver, the near-turn view and distance bar, a resend every second), so the cluster no longer stops on a maneuver the official table has no icon for. On a unit with no Wi-Fi chip (the stock driver gives up at boot), it stops HMG-API's projection AP retries for that boot, which would otherwise start a Dalvik process every 30 seconds.",
   "system": {
     "model": [
       "NX4",
@@ -48,6 +48,13 @@
       "script": "svc/launch.sh",
       "user": "root",
       "start": "manual",
+      "restart": false
+    },
+    {
+      "name": "nochip",
+      "script": "svc/nochip.sh",
+      "user": "root",
+      "start": "boot",
       "restart": false
     }
   ],
