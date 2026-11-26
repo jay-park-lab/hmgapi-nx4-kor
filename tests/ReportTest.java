@@ -16,7 +16,7 @@ public class ReportTest {
     static final String GOOD =
         "product=NX4.KOR.0000.V039.001.260902\n" +
         "targetdir=/system/onebin/nx4_kr\n" +
-        "pkgver=2.0.0\ntested=yes\nhmgapi=version 1.1.0-rc.9 build 96fe95d 2026-11-25\n" +
+        "pkgver=2.0.0\ntested=yes\nhmgapi=version 1.1.0-rc.10 build daa0837 2026-11-26\n" +
         "wm=yes\nwm_ver=2.2.0-rc.9\nwm_on=yes\nwm_hooks=on\nbridge=on\nhooks=on\nhookmap=mapped\n" +
         "feat_carplay=yes\nfeat_aa=yes\nfeat_hotspot=yes\nfeat_wifi=no\nchip=yes\nwlan0=yes\n" +
         "proj=yes\nap_boot=yes\nap_fail=no\nap=yes\nap_mode=projection\nother_ap=no\nwpa=no\n" +
@@ -99,14 +99,16 @@ public class ReportTest {
             && "2.0.0".equals(row(r, "NX4 KOR")) && "예".equals(row(r, "무선 카플레이 기능")) && "예".equals(row(r, "순정 핫스팟 기능 (Wi-Fi 칩 전원)")));
         check("  판정 코드 줄(verdict), 카플레이 연결 수", "ready".equals(row(r, "판정 코드")) && "0개".equals(row(r, "카플레이 연결"))
             && "-".equals(row(Report.parse(GOOD.replace("cp_conn=0\n", "")), "카플레이 연결")));
-        check("정상이면 HMG-API 칸은 버전만 (1.1.0-rc.9), 최소 판은 rc.9·공식 모드 2.2.0-rc.9", "1.1.0-rc.9".equals(row(r, "HMG-API"))
-            && Report.MIN_HMGAPI.equals("1.1.0-rc.9") && Report.MIN_WIRELESS.equals("2.2.0-rc.9"));
-        Report old = Report.parse(GOOD.replace("version 1.1.0-rc.9 build", "version 1.0.2 build"));
-        check("  HMG-API 1.0.2 → '지원 안 함, 1.1.0-rc.9 이상 필요'", "1.0.2 (지원 안 함, 1.1.0-rc.9 이상 필요)".equals(row(old, "HMG-API")));
+        check("정상이면 HMG-API 칸은 버전만 (1.1.0-rc.10), 최소 판은 rc.10·공식 모드 2.2.0-rc.9", "1.1.0-rc.10".equals(row(r, "HMG-API"))
+            && Report.MIN_HMGAPI.equals("1.1.0-rc.10") && Report.MIN_WIRELESS.equals("2.2.0-rc.9"));
+        Report old = Report.parse(GOOD.replace("version 1.1.0-rc.10 build", "version 1.0.2 build"));
+        check("  HMG-API 1.0.2 → '지원 안 함, 1.1.0-rc.10 이상 필요'", "1.0.2 (지원 안 함, 1.1.0-rc.10 이상 필요)".equals(row(old, "HMG-API")));
         check("  HMG-API 1.1.0-rc.7(2.0.x가 받던 판) → 지원 안 함(rc 꼬리까지 비교)",
-            "1.1.0-rc.7 (지원 안 함, 1.1.0-rc.9 이상 필요)".equals(row(Report.parse(GOOD.replace("version 1.1.0-rc.9 build", "version 1.1.0-rc.7 build")), "HMG-API")));
+            "1.1.0-rc.7 (지원 안 함, 1.1.0-rc.10 이상 필요)".equals(row(Report.parse(GOOD.replace("version 1.1.0-rc.10 build", "version 1.1.0-rc.7 build")), "HMG-API")));
         check("  HMG-API 1.1.0-rc.8(2.1.0이 받던 판, NEMESIS 1.17에서 지우면 위험 Open-HMG/HMG-API#397) → 지원 안 함",
-            "1.1.0-rc.8 (지원 안 함, 1.1.0-rc.9 이상 필요)".equals(row(Report.parse(GOOD.replace("version 1.1.0-rc.9 build", "version 1.1.0-rc.8 build")), "HMG-API")));
+            "1.1.0-rc.8 (지원 안 함, 1.1.0-rc.10 이상 필요)".equals(row(Report.parse(GOOD.replace("version 1.1.0-rc.10 build", "version 1.1.0-rc.8 build")), "HMG-API")));
+        check("  HMG-API 1.1.0-rc.9(FORCE로 설치한 NEMESIS 1.17 차를 올리면 위험, rc.10이 고침) → 지원 안 함(rc.9 < rc.10, 숫자로 비교)",
+            "1.1.0-rc.9 (지원 안 함, 1.1.0-rc.10 이상 필요)".equals(row(Report.parse(GOOD.replace("version 1.1.0-rc.10 build", "version 1.1.0-rc.9 build")), "HMG-API")));
         check("  판 비교는 HMG-API Version·셸 ver_lt와 같음: rc.4 < rc.8 < rc.10 < 정식, beta < rc, 꼬리 없는 최소 판",
             Report.older("1.1.0-rc.4", "1.1.0-rc.8") == 1 && Report.older("1.1.0-rc.8", "1.1.0-rc.8") == 0 && Report.older("1.1.0-rc.10", "1.1.0-rc.8") == 0
             && Report.older("1.1.0", "1.1.0-rc.8") == 0 && Report.older("1.1.0-rc.8", "1.1.0") == 1 && Report.older("1.1.0-beta.9", "1.1.0-rc.1") == 1
@@ -114,11 +116,12 @@ public class ReportTest {
             && Report.older("1.0.10", "1.0.2") == 0 && Report.older("1.0.1", "1.0.10") == 1 && Report.older("1.1", "1.1.0") == 0
             && Report.older("2.2.0-rc.5", "2.2.0-rc.9") == 1 && Report.older("2.2.0", "2.2.0-rc.9") == 0 && Report.older("1.1.0-rc", "1.1.0-rc.1") == 1
             && Report.older("1.1.0-rc.8+abc", "1.1.0-rc.8") == 0);
-        check("  1.1.0-rc.10·1.2.0은 지원(버전만 보임)", "1.1.0-rc.10".equals(row(Report.parse(GOOD.replace("1.1.0-rc.9 build", "1.1.0-rc.10 build")), "HMG-API"))
-            && "1.2.0".equals(row(Report.parse(GOOD.replace("1.1.0-rc.9 build", "1.2.0 build")), "HMG-API")));
-        Report none = Report.parse(GOOD.replace("hmgapi=version 1.1.0-rc.9 build 96fe95d 2026-11-25\n", ""));
-        check("  HMG-API 없음 → '없음 (1.1.0-rc.9 이상 필요)'", "없음 (1.1.0-rc.9 이상 필요)".equals(row(none, "HMG-API")));
-        Report odd = Report.parse(GOOD.replace("version 1.1.0-rc.9 build", "version dev build"));
+        check("  1.1.0-rc.11·1.1.0·1.2.0은 지원(버전만 보임)", "1.1.0-rc.11".equals(row(Report.parse(GOOD.replace("1.1.0-rc.10 build", "1.1.0-rc.11 build")), "HMG-API"))
+            && "1.1.0".equals(row(Report.parse(GOOD.replace("1.1.0-rc.10 build", "1.1.0 build")), "HMG-API"))
+            && "1.2.0".equals(row(Report.parse(GOOD.replace("1.1.0-rc.10 build", "1.2.0 build")), "HMG-API")));
+        Report none = Report.parse(GOOD.replace("hmgapi=version 1.1.0-rc.10 build daa0837 2026-11-26\n", ""));
+        check("  HMG-API 없음 → '없음 (1.1.0-rc.10 이상 필요)'", "없음 (1.1.0-rc.10 이상 필요)".equals(row(none, "HMG-API")));
+        Report odd = Report.parse(GOOD.replace("version 1.1.0-rc.10 build", "version dev build"));
         check("  숫자가 아닌 버전·모르는 꼬리 → '버전 확인 안 됨'(멈추지 않음)", row(odd, "HMG-API").contains("버전 확인 안 됨") && Report.older("dev", "1.1.0") == 2
             && Report.older("1.1.0-dev", "1.1.0-rc.8") == 2 && Report.older("", "1.1.0") == 2 && Report.older(null, "1.1.0") == 2);
         check("공식 무선 모드 칸: 정상 '판, 켜짐', 없음, 꺼짐, 낮은 판, 훅이 안 켜짐, Wireless CarPlay 설정 꺼짐",

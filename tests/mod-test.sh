@@ -32,12 +32,12 @@ for f in $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/usb/troubleShooter $B/
 done
 
 # --- mod.json: NX4 KOR 모드(2.1.0: 관리 앱과 그 서비스만. 무선은 HMG-API와 공식 무선 모드 wireless-carplay-aa가 맡음) ---
-check "mod.json: launch 서비스·앱·런처만, NX4.KOR 260902만, HMG-API 1.1.0-rc.9 이상, 훅·무선 부분·Wi-Fi 요청·충돌·requires 없음" 'python3 - "$PKG" <<PY
+check "mod.json: launch 서비스·앱·런처만, NX4.KOR 260902만, HMG-API 1.1.0-rc.10 이상, 훅·무선 부분·Wi-Fi 요청·충돌·requires 없음" 'python3 - "$PKG" <<PY
 import json, os, sys
 d = sys.argv[1]
 m = json.load(open(os.path.join(d, "mod.json")))
 assert m["id"] == "nx4-kor"
-assert m["hmgapi"] == ">=1.1.0-rc.9", m["hmgapi"]
+assert m["hmgapi"] == ">=1.1.0-rc.10", m["hmgapi"]
 for s in m["services"]:
     assert os.path.isfile(os.path.join(d, s["script"])), s
 assert [(s["name"], s["start"], s["user"], s["restart"]) for s in m["services"]] == [("launch", "manual", "root", False)], m["services"]
@@ -54,7 +54,7 @@ PY'
 check "빠진 것: 한국 포크 무선 모드(hooks.jar·레시피·libleafiaaac.so·patches.json·settings.json, wireless/), 핫스팟 서비스(svc/ap.sh·hotspot.sh, scripts/post.sh)" \
   '[ ! -e $PKG/hooks.jar ] && [ ! -e $PKG/recipes ] && [ ! -e $PKG/files ] && [ ! -e $PKG/patches.json ] && [ ! -e $PKG/settings.json ] && [ ! -e $B/wireless ] && [ ! -e $PKG/svc/ap.sh ] && [ ! -e $PKG/svc/hotspot.sh ] && [ ! -e $PKG/scripts/post.sh ] && [ -f $PKG/svc/lib.sh ]'
 check "lib.sh: 모드 id·HMG-API 최소 판이 mod.json과 같음, 공식 무선 모드 최소 판, env.sh의 NX4_MOD_ID도 같음, 앱 Report의 최소 판도 같음" \
-  'grep -q "^MOD_ID=\${NX4_MOD_ID:-nx4-kor}$" $PKG/svc/lib.sh && grep -q "^HMG_MIN=1.1.0-rc.9$" $PKG/svc/lib.sh && grep -q "^WM_ID=wireless-carplay-aa$" $PKG/svc/lib.sh && grep -q "^WM_MIN=2.2.0-rc.9$" $PKG/svc/lib.sh && grep -q "^NX4_MOD_ID=nx4-kor$" $PKG/svc/env.sh && grep -q "MIN_HMGAPI = \"1.1.0-rc.9\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java && grep -q "MIN_WIRELESS = \"2.2.0-rc.9\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java'
+  'grep -q "^MOD_ID=\${NX4_MOD_ID:-nx4-kor}$" $PKG/svc/lib.sh && grep -q "^HMG_MIN=1.1.0-rc.10$" $PKG/svc/lib.sh && grep -q "^WM_ID=wireless-carplay-aa$" $PKG/svc/lib.sh && grep -q "^WM_MIN=2.2.0-rc.9$" $PKG/svc/lib.sh && grep -q "^NX4_MOD_ID=nx4-kor$" $PKG/svc/env.sh && grep -q "MIN_HMGAPI = \"1.1.0-rc.10\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java && grep -q "MIN_WIRELESS = \"2.2.0-rc.9\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java'
 check "launch 서비스 이름 = 앱이 부르는 이름" 'grep -q "\"service-start\", \"launch\"" $B/app/java/io/github/jayparklab/nx4kor/StatusActivity.java'
 # 앱 메뉴 타일 그림(#47): HMG-API tools/mkicon.sh가 만드는 순정 꼴(99x99 투명 타일) 넷. 원본 모양은 art/tile.svg
 check "mod.json: 앱 메뉴 타일에 낮·밤·꺼짐(낮·밤) 그림 넷(icons/), 모두 모드 안의 99x99 투명 PNG(RGBA, 꺼짐은 투명 팔레트일 수 있음)" 'python3 - "$PKG" <<PY
@@ -474,11 +474,16 @@ mkdir -p $K/hmgapi $U/HMGAPI/install/payload; echo "# hmg-api" > $K/hmgapi/troub
 ts $U
 check "USB 설치기: ... 스틱에 최소 판 이상의 HMG-API 설치기가 있으면 그것으로 올림(엔진을 부르지 않음)" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "HMG-API 설치기로 넘김(업데이트)" $T/ts.out && grep -q "1.0.2에서 $NEEDV(으)로" $T/ts.out && ! engcalls'
-# 2.1.0이 받던 rc.8: NEMESIS 1.17에서 지우면 Android가 뜨지 않을 수 있어(Open-HMG/HMG-API#397) 2.1.1부터 먼저 올린다
+# 2.1.0이 받던 rc.8(NEMESIS 1.17에서 지우면 Android가 뜨지 않음)과 rc.9(FORCE로 설치한 NEMESIS 1.17 차를 올리면 Android가
+# 뜨지 않음): 2.1.1부터 스틱의 HMG-API(rc.10)로 먼저 올린다(Open-HMG/HMG-API#397). rc.9 < rc.10은 꼬리를 숫자로 비교해야 나온다
 printf 'version 1.1.0-rc.8\n' > $HD/installed.txt
 ts $U
 check "USB 설치기: HMG-API 1.1.0-rc.8(2.1.0이 받던 판)도 최소 판($NEEDV)보다 낮아 스틱의 HMG-API로 먼저 올림" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "HMG-API 설치기로 넘김(업데이트)" $T/ts.out && grep -q "1.1.0-rc.8에서 $NEEDV(으)로" $T/ts.out && ! engcalls'
+printf 'version 1.1.0-rc.9\n' > $HD/installed.txt
+ts $U
+check "  1.1.0-rc.9도 최소 판($NEEDV)보다 낮아 먼저 올림(rc.9 < rc.10)" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "HMG-API 설치기로 넘김(업데이트)" $T/ts.out && grep -q "1.1.0-rc.9에서 $NEEDV(으)로" $T/ts.out && ! engcalls'
 printf 'version 1.1.0-rc.3\n' > $HD/installed.txt; echo 1.1.0-rc.3 > $U/HMGAPI/install/payload/VERSION
 ts $U
 check "USB 설치기: ... rc 꼬리까지 비교(1.1.0-rc.3 < $NEEDV), 스틱의 HMG-API도 낮으면 넘기지 않고 멈춤" \
@@ -491,7 +496,7 @@ check "USB 설치기: 스틱의 공식 무선 모드가 HMG-API 1.2.0 이상을 
   '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "HMG-API 1.2.0 이상으로 먼저 올려" $T/ts.out && ! engcalls'
 cp $T/wj.keep $K/wireless/mod.json
 rm -rf $K/hmgapi $U/HMGAPI $HD/mods/wireless-carplay-aa
-for hv in $NEEDV 1.1.0-rc.10 1.1.0 1.2.0-beta.1; do
+for hv in $NEEDV 1.1.0-rc.11 1.1.0 1.2.0-beta.1; do
   printf 'version %s\n' $hv > $HD/installed.txt
   pset plan-new; mapnew
   ts $U
@@ -1022,7 +1027,7 @@ streset() {
   rm -rf $SH $T/sw $T/sproc $T/sysnet $T/procnet $T/shlog $T/sprog $T/status.txt $T/ps.out $T/wifiseen $T/shook
   mkdir -p $SH/mods/wireless-carplay-aa $SH/state $SH/wifi $SH/settings $T/sw $T/sproc/1234 $T/sproc/99 $T/sysnet/wlan0 $T/procnet $T/shlog $T/shook
   printf '{\n  "id": "wireless-carplay-aa",\n  "version": "2.2.0-rc.9"\n}\n' > $SH/mods/wireless-carplay-aa/mod.json
-  printf 'version 1.1.0-rc.9\nbuild x\n' > $T/sinst
+  printf 'version 1.1.0-rc.10\nbuild x\n' > $T/sinst
   printf '%s\n' feature:com.hkmc.software.connectivity.carplay_wireless feature:com.hkmc.software.connectivity.androidauto_wireless \
     feature:com.hkmc.software.wifihotspot > $T/features
   printf '%s\n' "11-23 06:00:01.000 I/HMG-API: hook map: verified for hyundai/nx4/kor/260902, hooks on" \
@@ -1048,13 +1053,15 @@ streset; stsh FAKE_PROD=DEPEHEV.KOR.0000.V039.001.260902
 check "status.sh: NX4가 아니면 verdict=nocar, verdict_end=yes" '[ "$(sv verdict)" = nocar ] && [ "$(sv verdict_end)" = yes ] && [ "$(sv tested)" = no ]'
 check "status.sh: 상태 파일과 한 줄 요약에 NEMESIS·Korea Projection·제보 문구 없음" '! grep -qE "NEMESIS|Korea Projection|제보|QR" $T/status.txt $T/st.out'
 streset; rm -f $T/sinst; stsh
-check "status.sh: HMG-API가 없으면 verdict=nohmgapi(1.1.0-rc.9 이상을 먼저)" '[ "$(sv verdict)" = nohmgapi ] && grep -q "1.1.0-rc.9 이상" $T/status.txt'
+check "status.sh: HMG-API가 없으면 verdict=nohmgapi(1.1.0-rc.10 이상을 먼저)" '[ "$(sv verdict)" = nohmgapi ] && grep -q "1.1.0-rc.10 이상" $T/status.txt'
 streset; printf 'version 1.1.0-rc.7\n' > $T/sinst; stsh
-check "status.sh: HMG-API 1.1.0-rc.7(2.0.x가 받던 판)은 rc 꼬리까지 비교해 verdict=oldhmgapi" '[ "$(sv verdict)" = oldhmgapi ] && grep -q "1.1.0-rc.9 이상으로" $T/status.txt' || cat $T/status.txt
+check "status.sh: HMG-API 1.1.0-rc.7(2.0.x가 받던 판)은 rc 꼬리까지 비교해 verdict=oldhmgapi" '[ "$(sv verdict)" = oldhmgapi ] && grep -q "1.1.0-rc.10 이상으로" $T/status.txt' || cat $T/status.txt
 streset; printf 'version 1.1.0-rc.8\n' > $T/sinst; stsh
-check "  1.1.0-rc.8(2.1.0이 받던 판, NEMESIS 1.17에서 지우면 위험 Open-HMG/HMG-API#397)도 verdict=oldhmgapi" '[ "$(sv verdict)" = oldhmgapi ] && grep -q "1.1.0-rc.9 이상으로" $T/status.txt' || cat $T/status.txt
-streset; printf 'version 1.1.0-rc.10\n' > $T/sinst; stsh
-check "  1.1.0-rc.10은 지원(ready)" '[ "$(sv verdict)" = ready ]' || cat $T/status.txt
+check "  1.1.0-rc.8(2.1.0이 받던 판, NEMESIS 1.17에서 지우면 위험 Open-HMG/HMG-API#397)도 verdict=oldhmgapi" '[ "$(sv verdict)" = oldhmgapi ] && grep -q "1.1.0-rc.10 이상으로" $T/status.txt' || cat $T/status.txt
+streset; printf 'version 1.1.0-rc.9\n' > $T/sinst; stsh
+check "  1.1.0-rc.9(FORCE로 설치한 NEMESIS 1.17 차를 올리면 위험, rc.10이 고침)도 verdict=oldhmgapi(rc.9 < rc.10)" '[ "$(sv verdict)" = oldhmgapi ] && grep -q "1.1.0-rc.10 이상으로" $T/status.txt' || cat $T/status.txt
+streset; printf 'version 1.1.0-rc.11\n' > $T/sinst; stsh
+check "  1.1.0-rc.11은 지원(ready)" '[ "$(sv verdict)" = ready ]' || cat $T/status.txt
 # 설치 진행 기록(USB 설치기가 지금 형식 그대로 씀): 이번 부팅 것만
 spr() { printf 'pct=%s\nstate=%s\nstage=%s\nstart=1\nt=2\nboot=%s\nstep=\nust=1\nut=95\n' "$1" "$2" "$3" "${4:-test-boot-id}" > $T/sprog; }
 streset; spr 40 run "map을 확인하는 중입니다"; stsh
@@ -1198,7 +1205,7 @@ check "  설치가 진행 중(이번 부팅 run, 마지막 기록 5초 전) → 
 # HMG-API 부팅 보호 거절(#18, HMG-API rc.6 이후). [지금 재부팅]은 새 커널 부팅이라 다음 zygote 시작의 이번 부팅 횟수는 0부터:
 # starts(올린 뒤 값)가 6이면 다음 시작에, 5면 그다음 시작에 훅이 꺼진다. 그래서 5·6만 거절(code=guard). 부팅 뒤 100초
 # (위 테스트까지는 HMG-API 설치 기록 $RW/inst가 없어 부팅 보호로는 막지 않았다)
-rm -f $RW/prog; printf 'version 1.1.0-rc.9\n' > $RW/inst; mkdir -p $RW/hook; : > $RW/hook/enable; : > $RW/dmesg
+rm -f $RW/prog; printf 'version 1.1.0-rc.10\n' > $RW/inst; mkdir -p $RW/hook; : > $RW/hook/enable; : > $RW/dmesg
 rbn() { grep -c reboot $RW/rbcalls; }
 # rgset <starts> [hook/boot 내용, 없으면 파일 없음]. starts는 zygote처럼 줄바꿈 없이 쓴다
 rgset() { rm -f $RW/hook/starts $RW/hook/boot; printf %s "$1" > $RW/hook/starts; [ -n "$2" ] && echo "$2" > $RW/hook/boot; return 0; }
@@ -1225,7 +1232,7 @@ rgset 7 "other-boot 2"; c0=$(rbn); rbreq 5019 test-boot-id 95; _ro7=$(rbn)
 rgset 7; rbreq 5020 test-boot-id 95
 check "  hook/boot가 다른 부팅 것이거나 없고 starts=7이면 막지 않음(거절은 5·6까지)" '[ "$_ro7" = $((c0+1)) ] && [ "$(rbn)" = $((c0+2)) ] && grep -qx "id=5020" $RW/rbres && grep -qx "code=cmd" $RW/rbres'
 rgset 6 "test-boot-id 1"; : > $RW/hook/disable; c0=$(rbn); rbreq 5014 test-boot-id 95; rm -f $RW/hook/disable; _rdis=$(rbn)
-rm -f $RW/inst; rbreq 5015 test-boot-id 95; printf 'version 1.1.0-rc.9\n' > $RW/inst
+rm -f $RW/inst; rbreq 5015 test-boot-id 95; printf 'version 1.1.0-rc.10\n' > $RW/inst
 check "  hook/disable이 있거나 HMG-API가 설치돼 있지 않으면 막지 않음" '[ "$_rdis" = $((c0+1)) ] && [ "$(rbn)" = $((c0+2)) ]'
 # 커널 줄이 있으면 그것을 따른다. watcher는 "hooks on" 줄 시각 + 120초에 돌므로 그 + 15초까지 막는다(10초면 145초)
 rgset 6 "test-boot-id 4"
@@ -1377,7 +1384,7 @@ PY'
   rm -rf $T/ux2; mkdir -p $T/ux2; (cd $T/ux2 && unzip -q $T/out-nobb/hmgapi-nx4-kor-$V-usb.zip 2>/dev/null)
   check "라이선스: NX4_BUSYBOX=none·HMG-API 없이 만들면 busybox·BUSYBOX-LICENSE.txt·HMGAPI-SOURCE.txt 없음, LICENSE·NOTICE.md는 있음" \
     '[ "$(cat $T/build.rc)" = 0 ] && grep -q "NX4_BUSYBOX=none" $T/build.out && [ ! -f $T/ux2/NX4/install/payload/bin/busybox ] && [ ! -f $T/ux2/BUSYBOX-LICENSE.txt ] && [ ! -f $T/ux2/NX4/install/payload/bin/busybox-LICENSE.txt ] && [ ! -f $T/ux2/HMGAPI-SOURCE.txt ] && [ -f $T/ux2/LICENSE ] && [ -f $T/ux2/NOTICE.md ]' || cat $T/build.out
-  # HMG-API 엔진(PC JVM)으로 설치: 가짜 헤드유닛. 이 모드는 HMG-API 1.1.0-rc.9 이상을 요구한다(mod.json "hmgapi").
+  # HMG-API 엔진(PC JVM)으로 설치: 가짜 헤드유닛. 이 모드는 HMG-API 1.1.0-rc.10 이상을 요구한다(mod.json "hmgapi").
   # 엔진은 자기 판(Engine.HMGAPI_VERSION)으로 그것을 보므로, HMGAPI_SRC가 그보다 낮으면 설치 시험을 할 수 없다
   MV=$(sed -n 's/.*"hmgapi": *">=\([^"]*\)".*/\1/p' $PKG/mod.json)
   HSV=$(sed -n 's/.*HMGAPI_VERSION = "\(.*\)";/\1/p' $HS/core/runtime/java/hmgapi/engine/Engine.java)

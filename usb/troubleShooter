@@ -64,11 +64,12 @@ MOD=nx4-kor
 WMOD=wireless-carplay-aa
 APP_ID=io.github.jayparklab.nx4kor
 # 이 설치기가 요구하는 HMG-API 최소 판(nx4-kor mod.json "hmgapi"와 같다. 공식 무선 모드 2.2.0-rc.9는 rc.8 이상).
-# 2.1.1부터 rc.9(2026-11-25 사용자 결정): rc.8 이하는 app_process를 스크립트로 바꾸는 LivePatch가 깔린 차에서 지우면 재부팅
-# 한두 번 뒤 Android가 뜨지 않고, 업데이트도 zygote 래퍼를 실제로 바꾸지 못한다(Open-HMG/HMG-API#397, docs/design.md
-# "다른 패키지·모드와 함께 쓸 때"). rc.8 차는 아래 "HMG-API 확인"이 스틱의 rc.9로 먼저 올린다.
+# 2.1.1부터 rc.10(2026-11-25·26 사용자 결정): rc.8 이하는 app_process를 스크립트로 바꾸는 LivePatch가 깔린 차에서 지우면 재부팅
+# 한두 번 뒤 Android가 뜨지 않고, 업데이트도 zygote 래퍼를 실제로 바꾸지 못한다. rc.9는 그런 차에 예전에 FORCE로 설치한
+# HMG-API를 올리면 마지막 순정 파일을 덮어써 Android가 뜨지 않는다. rc.10이 둘 다 고쳤다(Open-HMG/HMG-API#397, docs/design.md
+# "다른 패키지·모드와 함께 쓸 때"). rc.10보다 낮은 차는 아래 "HMG-API 확인"이 스틱의 HMG-API로 먼저 올린다.
 # 스틱의 두 모드가 더 높은 판을 요구하면 그 판을 쓴다(need_hmg). release.yml이 이 줄을 읽는다
-HMG_MIN=1.1.0-rc.9
+HMG_MIN=1.1.0-rc.10
 # 이 차의 map(HMG-API engine map-car --write가 쓴다)과 확인 결과(verify-map이 쓴다)
 LOCALMAP=$HMGDATA/state/local-map.json
 MAPCHK=$HMGDATA/state/map-check.json
