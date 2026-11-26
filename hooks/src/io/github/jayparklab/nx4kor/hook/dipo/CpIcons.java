@@ -1,9 +1,11 @@
 package io.github.jayparklab.nx4kor.hook.dipo;
-// exactIcon from StopDragon/HMG-API korea-build 6258357444cdd07539fc2bcc416b76eb8e07fc5a, mods/wireless-carplay-aa/src/hmgapi/mods/wireless/dipo/CpTurns.java (AGPL-3.0),
-// the Korean stock DiPO table on top of the official mod's icon() (VysseCodes, AGPL-3.0). Unchanged.
+// exactIcon and distStrState from StopDragon/HMG-API korea-build ebca56f3824a2234e48b336abda927d7a635e243, mods/wireless-carplay-aa/src/hmgapi/mods/wireless/dipo/CpTurns.java (AGPL-3.0):
+// the Korean stock DiPO table on top of the official mod's icon() (VysseCodes, AGPL-3.0), and the shown-distance
+// string state for the maneuver log. Unchanged.
 // Modified by NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-25 (#67): only exactIcon, in a class of its own.
+// Updated by NX4 KOR, 2026-11-26: taken again from KP's mod 2.4.10 (Korea Projection 1.8.1), distStrState added.
 
-/** KP CpTurns.exactIcon: the stock Korean DiPO icon for a CarPlay maneuver, 0 when the stock table has none. */
+/** KP CpTurns.exactIcon (the stock Korean DiPO icon for a CarPlay maneuver, 0 when the table has none) and distStrState. */
 final class CpIcons {
     private CpIcons() {}
 
@@ -81,6 +83,17 @@ final class CpIcons {
             case 52: return side == 0 && junction == 0 && exit == 0 ? 174 : 0;
             case 53: return side == 0 && junction == 0 && exit == 0 ? 173 : 0;
             default: return 0;
+        }
+    }
+
+    /** 2.4.10(1.8.1 T1-4): 표시 거리 문자열의 상태(로그용, CpTurnsFit도 씀): 0 없음·빈 값, 1 숫자(0 이상), 2 숫자 아님 */
+    static int distStrState(String s) {
+        if (s == null || s.length() == 0) return 0;
+        try {
+            float f = Float.parseFloat(s);
+            return Float.isNaN(f) || Float.isInfinite(f) || f < 0f ? 2 : 1;
+        } catch (NumberFormatException e) {
+            return 2;
         }
     }
 }

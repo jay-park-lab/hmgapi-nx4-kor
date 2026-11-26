@@ -46,10 +46,10 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
 
 | 이 저장소의 파일 | 가져온 곳 | 바꾼 것 |
 |---|---|---|
-| `hooks/src/io/github/jayparklab/nx4kor/hook/dipo/CpTurnsFit.java` | Korea Projection(StopDragon) `StopDragon/HMG-API` 브랜치 `korea-build` 커밋 `6258357444cdd07539fc2bcc416b76eb8e07fc5a`, `mods/wireless-carplay-aa/src/hmgapi/mods/wireless/dipo/CpTurnsFit.java`. 그 바탕은 공식 무선 모드의 `CpTurns.java`(VysseCodes)이고, 일부(대체 아이콘, 각도 띠, 다시 보내기, 차선 그림 `LaneGlyphs` 등)는 HMG-Seogaemo(seogaemo, https://github.com/seogaemo/hmg-seogaemo, 커밋 `26eeb97e`)에서 왔습니다(파일 머리말의 KP 줄) | 패키지, 로그(`Dipo.log` → `KorTbt.log`), `CpTurns.exactIcon` → `CpIcons.exactIcon`, 고르는 곳 `make()`를 뺌 |
+| `hooks/src/io/github/jayparklab/nx4kor/hook/dipo/CpTurnsFit.java` | Korea Projection(StopDragon) `StopDragon/HMG-API` 브랜치 `korea-build` 커밋 `ebca56f3824a2234e48b336abda927d7a635e243`(무선 모드 2.4.10, Korea Projection 1.8.1. 2026-11-25에는 `6258357`에서 가져왔고 2026-11-26에 다시 가져옴), `mods/wireless-carplay-aa/src/hmgapi/mods/wireless/dipo/CpTurnsFit.java`. 그 바탕은 공식 무선 모드의 `CpTurns.java`(VysseCodes)이고, 일부(대체 아이콘, 각도 띠, 다시 보내기, 차선 그림 `LaneGlyphs` 등)는 HMG-Seogaemo(seogaemo, https://github.com/seogaemo/hmg-seogaemo, 커밋 `26eeb97e`)에서 왔습니다(파일 머리말의 KP 줄) | 패키지, 로그(`Dipo.log` → `KorTbt.log`), `CpTurns.exactIcon`·`CpTurns.distStrState` → `CpIcons`, 고르는 곳 `make()`를 뺌, 진단 줄 한도 `DIAG_LOGS_MAX`를 1200에서 300으로(2026-11-26) |
 | `hooks/src/.../hook/dipo/CpTbt.java` | 같은 커밋의 `CpTbt.java` | 패키지 |
-| `hooks/src/.../hook/dipo/CpIcons.java` | 같은 커밋의 `CpTurns.java`의 `exactIcon`(순정 한국 DiPO 표, 공식 모드 `icon()` 바탕) | 그 함수만 따로 둠 |
-| `hooks/src/.../hook/dipo/PhoneBarOut.java` | 같은 커밋의 `PhoneBarOut.java`의 꼴 | 아무것도 보내지 않음(받는 쪽 `TrapBar`를 가져오지 않음) |
+| `hooks/src/.../hook/dipo/CpIcons.java` | 같은 커밋의 `CpTurns.java`의 `exactIcon`(순정 한국 DiPO 표, 공식 모드 `icon()` 바탕)과 `distStrState`(표시 거리 문자열 상태, 기록용) | 그 두 함수만 따로 둠 |
+| `hooks/src/.../hook/dipo/PhoneBarOut.java` | 커밋 `6258357`의 `PhoneBarOut.java`의 꼴(`ebca56f`에서도 같음) | 아무것도 보내지 않음(받는 쪽 `TrapBar`를 가져오지 않음) |
 | `hooks/stubs/com/tcc/iap2/*.java` 4개 | 공식 무선 모드(VysseCodes) `Open-HMG/hmgapi-wireless-cp-aa` 태그 `v2.2.0-rc.9`의 `wireless-carplay-aa/stubs/com/tcc/iap2/` | 그대로(컴파일할 때만 쓰고 `hooks.jar`에는 넣지 않음) |
 | `tests/fixtures/wireless-carplay-aa-2.2.0-rc.9-hooks.json` | 같은 태그의 `wireless-carplay-aa/mod.json`에서 `id`·`version`·`hooks.points`만 | 그 셋만 남김 |
 
