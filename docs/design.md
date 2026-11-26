@@ -64,10 +64,10 @@
   - QuickBoot에서 깨어나면(`woke`) 처음부터 다시 합니다.
   - 칩이 없는 차에서는 이 시도가 하나도 성공하지 못합니다.
 - **멈추는 법:** 지기는 `wifi/ap.boot`에 이번 부팅 id가 있으면 시도하지 않습니다(`ap_keep`). `nochip` 서비스(start `boot`, `restart` false)가 칩이 없는 부팅이면 그 id를 씁니다.
-  1. 순정 Wi-Fi 드라이버의 결과를 기다립니다(부팅 뒤 약 20초. 5초마다, 부팅 뒤 120초까지). 포기한 줄이 있어도 부팅 뒤 30초까지는 기다려 USB Wi-Fi 동글이 올라올 틈을 둡니다.
+  1. 순정 Wi-Fi 드라이버의 결과를 기다립니다(부팅 뒤 약 20초. 5초마다, 부팅 뒤 120초까지). 포기한 줄이 있어도 부팅 뒤 50초까지는 기다려 USB Wi-Fi 동글이 올라올 틈을 둡니다. 이 차는 부팅 약 40초에 앞쪽 USB 포트 전원을 껐다 켜서(`dwc_otg_vbus_set` OFF→ON), 꽂힌 장치가 43~44초에야 다시 보이기 때문입니다(11-26 진단 기록 4개, 동글 세션 지적).
   2. 칩이 없는 부팅인지 봅니다(`lib.sh` `nochip_now`). 이 내비에서 칩을 본 적이 없고(HMG-API `public/wifi-chip`, SDIO 장치), `wlan0`이 없고, USB Wi-Fi 동글일 수 있는 장치(`lib.sh` `dongle_present`: Realtek `0bda`·TP-Link `2357`, 동글 드라이버가 받는 `0bda:b812`·`2357:012d`·`0bda:b831`·`0bda:b851`의 만든 곳)가 없고, 커널 기록에 `failed to power up DHD generic adapter, max retry reached`가 있어야 합니다. 그 부팅에는 드라이버를 다시 올리지 않아 칩이 올라오지 않습니다(11-26 진단: 부팅 뒤 19분 동안 그 줄은 부팅 때 한 번뿐).
   3. 순정 핫스팟 기능 권한 파일(`/system/etc/permissions/com.hkmc.software.wifihotspot.xml`)과 프로젝션 AP 요청이 있을 때만, 이번 부팅 id를 이 모드의 기록 `/data/local/tmp/nx4-kor-nochip.txt`(관리 앱 판정·진단용)와 HMG-API `wifi/ap.boot`에 씁니다.
-  4. 그 뒤 `wifi` 폴더에서 파일이 지워질 때만 깨어나는 `inotifyd`(함께 넣은 busybox 1.36.1)를 띄워 둡니다. 지기가 깨어남에 `ap.boot`를 지우면 바로 다시 씁니다. 그 사이 시도는 한 번쯤입니다. 주기적으로 깨지 않습니다. 그때 칩·`wlan0`·동글이 보이면(나중에 꽂은 동글을 켜려고 `ap.boot`를 지운 경우 등) 다시 쓰지 않고, 칩 없음 기록을 지운 뒤 `inotifyd`를 멈추고 끝냅니다. `inotifyd`가 없는 busybox면 3까지만 합니다.
+  4. 그 뒤 `wifi` 폴더에서 파일이 지워질 때만 깨어나는 `inotifyd`(함께 넣은 busybox 1.36.1)를 띄워 둡니다. 지기가 깨어남에 `ap.boot`를 지우면 바로 다시 씁니다. 그 사이 시도는 한 번쯤입니다. 주기적으로 깨지 않습니다. 그때 칩·`wlan0`·동글이 보이면(나중에 꽂은 동글을 켜려고 `ap.boot`를 지운 경우 등) 다시 쓰지 않고, 칩 없음 기록을 지운 뒤 `inotifyd`를 멈추고 끝냅니다. 안 보여도 5초 뒤 한 번 더 보고 씁니다(포트 전원을 껐다 켜는 4초쯤에는 꽂힌 동글이 안 보임). 그래서 깨어날 때마다 지기의 시도는 두어 번 남습니다. `inotifyd`가 없는 busybox면 3까지만 합니다.
 - **차 이벤트를 쓰지 않는 까닭:** HMG-API `car_events`의 `wake`로도 깨어남을 받을 수 있습니다. 하지만 하나라도 쓰면 hmgapid가 HMG-API 차량 서비스(`hmgapi.vehicle.Hub`, 상주 Dalvik)를 띄웁니다(rc.10 `ModRuntime`). 이 차에서는 지금 그것을 쓰는 모드가 없어 돌지 않습니다.
 - **하지 않는 차:** 칩이 있는 차, 순정 핫스팟 기능이 없는 차, USB Wi-Fi 동글을 꽂은 차([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)·[#80](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/80)). 그때는 아무것도 쓰지 않고 끝납니다(상주 없음).
   - 동글을 꽂은 부팅에도 순정 드라이버가 먼저 올라 포기한 줄과 "`wlan0` 없음"이 생기고, 그 뒤에 동글 드라이버가 순정 자리에 올라 `wlan0`이 생깁니다(2.2.0 계획, #80 동글 세션 지적). 그래서 커널 줄과 `wlan0`만으로는 동글 차를 가르지 못해 USB 장치를 봅니다.
@@ -155,7 +155,7 @@
     - 관리 앱이 읽는 값은 이번 시작이 올린 뒤 값입니다. 커널 줄이 없으면 이번 부팅 횟수 4 이상, 또는 이번 부팅에 센 기록이 있고 `starts` 7 이상일 때 꺼진 것으로 봅니다. `hook/boot`가 다른 부팅 것이거나 없으면 `starts`는 지난 값이라 그것만으로 보지 않습니다.
     - 재부팅은 새 커널 부팅이라 다음 시작은 `starts`만 봅니다. 그래서 노랑·빨강을 `starts` 6에서 나눕니다.
   - HMG-API의 프로젝션 AP 기록은 HMG-API Wi-Fi 지기(rc.8 `engine/HomeWifi.java`, 서비스 `hmgapi wifi`)의 것입니다. 부팅마다 Android Wi-Fi 서비스가 뜨자마자 한 번 띄우고, 이번 부팅 id를 `wifi/ap.boot`(떴거나 이미 떠 있었음, Wi-Fi 클라이언트가 켜져 있어 두었음)나 `wifi/ap.fail`(다시 시도 중)에 씁니다. 그 줄은 `/data/hmgapi/logs/hmgapi/wifi.log`에 남습니다. 차가 나중에 끈 AP는 지기가 다시 켜지 않고, 폰이 붙을 때 공식 모드가 다시 켭니다(rc.8 `hmgapi.hook.Wifi.projectionAp`). 칩이 없는 부팅이면 이 모드의 `nochip` 서비스가 `ap.boot`를 써서 지기의 다시 시도를 멈춥니다(위).
-  - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `kor_hooks`·`kor_hooks_why`·`kor_tbt`·`kor_tbt_log`(이 모드의 한국 카플레이 길안내, 아래), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `nochip`·`nochip_mark`(이번 부팅에 칩이 없음, `nochip` 서비스가 `ap.boot`를 씀), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
+  - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `kor_hooks`·`kor_hooks_why`·`kor_tbt`·`kor_tbt_log`(이 모드의 한국 카플레이 길안내, 아래), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `nochip`·`nochip_mark`(이번 부팅에 칩이 없음, `nochip` 서비스가 `ap.boot`를 씀. 그때 `ap_boot`·`ap_fail`은 `no`로 내보냄), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
   - **한국 카플레이 길안내 줄**([#71](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/71), 2026-11-26): "자세히" 표의 "한국 카플레이 길안내" 칸에 HMG-API가 이 모드의 훅(#67)을 올렸는지 보입니다. DiPO 안에서 길안내를 시작했는지는 아닙니다(stepofspec 999 이상, 계기판 서비스 없음, 앱 부분 실패면 "켜짐"이어도 돌지 않음. HMG-API 앱 Logs 탭의 `CarPlay (NX4 KOR): … stays off`·`didn't start` 줄로 봄, PR #83 리뷰 4).
     - `kor_hooks`는 공식 모드의 `wm_hooks`와 같은 HMG-API 기록 줄(`mods: loaded nx4-kor …` / `mods: nx4-kor not loaded: <이유>`)에서, 같은 한 번의 읽기로 정합니다. 이유는 HMG-API 영문 그대로(지점·모드 이름뿐) `kor_hooks_why`에 200자까지 둡니다. rc.10의 지점 이유는 `hook point <지점> isn't mapped on this car (…)`, `… is mapped on this car only, which is enough for observe hooks: a change hook needs it …`(이 모드의 계기판 지점 8곳은 `change`), `… isn't one HMG-API has …`입니다(`engine/HookPlan.java`, PR #83 리뷰 1).
     - 부팅마다 그 부팅의 `hook map:` 줄이 `mods:` 줄보다 먼저 옵니다. 훅이 꺼진 부팅은 `mods:` 줄이 없으므로 `hook map:` 줄에서 두 모드의 값을 비웁니다(지난 부팅의 "loaded"가 남지 않음). 관리 앱은 HMG-API 훅이 꺼졌으면 이 칸을 "안 돎 (HMG-API 훅 꺼짐)"으로 보입니다(PR #83 리뷰 3).
@@ -296,7 +296,7 @@
     | `features.txt`, `permissions-ls.txt`, `featurexml-<onebin>.cfg` | 지금 켜진 순정 기능(`pm list features`), `/system/etc/permissions` 목록, 기능을 지우는 순정 설정 사본. Wi-Fi 칩 전원이 달린 순정 핫스팟 기능이 켜졌는지 봅니다(2.0.x 자동 설정의 "핫스팟 기능을 먼저 켜는 갈래") |
     | `hmgapi-status.txt` | `hmgapid engine status`. HMG-API가 바꾼 파일마다 순정·기대·지금 md5가 있어, 모드가 적용된 뒤에도 순정 md5를 압니다 |
     | `car-report.txt`, `car-report-*.json`·`.md` | `hmgapid engine report`(HMG-API Car Report)의 출력과 보고서 파일. 이 차에서 찾은 훅 지점(`map_car`), map 확인, 기능, 모드, 오류가 들어 있습니다. HMG-API가 VIN·일련번호를 넣지 않고 기록 줄을 가립니다 |
-    | `logs/` | 이 모드의 `ap.log`, 서비스 기록(`/data/hmgapi/logs/nx4-kor/`), `/data/local/tmp/nx4-kor/*.txt`(map 만들기·확인·계획·적용 결과), `/data/local/tmp/nx4-kor-*.txt`(상태 파일), HMG-API 설치 기록 |
+    | `logs/` | 이 모드의 `ap.log`, 서비스 기록(`/data/hmgapi/logs/nx4-kor/`, `nochip.log` 포함), `/data/local/tmp/nx4-kor/*.txt`(map 만들기·확인·계획·적용 결과), `/data/local/tmp/nx4-kor-*.txt`(상태 파일, 칩 없음 기록), HMG-API 설치 기록, HMG-API Wi-Fi 지기 기록(`hmgapi-wifi.log`, 2.1.2-beta.4부터) |
     | `dongle/` | USB Wi-Fi 동글 드라이버를 이 차 커널에 맞춰 빌드하고 순정 HAL 자리에 잇는 데 필요한 것([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48) 1단계). 아래 표 |
 
   - `dongle/`(설치기 `diag_dongle`, 읽기만 함):
@@ -371,7 +371,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - **Wi-Fi 부품이 없는 차에서 관리 앱이 "부품 없음"을 보이고 HMG-API의 다시 시도가 멈추는지**(2026-11-23 NX4HEV 260902, 2.0.4-beta.1에서 순정 핫스팟 기능을 켜도 칩이 올라오지 않음, #38. 다시 시도 멈추기는 2.1.2-beta.4부터).
   - 재부팅 뒤 USB 진단 기록 `logs/service/nochip.log`에 "Wi-Fi 칩 없음(순정 드라이버가 이번 부팅에 칩 켜기를 포기함): HMG-API의 프로젝션 AP 다시 시도를 이번 부팅에 멈춤"이 남고, `logs/nx4-kor-nochip.txt`가 그 부팅 id인지. 상태 파일은 `nochip=yes`, `nochip_mark=yes`
   - 관리 앱 판정이 부팅 직후부터 `nowifipart`(노랑, "Wi-Fi 부품이 없는 것으로 보여…")인지(5분 동안 "켜는 중"이 나오지 않아야 함). 표의 "Wi-Fi 칩"이 "안 보임", "순정 핫스팟 기능"이 "예"인지
-  - 진단 기록 `logs/hmgapi-wifi.log`에 그 부팅의 `projection AP: not up yet, trying again (…)`이 없거나 한 줄뿐인지(서비스가 지기의 첫 시도보다 늦으면 한 줄 남음)
+  - 다시 시도가 멈췄는지는 기록으로 직접 볼 수 없습니다. rc.10 지기는 `projection AP: not up yet, trying again (…)`을 부팅마다 처음 실패할 때 한 줄만 남기고 그 뒤 시도는 남기지 않습니다(고치기 전에도 한 줄, PR #86 리뷰 2). 그래서 `nochip.log`의 줄과 `nochip_mark=yes`, adb가 있으면 `/data/hmgapi/wifi/ap.boot`가 그 부팅 id인지로 봅니다(지기는 그 파일이 이번 부팅 것이면 시도하지 않음). 상태 파일의 `ap_boot`·`ap_fail`은 이때 `no`입니다
   - 차를 1분 넘게 껐다가 QuickBoot로 다시 켰을 때 `hmgapi-wifi.log`에 `back from a suspend`, `nochip.log`에 "HMG-API가 ap.boot를 지움(QuickBoot에서 깨어남): 다시 씀"이 한 줄씩 남는지
   - 유선 카플레이·안드로이드 오토와 계기판 길안내(공식 모드)가 그대로인지
   - 2026-11-25 2.1.0-beta.3과 11-26 2.1.2-beta.3에서는 부팅 뒤 5분 동안 `apwait`였다가 `nowifipart`로 바뀌었습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23), 11-26 진단 기록 `launch.log`). 결과와 유선 연결·계기판 길안내는 [#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64), 동글로 무선을 보는 일은 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적습니다.

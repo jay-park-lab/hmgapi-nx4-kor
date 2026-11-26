@@ -181,6 +181,9 @@ st_collect() {
   # 기록 뒤에 동글을 꽂았으면(칩·wlan0·동글이 보임) 기록을 믿지 않는다(lib.sh nochip_mark)
   K_NOCHIPW=$(yesno nochip_mark); K_NOCHIP=$K_NOCHIPW; [ $K_NOCHIP = yes ] || K_NOCHIP=$(yesno nochip_now)
   K_PROJ=$(yesno proj_asked $WM_ID); K_APBOOT=$(yesno this_boot $HMGWIFI/ap.boot); K_APFAIL=$(yesno this_boot $HMGWIFI/ap.fail)
+  # nochip.sh가 쓴 ap.boot는 AP가 뜬 것이 아니고, 그 뒤 지기는 다시 시도하지 않는다. 그래서 ap_boot·ap_fail을 둘 다 no로 둔다:
+  # 관리 앱 표가 "이번 부팅에 켰다가 꺼짐"·"다시 시도 중"을 보이지 않고, apoff 판정에도 들지 않는다(PR #86 리뷰 1)
+  [ $K_NOCHIPW = yes ] && { K_APBOOT=no; K_APFAIL=no; }
   K_UP=$(up_s); case "$K_UP" in ''|*[!0-9]*) K_UP= ;; esac
   # HMG-API 부팅 보호. HMG-API가 설치돼 있을 때만 본다(지운 차·disable로 끈 차는 starts가 남아도 아님).
   # 이번 부팅 커널 로그에 zygote 줄이 있으면 그것을 따른다(마지막 줄: guard면 맞음, on·다른 off면 아님). 줄이 없을 때만(로그가
@@ -274,9 +277,9 @@ st_verdict() {
     # 이번 부팅에 칩이 없음(nochip.sh 기록 또는 lib.sh nochip_now: 이 내비에서 칩을 본 적 없음, wlan0 없음, 순정 드라이버가 이번 부팅에 칩 켜기를
     # 포기함). 그 부팅에는 칩이 올라오지 않으므로 아래 "켜는 중"(부팅 뒤 5분)을 기다리지 않는다. 핫스팟 기능은 아래와 같이 본다
     _vs nowifipart 1 "$NOWIFI_MSG"
-  elif [ "$K_APBOOT" = yes ] && [ "$K_NOCHIPW" = no ]; then
+  elif [ "$K_APBOOT" = yes ]; then
     # 이번 부팅에 떴다가 지금은 꺼짐(차가 끈 것은 HMG-API 지기가 다시 켜지 않는다). 폰이 붙을 때 공식 모드가 다시 켠다(HMG-API rc.8).
-    # svc/nochip.sh가 쓴 ap.boot(칩 없는 부팅, 핫스팟 기능이 꺼진 드문 경우)는 뜬 것이 아니므로 여기에 넣지 않는다
+    # svc/nochip.sh가 쓴 ap.boot는 위 st_collect에서 빼 두었다(칩 없는 부팅, 핫스팟 기능이 꺼진 드문 경우도 여기에 들지 않음)
     _vs apoff 1 "무선 연결용 Wi-Fi가 지금 꺼져 있습니다. 폰을 연결해 보고, 안 되면 내비를 재부팅해 주세요."
   elif [ -z "$K_UP" ] || [ "$K_UP" -lt "$AP_WAIT" ]; then
     # 부팅 뒤 AP_WAIT(5분) 전: 지기는 첫 시도가 실패하면 바로 ap.fail을 쓰고 다시 시도한다. 칩이 SDIO에 늦게 올라오는 첫 부팅도 있어
