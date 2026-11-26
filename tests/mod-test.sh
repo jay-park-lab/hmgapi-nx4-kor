@@ -69,12 +69,23 @@ for k in ("parts", "feature_flags", "wifi", "conflicts", "requires", "logs", "pr
 PY'
 check "빠진 것: 한국 포크 무선 모드(레시피·libleafiaaac.so·patches.json, wireless/), 핫스팟 서비스(svc/ap.sh·hotspot.sh, scripts/post.sh), 만든 hooks.jar(빌드가 넣음)" \
   '[ ! -e $PKG/hooks.jar ] && [ ! -e $PKG/recipes ] && [ ! -e $PKG/files ] && [ ! -e $PKG/patches.json ] && [ ! -e $B/wireless ] && [ ! -e $PKG/svc/ap.sh ] && [ ! -e $PKG/svc/hotspot.sh ] && [ ! -e $PKG/scripts/post.sh ] && [ -f $PKG/svc/lib.sh ]'
-check "settings.json: 한국 길안내(kor_tbt)와 그 진단 줄(kor_tbt_log)만, 둘 다 켜기 기본·다시 시작해 적용" 'python3 - "$PKG" <<PY
-import json, os, sys
+# kor_tbt_log(#77, 2026-11-26 사용자 결정): 베타는 켬(#67 차 확인), 정식 2.1.2부터 끔. 꼬리 없는 판(정식)이 2.1.2 이상이면
+# 기본 끔이어야 한다(release/의 판에서 꼬리를 떼는 커밋에서 함께 바꿈. develop의 뒤처진 2.1.1은 대상 아님).
+# KorTbt가 settingBoolean에 주는 기본값도 settings.json과 같아야 한다
+check "settings.json: 한국 길안내(kor_tbt, 기본 켬)와 그 진단 줄(kor_tbt_log)만, 다시 시작해 적용. kor_tbt_log는 베타 켬·정식 2.1.2부터 끔, KorTbt의 기본값과 같음" 'python3 - "$PKG" "$B/hooks/src/io/github/jayparklab/nx4kor/hook" <<PY
+import json, os, re, sys
 s = json.load(open(os.path.join(sys.argv[1], "settings.json")))
+m = json.load(open(os.path.join(sys.argv[1], "mod.json")))
 assert s["version"] == 1
-got = [(x["key"], x["type"], x["default"], x["apply"]) for x in s["settings"]]
-assert got == [("kor_tbt", "toggle", True, "restart"), ("kor_tbt_log", "toggle", True, "restart")], got
+got = [(x["key"], x["type"], x["apply"]) for x in s["settings"]]
+assert got == [("kor_tbt", "toggle", "restart"), ("kor_tbt_log", "toggle", "restart")], got
+d = {x["key"]: x["default"] for x in s["settings"]}
+assert d["kor_tbt"] is True, d
+v = m["version"]
+formal = "-" not in v and tuple(int(n) for n in v.split(".")) >= (2, 1, 2)
+assert d["kor_tbt_log"] is (not formal), (v, d)
+part = open(os.path.join(sys.argv[2], "dipo", "KorTbt.java")).read()
+assert ("settingBoolean(\"kor_tbt_log\", %s)" % ("true" if d["kor_tbt_log"] else "false")) in part
 for x in s["settings"]:
     assert x["title"] and x["description"], x
 PY'
@@ -94,13 +105,20 @@ m = json.load(open(sys.argv[1]))
 entry = open(sys.argv[2] + "/Nx4KorHooks.java").read()
 part = open(sys.argv[2] + "/dipo/KorTbt.java").read()
 assert "settingBoolean(\"kor_tbt\", true)" in entry
-assert "settingBoolean(\"kor_tbt_log\", true)" in part
+assert "settingBoolean(\"kor_tbt_log\", " in part   # its default is checked against settings.json above (#77)
+# #77: CpTurnsFit sends through ClusterOut, which skips a call the official mod already carried (TbtGate.skipOurs)
+fit = open(sys.argv[2] + "/dipo/CpTurnsFit.java").read()
+assert "final ClusterOut cluster;" in fit and "CpTurnsFit(Context context, ClusterOut cluster, Runnable restart)" in fit
+assert "new CpTurnsFit(app.context, new ClusterOut(c, gate)," in part
 assert "\"com.daudio.app.dipo\"" in entry and "\"io.github.jayparklab.nx4kor.hook.dipo.KorTbt\"" in entry
 assert "LISTENER_ROUTE_GUIDANCE = 4096" in part
 a = re.search(r"CLUSTER_POINTS = \{(.*?)\};", part, re.S).group(1)
 got = sorted(re.findall(r"\"(update_[a-z0-9_]+)\"", a))
 want = sorted(p.split(".")[-1] for p, v in m["hooks"]["points"].items() if v == "change")
 assert got == want, (got, want)
+# ClusterOut checks the same 8 calls, each by the point name the hook records ours under (#77)
+out = open(sys.argv[2] + "/dipo/ClusterOut.java").read()
+assert sorted(re.findall(r"if \(skip\(\"(update_[a-z0-9_]+)\"", out)) == got, out
 assert "\"dipo.iap2_proxy.stop_route_guidance\"" in part
 # 판단은 TbtGate가 한다(아래 호스트 테스트): 우리 호출 기록, 남의 호출에 줄 인자, 남의 Stop 미루기, 비켜 주기, 앱에서 끔
 for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), mod.enabled())",
@@ -114,7 +132,7 @@ if command -v javac >/dev/null 2>&1; then
   mkdir -p $T/gate
   javac --release 8 -Xlint:-options -nowarn -d $T/gate $HK/dipo/TbtGate.java $B/tests/tools/TbtGateTest.java > $T/gate.err 2>&1
   java -cp $T/gate io.github.jayparklab.nx4kor.hook.dipo.TbtGateTest > $T/gate.out 2>&1
-  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음)" \
+  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음), 공식 모드가 우리 최신 값을 900ms 안에 실어 보냈으면 같은 값의 우리 호출을 건너뜀(#77)" \
     'tail -n 1 $T/gate.out | grep -qx ok && ! grep -q "^FAIL" $T/gate.out' || cat $T/gate.err $T/gate.out
 else
   echo "skip TbtGate 테스트(javac 없음)"

@@ -15,7 +15,7 @@
       "default": true,
       "apply": "restart",
       "title": "Log the CarPlay turn-by-turn diagnosis",
-      "description": "Adds Korea Projection's diagnosis lines: the near-turn decision (lanes, distance, D), what was sent to the cluster, lanes, and the navigation app's first name. Numbers otherwise, when they change, a few hundred lines at most per start. Off, these are still logged: the maneuver values received (type, side, junction, angle, up to 300 lines), the HUD list sent, a change of navigation app (both app names) and turn-by-turn cleared. No road or place names either way."
+      "description": "Adds Korea Projection's diagnosis lines: the near-turn decision (lanes, distance, D), what was sent to the cluster, lanes, and the navigation app's first name. Numbers otherwise, when they change, a few hundred lines at most per start. With it, the HUD list sent too (up to 300 lines; the official mod logs its own). Off, these are still logged: the maneuver values received (type, side, junction, angle, up to 300 lines), a change of navigation app (both app names) and turn-by-turn cleared. No road or place names either way. On in betas, off from the 2.1.2 release."
     }
   ]
 }
