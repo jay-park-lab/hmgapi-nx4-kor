@@ -16,7 +16,8 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 // Modified by NX4 KOR, 2026-11-26 (owner's decision, fewer far-turn icon cards on the cluster): D_GENERAL 350 -> 600 m,
 //   so the near-turn view (road picture and distance bar) opens 600 m before a turn on ordinary roads; expressway
 //   exits stay at 1050 m and D still shrinks to a shorter first distance (dynamicD). Stock windows seen on a NEEV KOR
-//   were 150-600 m (HMG-Seogaemo .agents/cluster-ar-view.md); Leafia uses 457 m, HMG_Phone_Projection_TBT 400 m.
+//   were 150-600 m (HMG-Seogaemo .agents/cluster-ar-view.md); the official mod's GUIDE_WINDOW is 457 m,
+//   HMG_Phone_Projection_TBT's default 400 m.
 // Modified by Korea Projection (StopDragon/HMG-API, branch korea-build), 2026-11-07:
 //   - an icon for every maneuver (angle bands, then the type alone, then the blank icon 8);
 //     turn() no longer stops before the distance, HUD and trip when the exact table has none
@@ -244,7 +245,7 @@ final class CpTurnsFit implements CpTbt {
     /**
      * 1.7.4(2.4.3, 소유자 결정 2026-11-15 "D값을 고정하지 않기"): 이 회전의 D = max(D_MIN, min(기준 D, nearFirst)).
      * nearFirst는 이 회전이 안내되기 시작한 뒤(회전이 바뀐 뒤 처음 받은 유효한 남은 거리) 본 가장 긴 남은 거리다.
-     * 그래서 앞 회전 직후 100m 앞 회전은 D=100m(막대가 가득 찬 채 시작), 처음 거리가 기준보다 길면 기준 D(일반 600m, KP는 350m·고속도로 1050m)에서 들어간다.
+     * 그래서 앞 회전 직후 100m 앞 회전은 D=100m(막대가 가득 찬 채 시작), 처음 거리가 기준보다 길면 기준 D(일반 600m(KP는 350m), 고속도로 출구 1050m)에서 들어간다.
      * 거리가 도로 늘면(차가 되돌아감·경로 바뀜) 그만큼 D도 늘고(기준까지), 재탐색·새 경로·다른 회전이면 처음부터 다시 잡는다.
      * 큰 그림 진입·경계 여유·막대가 모두 같은 D를 쓴다.
      * 순정 내비와 다른 점: 순정 내비는 D를 줄이지 않는다(차 로그 2026-11-09 15:29:36 바로 다음 회전이 210m에서 막대 60,
@@ -313,7 +314,8 @@ final class CpTurnsFit implements CpTbt {
     /**
      * 곧 회전 화면을 쓰기 시작하는 거리 D(m). KP는 일반 350(순정 교차로 확대 안내 단계 5 + MarginalDist 50, 차-1 설정 파일),
      * 고속도로 1050. NX4 KOR(2026-11-26 소유자 결정): 일반을 600으로 늘려 먼 회전 아이콘 칸을 줄인다. 근거: 서개모가 NEEV KOR에서 본
-     * 순정 창 150~600m(시내 150~375m, 고속도로 580~600m), Leafia 457m, HMG_Phone_Projection_TBT 400m. 고속도로 출구는 그대로
+     * 순정 창 150~600m(시내 150~375m, 고속도로 580~600m), 공식 모드 GUIDE_WINDOW 457m, HMG_Phone_Projection_TBT 기본 400m.
+     * 고속도로 출구는 그대로
      */
     static final int D_GENERAL = 600, D_EXPRESSWAY = 1050;
     /** 곧 회전 표시 번호(순정 SetCase*): 회전 지점 13, 유턴 31, 고속도로 오른쪽·왼쪽 출구 17·18. 갈림도 13(1.8.0, 전에는 Y자 25) */
@@ -1118,7 +1120,8 @@ final class CpTurnsFit implements CpTbt {
         // 곧이어 새 회전이 오면 미루지 않고 그 값으로 받고, 새 회전이 오지 않으면(되돌아감·재탐색 없는 경로 변경) 다음 갱신이나
         // refresh()에서 지금처럼 D를 늘려 받아들인다.
         // 4차 리뷰 중간 1: 뛴 값을 받아도 곧 회전이 유지될 때만 붙잡는다. 받으면 멀리 있음이 될 값이면 바로 보낸다
-        // (잘못 나간 큰 그림을 한 번 더 붙잡지 않게. 카카오 6@485처럼 멀리 있음이 바른 출력인 경우도 바로 나감)
+        // (잘못 나간 큰 그림을 한 번 더 붙잡지 않게. D 밖이라 멀리 있음이 바른 출력인 경우도 바로 나감: KP의 D 350m 때 카카오 6@485,
+        // D 600m인 지금은 예컨대 6@700)
         if (!newKey && u.distNextFresh && !jumpPending && u.nearPrevLast >= 0
                 && ((u.nearPrevLast <= D_MIN && remain > u.nearPrevLast + NEAR_PASS_RISE) || remain > u.nearPrevLast + NEAR_NEW_TURN_JUMP)
                 && staysNear(x, icon, u, remain)) {
