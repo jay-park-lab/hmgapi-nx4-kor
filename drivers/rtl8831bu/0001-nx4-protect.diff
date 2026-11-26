@@ -3,8 +3,9 @@ nx4-protect: 동글을 쓰다 뽑거나 동글이 망가졌을 때 내비 커널
 차에서 아직 확인하지 않았다(#48 차 확인). 하는 일(drivers/README.md "보호 패치"):
   1. 뽑힘(rtw_dev_remove): USB 장치가 이미 떨어졌으면 네트워크 장치를 내리기 전에 surprise removed로 둔다
   2. 열기(netdev_open): 내리는 중이거나 USB 장치가 떨어졌으면 -ENODEV
-  3. 수신 오류(rtw_usb_read_port_complete): 1초 안에 100번을 넘으면 surprise removed·drv stopped로 두어 phl이 다시 걸지
-     못하게 한다. 되살리기는 모듈을 다시 올리기(Wi-Fi 끄고 켜기·재부팅·다시 꽂기)
+  3. 수신 오류(rtw_usb_read_port_complete): 1초 안에 100번을 넘으면 surprise removed·drv stopped. 이 드라이버의 phl은 오류
+     뒤에 다시 걸지 않아, 보통은 걸린 요청이 줄어 수신이 기록 없이 멈출 뿐이다. 이것은 phl 지연 타이머가 요청을 다시 채우며
+     오류가 몰리는 좁은 경우만 막는다. 수신이 멈추면 되살리기는 모듈 다시 올리기(Wi-Fi 끄고 켜기·재부팅·다시 꽂기)
   RTL88x2BU의 네 번째(풀기 전 tasklet_kill)는 넣지 않는다. 이 드라이버의 tasklet은 phl 처리기라 phl 정리가 tasklet_kill을
   한다(phl/pltfm_ops_linux.h _os_tasklet_deinit)
 기록은 dmesg의 "nx4-protect:" 줄(printk).
@@ -60,20 +61,23 @@ nx4-protect: 동글을 쓰다 뽑거나 동글이 망가졌을 때 내비 커널
  	/*rtw_dump_stack();*/
 --- a/os_dep/linux/usb_ops_linux.c
 +++ b/os_dep/linux/usb_ops_linux.c
-@@ -454,6 +454,28 @@
+@@ -453,7 +453,31 @@
+ 
  
  }
- 
-+/* nx4-protect: 수신이 오류로 끝나면 phl이 수신 요청을 다시 건다(rtw_phl_post_in_complete → _phl_rx_start_usb). 장치가
-+ * 망가졌거나 반쯤 뽑혀 오류와 성공이 섞여 오면, 드라이버의 연속 오류 세기(continual_io_error, 한 번 성공하면 0)로는 멈추지
-+ * 않고 계속 돈다. 그래서 성공과 상관없이 1초 안에 NX4_RXERR_LIMIT번을 넘으면 surprise removed·drv stopped로 둔다. 그러면
-+ * rtw_usb_read_port가 RTW_CANNOT_RX로 다시 걸기를 거절한다. 되살리려면 모듈을 다시 올린다(순정 HAL은 Wi-Fi를 끌 때
-+ * bcmdhd를 내리므로 Wi-Fi 끄고 켜기, 재부팅, 동글 다시 꽂기) */
++
++/* nx4-protect: 수신이 오류로 끝나면 phl은 그 버퍼를 놀림 목록에 돌려놓기만 하고 다시 걸지 않는다(phl_pend_rxbuf_usb는
++ * 성공·INVALID_PARAM일 때만 _phl_in_token_usb를 부른다). 그래서 보통은 오류마다 걸린 수신 요청(최대 NR_RECV_URB개)이 하나씩
++ * 줄어 수신이 이 기록 없이 멈출 뿐, 오류가 계속 돌지는 않는다. 다만 성공 뒤 다시 걸기에 실패하면 phl의 10ms 지연 타이머
++ * (_phl_rx_deferred_in_token)가 요청을 다시 채우므로, 그때 오류가 몰리는 좁은 경우만 막는다: 성공과 상관없이 1초 안에
++ * NX4_RXERR_LIMIT번을 넘으면 surprise removed·drv stopped로 두어 rtw_usb_read_port가 RTW_CANNOT_RX로 거절하게 한다.
++ * 수신이 멈추면(이 기록 없이 멈춘 경우 포함) 되살리려면 모듈을 다시 올린다(순정 HAL은 Wi-Fi를 끌 때 bcmdhd를 내리므로
++ * Wi-Fi 끄고 켜기, 재부팅, 동글 다시 꽂기. PR #81 리뷰 3) */
 +#define NX4_RXERR_LIMIT 100
 +static void nx4_rx_error_flood(struct dvobj_priv *d)
 +{
 +	unsigned long now = jiffies;
-+
+ 
 +	if (d->nx4_rxerr_cnt == 0 || time_after(now, d->nx4_rxerr_since + HZ)) {
 +		d->nx4_rxerr_since = now;
 +		d->nx4_rxerr_cnt = 0;
@@ -89,7 +93,7 @@ nx4-protect: 동글을 쓰다 뽑거나 동글이 망가졌을 때 내비 커널
  static void rtw_usb_read_port_complete(struct urb *urb, struct pt_regs *regs)
  {
  	struct lite_data_buf *literecvbuf =
-@@ -522,6 +544,7 @@
+@@ -522,6 +546,7 @@
  
  		if (rtw_inc_and_chk_continual_io_error(dvobj) == _TRUE)
  			dev_set_surprise_removed(dvobj);

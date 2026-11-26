@@ -1539,8 +1539,14 @@ check "drivers/rtl8831bu: 패치는 번호 차례(0001 보호, 0002 HAL 맞춤, 
   '[ "$(ls $P8/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-nx4-protect.diff 0002-nx4-hal.diff 0003-nx4-build.diff " ] && ! grep -h "^+++ " $P8/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_driver rtl8831bu \"\$RTL8831BU_COMMIT\" /work/nx4/rtl8831bu bcmdhd .*\"\$EXPECTED_CFLAGS_SHA256_8831BU\" USER_EXTRA_CFLAGS \$P2" $B/drivers/build-in-container.sh && grep -q "report_driver rtl8831bu" $B/drivers/build-in-container.sh && grep -q "get_driver rtl8831bu \"\$RTL8831BU_GIT\" \"\$RTL8831BU_COMMIT\"" $B/drivers/build-in-container.sh && grep -q "cat out/drivers/tcc803x/rtl8831bu/bcmdhd.ko.txt" $B/.github/workflows/drivers.yml'
 check "drivers/rtl8831bu: HAL 인자(iface_name을 ifname으로, firmware_path·nvram_path는 받아 두기만), 빌드 맞춤(디버그 로그 끔, rtw_warn_on_cnt를 ATOMIC_INC에 넘기지 않음)" \
   'grep -q "^+module_param_named(iface_name, ifname, charp, 0644);" $P8/0002-nx4-hal.diff && grep -q "^+module_param_string(firmware_path" $P8/0002-nx4-hal.diff && grep -q "^+module_param_string(nvram_path" $P8/0002-nx4-hal.diff && grep -q "^+CONFIG_RTW_DEBUG = n$" $P8/0003-nx4-build.diff && grep -q "^-CONFIG_RTW_DEBUG = y$" $P8/0003-nx4-build.diff && grep -q "^-		ATOMIC_INC((ATOMIC_T \*)&rtw_warn_on_cnt);" $P8/0003-nx4-build.diff && grep -q "^+		rtw_warn_on_cnt++;" $P8/0003-nx4-build.diff'
+# 리뷰 81-1: 3.18에 없는 strscpy를 부르지 않게(drv_conf.h의 strlcpy→strscpy 정의를 빼고 os_intfs.c 다섯 곳을 strlcpy로)
+check "drivers/rtl8831bu 빌드 맞춤: strlcpy를 strscpy로 바꾸던 정의를 빼고, rtw_ethtool_get_drvinfo의 strscpy 다섯 곳을 strlcpy로" \
+  'grep -q "^-#define strlcpy(a, b, c) strscpy(a, b, c)$" $P8/0003-nx4-build.diff && [ "$(grep -c "^+[[:space:]]*strlcpy(info->" $P8/0003-nx4-build.diff)" = 5 ] && [ "$(grep -c "^-[[:space:]]*strscpy(info->" $P8/0003-nx4-build.diff)" = 5 ] && ! grep -q "^+[[:space:]]*strscpy(" $P8/0003-nx4-build.diff'
 check "drivers/rtl8831bu 보호 패치: 뽑힘 때 USB_STATE_NOTATTACHED면 먼저 surprise removed, 열기 거부(-ENODEV), 수신 오류 1초 100번이면 surprise removed·drv stopped, 기록은 printk, 되살리기는 모듈 다시 올리기" \
   '[ "$(grep -c "^+.*interface_to_usbdev(pusb_intf)->state == USB_STATE_NOTATTACHED" $P8/0001-nx4-protect.diff)" = 1 ] && grep -q "^+		dev_set_surprise_removed(dvobj);" $P8/0001-nx4-protect.diff && grep -q "^+		return -ENODEV;" $P8/0001-nx4-protect.diff && grep -q "^+#define NX4_RXERR_LIMIT 100$" $P8/0001-nx4-protect.diff && [ "$(grep -c "^+		nx4_rx_error_flood(dvobj);" $P8/0001-nx4-protect.diff)" = 1 ] && grep -q "^+	dev_set_drv_stopped(d);" $P8/0001-nx4-protect.diff && ! grep -q "^+.*RTW_PRINT" $P8/0001-nx4-protect.diff && [ "$(grep -c "^+.*printk(KERN_[A-Z]* \"nx4-protect: " $P8/0001-nx4-protect.diff)" = 3 ] && grep -q "되살리려면 모듈을 다시 올린다" $P8/0001-nx4-protect.diff && grep -q "두 드라이버와 자리 하나" $B/drivers/README.md'
+# 리뷰 81-3: phl은 오류 뒤 다시 걸지 않는다(성공·INVALID_PARAM 뒤에만). 수신이 기록 없이 멈출 수 있다고 적고 차 확인에 둔다
+check "drivers/rtl8831bu 보호 패치·README: 수신 설명이 phl 동작(오류 뒤 다시 걸지 않아 요청이 줄어 멈춤)과 맞고, 기록 없이 멈추는지 차 확인에 있음" \
+  'grep -q "다시 걸지 않는다(phl_pend_rxbuf_usb는" $P8/0001-nx4-protect.diff && ! grep -q "phl이 수신 요청을 다시 건다" $P8/0001-nx4-protect.diff && grep -q "수신이 기록 없이 멈춥니다" $B/drivers/README.md && grep -q "RTL8831BU: \`nx4-protect:\` 줄 없이 수신만 멈추는지" $B/drivers/README.md'
 # 보호 패치의 네 곳(drivers/README.md "보호 패치")과 기록 방식(RTW_PRINT는 CONFIG_RTW_DEBUG=n이면 컴파일되지 않아 printk)
 PD=$B/drivers/rtl88x2bu/0001-nx4-protect.diff
 check "drivers 보호 패치: 뽑힘 때 USB_STATE_NOTATTACHED면 먼저 surprise removed, 풀기 전 tasklet_kill 둘, 열기 거부(-ENODEV), 수신 오류 1초 100번이면 다시 걸지 않음(두 곳), 기록은 printk" \
@@ -1585,6 +1591,22 @@ if [ -e $KS/nb/shasum ]; then
   check "drivers/config-sum.sh: sha256sum이 없으면 shasum -a 256으로 세어 같은 결과(\"같음\")" \
     '[ "$(cat $KS/sha.rc)" = 0 ] && grep -q "^같음: " $KS/sha.out' || cat $KS/sha.out
 fi
+# 리뷰 81-2: lib.sh kernel_exports·check_ksyms. 가짜 커널 트리(EXPORT_SYMBOL 여러 꼴, .S, params.c의 STANDARD_PARAM_DEF)로
+KX=$T/kx; mkdir -p $KX/k/kernel $KX/k/lib $KX/k/arch
+printf 'EXPORT_SYMBOL(foo);\nEXPORT_SYMBOL_GPL( bar );\nint baz; /* EXPORT_SYMBOL(no_such) 같은 주석은 들어가도 됨 */\n' > $KX/k/lib/a.c
+printf 'EXPORT_SYMBOL(__aeabi_x)\n' > $KX/k/arch/b.S
+printf 'STANDARD_PARAM_DEF(int, int, "%%i", kstrtoint);\nSTANDARD_PARAM_DEF(uint, unsigned int, "%%u", kstrtouint);\n' > $KX/k/kernel/params.c
+bash -c '. "$1"; kernel_exports "$2"' x $B/drivers/lib.sh $KX/k > $KX/exports.txt
+printf 'foo\nbar\n__aeabi_x\nparam_ops_int\nparam_ops_uint\nfoo\n' > $KX/ok.txt
+printf 'foo\nstrscpy\nparam_ops_int\n' > $KX/bad.txt
+(bash -c '. "$1"; check_ksyms "$2" "$3"' x $B/drivers/lib.sh $KX/ok.txt $KX/exports.txt) > $KX/ok.out 2>&1; echo $? > $KX/ok.rc
+(bash -c '. "$1"; check_ksyms "$2" "$3"' x $B/drivers/lib.sh $KX/bad.txt $KX/exports.txt) > $KX/bad.out 2>&1; echo $? > $KX/bad.rc
+check "drivers/lib.sh kernel_exports: EXPORT_SYMBOL·EXPORT_SYMBOL_GPL(빈칸 포함)·.S의 이름과 STANDARD_PARAM_DEF의 param_ops_*를 정렬해 냄" \
+  'for n in __aeabi_x bar foo param_ops_int param_ops_uint; do grep -qx "$n" $KX/exports.txt || exit 1; done; [ "$(LC_ALL=C sort -u $KX/exports.txt | cmp -s - $KX/exports.txt; echo $?)" = 0 ]' || cat $KX/exports.txt
+check "drivers/lib.sh check_ksyms: 부르는 것이 모두 내보내는 것이면 통과(개수), 하나라도 없으면 그 이름을 보이고 실패" \
+  '[ "$(cat $KX/ok.rc)" = 0 ] && grep -q "부르는 것 5개가 모두 커널이 내보내는 것" $KX/ok.out && [ "$(cat $KX/bad.rc)" != 0 ] && grep -q "커널이 내보내지 않는 심볼을 부릅니다.*strscpy" $KX/bad.out' || cat $KX/ok.out $KX/bad.out
+check "drivers: 빌드는 드라이버마다 nm -u로 커널 심볼을 확인하고, 내보내는 이름 목록은 준비한 트리마다 한 번 만듦. README·차 확인에 Unknown symbol" \
+  'grep -q "check_ksyms /tmp/undef.txt \$K.exports" $B/drivers/build-in-container.sh && grep -q "\$TC/bin/arm-eabi-nm -u \$D/\$MNAME.ko" $B/drivers/build-in-container.sh && grep -q "kernel_exports \$K > \$K.exports.tmp" $B/drivers/build-in-container.sh && grep -q "\*\*커널 심볼 확인\*\*" $B/drivers/README.md && grep -q "dmesg에 \`Unknown symbol\`이 없는지" $B/drivers/README.md'
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc

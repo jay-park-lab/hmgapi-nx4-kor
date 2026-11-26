@@ -49,6 +49,28 @@ make_retry() {
   rm -f "$_log.try"
 }
 
+# 커널이 내보내는 이름 목록(정렬): 커널 트리 소스의 EXPORT_SYMBOL*(이름)과, kernel/params.c의 STANDARD_PARAM_DEF(이름, …)가
+# 매크로로 내보내는 param_ops_<이름>. 설정으로 빌드하지 않는 파일의 것도 들어가므로, 이 목록에 없으면 확실히 없는 것이다(있다고
+# 차 커널에 꼭 있는 것은 아님). 모듈 적재기는 미정의 심볼 하나만 못 찾아도 올리지 않는다(insmod: Unknown symbol)
+#   kernel_exports <커널 트리>
+kernel_exports() {
+  { grep -rhoE --include='*.c' --include='*.S' --include='*.h' \
+      'EXPORT_SYMBOL(_GPL|_GPL_FUTURE|_UNUSED|_UNUSED_GPL)?\([[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\)' "$1" \
+      | sed -E 's/.*\([[:space:]]*([A-Za-z0-9_]+)[[:space:]]*\)/\1/'
+    grep -hoE '^STANDARD_PARAM_DEF\([a-z]+' "$1/kernel/params.c" | sed 's/STANDARD_PARAM_DEF(/param_ops_/'
+  } | LC_ALL=C sort -u
+}
+
+# 모듈이 부르는 것(nm -u의 이름 목록)이 모두 커널이 내보내는 것인지 본다. 커널 준비가 modules_prepare까지라 Module.symvers가
+# 없어, modpost는 커널에 없는 심볼을 알리지 않는다(PR #81 리뷰 1·2: RTL8831BU가 3.18에 없는 strscpy를 불렀다)
+#   check_ksyms <nm -u 이름 목록> <kernel_exports 목록>
+check_ksyms() {
+  _ksu=$(LC_ALL=C sort -u "$1" | grep -c .)
+  _ksm=$(LC_ALL=C sort -u "$1" | LC_ALL=C comm -23 - "$2")
+  [ -z "$_ksm" ] || die "모듈이 커널이 내보내지 않는 심볼을 부릅니다(차에서 insmod가 Unknown symbol로 실패): $(echo $_ksm)"
+  echo "커널 심볼 확인: 부르는 것 ${_ksu}개가 모두 커널이 내보내는 것"
+}
+
 # 컴파일 옵션 확인. 커널은 make마다 컴파일러에 물어(cc-option) 옵션을 정한다. arch/arm/Makefile은 -march=armv7-a가 안 되면
 # 조용히 -march=armv5t로 넘어가고, -fno-strict-overflow·-fconserve-stack 같은 옵션도 같은 식으로 붙는다. 에뮬레이션에서는 이
 # 물음 중에 컴파일러가 멈춰 다른 옵션으로 컴파일될 수 있다(PR #69 리뷰 14: 실제로 armv5t로 컴파일되어 rev16 어셈블러 오류).
