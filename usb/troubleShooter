@@ -652,17 +652,25 @@ diag_bb() {
 #                       커널 기록의 avc: 줄. busybox 없이 /proc와 커널 기록만 읽는다(diag_mount)
 # busybox에 gunzip·sha256sum·strings·grep이 없으면 빈 값 대신 그 까닭을 적는다(bbok)
 # mount 이름공간 이름(ls -l의 링크 대상, 예: mnt:[4026531840]). readlink가 없는 툴박스에서도 되게 ls로 읽는다.
-# 링크를 못 읽으면 ls의 오류 문구를 그대로 적는다: 링크가 없는 것과 거절(SELinux 포함)이 갈린다(PR #84 리뷰 3)
+# 링크 대상을 못 읽으면 링크가 없는 것과 거절(SELinux 포함)을 가른다(PR #84 리뷰 3):
+# - 차의 툴박스 ls(KitKat toolbox/ls.c)는 readlink가 실패하면 아무것도 찍지 않는다. 커널(3.18 fs/proc/namespaces.c)은 ns 링크의
+#   readlink에만 ptrace 권한을 보고 lstat은 막지 않으므로, 거절이면 링크는 있는데(-L, lstat) 대상을 못 읽는다
+# - 링크가 없으면 ls가 lstat 오류 문구(No such file …)를 찍는다. 그 문구를 그대로 적는다
 diag_ns() {
   _nl=$(ls -l "$1" 2>&1)
-  case "$_nl" in *' -> '*) echo "${_nl##* -> }" ;; '') echo "없음" ;; *) echo "읽지 못함($_nl)" ;; esac
+  case "$_nl" in
+    *' -> '*) echo "${_nl##* -> }" ;;
+    *) if [ -L "$1" ]; then echo "읽지 못함(링크는 있음, 대상을 못 읽음: 거절일 수 있음)"
+       elif [ -n "$_nl" ]; then echo "읽지 못함($_nl)"
+       else echo "없음"; fi ;;
+  esac
 }
 # /proc/<pid>/stat에서 ppid(4번째 칸)를 _sp에, 부팅 뒤 시작 시각(22번째 칸 starttime, 1/100초 USER_HZ)을 _st에 둔다. 못 읽으면 ?.
 # 2번째 칸 (comm)에는 공백·글롭 문자가 들 수 있어 마지막 ") " 뒤(3번째 칸 state부터)만 나눈다(PR #84 리뷰 4).
 # 순정 bcmdhd가 부팅 약 9.7초에 올라가므로(#80), 부팅 서비스를 띄우는 HMG-API 데몬이 그보다 늦는지 본다
 diag_stat() {
   _sp=?; _st=?
-  _sl=; read -r _sl < "$1/stat" 2>/dev/null || return 0
+  _sl=; read -r _sl 2>/dev/null < "$1/stat" || return 0
   case "$_sl" in *") "*) _sl=${_sl##*") "} ;; *) return 0 ;; esac
   set -- $_sl
   [ $# -ge 20 ] || return 0
@@ -674,9 +682,9 @@ diag_stat() {
 # 프로세스 한 줄: 이름(comm), ppid, 시작 시각, mount 이름공간, SELinux 도메인(attr/current, 못 읽으면 ?). $1 꼬리표, $2 pid(self 포함).
 # HMG-API 데몬(comm hmgapid이고 ppid 1)에는 "데몬"을 붙인다
 diag_proc() {
-  _pc=; read -r _pc < $ROOT/proc/$2/comm 2>/dev/null
+  _pc=; read -r _pc 2>/dev/null < $ROOT/proc/$2/comm
   diag_stat $ROOT/proc/$2
-  _pa=; read -r _pa < $ROOT/proc/$2/attr/current 2>/dev/null
+  _pa=; read -r _pa 2>/dev/null < $ROOT/proc/$2/attr/current
   _pk=; [ "$_pc" = hmgapid ] && [ "$_sp" = 1 ] && _pk=" 데몬"
   echo "proc $1: pid=$2 comm=${_pc:-?} ppid=$_sp start=$_st ns=$(diag_ns $ROOT/proc/$2/ns/mnt) se=${_pa:-?}$_pk"
 }
@@ -699,7 +707,7 @@ diag_mount() {
   _ss=; _dm=; _hgs=
   for _pd in $ROOT/proc/[0-9]*; do
     [ -f $_pd/comm ] || continue
-    read -r _cm < $_pd/comm 2>/dev/null || continue
+    read -r _cm 2>/dev/null < $_pd/comm || continue
     case "$_cm" in
       system_server) [ -n "$_ss" ] || _ss=${_pd##*/} ;;
       *hmgapi*) _hgs="$_hgs ${_pd##*/}" ;;
@@ -727,7 +735,7 @@ diag_mount() {
       [ "$_pn" = "$_ins" ] && continue
       _n=$((_n + 1))
       [ $_n -le ${DIAG_NS_MAX:-100} ] || continue
-      _cm=; read -r _cm < $_pd/comm 2>/dev/null
+      _cm=; read -r _cm 2>/dev/null < $_pd/comm
       echo "pid=${_pd##*/} comm=${_cm:-?} ns=$_pn"
     done
     [ $_n -le ${DIAG_NS_MAX:-100} ] || echo "(… $((_n - ${DIAG_NS_MAX:-100}))개 더)"

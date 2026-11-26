@@ -742,11 +742,11 @@ printf 'wifi_load_driver\n/system/wifi/bcmdhd.ko\niface_name=\nwifi_check_module
 # HMG-API 데몬(245)은 실제 모양(comm hmgapid, ppid 1)으로 두고, /proc 사전 순으로 그보다 앞서는 미끼를 둔다(PR #84 리뷰 1):
 # 다른 이름공간의 hmgapid 클라이언트(12345, ppid 777), 차량 서비스 hmgapi.vehicle(1532), 이름에 공백·글롭 문자가 든 것(1600, 리뷰 4).
 # 명령줄에만 hmgapid가 든 300(app_process)은 적지 않는다. 888은 이름공간 링크가 없다(읽지 못함, 리뷰 3)
-for _p in 1 self 200 245 300 400 777 888 1532 1600 12345; do mkdir -p $R/proc/$_p/ns $R/proc/$_p/attr; done
-for _p in 1 self 245 300 400 1532 1600; do ln -s 'mnt:[4026531840]' $R/proc/$_p/ns/mnt; done
+for _p in 1 self 200 245 300 400 777 888 999 1532 1600 12345; do mkdir -p $R/proc/$_p/ns $R/proc/$_p/attr; done
+for _p in 1 self 245 300 400 1532 1600 999; do ln -s 'mnt:[4026531840]' $R/proc/$_p/ns/mnt; done
 ln -s 'mnt:[4026532001]' $R/proc/200/ns/mnt
 for _p in 777 12345; do ln -s 'mnt:[4026532999]' $R/proc/$_p/ns/mnt; done
-for _p in 1:init self:sh 200:system_server 245:hmgapid 300:app_process 400:zygote 777:com.example.app 888:kthreadx 1532:hmgapi.vehicle "1600:hmgapi w *" 12345:hmgapid; do
+for _p in 1:init self:sh 200:system_server 245:hmgapid 300:app_process 400:zygote 777:com.example.app 888:kthreadx 999:deniedproc 1532:hmgapi.vehicle "1600:hmgapi w *" 12345:hmgapid; do
   echo "${_p#*:}" > "$R/proc/${_p%%:*}/comm"
 done
 echo hmgapid > $R/proc/300/cmdline
@@ -804,7 +804,15 @@ check "USB 설치기 진단 기록(동글 준비, #80): mount.txt에 SELinux(get
 check "  HMG-API: 이름에 hmgapi가 든 프로세스를 모두 적고 데몬(comm hmgapid, ppid 1)에만 데몬 표시, mountinfo는 데몬 것. 사전 순으로 앞선 클라이언트·차량 서비스를 데몬으로 고르지 않음, 명령줄만 맞는 것은 적지 않음, 이름의 공백·글롭에도 시작 시각이 맞음(PR #84 리뷰 1·4)" \
   'grep -qxF "proc hmgapi: pid=245 comm=hmgapid ppid=1 start=8.1s ns=mnt:[4026531840] se=u:r:init:s0 데몬" $DG/mount.txt && grep -qxF "proc hmgapi: pid=12345 comm=hmgapid ppid=777 start=600.0s ns=mnt:[4026532999] se=?" $DG/mount.txt && grep -qxF "proc hmgapi: pid=1532 comm=hmgapi.vehicle ppid=300 start=41.0s ns=mnt:[4026531840] se=?" $DG/mount.txt && grep -qxF "proc hmgapi: pid=1600 comm=hmgapi w * ppid=5 start=50.0s ns=mnt:[4026531840] se=?" $DG/mount.txt && [ "$(grep -c " 데몬$" $DG/mount.txt)" = 1 ] && ! grep -q "^proc hmgapi: pid=300 " $DG/mount.txt && grep -qx "== mountinfo hmgapid 데몬(245)" $DG/mount.txt && ! grep -q "master:9" $DG/mount.txt' || cat $DG/mount.txt
 check "  init과 이름공간이 다른 프로세스 목록(링크를 못 읽으면 ls 오류 문구), avc 줄(MAC 꼴이 든 줄은 뺌)(PR #84 리뷰 2·3)" \
-  'sed -n "/^== mount 이름공간이 init/,/^== mountinfo init/p" $DG/mount.txt > $T/nsdiff && grep -qxF "pid=200 comm=system_server ns=mnt:[4026532001]" $T/nsdiff && grep -qxF "pid=777 comm=com.example.app ns=mnt:[4026532999]" $T/nsdiff && grep -qxF "pid=12345 comm=hmgapid ns=mnt:[4026532999]" $T/nsdiff && grep -q "^pid=888 comm=kthreadx ns=읽지 못함(.*888/ns/mnt" $T/nsdiff && ! grep -qE "^pid=(1|245|300|400|1532|1600) " $T/nsdiff && grep -qx "== avc(커널 기록, 앞 50줄)" $DG/mount.txt && grep -q "avc: denied { module_load } for pid=245 comm=\"hmgapid\"" $DG/mount.txt && ! grep -q "aa:bb:cc" $DG/mount.txt' || cat $DG/mount.txt
+  'sed -n "/^== mount 이름공간이 init/,/^== mountinfo init/p" $DG/mount.txt > $T/nsdiff && grep -qxF "pid=200 comm=system_server ns=mnt:[4026532001]" $T/nsdiff && grep -qxF "pid=777 comm=com.example.app ns=mnt:[4026532999]" $T/nsdiff && grep -qxF "pid=12345 comm=hmgapid ns=mnt:[4026532999]" $T/nsdiff && grep -q "^pid=888 comm=kthreadx ns=읽지 못함(.*888/ns/mnt" $T/nsdiff && ! grep -qE "^pid=(1|245|300|400|999|1532|1600) " $T/nsdiff && grep -qx "== avc(커널 기록, 앞 50줄)" $DG/mount.txt && grep -q "avc: denied { module_load } for pid=245 comm=\"hmgapid\"" $DG/mount.txt && ! grep -q "aa:bb:cc" $DG/mount.txt' || cat $DG/mount.txt
+# 셸이 파일을 못 열 때의 문구(self·12345·1532·1600에는 attr/current가 없음)가 mount.txt에 섞이지 않음(PR #84 리뷰 5)
+check "  파일을 못 연 셸 문구(attr/current·comm·stat)가 mount.txt에 섞이지 않음(PR #84 리뷰 5)" \
+  '! grep -qE "attr/current|/comm|/stat|line [0-9]+:|cannot open" $DG/mount.txt' || cat $DG/mount.txt
+# 차의 툴박스 ls처럼 링크 대상을 못 읽으면 아무것도 찍지 않는 경우(거절, PR #84 리뷰 3): 999의 이름공간 링크만 그렇게 흉내 낸다
+printf '#!/bin/sh\nfor a; do case "$a" in */proc/999/ns/mnt) exit 1 ;; esac; done\nexec /bin/ls "$@"\n' > $T/bin/ls; chmod +x $T/bin/ls
+rm -rf $K/diag; TSX="NX4_DMESG=$T/ddmesg"; ts $U; TSX=; rm -f $T/bin/ls; DG=$(dg)/dongle
+check "  툴박스 ls가 링크 대상을 못 읽어 아무것도 찍지 않으면(거절) \"링크는 있음\"으로 적고 \"없음\"으로 적지 않음(PR #84 리뷰 3)" \
+  'grep -qxF "pid=999 comm=deniedproc ns=읽지 못함(링크는 있음, 대상을 못 읽음: 거절일 수 있음)" $DG/mount.txt && ! grep -q "ns=없음" $DG/mount.txt && grep -qxF "proc system_server: pid=200 comm=system_server ppid=150 start=12.3s ns=mnt:[4026532001] se=u:r:system_server:s0" $DG/mount.txt' || cat $DG/mount.txt
 legon; rm -rf $R/data/nx4-kor/backup
 # 내비의 busybox에 strings·sha256sum·gunzip이 없으면 빈 값 대신 까닭을 적음(PR #66 리뷰 2)
 printf '#!/bin/sh\ncase "$1" in strings|sha256sum|gunzip) echo "$1: applet not found" >&2; exit 127 ;; esac\ncommand -v "$1" >/dev/null 2>&1 || exit 127\nexec "$@"\n' > $R/system/bin/busybox
