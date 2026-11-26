@@ -11,7 +11,7 @@
 | USB 설치기(`usb/troubleShooter`, root) | HMG-API 확인·업데이트 넘기기, 옛 2.0.x 되돌리기, 공식 무선 모드 설치(`--any-car`), nx4-kor 설치, NX4 map 만들기·확인, 적용, 진행 기록, 지우기 |
 | HMG-API(`hmgapid`, 엔진, zygote 훅) | 모드 설치·계획·적용, map, 부팅 때 훅 올리기, 프로젝션 AP 지기(Wi-Fi), 앱·서비스·타일 |
 | 공식 무선 모드(`wireless-carplay-aa`, 고치지 않음) | 무선 카플레이·안드로이드 오토 훅, 계기판·HUD 길안내, 프로젝션 AP 요청(`"wifi": {"projection": true}`) |
-| nx4-kor 모드(이 저장소) | 관리 앱과 앱 메뉴 타일, 앱이 부르는 `launch` 서비스(`bin/status.sh`), 한국 카플레이 길안내(DiPO 안 `hooks.jar`: 자기 iAP2 길안내 리스너로 받아 KP 보정으로 계기판·HUD에 보내고, 공식 모드가 보내는 값을 `change` 훅으로 그것으로 바꿈, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)). 시스템 파일·Wi-Fi 설정은 건드리지 않음 |
+| nx4-kor 모드(이 저장소) | 관리 앱과 앱 메뉴 타일, 앱이 부르는 `launch` 서비스(`bin/status.sh`), Wi-Fi 칩이 없는 차에서 HMG-API 지기의 다시 시도를 멈추는 `nochip` 서비스(부팅 때, `svc/nochip.sh`), 한국 카플레이 길안내(DiPO 안 `hooks.jar`: 자기 iAP2 길안내 리스너로 받아 KP 보정으로 계기판·HUD에 보내고, 공식 모드가 보내는 값을 `change` 훅으로 그것으로 바꿈, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)). 시스템 파일·Wi-Fi 설정은 건드리지 않음 |
 
 ```mermaid
 flowchart LR
@@ -135,6 +135,7 @@ sequenceDiagram
   participant H as HMG-API(hmgapid)
   participant W as 공식 무선 모드 훅
   participant A as HMG-API Wi-Fi 지기
+  participant N as nochip 서비스(이 모드)
   participant P as 휴대폰
 
   K->>H: 부팅, zygote 시작
@@ -149,12 +150,16 @@ sequenceDiagram
     A->>A: wifi/ap.boot에 이번 부팅 id
     P->>W: 블루투스로 시작 → 프로젝션 AP에 접속
     W-->>P: 무선 카플레이·안드로이드 오토
-  else 칩이 없거나 AP를 못 띄움
-    A->>A: wifi/ap.fail, 30초마다 다시 시도
+  else 칩이 없음(순정 드라이버가 이번 부팅에 칩 켜기를 포기, 칩을 본 적 없음, USB 동글 없음)
+    N->>N: 커널 기록과 USB 장치로 확인(부팅 뒤 50초, 그 앞 40초쯤 USB 포트 전원을 껐다 켬)
+    N->>A: wifi/ap.boot에 이번 부팅 id(그 부팅의 다시 시도를 멈춤)
+    Note over N,A: QuickBoot에서 깨어나 지기가 ap.boot를 지우면<br/>inotifyd로 알아채 다시 씀(그때 동글이 보이면 물러남)
+  else 칩은 있는데 AP를 못 띄움
+    A->>A: wifi/ap.fail, 약 1분 자주, 그 뒤 30초마다 다시 시도<br/>(시도마다 Dalvik 하나)
   end
 ```
 
-- Wi-Fi 부품이 없는 차(2026-11-23 NX4HEV 260902)는 AP가 뜨지 않습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로이고, 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다.
+- Wi-Fi 부품이 없는 차(2026-11-23 NX4HEV 260902)는 AP가 뜨지 않습니다. 2.1.2-beta.4부터는 `nochip` 서비스가 HMG-API 지기의 다시 시도를 멈춰 운전 내내 30초마다 Dalvik이 뜨지 않게 합니다(`design.md` "Wi-Fi 칩이 없는 차"). 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로이고, 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다.
 - HMG-API "집 Wi-Fi"를 켜면 주차한 동안만 HMG-API가 AP를 끄고 집 Wi-Fi에 붙습니다.
 
 ## 4. 관리 앱

@@ -1,4 +1,4 @@
-# NX4 KOR의 위치. svc/launch.sh·bin/uninstall.sh와 USB 설치기가 읽는다(. 으로).
+# NX4 KOR의 위치. svc/launch.sh·svc/nochip.sh·bin/uninstall.sh와 USB 설치기가 읽는다(. 으로).
 #   NX4_APP·APP  모드 파일: HMG-API가 모드를 푸는 곳($HMGAPI_MOD_DIR, /data/hmgapi/mods/nx4-kor)
 #   NX4_ROOT     이 모드의 기록 폴더(/data/nx4-kor). 지울 때 bin/uninstall.sh가 지운다
 #   BK          예전 판(2.0.x)의 백업·기록 폴더($NX4_ROOT/backup). 2.1.0은 쓰지 않는다(USB 설치기가 옛 판을 알아보는 데 씀)
