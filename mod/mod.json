@@ -1,8 +1,8 @@
 {
   "id": "nx4-kor",
   "name": "NX4 KOR: Tucson NX4 (Korea)",
-  "version": "2.1.0",
-  "hmgapi": ">=1.1.0-rc.8",
+  "version": "2.1.1",
+  "hmgapi": ">=1.1.0-rc.10",
   "authors": [
     "parkjoos",
     "StopDragon"

@@ -2,7 +2,7 @@
 
 2.1.0에서 설치부터 무선 연결, 관리 앱, 지우기까지 무엇이 어떤 차례로 도는지 그림으로 모았습니다. 자세한 규칙과 근거는 [`design.md`](design.md)에 있고, 이 문서는 그 요약입니다. 둘이 다르면 `design.md`와 코드가 맞습니다.
 
-> ⚠️ 2.1.0 흐름은 차에서 아직 확인하지 않았습니다. PC 테스트(`tests/mod-test.sh`)와 HMG-API 1.1.0-rc.8 엔진(PC)에서만 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23), [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)).
+> ⚠️ 2.1.0 흐름은 차에서 아직 확인하지 않았습니다. PC 테스트(`tests/mod-test.sh`)와 HMG-API 1.1.0-rc.8 엔진(PC, 2.1.1은 rc.10)에서만 확인했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23), [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)).
 
 ## 1. 누가 무엇을 하나
 
@@ -65,7 +65,7 @@ flowchart TD
   H -->|"없음 +<br/>스틱에 HMG-API 묶음 있음"| HU["스틱의 HMG-API 설치기로 넘김<br/>→ 재부팅 → Update OTA 한 번 더"]
   H -->|"없음 +<br/>스틱에도 없음"| STOP1["멈춤: HMG-API를 먼저<br/>설치하거나 올려 주세요"]
   H -->|"있지만<br/>기다려도 응답 없음"| STOP2["멈춤: 재부팅하고 다시"]
-  H -->|"있고 응답함"| VER{"최소 판 이상?<br/>(1.1.0-rc.8과 두 모드의 hmgapi 중 높은 것)"}
+  H -->|"있고 응답함"| VER{"최소 판 이상?<br/>(1.1.0-rc.10와 두 모드의 hmgapi 중 높은 것)"}
   VER -->|"낮음 +<br/>스틱의 HMG-API가 그 판 이상"| HU
   VER -->|"낮음 +<br/>스틱에 없거나 낮음"| STOP1
   VER -->|"예"| BK{"2.0.x 기록(backup)이 남았는데<br/>스틱에 legacy-2.0이 없음?"}
@@ -229,3 +229,4 @@ flowchart TD
 - 관리 앱에는 지우기 버튼을 두지 않습니다([#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)). 2.1.0의 nx4-kor는 시스템 파일·Wi-Fi 설정을 바꾸지 않아 HMG-API 앱에서 지워도 기록 파일만 남기 때문입니다.
 - USB 설치기 자신의 기록(`nx4-kor-usb.log`, 차에서는 `nx4-kor-ota-finish.sh`)은 지우기 뒤에도 남습니다.
 - 둘 다 지울 때는 NX4 KOR를 먼저, HMG-API를 나중에 지웁니다(README "삭제").
+- 설치기는 HMG-API를 지우지 않습니다. NEMESIS 1.17이 깔린 차에서 HMG-API 1.1.0-rc.8 이하를 지우면 재부팅 한두 번 뒤 Android가 뜨지 않으므로, 먼저 rc.10 이상으로 올린 뒤 지웁니다. `FORCE`로 설치한 NEMESIS 1.17 차는 rc.9로 올리면 Android가 뜨지 않으므로 rc.10으로 바로 올립니다(README "HMG-API를 지울 때", [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397)).

@@ -9,7 +9,7 @@
    - 태그의 판(`v`를 뗀 것)이 `mod/mod.json` `version`, `app/AndroidManifest.xml` `versionName`과 같은지 봅니다. 베타는 `-beta.<n>`까지 같아야 합니다(`v2.0.4-beta.2` ↔ `2.0.4-beta.2`, `git-flow.md` 규칙 4). 숫자에 앞자리 0이 있는 태그(`v2.0.4-beta.02`)는 받지 않습니다. 2.0.3-beta.1까지는 꼬리를 빼고 비교했습니다.
    - 정식 태그의 커밋이 `main`에 있는지, 베타 태그의 커밋이 `release/` 브랜치나 `main`에 있는지 봅니다.
    - 같은 태그의 릴리스가 이미 있는지 봅니다(아래 "같은 태그로 다시 만들지 않습니다").
-   - JDK 21(Temurin), HMG-API `v1.1.0-rc.8`(커밋 `939484e`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
+   - JDK 21(Temurin), HMG-API `v1.1.0-rc.10`(커밋 `daa0837`), mksh를 준비해 `sh tests/mod-test.sh`를 빌드·HMG-API 엔진 시험까지 돌립니다. 시험은 임시 키를 쓰고, 배포 키를 쓰는 job과 다른 러너에서 돕니다.
      - mksh는 러너의 apt로 설치합니다. apt가 멈출 때가 있어(v2.1.0-beta.1 첫 실행이 20분 멈춰 취소됨) 저장소에서 받는 명령(목록 갱신, 내려받기)마다 90초까지만 기다리고, 모두 3번까지 시도합니다. 설치 자체는 끊지 않습니다. 실패하면 어느 명령이 왜 실패했는지 경고로 남습니다. 그래도 이 단계가 실패하면 러너의 apt 저장소 쪽 문제일 수 있으니 실행을 다시 돌립니다(Actions의 **Re-run jobs**, 또는 `gh run rerun <실행 id>`). 릴리스가 아직 올라가지 않았으므로 같은 태그로 다시 돌려도 됩니다.
 3. Actions의 release 실행이 `production` 승인을 기다립니다. 실행 화면의 **Review deployments**에서 아래 "승인하기 전에"를 확인하고 승인합니다.
 4. `build` job(배포 키 있음, 저장소 읽기만)이 돕니다.
@@ -261,6 +261,8 @@ GitHub은 로그에서 secret 값을 가리지만, `build` job에서 도는 코�
   - `release.yml`의 `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`(같은 판의 `hmgapi-<판>-usb.zip`)
   - 이 문서
   - `mod/mod.json` `hmgapi`
+  - 최소 판까지 올리면 `usb/troubleShooter` `HMG_MIN`, `mod/svc/lib.sh` `HMG_MIN`, 관리 앱 `Report.MIN_HMGAPI`, 이를 보는 테스트(`tests/mod-test.sh`, `tests/ReportTest.java`), 에뮬레이터 시나리오(`tests/emu/scen.sh`)와 문서의 판 언급도 함께 바꿉니다. 2.1.1에서 rc.10으로 올린 까닭(NEMESIS 1.17, [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397))은 [`design.md`](design.md) "2.1.0 모드 구성"의 `hmgapi`
+  - 2.1.1은 처음에 rc.9로 고정했는데, PR #70 리뷰 중(2026-11-25) HMG-API가 rc.10을 내며 rc.9 릴리스를 지워 주소가 404가 됐습니다. 태그를 달기 직전에 아래 `curl` 확인을 꼭 돌립니다.
 - `HMGAPI_USB_SHA256`은 HMG-API 릴리스의 `SHA256SUMS`나 GitHub이 기록한 파일 digest에서 읽습니다. 받은 파일로 `shasum -a 256`을 돌려 같은지도 봅니다.
 
   ```sh
