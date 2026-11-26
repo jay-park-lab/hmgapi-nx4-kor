@@ -1595,18 +1595,31 @@ fi
 KX=$T/kx; mkdir -p $KX/k/kernel $KX/k/lib $KX/k/arch
 printf 'EXPORT_SYMBOL(foo);\nEXPORT_SYMBOL_GPL( bar );\nint baz; /* EXPORT_SYMBOL(no_such) 같은 주석은 들어가도 됨 */\n' > $KX/k/lib/a.c
 printf 'EXPORT_SYMBOL(__aeabi_x)\n' > $KX/k/arch/b.S
+# 리뷰 81-5: EXPORT_PER_CPU_SYMBOL(_GPL)도 내보내는 것(SMP), EXPORT_UNUSED_SYMBOL은 이 설정에서 내보내지 않음
+printf 'EXPORT_PER_CPU_SYMBOL(softnet_data);\nEXPORT_PER_CPU_SYMBOL_GPL(irq_regs);\nEXPORT_UNUSED_SYMBOL(unused_one);\n' > $KX/k/kernel/percpu.c
 printf 'STANDARD_PARAM_DEF(int, int, "%%i", kstrtoint);\nSTANDARD_PARAM_DEF(uint, unsigned int, "%%u", kstrtouint);\n' > $KX/k/kernel/params.c
 bash -c '. "$1"; kernel_exports "$2"' x $B/drivers/lib.sh $KX/k > $KX/exports.txt
 printf 'foo\nbar\n__aeabi_x\nparam_ops_int\nparam_ops_uint\nfoo\n' > $KX/ok.txt
 printf 'foo\nstrscpy\nparam_ops_int\n' > $KX/bad.txt
 (bash -c '. "$1"; check_ksyms "$2" "$3"' x $B/drivers/lib.sh $KX/ok.txt $KX/exports.txt) > $KX/ok.out 2>&1; echo $? > $KX/ok.rc
 (bash -c '. "$1"; check_ksyms "$2" "$3"' x $B/drivers/lib.sh $KX/bad.txt $KX/exports.txt) > $KX/bad.out 2>&1; echo $? > $KX/bad.rc
-check "drivers/lib.sh kernel_exports: EXPORT_SYMBOL·EXPORT_SYMBOL_GPL(빈칸 포함)·.S의 이름과 STANDARD_PARAM_DEF의 param_ops_*를 정렬해 냄" \
-  'for n in __aeabi_x bar foo param_ops_int param_ops_uint; do grep -qx "$n" $KX/exports.txt || exit 1; done; [ "$(LC_ALL=C sort -u $KX/exports.txt | cmp -s - $KX/exports.txt; echo $?)" = 0 ]' || cat $KX/exports.txt
+check "drivers/lib.sh kernel_exports: EXPORT_SYMBOL·EXPORT_SYMBOL_GPL(빈칸 포함)·.S·EXPORT_PER_CPU_SYMBOL(_GPL)의 이름과 STANDARD_PARAM_DEF의 param_ops_*를 정렬해 냄, EXPORT_UNUSED_SYMBOL은 넣지 않음" \
+  'for n in __aeabi_x bar foo param_ops_int param_ops_uint softnet_data irq_regs; do grep -qx "$n" $KX/exports.txt || exit 1; done; ! grep -qx unused_one $KX/exports.txt && [ "$(LC_ALL=C sort -u $KX/exports.txt | cmp -s - $KX/exports.txt; echo $?)" = 0 ]' || cat $KX/exports.txt
 check "drivers/lib.sh check_ksyms: 부르는 것이 모두 내보내는 것이면 통과(개수), 하나라도 없으면 그 이름을 보이고 실패" \
   '[ "$(cat $KX/ok.rc)" = 0 ] && grep -q "부르는 것 5개가 모두 커널이 내보내는 것" $KX/ok.out && [ "$(cat $KX/bad.rc)" != 0 ] && grep -q "커널이 내보내지 않는 심볼을 부릅니다.*strscpy" $KX/bad.out' || cat $KX/ok.out $KX/bad.out
 check "drivers: 빌드는 드라이버마다 nm -u로 커널 심볼을 확인하고, 내보내는 이름 목록은 준비한 트리마다 한 번 만듦. README·차 확인에 Unknown symbol" \
-  'grep -q "check_ksyms /tmp/undef.txt \$K.exports" $B/drivers/build-in-container.sh && grep -q "\$TC/bin/arm-eabi-nm -u \$D/\$MNAME.ko" $B/drivers/build-in-container.sh && grep -q "kernel_exports \$K > \$K.exports.tmp" $B/drivers/build-in-container.sh && grep -q "\*\*커널 심볼 확인\*\*" $B/drivers/README.md && grep -q "dmesg에 \`Unknown symbol\`이 없는지" $B/drivers/README.md'
+  '! grep -q "\$K.stamp -nt \$K.exports" $B/drivers/build-in-container.sh && grep -q "check_ksyms /tmp/undef.txt \$K.exports" $B/drivers/build-in-container.sh && grep -q "\$TC/bin/arm-eabi-nm -u \$D/\$MNAME.ko" $B/drivers/build-in-container.sh && grep -q "kernel_exports \$K > \$K.exports.tmp" $B/drivers/build-in-container.sh && grep -q "\*\*커널 심볼 확인\*\*" $B/drivers/README.md && grep -q "dmesg에 \`Unknown symbol\`이 없는지" $B/drivers/README.md'
+# .env.local의 NX4_DRV_DOCKER_CONTEXT: build-driver.sh가 이 빌드의 docker 명령에만 DOCKER_CONTEXT로 준다(명령 앞 값이 앞섬).
+# 가짜 docker는 받은 DOCKER_CONTEXT를 적고 docker info에서 실패해, 스크립트가 그 앞에서 멈춘다
+DX=$T/dx; mkdir -p $DX/bin
+printf '#!/bin/sh\necho "ctx=${DOCKER_CONTEXT:-none}" >> %s/calls\nexit 1\n' $DX > $DX/bin/docker; chmod +x $DX/bin/docker
+printf 'NX4_DRV_DOCKER_CONTEXT=ctx-from-file\n' > $DX/env
+dxrun() { rm -f $DX/calls; (env -u DOCKER_CONTEXT PATH=$DX/bin:$PATH "$@" sh $B/scripts/build-driver.sh) > $DX/out 2>&1; echo $? > $DX/rc; }
+dxrun NX4_ENV_FILE=$DX/env; cp $DX/calls $DX/calls.file 2>/dev/null; cp $DX/out $DX/out.file
+dxrun NX4_ENV_FILE=$DX/env NX4_DRV_DOCKER_CONTEXT=ctx-cmd; cp $DX/calls $DX/calls.cmd 2>/dev/null
+dxrun NX4_ENV_FILE=; cp $DX/calls $DX/calls.none 2>/dev/null
+check "scripts/build-driver.sh: .env.local의 NX4_DRV_DOCKER_CONTEXT를 이 빌드의 docker에만 DOCKER_CONTEXT로 줌(명령 앞 값이 앞섬, 없으면 셸 기본), 알림에 context" \
+  'grep -qx "ctx=ctx-from-file" $DX/calls.file && grep -q "Docker context: ctx-from-file" $DX/out.file && grep -q "context ctx-from-file" $DX/out.file && grep -qx "ctx=ctx-cmd" $DX/calls.cmd && grep -qx "ctx=none" $DX/calls.none && ! grep -q "docker context use" $B/scripts/build-driver.sh && grep -q "^# NX4_DRV_DOCKER_CONTEXT=" $B/.env.example' || cat $DX/out.file $DX/calls.file
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc

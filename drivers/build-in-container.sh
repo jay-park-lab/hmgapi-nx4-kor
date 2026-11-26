@@ -114,11 +114,10 @@ else
     bash $S/kernel/prepare.sh $K $DL/linux-3.18.24.tar.xz $MS/$MOBIS_DIR $TC $JOBS
   echo "$STAMP" > $K.stamp
 fi
-# 커널이 내보내는 이름 목록(lib.sh kernel_exports). 준비한 트리마다 한 번 만든다(트리를 다시 준비하면 stamp가 더 새것이 됨)
-if [ ! -s $K.exports ] || [ $K.stamp -nt $K.exports ]; then
-  kernel_exports $K > $K.exports.tmp || die "커널이 내보내는 이름 목록을 만들지 못함"
-  mv $K.exports.tmp $K.exports
-fi
+# 커널이 내보내는 이름 목록(lib.sh kernel_exports). 빌드마다 새로 만든다(몇 초. 캐시하면 kernel_exports를 고쳐도 옛 목록을 씀,
+# PR #81 리뷰 6)
+kernel_exports $K > $K.exports.tmp || die "커널이 내보내는 이름 목록을 만들지 못함"
+mv $K.exports.tmp $K.exports
 
 # 드라이버 하나 빌드: $1 이름(rtl88x2bu·rtl8831bu, bare 저장소 $DL/<이름>.git), $2 커밋, $3 폴더, $4 모듈 이름, $5 날짜, $6 시각,
 # $7 고정한 컴파일 옵션 지문, $8 우리 옵션을 넘길 make 변수, 그 뒤 패치 파일들(차례대로 patch -p1).

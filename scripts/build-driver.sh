@@ -3,12 +3,14 @@
 # 쓰는 법(저장소 맨 위에서):
 #   sh scripts/build-driver.sh               이 저장소의 드라이버 둘 → out/drivers/tcc803x/{rtl88x2bu,rtl8831bu}/
 #   sh scripts/build-driver.sh --src-asset   모비스 원본 묶음에서 커널 소스 자산을 만든다 → out/drivers/src/(drivers/README.md "커널 소스 자산")
-# 필요한 것: docker(linux/amd64를 돌릴 수 있어야 함. Apple Silicon은 colima 등의 qemu 에뮬레이션). 받은 자료와 준비한 커널은
+# 필요한 것: docker(linux/amd64를 돌릴 수 있어야 함. Apple Silicon은 colima 등의 에뮬레이션, Rosetta를 권함: drivers/README.md
+# "맥에서 빌드"). 받은 자료와 준비한 커널은
 # Docker 볼륨 nx4kor-drivers에 두고 다시 쓴다(처음은 받기·커널 준비로 오래 걸림). 지우려면 docker volume rm nx4kor-drivers.
 # 빌드 날짜·시각(.ko에 문자열로 들어감)은 drivers/나 이 스크립트를 마지막으로 바꾼 커밋의 시각으로 고정한다. 그래서 같은
 # 커밋이면 같은 .ko가 나와야 하고(다르면 에뮬레이션 쪽을 의심), 문서처럼 드라이버와 상관없는 커밋만 쌓여서는 .ko가 바뀌지 않는다(얕은 클론은 안 됨).
 # 환경 변수: NX4_DRV_JOBS(make -j), NX4_DRV_TRIES(에뮬레이션 충돌 때 make를 모두 몇 번까지 돌릴지, 기본 30),
-#            NX4_DRV_VOLUME(볼륨 이름), NX4_DRV_IMAGE(이미지 이름)
+#            NX4_DRV_VOLUME(볼륨 이름), NX4_DRV_IMAGE(이미지 이름),
+#            NX4_DRV_DOCKER_CONTEXT(이 빌드에 쓸 Docker context. .env.local에서도 읽음, 명령 앞에 준 값이 앞섬. 비면 셸의 기본)
 # 이 스크립트는 저장소의 다른 PC 스크립트처럼 AGPL-3.0이다. 컨테이너 안에서 도는 drivers/는 GPL-2.0(drivers/COPYING).
 set -eu
 B=$(cd "$(dirname "$0")/.." && pwd)
@@ -19,7 +21,16 @@ case "${1:-}" in
   *) echo "쓰는 법: sh scripts/build-driver.sh [--src-asset]"; exit 1 ;;
 esac
 command -v docker >/dev/null 2>&1 || { echo "docker가 없습니다"; exit 1; }
-docker info >/dev/null 2>&1 || { echo "Docker가 돌고 있지 않습니다(colima start 등)"; exit 1; }
+# 이 빌드에만 쓸 Docker context(예: Rosetta를 켠 colima 프로필 nx4의 colima-nx4). 전역 기본 context는 바꾸지 않고 이 스크립트의
+# docker 명령에만 DOCKER_CONTEXT로 준다. .env.local은 scripts/local-env.sh로 이 값만 읽는다
+. "$B/scripts/local-env.sh"
+nx4_env "$B" NX4_DRV_DOCKER_CONTEXT || exit 1
+if [ -n "${NX4_DRV_DOCKER_CONTEXT:-}" ]; then
+  DOCKER_CONTEXT=$NX4_DRV_DOCKER_CONTEXT
+  export DOCKER_CONTEXT
+  echo "Docker context: $DOCKER_CONTEXT (NX4_DRV_DOCKER_CONTEXT)"
+fi
+docker info >/dev/null 2>&1 || { echo "Docker가 돌고 있지 않습니다(colima start 등${DOCKER_CONTEXT:+, context $DOCKER_CONTEXT})"; exit 1; }
 IMG=${NX4_DRV_IMAGE:-nx4kor-drvbuild}
 VOL=${NX4_DRV_VOLUME:-nx4kor-drivers}
 OUT=$B/out/drivers

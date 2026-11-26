@@ -137,7 +137,7 @@ sh scripts/build-driver.sh --src-asset
 
 ## 빌드
 
-Docker가 필요합니다(linux/amd64. Apple Silicon 맥은 colima 등이 qemu로 돌림). 저장소 맨 위에서:
+Docker가 필요합니다(linux/amd64. Apple Silicon 맥은 아래 "맥에서 빌드"). 저장소 맨 위에서:
 
 ```sh
 sh scripts/build-driver.sh
@@ -149,9 +149,26 @@ sh scripts/build-driver.sh
 - 컨테이너는 `drivers/`의 사본으로 돕니다. 빌드 중에 파일을 고쳐도 그 빌드는 바뀌지 않습니다.
 - Apple Silicon 맥의 qemu 에뮬레이션에서는 컴파일러·어셈블러·커널의 호스트 도구가 가끔 `Segmentation fault`(`internal compiler error`)로 멈춥니다. 커널 준비와 드라이버 컴파일 모두, 그때만 `make`를 이어서 다시 돌립니다(모두 30번까지, `NX4_DRV_TRIES`로 바꿈, `lib.sh` `make_retry`. RTL8831BU는 오브젝트가 379개(RTL88x2BU 157개)라 충돌이 더 잦아, 8번으로는 한 빌드 안에서 다 써 버린 적이 있음). 다시 돌리기 전에 make가 실패로 적은 대상을 지웁니다(커널 3.18의 kbuild에는 `.DELETE_ON_ERROR`가 없어 반쯤 쓴 파일이 남을 수 있음). 다 된 것은 다시 만들지 않아 결과는 같습니다. 충돌이 없으면 한 번에 끝나므로(CI) 횟수를 늘려도 잃는 것이 없습니다. 이 맥에서는 세 번 연속 충돌도 여러 번 있었습니다. 끝까지 멈추면 빌드는 실패로 끝나고, 스크립트를 다시 돌리면 커널 준비를 마친 트리는 다시 쓰고 드라이버는 처음부터 다시 컴파일합니다. 동시 작업 수(`NX4_DRV_JOBS`)를 줄여도 충돌은 날 수 있습니다.
 - 받기는 잠깐의 오류(503 등)면 15초씩 쉬며 8번까지 다시 묻습니다.
+- `.env.local`의 `NX4_DRV_DOCKER_CONTEXT`가 있으면 이 빌드의 docker 명령에만 그 context를 씁니다(`DOCKER_CONTEXT`, 명령 앞에 준 값이 앞섬). 워크트리에서는 다른 PC 스크립트처럼 `NX4_ENV_FILE=<메인 체크아웃>/.env.local`로 가리킵니다.
 - 저장소가 Docker VM에 공유된 곳에 있어야 합니다. colima는 기본으로 홈 폴더와 `/tmp/colima`만 VM에 붙입니다(`/var/folders` 같은 `mktemp -d` 자리는 안 됨). 붙지 않은 곳이면 스크립트가 먼저 알리고 멈춥니다.
 - Docker가 이 셸의 프록시 설정을 이어받아 받기가 막히면, 프록시 변수를 뺀 셸에서 Docker(colima 등)를 다시 시작합니다.
 - GitHub Actions(`.github/workflows/drivers.yml`)도 `drivers/`나 이 스크립트가 바뀐 `feature/` 푸시·PR마다 같은 방법으로 빌드합니다. md5는 실행 요약에, `.ko`는 artifact `drivers-tcc803x`에 있습니다. 같은 커밋이면 PC와 md5가 같아야 합니다(다르면 PC의 에뮬레이션 쪽을 의심합니다).
+
+### 맥에서 빌드(Apple Silicon)
+
+툴체인(GCC 4.7)과 커널의 호스트 도구가 x86_64용이라 맥에서는 linux/amd64 컨테이너를 에뮬레이션으로 돌립니다. colima의 기본 VM은 qemu로 돌려 느리고, 컴파일러가 자주 멈추거나(한 빌드에 20번) `cc-option` 물음이 실패해 `armv5t`로 넘어갔습니다. **Rosetta를 켠 colima 프로필을 이 빌드에만** 씁니다.
+
+```sh
+colima start -p nx4 --cpu 10 --memory 16 --vz-rosetta
+docker context use colima
+```
+
+- 첫 줄은 Rosetta(Apple Virtualization.Framework)로 x86_64를 돌리는 VM을 따로 만듭니다. 다른 프로젝트가 쓰는 기본 VM(`default`, 프로필 `colima`)은 그대로입니다. 적용됐는지는 `colima ssh -p nx4 -- ls /proc/sys/fs/binfmt_misc`에 `rosetta`가 있는지로 봅니다.
+- `colima start -p nx4`는 시작할 때마다 전역 기본 context를 `colima-nx4`로 바꿉니다. 둘째 줄로 기본을 되돌립니다.
+- `.env.local`에 `NX4_DRV_DOCKER_CONTEXT=colima-nx4`를 적으면 `sh scripts/build-driver.sh`가 이 VM으로 빌드합니다(`.env.example`).
+- 이 VM은 Docker 볼륨을 따로 가져 첫 빌드는 처음부터 합니다. 2026-11-26 이 맥(M4 Max)에서 처음부터 끝까지(자산 받기·커널 준비·드라이버 둘) 344초였고, 컴파일러 충돌은 한 번도 없었으며, 두 `.ko`의 md5가 같은 커밋의 CI와 같았습니다(커밋 `1edffba`).
+- 안 쓸 때는 `colima stop -p nx4`로 멈춥니다.
+- Rosetta도 에뮬레이션입니다. 차에 넣을 `.ko`는 아래처럼 CI 것만 씁니다.
 
 ### 차에 넣을 `.ko`는 CI에서 만든 것만
 
@@ -159,7 +176,9 @@ sh scripts/build-driver.sh
 - 까닭: Apple Silicon 맥의 qemu 에뮬레이션에서 컴파일러가 **멈추지 않고도 다른 코드를 낸 적이 있습니다**. PR #69의 커밋 `572128e`를 PC에서 빌드했을 때 첫 빌드는 md5 `5035d662…`(`.text`가 다르고 여러 함수의 레지스터 배정·분기 배치가 다름)였습니다. 같은 커널 트리로 다시 빌드하니 CI와 같은 `aabf4de7…`가 나왔습니다. 충돌(Segmentation fault)은 알 수 있어 다시 돌리지만, 이런 조용한 차이는 결과를 보기 전에는 알 수 없었습니다.
 - 알려진 원인 하나(PR #69 리뷰 14·18): 커널은 make마다 컴파일러에 물어(`cc-option`) 옵션을 정합니다. `arch/arm/Makefile`은 `-march=armv7-a`가 안 되면 조용히 `-march=armv5t`로 넘어가고, `-fno-strict-overflow`·`-fconserve-stack` 같은 옵션도 같은 식으로 붙습니다. 에뮬레이션에서 그 물음 중에 컴파일러가 멈추면 다른 옵션으로 컴파일됩니다. 리뷰 중에 실제로 `armv5t`로 컴파일되어 `rev16` 어셈블러 오류가 난 적이 있습니다. `572128e`의 조용한 차이는 충돌도 오류도 없어, 어느 옵션 때문이었는지(또는 이 까닭이었는지)는 확인하지 못했습니다.
 - 그래서 빌드는 끝에 모든 오브젝트의 컴파일 옵션 묶음(`-m`·`-f`·`-W`·`-O`·`-g`·`-std`·`-D__LINUX_ARM_ARCH__`)을 봅니다(`lib.sh` `check_cflags`). 서로 같고, `-march=armv7-a`이며, 그 sha256이 `inputs.sh`의 고정 값과 같아야 합니다(드라이버 Makefile이 붙이는 옵션이 달라 따로 둠: RTL88x2BU `EXPECTED_CFLAGS_SHA256` CI 값 `d81069ca…`, RTL8831BU `EXPECTED_CFLAGS_SHA256_8831BU` CI 값 `9772552f…`). 아니면 실패로 끝납니다. 그 sha256은 `bcmdhd.ko.txt`의 `cflags` 줄에도 남습니다. 커널 소스·설정·툴체인·드라이버 Makefile·`EXTRA_CFLAGS`를 바꾸면 CI의 "컴파일 옵션 확인" 줄 값으로 `inputs.sh`를 함께 고칩니다.
-- **커널 심볼 확인**(PR #81 리뷰 2): 커널 준비가 `modules_prepare`까지라 `Module.symvers`가 없어, modpost는 커널에 없는 심볼을 불러도 알리지 않습니다. 그런 `.ko`는 빌드·CI는 통과하고 차에서 `Unknown symbol`로 올라가지 않습니다. 그래서 빌드 끝에 `.ko`가 부르는 이름(`arm-eabi-nm -u`)이 모두 커널이 내보내는 것인지 봅니다(`lib.sh` `check_ksyms`). 내보내는 이름은 커널 트리 소스의 `EXPORT_SYMBOL*(이름)`과 `kernel/params.c`의 `STANDARD_PARAM_DEF`가 만드는 `param_ops_*`입니다(`kernel_exports`, 준비한 트리마다 한 번 만듦). 설정으로 빌드하지 않는 파일의 것도 들어가 "없음"만 확실히 잡으므로, 차에서 dmesg에 `Unknown symbol`이 없는지도 봅니다.
+- **커널 심볼 확인**(PR #81 리뷰 2): 커널 준비가 `modules_prepare`까지라 `Module.symvers`가 없어, modpost는 커널에 없는 심볼을 불러도 알리지 않습니다. 그런 `.ko`는 빌드·CI는 통과하고 차에서 `Unknown symbol`로 올라가지 않습니다. 그래서 빌드 끝에 `.ko`가 부르는 이름(`arm-eabi-nm -u`)이 모두 커널이 내보내는 것인지 봅니다(`lib.sh` `check_ksyms`). 내보내는 이름은 커널 트리 소스의 `EXPORT_SYMBOL(_GPL)(이름)`, `EXPORT_PER_CPU_SYMBOL(_GPL)(이름)`(이 커널은 SMP라 내보냄, 리뷰 5), `kernel/params.c`의 `STANDARD_PARAM_DEF`가 만드는 `param_ops_*`입니다(`kernel_exports`, 빌드마다 새로 만듦, 몇 초).
+  - 설정으로 빌드하지 않는 파일의 것도 목록에 들어가, 확인을 통과해도 차 커널에 다 있다는 뜻은 아닙니다. 그래서 차에서 dmesg에 `Unknown symbol`이 없는지도 봅니다.
+  - 거꾸로 위 꼴이 아닌 다른 매크로로 내보내는 이름은 목록에 빠져 거짓으로 걸릴 수 있습니다. 걸리면 그 이름을 커널 소스에서 찾아보고, 정말 내보내는 것이면 `kernel_exports`에 그 꼴을 더합니다.
 - 그래도 PC 빌드는 개발·확인용입니다. `scripts/build-driver.sh`는 Docker VM의 CPU가 x86_64가 아니거나 맥이 Apple Silicon이면(Rosetta 터미널 포함) 끝에 알리고, `bcmdhd.ko.txt`에 `build host <Docker VM CPU>, <OS CPU> (emulated: …)`를 적습니다. PC 결과를 쓰려면 같은 커밋의 CI md5와 같은지 먼저 봅니다.
 
 ## 바깥 자료(`inputs.sh`)

@@ -49,13 +49,16 @@ make_retry() {
   rm -f "$_log.try"
 }
 
-# 커널이 내보내는 이름 목록(정렬): 커널 트리 소스의 EXPORT_SYMBOL*(이름)과, kernel/params.c의 STANDARD_PARAM_DEF(이름, …)가
-# 매크로로 내보내는 param_ops_<이름>. 설정으로 빌드하지 않는 파일의 것도 들어가므로, 이 목록에 없으면 확실히 없는 것이다(있다고
-# 차 커널에 꼭 있는 것은 아님). 모듈 적재기는 미정의 심볼 하나만 못 찾아도 올리지 않는다(insmod: Unknown symbol)
+# 커널이 내보내는 이름 목록(정렬): 커널 트리 소스의 EXPORT_SYMBOL(_GPL·_GPL_FUTURE)(이름), EXPORT_PER_CPU_SYMBOL(_GPL)(이름)
+# (이 커널은 CONFIG_SMP=y라 EXPORT_SYMBOL이 됨, include/linux/percpu-defs.h, PR #81 리뷰 5), kernel/params.c의
+# STANDARD_PARAM_DEF(이름, …)가 매크로로 내보내는 param_ops_<이름>. EXPORT_UNUSED_SYMBOL은 이 설정(CONFIG_UNUSED_SYMBOLS 꺼짐)에서
+# 내보내지 않아 넣지 않는다. 설정으로 빌드하지 않는 파일의 것도 들어가 "목록에 있음"이 차 커널에 있다는 뜻은 아니다. 거꾸로 이
+# 꼴들이 아닌 다른 매크로로 내보내는 이름은 빠져 거짓으로 걸릴 수 있다. 그때는 커널 소스에서 확인하고 여기에 더한다.
+# 모듈 적재기는 미정의 심볼 하나만 못 찾아도 올리지 않는다(insmod: Unknown symbol)
 #   kernel_exports <커널 트리>
 kernel_exports() {
   { grep -rhoE --include='*.c' --include='*.S' --include='*.h' \
-      'EXPORT_SYMBOL(_GPL|_GPL_FUTURE|_UNUSED|_UNUSED_GPL)?\([[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\)' "$1" \
+      'EXPORT_(PER_CPU_)?SYMBOL(_GPL|_GPL_FUTURE)?\([[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\)' "$1" \
       | sed -E 's/.*\([[:space:]]*([A-Za-z0-9_]+)[[:space:]]*\)/\1/'
     grep -hoE '^STANDARD_PARAM_DEF\([a-z]+' "$1/kernel/params.c" | sed 's/STANDARD_PARAM_DEF(/param_ops_/'
   } | LC_ALL=C sort -u
