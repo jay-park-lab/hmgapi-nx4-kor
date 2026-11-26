@@ -46,7 +46,17 @@ esac
 [ -z "$(git -C "$B" status --porcelain -- drivers scripts/build-driver.sh 2>/dev/null)" ] \
   || echo "알림: drivers/나 이 스크립트에 커밋하지 않은 수정이 있습니다(그 수정으로 빌드하지만 날짜는 마지막 커밋의 것)"
 
+# 빌드한 곳의 CPU. x86_64가 아니면 linux/amd64 컨테이너는 에뮬레이션(qemu 등)으로 돈다. 에뮬레이션에서는 컴파일러가 멈추지
+# 않고도 다른 코드를 낸 적이 있다(PR #69, 572128e: 첫 빌드 md5 5035d662…, 다시 빌드하니 CI와 같은 aabf4de7…).
+# 그래서 차에 넣을 .ko는 리눅스 x86(CI·release 워크플로)에서 만든 것만 쓴다. 정보 파일에 남기고 끝에 알린다
+HOST_ARCH=$(uname -m)
 docker run --rm --platform linux/amd64 \
   -v "$VOL":/work -v "$B/drivers":/src/drivers:ro -v "$OUT":/out \
   -e MODE=$MODE -e JOBS="${NX4_DRV_JOBS:-}" -e MAKE_TRIES="${NX4_DRV_TRIES:-8}" -e BUILD_DATE="$BDATE" -e BUILD_TIME="$BTIME" \
+  -e HOST_ARCH="$HOST_ARCH" \
   "$IMG" bash /src/drivers/build-in-container.sh
+case "$HOST_ARCH" in
+  x86_64|amd64) ;;
+  *) echo "알림: 이 PC($HOST_ARCH)에서는 에뮬레이션으로 빌드했습니다. 에뮬레이션은 멈추지 않고도 다른 코드를 낼 수 있어, 이 .ko는 차에 넣지 마세요."
+     echo "      확인용입니다. 같은 커밋의 CI(drivers 워크플로) md5와 견주고, 차에는 CI·release 워크플로가 만든 .ko를 씁니다(drivers/README.md)." ;;
+esac

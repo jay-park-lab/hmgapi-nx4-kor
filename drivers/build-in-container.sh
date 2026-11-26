@@ -131,6 +131,12 @@ case "$MODE" in
       echo "kernel linux-3.18.24 $KERNEL_SHA256"
       echo "car config $CARCFG_SHA256"
       echo "build date $BUILD_DATE $BUILD_TIME"
+      # 빌드한 PC의 CPU(scripts/build-driver.sh가 줌). x86_64가 아니면 에뮬레이션 빌드라 차에 넣지 않는다(drivers/README.md)
+      case "${HOST_ARCH:-}" in
+        x86_64|amd64) echo "build host $HOST_ARCH" ;;
+        "") echo "build host unknown" ;;
+        *) echo "build host $HOST_ARCH (emulated: check against CI, do not ship)" ;;
+      esac
       # 3.18의 모듈에는 modinfo name이 없다. 커널이 쓰는 이름(struct module의 name)은 .gnu.linkonce.this_module에 있다
       $TC/bin/arm-eabi-objcopy -O binary --only-section=.gnu.linkonce.this_module $O/bcmdhd.ko /tmp/this_module.bin
       echo "module name $(strings -n 3 /tmp/this_module.bin | head -1)"

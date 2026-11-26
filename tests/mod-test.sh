@@ -1373,6 +1373,8 @@ check "drivers: GPL-2.0 전문(drivers/COPYING), build-driver.sh는 빌드 날�
 check "drivers/rtl88x2bu: 패치는 번호 차례(0001 KP 보호 패치, 0002 HAL 맞춤)이고 -p1 꼴, nx4 빌드는 모듈 이름 bcmdhd·iface_name을 ifname으로 받음" \
   '[ "$(ls $B/drivers/rtl88x2bu/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-kp-protect.diff 0002-nx4-hal.diff " ] && ! grep -h "^+++ " $B/drivers/rtl88x2bu/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_88x2bu \$D bcmdhd" $B/drivers/build-in-container.sh && grep -q "module_param_named(iface_name, ifname" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "module_param_string(firmware_path" $B/drivers/rtl88x2bu/0002-nx4-hal.diff'
 check "drivers: README·NOTICE의 값(커널·툴체인·차 설정 값과 커밋, 드라이버 커밋, KP md5)이 inputs.sh와 같음" 'drv_docs_ok'
+check "drivers: 차에 넣을 .ko는 CI 것만 — build-driver.sh가 빌드한 CPU를 넘기고 x86_64가 아니면 알림, 정보 파일에 build host, README에 규칙" \
+  'grep -q -- "-e HOST_ARCH=\"\$HOST_ARCH\"" $B/scripts/build-driver.sh && grep -q "이 .ko는 차에 넣지 마세요" $B/scripts/build-driver.sh && grep -q "build host \$HOST_ARCH (emulated" $B/drivers/build-in-container.sh && grep -q "차에 넣을 \`.ko\`는 CI에서 만든 것만" $B/drivers/README.md'
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc

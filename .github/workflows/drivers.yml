@@ -2,7 +2,8 @@
 # Docker)으로 빌드한다. 키·비밀값을 쓰지 않고 저장소에 쓰지 않는다.
 #   1. --kp-check  Korea Projection 1.8.0-beta.2의 88x2bu.ko와 md5까지 같은지(방법이 KP와 같은지)
 #   2. 우리 드라이버(bcmdhd.ko). 빌드 날짜·시각을 drivers/를 마지막으로 바꾼 커밋의 시각으로 고정하므로 같은 커밋이면 PC와 같은 md5가 나온다.
-#      결과의 md5는 실행 요약에, .ko와 정보 파일은 artifact(drivers-tcc803x)에 둔다
+#      결과의 md5는 실행 요약에, .ko와 정보 파일은 artifact(drivers-tcc803x)에 둔다.
+# 차에 넣을 .ko는 이처럼 리눅스 x86에서 만든 것만 쓴다(맥의 qemu 에뮬레이션 빌드는 조용히 다른 코드를 낸 적이 있음, drivers/README.md)
 name: drivers
 
 on:

@@ -41,6 +41,12 @@ sh scripts/build-driver.sh
 - Docker가 이 셸의 프록시 설정을 이어받아 받기가 막히면, 프록시 변수를 뺀 셸에서 Docker(colima 등)를 다시 시작합니다.
 - GitHub Actions(`.github/workflows/drivers.yml`)도 `drivers/`나 이 스크립트가 바뀐 `feature/` 푸시·PR마다 같은 방법으로 빌드합니다(`--kp-check`, 그다음 우리 드라이버). md5는 실행 요약에, `.ko`는 artifact `drivers-tcc803x`에 있습니다. 같은 커밋이면 PC와 md5가 같아야 합니다.
 
+### 차에 넣을 `.ko`는 CI에서 만든 것만
+
+- **차에 넣는 `.ko`는 리눅스 x86에서 만든 것만 씁니다**(CI `drivers` 워크플로의 artifact, 4단계부터는 release 워크플로. 2026-11-26 결정).
+- 까닭: Apple Silicon 맥의 qemu 에뮬레이션에서 컴파일러가 **멈추지 않고도 다른 코드를 낸 적이 있습니다**. PR #69의 커밋 `572128e`를 PC에서 빌드했을 때 첫 빌드는 md5 `5035d662…`(`.text`가 다르고 여러 함수의 레지스터 배정·분기 배치가 다름)였습니다. 같은 커널 트리로 다시 빌드하니 CI와 같은 `aabf4de7…`가 나왔습니다. 충돌(Segmentation fault)은 알 수 있어 다시 돌리지만, 이런 조용한 차이는 빌드만으로는 알 수 없습니다.
+- 그래서 PC 빌드는 개발·확인용입니다. `scripts/build-driver.sh`는 PC가 x86_64가 아니면 끝에 알리고, `bcmdhd.ko.txt`에 `build host <CPU> (emulated: …)`를 적습니다. PC 결과를 쓰려면 같은 커밋의 CI md5와 같은지 먼저 봅니다.
+
 방법이 KP와 같은지 확인하려면:
 
 ```sh
