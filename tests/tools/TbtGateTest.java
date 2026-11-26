@@ -382,6 +382,32 @@ public class TbtGateTest {
         is(k.held(TBT, 8, true, w, waited) == null && w.waits == 0 && waited[0] == -1L,
                 "review 4: once this mod has a value, another argument count passes without waiting");
 
+        // PR #85 review 6: held-call log lines (kor_tbt_log): one call this mod never makes can't use them all, and they
+        // count again from the end of each guidance and connection
+        TbtGate lg = new TbtGate();
+        int lanes = 0;
+        for (int u = 0; u < 200; u++) if (lg.heldLog(LANE)) lanes++;
+        is(lanes == TbtGate.HELD_LOGS_PER_POINT, "review 6: 200 held lanes calls in one guidance: " + TbtGate.HELD_LOGS_PER_POINT + " lines");
+        is(lg.heldLog(TBT), "review 6: the turn still gets lines after that");
+        String[] pts = { "update_tbt_sub_info_b", "update_tbt_sub_info_2c", "update_tp_turn_list_new", "update_tp_destination_name",
+                "update_tp_crossroad_name", "update_tp_turn_list" };
+        int all = lanes + 1;
+        for (int u = 0; u < 200; u++) {
+            if (lg.heldLog(TBT)) all++;
+            for (String p : pts) if (lg.heldLog(p)) all++;
+        }
+        is(all == TbtGate.HELD_LOGS_MAX && !lg.heldLog("update_tp_turn_list"), "review 6: " + TbtGate.HELD_LOGS_MAX + " lines in all");
+        lg.setActive(true);
+        is(!lg.heldLog(TBT), "review 6: guidance on: still none left");
+        lg.setActive(true);
+        is(!lg.heldLog(TBT), "review 6: no change of guidance: still none");
+        lg.setActive(false);
+        is(lg.heldLog(TBT) && lg.heldLog(LANE), "review 6: guidance off: the next start's held calls get lines again");
+        for (int u = 0; u < 50; u++) lg.heldLog(LANE);
+        is(!lg.heldLog(LANE), "review 6: lanes used up again");
+        lg.heldLogsReset();
+        is(lg.heldLog(LANE), "review 6: the connection ended (heldLogsReset): lines again");
+
         // real threads, KorTbt's way of waiting (Object.wait): done on this mod's thread wakes the held call well before
         // HOLD_MS, and that thread never waits for the held one
         final TbtGate r = new TbtGate();

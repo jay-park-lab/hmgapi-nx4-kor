@@ -5,7 +5,8 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 // Projection's (StopDragon/HMG-API korea-build 6258357, AGPL-3.0). The cluster override is NX4 KOR's.
 // Modified by NX4 KOR, 2026-11-26 (2.1.2-beta.4, #67): an official mod's call this mod has nothing for yet waits
 //   briefly for this mod's thread (TbtGate.held), so a start no longer shows the official mod's first set;
-//   PR #85 review 2: with kor_tbt_log, every held call is logged (ours or passed), up to HELD_LOGS_MAX.
+//   PR #85 review 2: with kor_tbt_log, every held call is logged (ours or passed), up to TbtGate.HELD_LOGS_MAX;
+//   PR #85 review 6: that count, also per call, starts again when guidance goes off or the connection ends.
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -25,7 +26,6 @@ import com.tcc.iap2.Iap2NotiMsg;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import hmgapi.hook.Car;
 import hmgapi.hook.Cluster;
@@ -55,7 +55,8 @@ import hmgapi.hook.ModContext;
  *    call now waits up to TbtGate.HOLD_MS for this thread to finish all this listener has heard
  *    (or, with guidance off, is about to hear), then carries this thread's arguments if there are
  *    any (held, not on the main thread; with kor_tbt_log, each held call is logged, up to
- *    HELD_LOGS_MAX per start).
+ *    TbtGate.HELD_LOGS_MAX in all and HELD_LOGS_PER_POINT for one call, counted again from the
+ *    end of each guidance and of each connection).
  * 3. A Stop of the phone's route guidance that isn't this mod's own clears ours 2 s later, unless
  *    the phone sends again meanwhile: the official mod asks again with Stop and Start (a source
  *    change, its watchdog), and only DiPO's own Stop (CarPlay ends) is followed by silence.
@@ -89,12 +90,6 @@ public final class KorTbt {
     static final TbtGate gate = new TbtGate();
     /** points whose first override was logged */
     static final Set<String> overrideLogged = Collections.synchronizedSet(new HashSet<String>());
-    /**
-     * held official calls logged, ours or passed as they were (only with kor_tbt_log, up to HELD_LOGS_MAX per start, as
-     * CpTurnsFit's diagnosis and HUD lines: PR #85 review 2)
-     */
-    static final AtomicInteger heldLogs = new AtomicInteger();
-    static final int HELD_LOGS_MAX = 100;
     /** a held call's clock and wait: elapsedRealtime, and Object.wait on the gate (TbtGate.done wakes it) */
     static final TbtGate.Waits WAITS = new TbtGate.Waits() {
         @Override
@@ -238,9 +233,10 @@ public final class KorTbt {
                     long[] waited = { -1L };
                     c = gate.held(point, p.args.length, on, WAITS, waited);
                     // PR #85 review 2: with kor_tbt_log, each held call either way (passed: the official mod's values went
-                    // to the cluster), up to HELD_LOGS_MAX per start; nothing more without it
+                    // to the cluster); nothing more without it. Review 6: up to TbtGate.HELD_LOGS_MAX, HELD_LOGS_PER_POINT
+                    // for one call, counted again when guidance goes off or the connection ends
                     CpTurnsFit t = turns;
-                    if (waited[0] >= 0L && t != null && t.debug && heldLogs.getAndIncrement() < HELD_LOGS_MAX) {
+                    if (waited[0] >= 0L && t != null && t.debug && gate.heldLog(point)) {
                         log("CarPlay (NX4 KOR): " + point + " from the official mod held " + waited[0] + " ms, "
                                 + (c != null ? "carries ours" : "passed as it was") + " (debug)");
                     }
@@ -378,6 +374,8 @@ public final class KorTbt {
                 @Override
                 public void run() {
                     turns.disconnected();
+                    // the next connection's held calls get log lines of their own (PR #85 review 6)
+                    gate.heldLogsReset();
                 }
             });
         }

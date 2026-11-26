@@ -133,9 +133,10 @@ for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, Syste
           # 2.1.2-beta.4: a call ours has nothing for yet waits for this thread (TbtGate.held), never on the main thread;
           # the listener numbers the update and its post says when this thread is through (done wakes the call)
           "boolean on = mod.enabled();", "c = gate.held(point, p.args.length, on, WAITS, waited);",
-          # PR #85 리뷰 2: 붙잡은 호출은 kor_tbt_log일 때만, 우리 값·그대로 통과 모두, 시작마다 HELD_LOGS_MAX줄까지
-          "waited[0] >= 0L && t != null && t.debug && heldLogs.getAndIncrement() < HELD_LOGS_MAX",
-          "static final int HELD_LOGS_MAX = 100;",
+          # PR #85 리뷰 2: 붙잡은 호출은 kor_tbt_log일 때만, 우리 값·그대로 통과 모두. 리뷰 6: 줄 수는 TbtGate.heldLog가
+          # 정함(모두 HELD_LOGS_MAX, 한 지점 HELD_LOGS_PER_POINT, 길안내가 꺼질 때(setActive)·연결이 끝날 때 다시 셈)
+          "waited[0] >= 0L && t != null && t.debug && gate.heldLog(point)",
+          "gate.heldLogsReset();",
           "Looper.myLooper() != Looper.getMainLooper()", "lock.wait(ms);", "final long seq = gate.heard(", "}, seq);",
           "if (seq > 0L) gate.done(seq);",
           # 앱에서 끄면 받지 않고, 상태와 "그렸다" 표시를 비우고, 다시 켜면 길안내 전체를 다시 요청한다(PR #68 리뷰 2·11)
@@ -150,13 +151,15 @@ body = body[:body.index("\n    }\n")]
 assert re.search(r"noteActive\(\);\s*\}\s*finally\s*\{\s*if \(seq > 0L\) gate\.done\(seq\);", body), body
 run = body[body.index("h.post(new Runnable()"):]
 assert run.count("gate.done(") == 1 and run.index("noteActive();") < run.index("gate.done(seq);"), run
+# 리뷰 6: 연결이 끝나면(리스너의 disconnected를 이 스레드가 처리한 뒤) 붙잡기 기록 줄 수를 다시 셈
+assert re.search(r"turns\.disconnected\(\);\s*//[^\n]*\n\s*gate\.heldLogsReset\(\);", part), "heldLogsReset"
 PY'
 # KorTbt의 판단(TbtGate: 덮어쓰기, 비켜 주기, 남의 Stop 미루기, 앱에서 끔. PR #68 리뷰 1~4)을 PC에서 돌린다
 if command -v javac >/dev/null 2>&1; then
   mkdir -p $T/gate
   javac --release 8 -Xlint:-options -nowarn -d $T/gate $HK/dipo/TbtGate.java $B/tests/tools/TbtGateTest.java > $T/gate.err 2>&1
   java -cp $T/gate io.github.jayparklab.nx4kor.hook.dipo.TbtGateTest > $T/gate.out 2>&1
-  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음), 공식 모드가 우리 최신 값을 900ms 안에 실어 보냈으면 같은 값의 우리 호출을 건너뜀(#77), 우리 값이 아직 없는 공식 호출은 우리 스레드가 들은 것을 모두 끝낼 때까지 250ms(길안내가 꺼져 있고 못 들었으면 50ms)까지 기다려 우리 값을 실음(2.1.2-beta.4, PR #85 리뷰 1·3·4)" \
+  check "TbtGate(한국 길안내의 판단) $(grep -c '^ok ' $T/gate.out)개: 켜졌고 들을 때만 공식 호출을 덮음, 앱에서 끄면 통과, 공식은 계속 부르는데 우리만 3초 못 들으면 비켜 줌, 남의 Stop은 2초 안에 폰이 다시 보내면 지우지 않음(150ms 안에 온 것은 세지 않음), 공식 모드가 우리 최신 값을 900ms 안에 실어 보냈으면 같은 값의 우리 호출을 건너뜀(#77), 우리 값이 아직 없는 공식 호출은 우리 스레드가 들은 것을 모두 끝낼 때까지 250ms(길안내가 꺼져 있고 못 들었으면 50ms)까지 기다려 우리 값을 실음(2.1.2-beta.4, PR #85 리뷰 1·3·4), 그 기록은 길안내마다 100줄·한 지점 20줄까지(리뷰 6)" \
     'tail -n 1 $T/gate.out | grep -qx ok && ! grep -q "^FAIL" $T/gate.out' || cat $T/gate.err $T/gate.out
 else
   echo "skip TbtGate 테스트(javac 없음)"
