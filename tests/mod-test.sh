@@ -736,22 +736,32 @@ echo 1 > $R/sys/module/tcc_dwc_otg/parameters/vbus_control_enable
 printf 'CONFIG_CFG80211=y\nCONFIG_MODVERSIONS=n\n' > $T/kconfig; gzip -c $T/kconfig > $R/proc/config.gz
 printf 'dhd\nvermagic=3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8 \nlicense=GPL\n' > $R/system/wifi/bcmdhd.ko; echo fw > $R/system/wifi/fw_bcmdhd.bin
 printf 'wifi_load_driver\n/system/wifi/bcmdhd.ko\niface_name=\nwifi_check_module_info\nunrelated text\n' > $R/system/lib/libhardware_legacy.so
-# #80 차 확인(mount.txt): init·이 설치기·system_server·HMG-API 프로세스의 mount 이름공간과 mountinfo, SELinux.
-# 이름공간 링크는 ls -l로 읽으므로 대상 이름만 가진 링크로 흉내 낸다. system_server는 다른 이름공간에 둔다
-for _p in 1 self 200 300 400; do mkdir -p $R/proc/$_p/ns; done
-ln -s 'mnt:[4026531840]' $R/proc/1/ns/mnt; ln -s 'mnt:[4026531840]' $R/proc/self/ns/mnt
-ln -s 'mnt:[4026532001]' $R/proc/200/ns/mnt; ln -s 'mnt:[4026531840]' $R/proc/300/ns/mnt
-echo init > $R/proc/1/comm; echo system_server > $R/proc/200/comm; echo app_process > $R/proc/300/comm; echo hmgapid > $R/proc/300/cmdline
-echo zygote > $R/proc/400/comm
-# 시작 시각: stat 22번째 칸(1/100초). system_server 12.34초, HMG-API 23.45초
-printf '200 (system_server) S %s1234 100 0\n' "$(printf '0 %.0s' $(seq 1 18))" > $R/proc/200/stat
-printf '300 (app_process) S %s2345 100 0\n' "$(printf '0 %.0s' $(seq 1 18))" > $R/proc/300/stat
+# #80 차 확인(mount.txt): init·이 설치기·system_server·이름에 hmgapi가 든 프로세스 모두의 ppid·시작 시각·mount 이름공간·SELinux
+# 도메인, init과 이름공간이 다른 프로세스, mountinfo, SELinux, avc 줄.
+# 이름공간 링크는 ls -l로 읽으므로 대상 이름만 가진 링크로 흉내 낸다. system_server는 다른 이름공간에 둔다.
+# HMG-API 데몬(245)은 실제 모양(comm hmgapid, ppid 1)으로 두고, /proc 사전 순으로 그보다 앞서는 미끼를 둔다(PR #84 리뷰 1):
+# 다른 이름공간의 hmgapid 클라이언트(12345, ppid 777), 차량 서비스 hmgapi.vehicle(1532), 이름에 공백·글롭 문자가 든 것(1600, 리뷰 4).
+# 명령줄에만 hmgapid가 든 300(app_process)은 적지 않는다. 888은 이름공간 링크가 없다(읽지 못함, 리뷰 3)
+for _p in 1 self 200 245 300 400 777 888 1532 1600 12345; do mkdir -p $R/proc/$_p/ns $R/proc/$_p/attr; done
+for _p in 1 self 245 300 400 1532 1600; do ln -s 'mnt:[4026531840]' $R/proc/$_p/ns/mnt; done
+ln -s 'mnt:[4026532001]' $R/proc/200/ns/mnt
+for _p in 777 12345; do ln -s 'mnt:[4026532999]' $R/proc/$_p/ns/mnt; done
+for _p in 1:init self:sh 200:system_server 245:hmgapid 300:app_process 400:zygote 777:com.example.app 888:kthreadx 1532:hmgapi.vehicle "1600:hmgapi w *" 12345:hmgapid; do
+  echo "${_p#*:}" > "$R/proc/${_p%%:*}/comm"
+done
+echo hmgapid > $R/proc/300/cmdline
+# stat: 1 pid, 2 (comm), 3 state, 4 ppid, 22 시작 시각(1/100초)
+mkstat() { printf '%s (%s) S %s %s%s 100 0\n' "$1" "$2" "$3" "$(printf '0 %.0s' $(seq 1 17))" "$4" > "$R/proc/$5/stat"; }
+mkstat 1 init 0 0 1; mkstat 4242 sh 1 99900 self; mkstat 200 system_server 150 1234 200; mkstat 245 hmgapid 1 810 245
+mkstat 1532 hmgapi.vehicle 300 4100 1532; mkstat 1600 'hmgapi w *' 5 5000 1600; mkstat 12345 hmgapid 777 60000 12345
+for _p in 1:u:r:init:s0 200:u:r:system_server:s0 245:u:r:init:s0; do echo "${_p#*:}" > $R/proc/${_p%%:*}/attr/current; done
 _mi='1 0 179:2 / / ro,relatime shared:1 - ext4 /dev/root ro
 20 1 179:3 / /system ro,relatime shared:2 - ext4 /dev/block/system ro
 21 1 179:4 / /data rw,nosuid shared:3 - ext4 /dev/block/data rw
 22 1 0:5 / /dev rw,nosuid shared:4 - tmpfs tmpfs rw'
-printf '%s\n' "$_mi" > $R/proc/1/mountinfo; printf '%s\n' "$_mi" > $R/proc/self/mountinfo; printf '%s\n' "$_mi" > $R/proc/300/mountinfo
+printf '%s\n' "$_mi" > $R/proc/1/mountinfo; printf '%s\n' "$_mi" > $R/proc/self/mountinfo; printf '%s\n' "$_mi" > $R/proc/245/mountinfo
 printf '%s\n' "$_mi" | sed 's/shared:\([0-9]\)/master:\1/' > $R/proc/200/mountinfo
+printf '%s\n' "$_mi" | sed 's/shared:\([0-9]\)/master:9/' > $R/proc/12345/mountinfo
 mkdir -p $R/sys/fs/selinux; echo 0 > $R/sys/fs/selinux/enforce
 printf '#!/bin/sh\necho Permissive\n' > $T/bin/getenforce; chmod +x $T/bin/getenforce
 printf 'driver=nl80211\n' > $R/system/bin/hostapd
@@ -762,7 +772,9 @@ echo MACX > $R/sys/class/net/wlan0/address
 printf '%s\n' "<6>[   30.1] usb 1-1: new high-speed USB device number 2 using ehci-tcc" "<6>[   30.2] usb 1-1: SerialNumber: SERIALX" "<6>[   31.0] hmgapi-hook: something else" \
   "<4>[   32.0] dhd_attach: Broadcom Dongle Host Driver mac=00:90:4c:11:22:33" "<4>[   33.0] RTW: rtw_macaddr_cfg MAC Address  = 00:e0:4c:aa:bb:cc" \
   "<4>[   34.0] wlan0: link up 00-e0-4c-dd-ee-ff" "<4>[   35.0] RTW: rtw_ndev_init(wlan0) if1" \
-  "<4>[   36.0] rtl88x2bu: hwaddr 00e04c445566" "<4>[   37.0] rtl88x2bu: probe 00E04C778899 done" > $T/ddmesg
+  "<4>[   36.0] rtl88x2bu: hwaddr 00e04c445566" "<4>[   37.0] rtl88x2bu: probe 00E04C778899 done" \
+  '<5>[   38.0] type=1400 audit(1795680663.510:42): avc: denied { module_load } for pid=245 comm="hmgapid" scontext=u:r:init:s0 tcontext=u:object_r:system_file:s0 tclass=system' \
+  '<5>[   38.1] type=1400 audit(1795680663.520:43): avc: denied { read } for pid=777 comm="com.example.app" laddr=00:e0:4c:aa:bb:cc tclass=file' > $T/ddmesg
 # 이 회는 진단 기록만 본다. backup이 있어 설치기가 2.0.x 되돌리기 길을 타지 않게 legacy-2.0을 치워(가드에서 아무것도 바꾸지 않고 멈춤)
 # 진단 기록에 백업 폴더가 들어가지 않는지만 본다(PR #52 리뷰 10). 끝나면 backup을 지운다
 rm -rf $K/diag; legoff
@@ -787,8 +799,12 @@ check "USB 설치기 진단 기록(동글 준비): /system/wifi 목록·md5, 순
   'grep -q "fw_bcmdhd.bin" $DG/system-wifi-ls.txt && grep -qx "$KO5  /system/wifi/bcmdhd.ko" $DG/system-wifi-md5.txt && grep -q "^/system/wifi/bcmdhd.ko: vermagic=3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8" $DG/ko-vermagic.txt && grep -qx "== /system/lib/libhardware_legacy.so" $DG/wifi-strings.txt && grep -qx "iface_name=" $DG/wifi-strings.txt && grep -qx "/system/wifi/bcmdhd.ko" $DG/wifi-strings.txt && grep -qx "driver=nl80211" $DG/wifi-strings.txt && ! grep -q "unrelated" $DG/wifi-strings.txt' || cat $DG/wifi-strings.txt $DG/ko-vermagic.txt
 check "USB 설치기 진단 기록(동글 준비): USB 장치(ID·속도·전력·제품), 드라이버에 붙은 인터페이스, 네트워크 장치, 커널 로그의 USB·Wi-Fi 줄. 일련번호·MAC은 넣지 않음" \
   'grep -q "^1-1 0bda:b812 speed=480 maxpower=500mA class=00 manufacturer=Realtek product=802.11ac_NIC$" $DG/usb.txt && grep -q "^usb1 1d6b:0002 " $DG/usb.txt && grep -q "1-1" $DG/usb-ls.txt && grep -qx "== rtl88x2bu" $DG/usb-drivers.txt && grep -qx "1-1:1.0" $DG/usb-drivers.txt && grep -q "wlan0" $DG/net-ls.txt && grep -q "new high-speed USB device" $DG/dmesg-usb-wifi.txt && grep -q "rtw_ndev_init(wlan0)" $DG/dmesg-usb-wifi.txt && ! grep -q "hmgapi-hook" $DG/dmesg-usb-wifi.txt && ! grep -rqi -e SERIALX -e MACX -e 11:22:33 -e aa:bb:cc -e dd-ee-ff -e 445566 -e 778899 $K/diag && grep -q "동글 준비 정보를 모음" $K/install.log' || cat $DG/usb.txt $DG/dmesg-usb-wifi.txt
-check "USB 설치기 진단 기록(동글 준비, #80): mount.txt에 SELinux(getenforce·enforce), init·설치기·system_server·HMG-API 프로세스의 mount 이름공간과 시작 시각, 그 /·/system·/data mountinfo 줄(전파 표시)" \
-  'grep -qx "selinux_getenforce: Permissive" $DG/mount.txt && grep -qx "selinux_enforce: 0" $DG/mount.txt && grep -qx "ns init(1): mnt:\[4026531840\]" $DG/mount.txt && grep -qx "ns self: mnt:\[4026531840\]" $DG/mount.txt && grep -qx "ns system_server(200): mnt:\[4026532001\] start=12.3s" $DG/mount.txt && grep -qx "ns hmgapi(300 app_process): mnt:\[4026531840\] start=23.4s" $DG/mount.txt && grep -qx "== mountinfo system_server(200)" $DG/mount.txt && grep -q "^20 1 179:3 / /system ro,relatime master:2 " $DG/mount.txt && grep -q "^21 1 179:4 / /data .*shared:3" $DG/mount.txt && ! grep -q " /dev rw" $DG/mount.txt && grep -qx "wifi_check_module_info" $DG/wifi-strings.txt' || cat $DG/mount.txt
+check "USB 설치기 진단 기록(동글 준비, #80): mount.txt에 SELinux(getenforce·enforce), init·설치기·system_server의 ppid·시작 시각·mount 이름공간·SELinux 도메인, 그 /·/system·/data mountinfo 줄(전파 표시)" \
+  'grep -qx "selinux_getenforce: Permissive" $DG/mount.txt && grep -qx "selinux_enforce: 0" $DG/mount.txt && grep -qxF "proc init: pid=1 comm=init ppid=0 start=0.0s ns=mnt:[4026531840] se=u:r:init:s0" $DG/mount.txt && grep -qxF "proc self: pid=self comm=sh ppid=1 start=999.0s ns=mnt:[4026531840] se=?" $DG/mount.txt && grep -qxF "proc system_server: pid=200 comm=system_server ppid=150 start=12.3s ns=mnt:[4026532001] se=u:r:system_server:s0" $DG/mount.txt && grep -qx "== mountinfo system_server(200)" $DG/mount.txt && grep -q "^20 1 179:3 / /system ro,relatime master:2 " $DG/mount.txt && grep -q "^21 1 179:4 / /data .*shared:3" $DG/mount.txt && ! grep -q " /dev rw" $DG/mount.txt && grep -qx "wifi_check_module_info" $DG/wifi-strings.txt' || cat $DG/mount.txt
+check "  HMG-API: 이름에 hmgapi가 든 프로세스를 모두 적고 데몬(comm hmgapid, ppid 1)에만 데몬 표시, mountinfo는 데몬 것. 사전 순으로 앞선 클라이언트·차량 서비스를 데몬으로 고르지 않음, 명령줄만 맞는 것은 적지 않음, 이름의 공백·글롭에도 시작 시각이 맞음(PR #84 리뷰 1·4)" \
+  'grep -qxF "proc hmgapi: pid=245 comm=hmgapid ppid=1 start=8.1s ns=mnt:[4026531840] se=u:r:init:s0 데몬" $DG/mount.txt && grep -qxF "proc hmgapi: pid=12345 comm=hmgapid ppid=777 start=600.0s ns=mnt:[4026532999] se=?" $DG/mount.txt && grep -qxF "proc hmgapi: pid=1532 comm=hmgapi.vehicle ppid=300 start=41.0s ns=mnt:[4026531840] se=?" $DG/mount.txt && grep -qxF "proc hmgapi: pid=1600 comm=hmgapi w * ppid=5 start=50.0s ns=mnt:[4026531840] se=?" $DG/mount.txt && [ "$(grep -c " 데몬$" $DG/mount.txt)" = 1 ] && ! grep -q "^proc hmgapi: pid=300 " $DG/mount.txt && grep -qx "== mountinfo hmgapid 데몬(245)" $DG/mount.txt && ! grep -q "master:9" $DG/mount.txt' || cat $DG/mount.txt
+check "  init과 이름공간이 다른 프로세스 목록(링크를 못 읽으면 ls 오류 문구), avc 줄(MAC 꼴이 든 줄은 뺌)(PR #84 리뷰 2·3)" \
+  'sed -n "/^== mount 이름공간이 init/,/^== mountinfo init/p" $DG/mount.txt > $T/nsdiff && grep -qxF "pid=200 comm=system_server ns=mnt:[4026532001]" $T/nsdiff && grep -qxF "pid=777 comm=com.example.app ns=mnt:[4026532999]" $T/nsdiff && grep -qxF "pid=12345 comm=hmgapid ns=mnt:[4026532999]" $T/nsdiff && grep -q "^pid=888 comm=kthreadx ns=읽지 못함(.*888/ns/mnt" $T/nsdiff && ! grep -qE "^pid=(1|245|300|400|1532|1600) " $T/nsdiff && grep -qx "== avc(커널 기록, 앞 50줄)" $DG/mount.txt && grep -q "avc: denied { module_load } for pid=245 comm=\"hmgapid\"" $DG/mount.txt && ! grep -q "aa:bb:cc" $DG/mount.txt' || cat $DG/mount.txt
 legon; rm -rf $R/data/nx4-kor/backup
 # 내비의 busybox에 strings·sha256sum·gunzip이 없으면 빈 값 대신 까닭을 적음(PR #66 리뷰 2)
 printf '#!/bin/sh\ncase "$1" in strings|sha256sum|gunzip) echo "$1: applet not found" >&2; exit 127 ;; esac\ncommand -v "$1" >/dev/null 2>&1 || exit 127\nexec "$@"\n' > $R/system/bin/busybox
