@@ -26,14 +26,14 @@ kernel.org linux-3.18.24 (빌드 뼈대)
 
 ## 보호 패치(`rtl88x2bu/0001-nx4-protect.diff`)
 
-동글을 쓰다 뽑거나 동글이 망가졌을 때 내비 커널이 멈추지 않게 하는 패치입니다. 이 저장소가 드라이버 원본(`fc158d1f`)을 읽고 새로 썼습니다. **차에서 아직 확인하지 않았습니다**(#48 차 확인: 꽂은 채 뽑기, Wi-Fi 끄고 켜기, 오래 쓰기). 기록은 dmesg의 `nx4-protect:` 줄입니다(드라이버의 `RTW_PRINT`는 디버그 빌드에서만 찍혀 `printk`를 씁니다).
+동글을 쓰다 뽑거나 동글이 망가졌을 때 내비 커널이 멈추지 않게 하는 패치입니다. 이 저장소가 드라이버 원본(`fc158d1f`)을 읽고 새로 썼습니다. **차에서 아직 확인하지 않았습니다**(#48 차 확인: 꽂은 채 뽑기, Wi-Fi 끄고 켜기, 수신이 멈춘 뒤 Wi-Fi 끄고 켜기, 오래 쓰기). 기록은 dmesg의 `nx4-protect:` 줄입니다(드라이버의 `RTW_PRINT`는 디버그 빌드에서만 찍혀 `printk`를 씁니다).
 
 | 곳 | 원본의 문제 | 패치 |
 |---|---|---|
 | 뽑힘 `rtw_dev_remove` | 장치가 떨어졌다는 표시(surprise removed)를 네트워크 장치를 내린 **뒤에** 합니다. 그 사이 닫기가 없는 장치의 레지스터를 읽고 쓰며 기다릴 수 있습니다 | USB 장치가 이미 떨어졌으면(`USB_STATE_NOTATTACHED`) 네트워크 장치를 내리기 **전에** 표시합니다. `rmmod`처럼 장치가 붙어 있으면 그대로 둡니다 |
 | 정리 `rtw_usb_primary_adapter_deinit` | 수신·송신 tasklet을 끝내지 않고 어댑터 메모리를 풉니다 | USB 요청을 거둔 뒤(`rtw_dev_unload`) 두 tasklet을 `tasklet_kill`로 끝내고 풉니다 |
-| 열기 `netdev_open` | 열기는 surprise removed 표시를 지우고 하드웨어를 다시 초기화합니다. 내리는 중이거나 없는 장치에도 그렇게 합니다 | 내리는 중이거나 USB 장치가 떨어졌으면 `-ENODEV`로 열지 않습니다 |
-| 수신 완료 `usb_read_port_complete`(두 수신 방식) | 오류로 끝나면 수신 요청을 곧바로 다시 겁니다. 연속 오류 세기는 한 번 성공하면 0이 되어, 오류와 성공이 섞이면 멈추지 않고 돕니다 | 성공과 상관없이 1초 안에 100번을 넘으면 surprise removed·drv stopped로 두고 다시 걸지 않습니다. 장치가 붙어 있으면 인터페이스를 내렸다 올리거나(열기가 다시 초기화) 모듈을 다시 올려 되살립니다 |
+| 열기 `netdev_open` | 아직 올리지 않은 어댑터(`bup`이 거짓)면 열기가 surprise removed 표시를 지우고 하드웨어를 초기화합니다. 내리는 중이거나 없는 장치에도 그렇게 합니다 | 내리는 중이거나 USB 장치가 떨어졌으면 `-ENODEV`로 열지 않습니다 |
+| 수신 완료 `usb_read_port_complete`(두 수신 방식) | 오류로 끝나면 수신 요청을 곧바로 다시 겁니다. 연속 오류 세기는 한 번 성공하면 0이 되어, 오류와 성공이 섞이면 멈추지 않고 돕니다 | 성공과 상관없이 1초 안에 100번을 넘으면 surprise removed·drv stopped로 두고 다시 걸지 않습니다. 되살리려면 모듈을 다시 올립니다(Wi-Fi 끄고 켜기: 순정 HAL이 `bcmdhd`를 내렸다 올림, 재부팅, 동글 다시 꽂기). 인터페이스를 내렸다 올려서는 되살아나지 않습니다(`netdev_close`가 `rtw_dev_unload`를 부르지 않아 `bup`이 참으로 남고, 열기는 `bup`이 거짓일 때만 표시를 지움) |
 
 `0002-nx4-hal.diff`보다 먼저 넣습니다(파일 이름 차례).
 
@@ -74,7 +74,7 @@ kernel.org linux-3.18.24 (빌드 뼈대)
   sh drivers/config-sum.sh <진단 기록>/dongle/config.txt
   ```
 
-  "같음"이면 그대로 씁니다. "다름"이면 다른 줄을 보고 `prepare.sh`의 조정과 `KCONFIG_SUM`을 우리 차 것에 맞춥니다(#48).
+  "같음"(0)이면 그대로 씁니다. "다름"(3)이면 다른 줄을 보고 `prepare.sh`의 조정과 `KCONFIG_SUM`을 우리 차 것에 맞춥니다(#48). `sha256sum`이 없는 PC는 `shasum -a 256`으로 세고, 둘 다 없거나 설정 파일이 아니면 견주지 않고 멈춥니다(1).
 - 빌드한 `.ko`의 vermagic이 순정 모듈의 것(`dongle/ko-vermagic.txt`)과 같은지도 봅니다.
 
 ## 커널 소스 자산
@@ -165,4 +165,4 @@ sh scripts/build-driver.sh
 - 빌드한 `.ko`의 vermagic이 순정 모듈의 것과 같은지(`dongle/ko-vermagic.txt`)
 - 순정 HAL이 주는 insmod 인자와 `bcmdhd` 매개변수 이름(`dongle/wifi-strings.txt`)
 - HAL이 바꿔 둔 `bcmdhd.ko`를 올렸을 때 `wlan0`이 생기고 HMG-API가 AP를 띄우는지(149번 채널 포함)
-- 보호 패치: 쓰는 중에 동글을 뽑아도 내비가 멈추지 않는지, Wi-Fi를 끄고 켜도 되는지, dmesg의 `nx4-protect:` 줄
+- 보호 패치: 쓰는 중에 동글을 뽑아도 내비가 멈추지 않는지, Wi-Fi를 끄고 켜도 되는지, 수신 오류로 멈춘(`nx4-protect: … rx stopped`) 뒤 Wi-Fi를 끄고 켜면 AP가 돌아오는지, dmesg의 `nx4-protect:` 줄

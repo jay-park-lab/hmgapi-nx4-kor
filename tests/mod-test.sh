@@ -1470,7 +1470,13 @@ check "drivers/rtl88x2bu: 패치는 번호 차례(0001 보호, 0002 HAL 맞춤)�
 PD=$B/drivers/rtl88x2bu/0001-nx4-protect.diff
 check "drivers 보호 패치: 뽑힘 때 USB_STATE_NOTATTACHED면 먼저 surprise removed, 풀기 전 tasklet_kill 둘, 열기 거부(-ENODEV), 수신 오류 1초 100번이면 다시 걸지 않음(두 곳), 기록은 printk" \
   '[ "$(grep -c "^+.*interface_to_usbdev(pusb_intf)->state == USB_STATE_NOTATTACHED" $PD)" = 1 ] && [ "$(grep -c "^+	tasklet_kill(&padapter->\(recvpriv.recv\|xmitpriv.xmit\)_tasklet);" $PD)" = 2 ] && grep -q "^+		return -ENODEV;" $PD && grep -q "^+#define NX4_RXERR_LIMIT 100$" $PD && [ "$(grep -c "^+			if (!nx4_rx_error_flood(padapter))" $PD)" = 2 ] && ! grep -q "^+.*RTW_PRINT" $PD && [ "$(grep -c "^+.*printk(KERN_[A-Z]* \"nx4-protect: " $PD)" = 3 ]'
+# 리뷰 21: 수신 오류로 멈춘 뒤 되살리는 길은 모듈 다시 올리기(netdev_close가 rtw_dev_unload를 부르지 않아 down/up으로는 안 됨)
+check "drivers 보호 패치·README: 수신 오류로 멈춘 뒤 되살리기는 모듈 다시 올리기(Wi-Fi 끄고 켜기 등), 인터페이스 down/up으로 되살아난다고 적지 않음" \
+  'grep -q "^+ \* 수신을 다시 걸지 않는다. 되살리려면 모듈을 다시 올린다" $PD && grep -q "인터페이스를 내렸다 올려서는 되살아나지 않는다" $PD && ! grep -q "다시 열려 되살아난다\|인터페이스를 내렸다 올리거나" $PD $B/drivers/README.md && grep -q "되살리려면 모듈을 다시 올립니다" $B/drivers/README.md'
 check "drivers: README·NOTICE의 값(커널 뼈대·모비스 원본·자산·폴더 값, 설정 값, 툴체인, 컴파일 옵션 지문, 드라이버 커밋)이 inputs.sh와 같음" 'drv_docs_ok'
+# 리뷰 15·19·20: 판정 두 줄 자체와 끝 알림(nx4 빌드일 때), 정보 파일의 (emulated: …), README 규칙
+check "drivers: 차에 넣을 .ko는 CI 것만 — build-driver.sh가 빌드한 CPU를 넘기고 x86_64가 아니면 알림, 정보 파일에 build host, README에 규칙" \
+  'grep -q -- "-e HOST_ARCH=\"\$HOST_ARCH\" -e BUILD_EMU=\$EMU" $B/scripts/build-driver.sh && grep -q "docker info --format .{{.Architecture}}." $B/scripts/build-driver.sh && grep -q "^\[ \"\$(sysctl -n hw.optional.arm64 2>/dev/null)\" = 1 \] && EMU=yes" $B/scripts/build-driver.sh && grep -q "^case \"\$DARCH\" in x86_64|amd64) ;; \*) EMU=yes ;; esac" $B/scripts/build-driver.sh && grep -q "^  \"nx4 yes\") echo \"알림: .*이 .ko는 차에 넣지 마세요" $B/scripts/build-driver.sh && grep -q "(emulated: check against CI, do not ship)" $B/drivers/build-in-container.sh && grep -q "차에 넣을 \`.ko\`는 CI에서 만든 것만" $B/drivers/README.md'
 check "drivers: 드라이버 쪽 문서·스크립트·CI와 NOTICE 드라이버 절에 Korea Projection·JMK 언급 없음" 'drv_noref_ok'
 check "drivers: 커널 소스 자산 — build-driver.sh --src-asset, 원본 zip sha256·폴더 값 확인, 이름 차례·시각·소유자 고정 tar와 한 스레드 xz, 빌드는 받은 자산의 sha256과 푼 폴더 값을 확인" \
   'grep -q "^  --src-asset) MODE=src-asset ;;" $B/scripts/build-driver.sh && grep -q "sha_ok \$MOBIS_ZIP_SHA256" $B/drivers/build-in-container.sh && grep -q "\[ \"\$GOT\" = \"\$MOBIS_TREE_SHA256\" \]" $B/drivers/build-in-container.sh && grep -q -- "--sort=name --mtime=" $B/drivers/build-in-container.sh && grep -q "xz -9 -T1" $B/drivers/build-in-container.sh && grep -q "sha_ok \$MOBIS_SRC_SHA256" $B/drivers/build-in-container.sh && grep -q "tree_sum \$MS/\$MOBIS_DIR)\" = \"\$MOBIS_TREE_SHA256\"" $B/drivers/build-in-container.sh && grep -q "sha_ok \$TOOLCHAIN_SHA256" $B/drivers/build-in-container.sh'
@@ -1489,6 +1495,21 @@ cp $B/drivers/lib.sh $B/drivers/config-sum.sh $KS/d/; sed "s/^KCONFIG_SUM=.*/KCO
 (sh $KS/d/config-sum.sh $KS/other.config) > $KS/diff.out 2>&1; echo $? > $KS/diff.rc
 check "drivers/config-sum.sh: 진단 기록 config.txt가 KCONFIG_SUM과 같으면 \"같음\"(0), 다르면 \"다름\"(3)" \
   '[ "$(cat $KS/same.rc)" = 0 ] && grep -q "^같음: " $KS/same.out && [ "$(cat $KS/diff.rc)" = 3 ] && grep -q "^다름: " $KS/diff.out' || cat $KS/same.out $KS/diff.out
+# 리뷰 22: sha256sum이 없는 PC. 스크립트가 쓰는 도구만 둔 PATH로(sha256sum 없이) 돌린다
+mkdir -p $KS/nb $KS/nb2
+for _t in sed grep sort cut dirname; do ln -sf "$(command -v $_t)" $KS/nb/$_t; ln -sf "$(command -v $_t)" $KS/nb2/$_t; done
+command -v shasum >/dev/null 2>&1 && ln -sf "$(command -v shasum)" $KS/nb/shasum
+(env PATH=$KS/nb2 /bin/sh $KS/d/config-sum.sh $KS/built.config) > $KS/none.out 2>&1; echo $? > $KS/none.rc
+check "drivers/config-sum.sh: sha256sum도 shasum도 없으면 \"다름\" 대신 세지 못한다고 멈춤(1)" \
+  '[ "$(cat $KS/none.rc)" = 1 ] && grep -q "sha256sum도 shasum도 없어" $KS/none.out && ! grep -q "^다름" $KS/none.out' || cat $KS/none.out
+(sh $KS/d/config-sum.sh $KS/d/inputs.sh) > $KS/nocfg.out 2>&1; echo $? > $KS/nocfg.rc
+check "drivers/config-sum.sh: CONFIG_ 줄이 없는 파일은 설정 파일이 아니라고 멈춤(1, \"다름\"이 아님)" \
+  '[ "$(cat $KS/nocfg.rc)" = 1 ] && grep -q "커널 설정 파일이 아닙니다" $KS/nocfg.out' || cat $KS/nocfg.out
+if [ -e $KS/nb/shasum ]; then
+  (env PATH=$KS/nb /bin/sh $KS/d/config-sum.sh $KS/built.config) > $KS/sha.out 2>&1; echo $? > $KS/sha.rc
+  check "drivers/config-sum.sh: sha256sum이 없으면 shasum -a 256으로 세어 같은 결과(\"같음\")" \
+    '[ "$(cat $KS/sha.rc)" = 0 ] && grep -q "^같음: " $KS/sha.out' || cat $KS/sha.out
+fi
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc
