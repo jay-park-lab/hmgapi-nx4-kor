@@ -116,6 +116,16 @@ HMG-API는 훅 때문에 내비가 제대로 뜨지 못한다고 보면 스스�
 
 관리 앱의 [지금 재부팅]도 이 횟수를 봅니다. `hook/starts`가 5·6이면(2분을 버티지 못한 시작이 이번 것까지 5·6번 이어짐) 다음이나 그다음 시작에 훅이 꺼지므로, 이번 시작이 2분을 넘길 때까지(켠 지 3~5분) 재부팅을 거절하고 "… 3~5분 뒤에 다시 눌러 주세요."를 보입니다.
 
+## 카플레이 계기판 길안내가 이상할 때
+
+한국 카플레이 길안내([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67), HMG-API 앱의 NX4 KOR 설정 `kor_tbt`)가 공식 무선 모드의 계기판·HUD 길안내를 덮어씁니다.
+
+1. 이상하게 보인 시각을 적고, 그때 폰 화면의 안내(예: "차선 유지", "약간 좌회전")를 함께 남깁니다.
+2. HMG-API 앱 Logs 탭(Everything)에서 그 시각 앞뒤의 `nx4-kor` 줄을 봅니다. `CarPlay: maneuver type … side … junction … exit …`가 받은 안내, `CarPlay: hud list …`가 보낸 HUD 목록입니다(길·장소 이름은 남지 않음). 설정 `kor_tbt_log`가 켜져 있으면 곧 회전 판단과 계기판에 보낸 값 줄이 더 있습니다. 같은 시각의 `wireless-carplay-aa` 줄은 공식 모드의 것입니다.
+3. `route guidance reaches this listener` 줄이 한 번도 없으면 이 모드가 길안내를 받지 못한 것입니다. 그때는 공식 모드 혼자 보냅니다.
+4. 공식 모드 그대로 쓰려면 HMG-API 앱에서 NX4 KOR의 `kor_tbt`를 끄고 변경 사항을 적용한 뒤 재부팅합니다. 공식 무선 모드의 `tbt`는 켜 둡니다.
+5. 기록과 시각을 [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)에 적어 주세요.
+
 ## 내비가 재부팅을 반복하거나 화면이 이상할 때
 
 1. **우선 그대로 둡니다.** 위 "부팅 보호"가 훅을 끄고 정상으로 띄웁니다.

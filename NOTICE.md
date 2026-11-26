@@ -30,14 +30,31 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
     - 화면이 열릴 때 `hmgapid service-start launch`를 부르고, 상태 파일이 새로 쓰이면 다시 그립니다
 - **시험:** `tests/mod-test.sh`를 새로 넣었고 `tests/ReportTest.java`는 남은 기능에 맞췄습니다. 원본의 `tests/stub-test.sh`는 뺐습니다.
 - **문서:** `README.md`, `docs/design.md`, `usb/README.txt`
+- **한국 카플레이 길안내(2026-11-25, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)):** `nx4-kor`에 `hooks.jar`(소스 `hooks/src`, 빌드 `scripts/build-hooks.sh`)와 `settings.json`(`kor_tbt`, `kor_tbt_log`)을 다시 넣었습니다. 공식 무선 모드 옆 DiPO 안에서 카플레이 길안내를 따로 받아 Korea Projection의 보정으로 계기판·HUD에 보냅니다. 가져온 코드는 아래 "Korea Projection의 카플레이 길안내 보정", 이 저장소가 새로 쓴 것은 `Nx4KorHooks.java`, `KorTbt.java`(리스너·다시 보내기·다시 요청 배선은 공식 모드와 KP의 `Dipo.java`를 따름, 계기판 호출 덮어쓰기는 새로 씀), `TbtGate.java`(덮어쓰기·비켜 주기·남의 멈춤 미루기 판단), `PhoneBarOut.java`(KP와 같은 꼴, 아무것도 보내지 않음), 테스트 `tests/tools/HookPlanCheck.java`·`TbtGateTest.java`와 `tests/fixtures/`입니다.
 - **2.1.0 USB 설치기(2026-11-23):** `usb/troubleShooter`가 HMG-API 쪽 일을 모두 맡습니다. 공식 무선 모드 설치(`--any-car`), 옛 2.0.x 되돌리기, 이 차의 map 만들기·확인, 계획 확인 뒤 적용입니다. `scripts/build.sh`는 공식 무선 모드 zip을 USB 묶음에 그대로 넣고(`scripts/fetch-wireless.sh`, 아래 "공식 무선 모드"), 옛 2.0.x의 되돌리기 스크립트를 이 저장소의 태그 `v2.0.4-beta.1`에서 그대로 꺼내 `NX4/legacy-2.0/`에 넣습니다.
 
 ## HMG-API (VysseCodes, AGPL-3.0)
 
 - https://github.com/Open-HMG/HMG-API (예전 주소 `VysseCodes/HMG-API`)
-- 2.1.0의 이 저장소(소스)에는 HMG-API나 그 무선 모드("Wireless CarPlay + Android Auto", https://github.com/Open-HMG/hmgapi-wireless-cp-aa)의 코드가 들어 있지 않습니다. 릴리스 USB 묶음에는 둘을 고치지 않고 함께 넣습니다(HMG-API는 `HMGAPI-SOURCE.txt`, 무선 모드는 아래 "공식 무선 모드").
-  - 2.0.x에 합쳤던 무선 모드 2.4.5(Korea Projection이 HMG-API 무선 모드를 한국 차용으로 고친 판, 포크 `StopDragon/HMG-API`의 `korea-build` 브랜치)와 그 안의 HMG-Seogaemo(seogaemo, AGPL-3.0, https://github.com/seogaemo/hmg-seogaemo)에서 옮긴 계기판·HUD 회전 안내 코드는 2.1.0에서 뺐습니다. 그 판의 묶음과 대응 소스 안내는 2.0.x 베타 태그(`v2.0.4-beta.1` 등)의 `wireless/README.md`에 있습니다.
+- 이 저장소(소스)에는 HMG-API의 코드가 들어 있지 않습니다. `hooks.jar`는 HMG-API의 런타임 소스에 대고 컴파일만 하고(`scripts/build-hooks.sh`, `HMGAPI_SRC`), 그 클래스는 넣지 않습니다(차에서는 HMG-API가 올림). 공식 무선 모드에서 온 것은 아래 "Korea Projection의 카플레이 길안내 보정"에 적은 것뿐입니다. 릴리스 USB 묶음에는 HMG-API와 공식 무선 모드를 고치지 않고 함께 넣습니다(HMG-API는 `HMGAPI-SOURCE.txt`, 무선 모드는 아래 "공식 무선 모드").
+  - 2.0.x에 합쳤던 무선 모드 2.4.5(Korea Projection이 HMG-API 무선 모드를 한국 차용으로 고친 판, 포크 `StopDragon/HMG-API`의 `korea-build` 브랜치)는 2.1.0에서 통째로 뺐습니다. 그 판의 묶음과 대응 소스 안내는 2.0.x 베타 태그(`v2.0.4-beta.1` 등)의 `wireless/README.md`에 있습니다. 그중 카플레이 길안내 보정만 2026-11-25에 그 브랜치의 새 커밋에서 다시 가져왔습니다(아래).
 - `scripts/build.sh`는 HMG-API의 `tools/mkmodpkg.sh`로 모드를 서명합니다. USB 설치기 `usb/troubleShooter`는 HMG-API USB 설치기와 같은 방식(DSP Update OTA)을 씁니다.
+
+## Korea Projection의 카플레이 길안내 보정 (StopDragon, HMG-Seogaemo, VysseCodes, AGPL-3.0)
+
+`hooks/`(한국 카플레이 길안내, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67))에 가져온 코드입니다. 모두 GNU AGPL-3.0(이 저장소와 같음)이고, 파일마다 머리말에 출처와 이 저장소가 바꾼 것을 적었습니다.
+
+| 이 저장소의 파일 | 가져온 곳 | 바꾼 것 |
+|---|---|---|
+| `hooks/src/io/github/jayparklab/nx4kor/hook/dipo/CpTurnsFit.java` | Korea Projection(StopDragon) `StopDragon/HMG-API` 브랜치 `korea-build` 커밋 `6258357444cdd07539fc2bcc416b76eb8e07fc5a`, `mods/wireless-carplay-aa/src/hmgapi/mods/wireless/dipo/CpTurnsFit.java`. 그 바탕은 공식 무선 모드의 `CpTurns.java`(VysseCodes)이고, 일부(대체 아이콘, 각도 띠, 다시 보내기, 차선 그림 `LaneGlyphs` 등)는 HMG-Seogaemo(seogaemo, https://github.com/seogaemo/hmg-seogaemo, 커밋 `26eeb97e`)에서 왔습니다(파일 머리말의 KP 줄) | 패키지, 로그(`Dipo.log` → `KorTbt.log`), `CpTurns.exactIcon` → `CpIcons.exactIcon`, 고르는 곳 `make()`를 뺌 |
+| `hooks/src/.../hook/dipo/CpTbt.java` | 같은 커밋의 `CpTbt.java` | 패키지 |
+| `hooks/src/.../hook/dipo/CpIcons.java` | 같은 커밋의 `CpTurns.java`의 `exactIcon`(순정 한국 DiPO 표, 공식 모드 `icon()` 바탕) | 그 함수만 따로 둠 |
+| `hooks/src/.../hook/dipo/PhoneBarOut.java` | 같은 커밋의 `PhoneBarOut.java`의 꼴 | 아무것도 보내지 않음(받는 쪽 `TrapBar`를 가져오지 않음) |
+| `hooks/stubs/com/tcc/iap2/*.java` 4개 | 공식 무선 모드(VysseCodes) `Open-HMG/hmgapi-wireless-cp-aa` 태그 `v2.2.0-rc.9`의 `wireless-carplay-aa/stubs/com/tcc/iap2/` | 그대로(컴파일할 때만 쓰고 `hooks.jar`에는 넣지 않음) |
+| `tests/fixtures/wireless-carplay-aa-2.2.0-rc.9-hooks.json` | 같은 태그의 `wireless-carplay-aa/mod.json`에서 `id`·`version`·`hooks.points`만 | 그 셋만 남김 |
+
+- 저작자: Korea Projection(StopDragon), HMG-Seogaemo(seogaemo), 공식 무선 모드와 HMG-API(VysseCodes). 원저작권은 각 저작자에게 있습니다.
+- 대응 소스: 이 저장소의 태그(릴리스마다), 그리고 위 커밋·태그.
 
 ## 공식 무선 모드 wireless-carplay-aa (VysseCodes, AGPL-3.0)
 
