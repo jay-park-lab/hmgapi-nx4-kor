@@ -23,7 +23,8 @@ bash "$H/hdr-patch.sh" "$K"
 bash "$H/hdr-patch-803x.sh" "$K"
 cp "$CFG" "$K/.config"
 "$K/scripts/config" --file "$K/.config" --disable CC_STACKPROTECTOR_STRONG --enable CC_STACKPROTECTOR_REGULAR
-make -s -C "$K" ARCH=arm CROSS_COMPILE="$TC/bin/arm-eabi-" olddefconfig
+# olddefconfig도 호스트 gcc로 scripts/basic/fixdep·scripts/kconfig/conf를 만든다. 에뮬레이션 충돌에 대비해 같이 감싼다
+make_retry "$(dirname "$K")/olddefconfig.log" "$K" -s ARCH=arm CROSS_COMPILE="$TC/bin/arm-eabi-" olddefconfig || die "olddefconfig"
 make_retry "$(dirname "$K")/modules_prepare.log" "$K" -s ARCH=arm CROSS_COMPILE="$TC/bin/arm-eabi-" -j"$JOBS" modules_prepare \
   || die "modules_prepare"
 [ "$(cat "$K/include/config/kernel.release")" = 3.18.24-tcc ] || die "kernel.release가 3.18.24-tcc가 아닙니다: $(cat "$K/include/config/kernel.release")"
