@@ -77,7 +77,7 @@
 ## 필요한 것
 
 - **USB 묶음** `hmgapi-nx4-kor-버전-usb.zip`: 이 저장소의 [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases)에서 받습니다. 직접 만들려면 [만들기와 시험](#만들기와-시험).
-  - 2.1.0부터 **HMG-API**와 **공식 무선 모드** `wireless-carplay-aa`(2.2.0-rc.9, 공식 릴리스 파일 그대로)가 함께 들어 있어, HMG-API가 없는 차도 이 USB 하나로 설치합니다. 함께 넣은 HMG-API는 2.1.1이 1.1.0-rc.10, 2.1.0이 rc.8입니다. 2.1.0 묶음의 rc.8은 NEMESIS 1.17이 먼저 깔린 차에 설치되지 않습니다("isn't a known stock build"). 그러니 2.1.1 이후 묶음을 씁니다.
+  - 2.1.0부터 **HMG-API**와 **공식 무선 모드** `wireless-carplay-aa`(2.2.0-rc.9, 공식 릴리스 파일 그대로)가 함께 들어 있어, HMG-API가 없는 차도 이 USB 하나로 설치합니다. 함께 넣은 HMG-API는 2.1.1이 1.1.0-rc.10, 2.1.0이 rc.8입니다. 2.1.0 묶음의 rc.8은 NEMESIS 1.17이 먼저 깔린 차에 설치되지 않습니다("isn't a known stock build"). 2.1.2부터는 NEMESIS가 깔린 차에 아무것도 설치하지 않습니다([#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75), 아래 "알아 두실 점").
   - 2.0.x 베타 묶음: `v2.0.0-beta.3`부터 HMG-API(1.1.0-rc.7)가 들어 있고 공식 무선 모드는 없습니다. `v2.0.0-beta.1`에는 HMG-API도 없습니다. `v2.0.0-beta.2`는 빌드가 멈춰 릴리스가 없습니다.
 - **HMG-API는 1.1.0-rc.10 이상**이어야 합니다(2.1.1부터. USB 설치기와 이 모드가 요구). 이미 있는 HMG-API가 이보다 낮으면(2.1.0을 쓰던 차의 rc.8, rc.9 포함) USB 묶음의 HMG-API로 먼저 올립니다(아래 "설치" 2).
   - rc.10으로 올리는 업데이트는 NEMESIS 1.17에서도 안전합니다. 예전에 `FORCE`로 설치한 차도 rc.10이 NEMESIS가 남긴 순정 파일로 다시 설치합니다.
@@ -207,7 +207,7 @@ NX4 KOR("NX4 KOR: Tucson NX4 (Korea)")의 설정은 둘입니다.
   - rc.9가 삭제를, rc.10이 `FORCE` 설치 차를 고쳤습니다(HMG-API 1.1.0-rc.10 릴리스 노트). rc.9 릴리스는 rc.10이 나오며 지워졌습니다.
 - **지울 때 도는 것은 그 HMG-API를 설치(업데이트)할 때 저장해 둔 삭제입니다.** 그래서 새 판 HMG-API USB의 `HMGAPI/UNINSTALL`로 지워도 차에 든 판의 삭제가 돕니다. 반드시 **먼저 올린 뒤** 지웁니다.
   1. HMG-API 판을 봅니다. 관리 앱 "자세히" 표의 HMG-API 칸이나 HMG-API 앱에 나옵니다.
-  2. 1.1.0-rc.10보다 낮으면 HMG-API 릴리스의 `hmgapi-<판>-update.zip`을 HMG-API 앱 "Check USB updates"로 넣거나 HMG-API 릴리스의 USB(`hmgapi-<판>-usb.zip`)로 올리고 재부팅합니다(rc.10 이상). NEMESIS Manager로 `hmgapi-<판>-nemesis.zip`을 넣어도 됩니다. 이 저장소의 USB는 쓰지 않습니다(2.1.2 이후는 멈추고, 2.1.1 이전은 HMG-API를 올린 뒤 NX4 KOR까지 설치함, [#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75)).
+  2. 1.1.0-rc.10보다 낮으면 HMG-API 릴리스의 `hmgapi-<판>-update.zip`을 HMG-API 앱 "Check USB updates"로 넣거나 HMG-API 릴리스의 USB(`hmgapi-<판>-usb.zip`)로 올리고 두 번 재부팅합니다(rc.10 이상, HMG-API 1.1.0-rc.10 릴리스 노트의 NEMESIS 1.17 안내). NEMESIS Manager로 `hmgapi-<판>-nemesis.zip`을 넣어도 됩니다. 이 저장소의 USB는 쓰지 않습니다(2.1.2 이후는 멈추고, 2.1.1 이전은 HMG-API를 올린 뒤 NX4 KOR까지 설치함, [#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75)).
   3. 재부팅한 뒤 NX4 KOR를 먼저(위 `UNINSTALL`), HMG-API를 나중에 지웁니다.
 - **이미 rc.8 이하를 지웠다면**(#397, [HMG-API 1.1.0-rc.9 릴리스 노트](https://github.com/Open-HMG/HMG-API/blob/v1.1.0-rc.9/.github/release-notes/v1.1.0-rc.9.md)):
   - 지운 뒤 아직 재부팅하지 않았으면, 재부팅하기 전에 HMG-API 1.1.0-rc.10 이상을 새로 설치합니다. HMG-API 릴리스의 USB(`hmgapi-<판>-usb.zip`)로 Update OTA를 누르거나 NEMESIS Manager로 `hmgapi-<판>-nemesis.zip`을 넣습니다. 이 저장소의 USB는 쓰지 않습니다(2.1.2 이후는 멈추고, 2.1.1 이전은 HMG-API를 올린 뒤 NX4 KOR까지 설치함, [#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75)).
