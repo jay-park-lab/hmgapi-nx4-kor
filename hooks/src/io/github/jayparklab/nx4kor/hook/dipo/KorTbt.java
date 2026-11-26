@@ -268,7 +268,7 @@ public final class KorTbt {
             }
             noteActive();
             // #77: while giving way, nothing to resend: look again when the way ends (the official mod quiet for
-            // QUIET_MS; its calls move that on), not every second. Hearing again needs no tick (the update itself sends)
+            // QUIET_MS; its calls move that on), not every second. Hearing again brings the second back (RESUME, PR #78 review 5)
             refreshBackedOff = yielding && turns.active();
             if (turns.active()) handler.postDelayed(this, yielding ? Math.max(1000L, gate.yieldEndsIn(now)) : 1000L);
             else refreshing = false;

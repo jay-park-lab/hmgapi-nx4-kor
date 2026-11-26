@@ -131,7 +131,9 @@ assert "\"dipo.iap2_proxy.stop_route_guidance\"" in part
 for s in ("gate.ours(point, p.args)", "gate.forOther(point, p.args.length, SystemClock.elapsedRealtime(), mod.enabled())",
           "gate.stopSeen(", "gate.stopDue(", "gate.yielding(", "gate.heard(", "gate.setActive(turns.active())",
           # 앱에서 끄면 받지 않고, 상태와 "그렸다" 표시를 비우고, 다시 켜면 길안내 전체를 다시 요청한다(PR #68 리뷰 2·11)
-          "if (!mod.enabled()) {", "turns.reset();", "turns.shown = false;", "turns.hudShown = false;", "if (wasOff) {"):
+          "if (!mod.enabled()) {", "turns.reset();", "turns.shown = false;", "turns.hudShown = false;", "if (wasOff) {",
+          # giving way: REFRESH waits for the way to end, hearing again brings it back (#77, PR #78 review 5·10)
+          "refreshBackedOff = yielding && turns.active();", "h.post(RESUME);", "handler.removeCallbacks(REFRESH);"):
     assert s in part, s
 PY'
 # KorTbt의 판단(TbtGate: 덮어쓰기, 비켜 주기, 남의 Stop 미루기, 앱에서 끔. PR #68 리뷰 1~4)을 PC에서 돌린다
