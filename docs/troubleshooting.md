@@ -91,6 +91,7 @@ HMG-API 설치기가 멈추면 USB의 `HMGAPI/install.log` 맨 아래 `FAIL:` �
 | HMG-API 앱에서 Wireless CarPlay + Android Auto가 꺼져 있습니다 (`wirelessoff`) / 'Wireless CarPlay'가 꺼져 있습니다 (`bridgeoff`) | HMG-API 앱에서 켜고 적용한 뒤 재부팅합니다(아래 "HMG-API 앱을 열 수 없을 때") |
 | HMG-API 훅이 꺼져 있습니다 (`hooksoff`) | 문구대로 합니다. map이 없으면(`none`) USB 설치기를 다시 실행하고, 그래도 같으면 USB 진단 기록을 남겨 알려 주세요 |
 | Wireless CarPlay + Android Auto가 다른 모드와 같은 훅을 써서 꺼졌습니다 / 그 훅을 켜지 못했습니다 (`wmhooksoff`) | 다른 모드와 겹치면 HMG-API 앱의 Mods에서 겹치는 모드를 끕니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)). 아니면 3분 뒤 재부팅하고, 같으면 Mods에서 이유를 봅니다. 이 차의 map에 공식 모드의 훅 지점이 없을 수 있습니다 |
+| "자세히" 표 "한국 카플레이 길안내": 훅이 안 켜짐 (공식 모드 길안내로 동작: <이유>) | 판정은 그대로이고 공식 모드의 카플레이 길안내가 돕니다(#67의 0 m 멈춤 보정만 빠짐). 이유가 `… isn't in this car's map`이면 이 차의 map에 그 지점이 없는 것이니 USB 진단 기록을 남겨 [#71](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/71)에 알려 주세요. 다른 모드와 겹친다는 이유면 HMG-API 앱의 Mods에서 그 모드를 끕니다. "꺼 둠 (설정…)"은 HMG-API 앱의 NX4 KOR 설정 `kor_tbt`를 끈 것입니다 |
 | HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). … 또 생기면 마지막으로 넣거나 바꾼 모드를 HMG-API 앱에서 꺼 주세요 (`bootguard`, 노랑) | 내비를 재부팅하고 3분 넘게 켜 둡니다. 또 노랑이 나오면 마지막으로 넣거나 바꾼 모드를 HMG-API 앱에서 끕니다. 훅이 꺼진 동안에는 HMG-API 앱 타일이 없으니 아래 "HMG-API 앱을 열 수 없을 때"의 길로 엽니다. 아래 "부팅 보호" |
 | **HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다** (`bootguard`, 빨강) | 아래 "부팅 보호"대로 HMG-API를 다시 설치합니다 |
 | 다른 Wi-Fi 패키지가 Wi-Fi를 쓰고 있어… (`otherwifi`) | NEMESIS의 Korea Projection이나 다른 무선·핫스팟 패키지를 지우고 재부팅합니다([`design.md`](design.md) "다른 패키지·모드와 함께 쓸 때") |

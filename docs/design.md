@@ -123,7 +123,13 @@
     - 관리 앱이 읽는 값은 이번 시작이 올린 뒤 값입니다. 커널 줄이 없으면 이번 부팅 횟수 4 이상, 또는 이번 부팅에 센 기록이 있고 `starts` 7 이상일 때 꺼진 것으로 봅니다. `hook/boot`가 다른 부팅 것이거나 없으면 `starts`는 지난 값이라 그것만으로 보지 않습니다.
     - 재부팅은 새 커널 부팅이라 다음 시작은 `starts`만 봅니다. 그래서 노랑·빨강을 `starts` 6에서 나눕니다.
   - HMG-API의 프로젝션 AP 기록은 HMG-API Wi-Fi 지기(rc.8 `engine/HomeWifi.java`, 서비스 `hmgapi wifi`)의 것입니다. 부팅마다 Android Wi-Fi 서비스가 뜨자마자 한 번 띄우고, 이번 부팅 id를 `wifi/ap.boot`(떴거나 이미 떠 있었음, Wi-Fi 클라이언트가 켜져 있어 두었음)나 `wifi/ap.fail`(다시 시도 중)에 씁니다. 그 줄은 `/data/hmgapi/logs/hmgapi/wifi.log`에 남습니다. 차가 나중에 끈 AP는 지기가 다시 켜지 않고, 폰이 붙을 때 공식 모드가 다시 켭니다(rc.8 `hmgapi.hook.Wifi.projectionAp`).
-  - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
+  - 상태 파일 키: `wm`·`wm_ver`·`wm_on`·`wm_hooks`·`bridge`(공식 모드), `hooks`·`hookmap`(HMG-API 훅), `kor_hooks`·`kor_hooks_why`·`kor_tbt`·`kor_tbt_log`(이 모드의 한국 카플레이 길안내, 아래), `feat_carplay`·`feat_aa`·`feat_hotspot`·`feat_wifi`(순정 기능), `chip`·`wlan0`(Wi-Fi 칩·장치), `proj`·`ap_boot`·`ap_fail`·`ap`·`ap_mode`·`other_ap`·`wpa`(프로젝션 AP), `cp_conn`, `state`. 이름·버전·예/아니요·개수만 넣고 SSID·비밀번호·휴대폰 이름·MAC·IP는 넣지 않습니다.
+  - **한국 카플레이 길안내 줄**([#71](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/71), 2026-11-26): "자세히" 표의 "한국 카플레이 길안내" 칸에 이 모드의 훅(#67)이 도는지 보입니다.
+    - `kor_hooks`는 공식 모드의 `wm_hooks`와 같은 HMG-API 기록 줄(`mods: loaded nx4-kor …` / `mods: nx4-kor not loaded: <이유>`)에서, 같은 한 번의 읽기로 정합니다. 이유는 HMG-API 영문 그대로(지점·모드 이름뿐) `kor_hooks_why`에 200자까지 둡니다.
+    - `kor_tbt`·`kor_tbt_log`는 HMG-API에 저장된 소유자 값(`/data/hmgapi/settings/nx4-kor.json`)을 보고, 없으면 `mod/settings.json` 기본(켬·끔)입니다.
+    - 칸: "꺼 둠 (설정, 공식 모드 길안내로 동작)"(`kor_tbt` 끔), "훅이 안 켜짐 (공식 모드 길안내로 동작: <이유>)", "켜짐", "켜짐 (진단 기록 켬)"(`kor_tbt_log` 켬), 기록이 없으면 "-".
+    - 판정은 바꾸지 않습니다. 이 모드의 훅이 없어도 공식 모드의 카플레이 길안내는 돌기 때문입니다(관리 앱 UI는 그대로 두고 표에 줄 하나만 더함).
+    - 길안내를 실제로 받고 있는지(`route guidance reaches this listener` 줄)는 보이지 않습니다. 그 줄은 HMG-API 앱 Logs 탭에서 봅니다.
   - 2.0.x 서비스가 쓰던 상태 안내 `/data/local/tmp/nx4-kor-hint.txt`(아이폰·AA 안내)는 2.1.0에 쓰는 곳이 없습니다. 앱은 그대로 읽지만 보통 아무것도 보이지 않습니다.
 - [지금 재부팅]은 앱 개인 폴더의 `reboot.req`를 `status.sh --watch`(화면을 연 뒤 10분)가 받습니다. 설치 중(진행 기록 `run`), `/system`을 바꾸는 작업 중(HMG-API 적용·remount 등), HMG-API 부팅 보호에 걸릴 때는 거절합니다.
   - 부팅 보호 거절은 `hook/starts`가 5·6이고, 이번 시작의 watcher가 돌기 전("hooks on" 줄 시각 + 135초, 그 줄이 없으면 부팅 뒤 300초)일 때입니다. 재부팅은 새 커널 부팅이라 다음 시작의 이번 부팅 횟수는 0부터이고, `starts`가 6이면 다음 시작에, 5면 그다음 시작에 훅이 꺼지기 때문입니다. 이번 시작이 이미 꺼졌으면(커널 줄 guard, 또는 파일로 보아 꺼짐) 막지 않습니다. 앱은 "HMG-API는 내비가 켜지고 2분 안의 재부팅이 6번 이어지면 무선 기능을 끕니다."와 그 아래 줄 "3~5분 뒤에 다시 눌러 주세요."를 보입니다.
