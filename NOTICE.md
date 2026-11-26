@@ -18,6 +18,7 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
 - **뺀 것:**
   - NEMESIS 관련: NEMESIS 버전 판정, NEMESIS판·wireless.projection과의 충돌 확인, NEMESIS 문구
     - 2026-11-24에 USB 설치기에 확인 하나를 새로 넣었습니다([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). NEMESIS의 Korea Projection 패키지(`/data/nemesis/apps/korea.projection`)가 있으면 설치·업데이트하지 않고 멈춥니다. 원본의 충돌 확인을 되살린 것이 아니고, 그 패키지만 봅니다(`wireless.projection` 등 다른 NEMESIS 패키지는 막지 않음).
+    - 2026-11-26에 NEMESIS 자체(`/system/xbin/nemesis`)가 있으면 설치·업데이트하지 않고 멈추는 확인을 더했습니다([#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75)). 이것도 원본의 판정을 되살린 것이 아니고, HMG-API가 NEMESIS를 알아보는 기준을 따랐습니다.
   - 다른 차: 차 목록, 차별 map, 패치 세트, 니로 featurexml 되돌리기
   - 제보 기능: 관리 앱의 제보 파일 만들기·QR, `bin/carreport.sh`, 리포트, USB 진단·로그 꺼내기
   - 그 밖: 이슈 자동 분류 워크플로·이슈 양식, 후원 링크, NEMESIS용 문서·빌드(`docs/install-guide.md`, `docs/car-report-guide.md`, `scripts/build-usb.sh`)

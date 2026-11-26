@@ -47,7 +47,7 @@ flowchart LR
 
 ### 시작 전 확인
 
-이 그림의 멈춤은 모두 아무것도 바꾸지 않고, 진행 기록도 쓰지 않습니다. 차례는 설치기(`usb/troubleShooter`)가 도는 차례입니다(스틱 확인, Korea Projection 패키지 확인, HMG-API 기다리기, 진단 기록 묻기, HMG-API 확인 순. 스틱·Korea Projection 확인에서 멈출 때는 기다리지 않고 진단 기록만 묻고 멈춤). Korea Projection 패키지는 HMG-API 설치기로 넘기기(HMG-API를 설치·업데이트하고 재부팅) 전에 봅니다.
+이 그림의 멈춤은 모두 아무것도 바꾸지 않고, 진행 기록도 쓰지 않습니다. 차례는 설치기(`usb/troubleShooter`)가 도는 차례입니다(스틱 확인, NEMESIS 확인, Korea Projection 패키지 확인, HMG-API 기다리기, 진단 기록 묻기, HMG-API 확인 순. 스틱·NEMESIS·Korea Projection 확인에서 멈출 때는 기다리지 않고 진단 기록만 묻고 멈춤). NEMESIS와 Korea Projection 패키지는 HMG-API 설치기로 넘기기(HMG-API를 설치·업데이트하고 재부팅) 전에 봅니다.
 
 ```mermaid
 flowchart TD
@@ -55,7 +55,9 @@ flowchart TD
   UN -->|"예"| DEL["아래 5절 지우기로<br/>(먼저 HMG-API 기다리기 → 진단 기록 묻기)"]
   UN -->|"아니요"| S0{"0. 스틱 확인<br/>묶음(install·wireless)이 있고<br/>nx4-kor가 2.1.0 꼴?"}
   S0 -->|"아니요<br/>(묶음 없음, 2.0.x 꼴)"| STOP0["진단 기록을 물은 뒤 멈춤:<br/>2.1.0 이후의 USB 묶음을 써 주세요"]
-  S0 -->|"예"| KPKG{"NEMESIS의 Korea Projection 패키지<br/>(/data/nemesis/apps/korea.projection)가 있나?"}
+  S0 -->|"예"| NMS{"NEMESIS(/system/xbin/nemesis)가 있나?<br/>(이슈 75)"}
+  NMS -->|"예"| STOPN["진단 기록을 물은 뒤 멈춤:<br/>NEMESIS가 깔린 차에는 설치하지 않음<br/>(NMS_MSG, HMG-API도 그대로)"]
+  NMS -->|"아니요"| KPKG{"NEMESIS의 Korea Projection 패키지<br/>(/data/nemesis/apps/korea.projection)가 있나?"}
   KPKG -->|"예"| STOPK["진단 기록을 물은 뒤 멈춤:<br/>NEMESIS에서 Korea Projection을 지우고<br/>내비를 재부팅한 뒤 다시(KORPROJ_MSG)"]
   KPKG -->|"아니요"| HW{"HMG-API(hmgapid·/data/hmgapi)가 있고<br/>ping에 답하지 않음?"}
   HW -->|"예"| WAIT["답할 때까지 3초마다 다시 물음<br/>(부팅 뒤 300초까지, 적어도 30초)<br/>토스트: HMG-API가 준비되기를 기다리는 중"]
@@ -79,8 +81,9 @@ flowchart TD
   P1 -->|"괜찮음"| GO(["아래 바꾸는 단계로"])
 ```
 
-- Korea Projection 패키지 확인은 그 패키지 폴더만 봅니다. 다른 NEMESIS 패키지는 막지 않고, 지우기(5절)도 막지 않습니다([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). 이 멈춤은 같은 판의 관리 앱 열기보다 앞이라 관리 앱을 열지 않습니다.
-- HMG-API 기다리기는 부팅 직후에 눌러도 되게 하려는 것입니다(2026-11-25). hmgapid는 zygote가 시작할 때 뜨고, 부팅 뒤 몇 분은 HMG-API 자신의 부팅 작업으로 바빠 잠깐 답하지 않을 수 있습니다. HMG-API가 필요 없는 확인(스틱, Korea Projection 패키지) 뒤에 기다리므로, 그 확인에서 멈출 차는 기다리지 않습니다. 진단 기록이 HMG-API 상태·Car Report를 모으므로 진단 묻기는 기다린 뒤입니다(그 앞에서 멈출 때는 멈추기 전에 묻습니다). HMG-API가 없는 차(`hmgapid`나 `/data/hmgapi`가 없음)는 기다리지 않습니다. 근거와 시간은 `design.md` "HMG-API 확인"에 있습니다.
+- NEMESIS 확인은 실행 파일 `/system/xbin/nemesis`만 봅니다(HMG-API가 NEMESIS를 알아보는 기준과 같음, [#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75)). 새 설치·업데이트·같은 판 다시 설치를 모두 막고, 지우기(5절)는 막지 않습니다. NEMESIS 1.17 차의 HMG-API 올리기·다시 설치는 HMG-API 릴리스의 USB로 안내합니다.
+- Korea Projection 패키지 확인은 그 패키지 폴더만 봅니다(NEMESIS 실행 파일 없이 폴더만 남은 차). 다른 NEMESIS 패키지 폴더만으로는 막지 않고, 지우기(5절)도 막지 않습니다([#13](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/13)). 이 멈춤은 같은 판의 관리 앱 열기보다 앞이라 관리 앱을 열지 않습니다.
+- HMG-API 기다리기는 부팅 직후에 눌러도 되게 하려는 것입니다(2026-11-25). hmgapid는 zygote가 시작할 때 뜨고, 부팅 뒤 몇 분은 HMG-API 자신의 부팅 작업으로 바빠 잠깐 답하지 않을 수 있습니다. HMG-API가 필요 없는 확인(스틱, NEMESIS, Korea Projection 패키지) 뒤에 기다리므로, 그 확인에서 멈출 차는 기다리지 않습니다. 진단 기록이 HMG-API 상태·Car Report를 모으므로 진단 묻기는 기다린 뒤입니다(그 앞에서 멈출 때는 멈추기 전에 묻습니다). HMG-API가 없는 차(`hmgapid`나 `/data/hmgapi`가 없음)는 기다리지 않습니다. 근거와 시간은 `design.md` "HMG-API 확인"에 있습니다.
 - HMG-API의 판을 읽지 못하거나 비교할 수 없으면 기록만 하고 지나갑니다. 엔진이 설치할 때 다시 봅니다.
 - 설치된 nx4-kor가 2.0.x 자체면 아래 2단계에서 그 판의 것으로 되돌립니다. 그래서 `legacy-2.0` 멈춤(`OLDLEFT_MSG`)에 걸리지 않습니다.
 - "같은 판"은 `NX4/REINSTALL`이 없고 2.0.x 기록도 없을 때입니다.
@@ -229,4 +232,4 @@ flowchart TD
 - 관리 앱에는 지우기 버튼을 두지 않습니다([#44](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/44)). 2.1.0의 nx4-kor는 시스템 파일·Wi-Fi 설정을 바꾸지 않아 HMG-API 앱에서 지워도 기록 파일만 남기 때문입니다.
 - USB 설치기 자신의 기록(`nx4-kor-usb.log`, 차에서는 `nx4-kor-ota-finish.sh`)은 지우기 뒤에도 남습니다.
 - 둘 다 지울 때는 NX4 KOR를 먼저, HMG-API를 나중에 지웁니다(README "삭제").
-- 설치기는 HMG-API를 지우지 않습니다. NEMESIS 1.17이 깔린 차에서 HMG-API 1.1.0-rc.8 이하를 지우면 재부팅 한두 번 뒤 Android가 뜨지 않으므로, 먼저 rc.10 이상으로 올린 뒤 지웁니다. `FORCE`로 설치한 NEMESIS 1.17 차는 rc.9로 올리면 Android가 뜨지 않으므로 rc.10으로 바로 올립니다(README "HMG-API를 지울 때", [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397)).
+- 설치기는 HMG-API를 지우지 않습니다. NEMESIS 1.17이 깔린 차에서 HMG-API 1.1.0-rc.8 이하를 지우면 재부팅 한두 번 뒤 Android가 뜨지 않으므로, 먼저 rc.10 이상으로 올린 뒤 지웁니다(2.1.2부터 이 USB는 NEMESIS가 깔린 차에서 HMG-API를 올리지 않으므로 HMG-API 릴리스의 USB·update zip으로, #75). `FORCE`로 설치한 NEMESIS 1.17 차는 rc.9로 올리면 Android가 뜨지 않으므로 rc.10으로 바로 올립니다(README "HMG-API를 지울 때", [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397)).
