@@ -8,14 +8,16 @@
 # 하는 일
 #   1. 순정 Wi-Fi 드라이버의 결과를 기다린다(부팅 뒤 약 20초. NX4_NOCHIP_POLL초마다, 부팅 뒤 NX4_NOCHIP_MAX초까지).
 #      칩·wlan0·USB Wi-Fi 동글이 보이면(lib.sh chip_or_dongle) 바로, 끝까지 포기한 줄이 없으면 그때 그냥 끝낸다.
-#      포기한 줄이 있어도 부팅 뒤 NX4_NOCHIP_SETTLE초까지는 기다린다: 동글을 꽂은 부팅에도 순정 드라이버가 먼저 올라 그 줄을
-#      남기므로(#80), 동글이 USB에 올라올 틈을 둔다.
+#      포기한 줄이 있어도 부팅 뒤 NX4_NOCHIP_SETTLE(50)초까지는 기다린다: 동글을 꽂은 부팅에도 순정 드라이버가 먼저 올라 그
+#      줄을 남기므로(#80) 동글이 USB에 올라올 틈을 둔다. 이 차는 부팅 약 40초에 앞쪽 USB 포트 전원을 껐다 켜고(dwc_otg_vbus_set
+#      OFF→ON), 꽂힌 장치는 43~44초에야 다시 보인다(11-26 진단 기록 4개, #48 동글 세션). 그 틈에 보면 꽂힌 동글을 못 본다.
 #   2. 이번 부팅에 칩이 없다고 볼 때(lib.sh nochip_now), 순정 핫스팟 기능 권한 파일이 있고 프로젝션 AP를 요청한 모드가 있을
 #      때만 이번 부팅 id를 이 모드의 기록(NOCHIP, 관리 앱 판정·진단용)과 HMG-API의 ap.boot에 쓴다. 칩이 없으면 그 부팅의
 #      시도는 어차피 실패한다(순정 드라이버를 다시 올리지 않음).
 #   3. 그 뒤 wifi 폴더에서 파일이 지워질 때만 깨어나는 inotifyd(함께 넣은 busybox)를 띄워 두고, 지기가 깨어남에 ap.boot를
-#      지우면 바로 다시 쓴다(그 사이 시도는 한 번쯤). 주기적으로 깨지 않는다. 그때 칩·wlan0·동글이 보이면(나중에 꽂은 동글을
-#      켜려고 ap.boot를 지운 경우 등) 다시 쓰지 않고 이 모드의 기록을 지운 뒤 inotifyd를 멈추고 끝낸다(물러남).
+#      지우면 다시 쓴다. 주기적으로 깨지 않는다. 그때 칩·wlan0·동글이 보이면(나중에 꽂은 동글을 켜려고 ap.boot를 지운 경우 등)
+#      다시 쓰지 않고 이 모드의 기록을 지운 뒤 inotifyd를 멈추고 끝낸다(물러남). 안 보여도 NX4_NOCHIP_RECHECK(5)초 뒤 한 번 더
+#      본다(포트 전원을 껐다 켜는 4초쯤에는 꽂힌 동글이 안 보임). 그 사이 지기의 시도는 두어 번이다.
 #      차량 서비스(car_events "wake")를 쓰지 않는 것은 그것이 HMG-API 차량 서비스(상주 Dalvik)를 새로 띄우기 때문이다
 #      (ModRuntime). inotifyd가 없는 busybox면 2까지만 한다.
 # 이 모드를 끄거나 지우면 hmgapid가 이 서비스의 프로세스 묶음(setsid)을 함께 내린다. 줄은 hmgapid 서비스 기록
@@ -24,7 +26,8 @@
 . $NX4_APP/svc/lib.sh
 NOCHIP_MAX=${NX4_NOCHIP_MAX:-120}
 NOCHIP_POLL=${NX4_NOCHIP_POLL:-5}
-NOCHIP_SETTLE=${NX4_NOCHIP_SETTLE:-30}
+NOCHIP_SETTLE=${NX4_NOCHIP_SETTLE:-50}
+NOCHIP_RECHECK=${NX4_NOCHIP_RECHECK:-5}
 
 # 이번 부팅 id를 파일($1)에 쓴다(같은 폴더의 임시 파일에 쓴 뒤 바꿈: 지기가 반쯤 쓴 파일을 읽지 않게). 이미 이번 부팅 것이면 그대로
 put_boot() {
@@ -58,16 +61,23 @@ mark() {
 # 3. 지기가 ap.boot를 지우면(깨어남) 다시 쓴다. inotifyd는 "d<TAB>폴더<TAB>파일" 줄을 FIFO로 내고(- : 표준출력), 이 셸은 그것을
 # 읽는다. FIFO로 받는 것은 물러날 때 inotifyd를 멈추려고(파이프라인이면 pid를 모름)
 watch_wake() {
-  if ! $BB --list 2>/dev/null | $BB grep -qx inotifyd; then
+  # inotifyd: 고른 busybox(내비의 것이 있으면 그것)에 없으면 함께 넣은 busybox(1.36.1)의 것(PR #86 리뷰 3)
+  IBB=
+  for _ib in $BB $BB_OWN; do
+    [ -x "$_ib" ] || continue
+    "$_ib" --list 2>/dev/null | $BB grep -qx inotifyd && { IBB=$_ib; break; }
+  done
+  if [ -z "$IBB" ]; then
     echo "NX4 KOR: busybox에 inotifyd가 없어 QuickBoot에서 깨어난 뒤에는 지키지 않음"
     return 0
   fi
   _fifo=$W/nochip.fifo
   ( umask 077; mkdir -p $W 2>/dev/null; rm -f $_fifo; $BB mkfifo $_fifo 2>/dev/null ) || { echo "NX4 KOR: $_fifo를 만들지 못해 깨어난 뒤에는 지키지 않음"; return 0; }
-  $BB inotifyd - $HMGWIFI:d > $_fifo 2>/dev/null &
+  $IBB inotifyd - $HMGWIFI:d > $_fifo 2>/dev/null &
   _ip=$!
   while read -r _we _wd _wf; do
     [ "$_wf" = ap.boot ] || continue
+    chip_or_dongle || sleep $NOCHIP_RECHECK
     if chip_or_dongle; then
       rm -f $NOCHIP
       log_ts; echo "$_LT NX4 KOR: Wi-Fi 칩이나 USB Wi-Fi 동글이 보여 물러남(ap.boot를 다시 쓰지 않고 칩 없음 기록을 지움)"

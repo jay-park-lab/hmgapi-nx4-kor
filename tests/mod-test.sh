@@ -723,7 +723,7 @@ gfresh; ts $U; pset plan-same
 mkdir -p $R/system/lib/hw $R/system/bin $R/data/nx4-kor/logs $R/data/nx4-kor/backup $R/data/local/tmp/nx4-kor $HD/logs/nx4-kor $R/data/misc/wifi
 echo core > $R/system/lib/libCarPlayCore.so; echo hw > $R/system/lib/hw/gralloc.so; ln -s libCarPlayCore.so $R/system/lib/liblink.so
 cp $T/bin/bb $R/system/bin/busybox
-echo aplog > $R/data/nx4-kor/logs/ap.log; echo svclog > $HD/logs/nx4-kor/ap.log; echo hmgapi-install > $HD/install.log
+echo aplog > $R/data/nx4-kor/logs/ap.log; echo svclog > $HD/logs/nx4-kor/ap.log; echo hmgapi-install > $HD/install.log; mkdir -p $HD/logs/hmgapi; echo hmgapiwifi > $HD/logs/hmgapi/wifi.log
 echo mapcar > $R/data/local/tmp/nx4-kor/map-car.txt; echo status > $R/data/local/tmp/nx4-kor-status.txt
 echo "wpa_passphrase=SECRETPW" > $R/data/misc/wifi/softap.conf; echo SECRETPW > $R/data/nx4-kor/backup/softap.conf
 mkdir -p $R/system/etc/permissions $R/system/onebin/nx4hev_kr; : > $R/system/etc/permissions/com.hkmc.software.wifi.module.xml
@@ -759,7 +759,7 @@ CORE5=$(md5sum < $R/system/lib/libCarPlayCore.so | cut -d" " -f1)
 check "USB 설치기 진단 기록: NX4/diag/<시각>/에 /system/lib 아래 모든 파일(하위 폴더·링크 포함)의 md5와 경로, ls -lR" \
   '[ "$(ls $K/diag | wc -l)" -eq 1 ] && grep -q "^$CORE5  .*/system/lib/libCarPlayCore.so$" $(dg)/system-lib-md5.txt && grep -q "^$CORE5  .*/system/lib/liblink.so$" $(dg)/system-lib-md5.txt && grep -q "  .*/system/lib/hw/gralloc.so$" $(dg)/system-lib-md5.txt && [ "$(wc -l < $(dg)/system-lib-md5.txt)" -eq 4 ] && grep -q "liblink.so -> libCarPlayCore.so" $(dg)/system-lib-ls.txt' || cat $(dg)/system-lib-md5.txt
 check "USB 설치기 진단 기록: info.txt(판·공식 무선 모드 판·getprop·내비 busybox 유무·wifi_ap_on), HMG-API 상태·Car Report 복사, 이 모드와 HMG-API 기록" \
-  'grep -qx "installed_mod: $V" $(dg)/info.txt && grep -qx "usb_mod: $V" $(dg)/info.txt && grep -qx "installed_wireless: $WV" $(dg)/info.txt && grep -qx "usb_wireless: $WV" $(dg)/info.txt && grep -q "^ro.build.product: NX4.KOR" $(dg)/info.txt && grep -qx "system_busybox: yes" $(dg)/info.txt && grep -qx "md5_busybox: $R/system/bin/busybox" $(dg)/info.txt && grep -qx "wifi_ap_on: 1" $(dg)/info.txt && grep -qx "hmgapid engine status" $T/calls && [ -f $(dg)/hmgapi-status.txt ] && grep -q "^saved: " $(dg)/car-report.txt && [ -f $(dg)/car-report-test.json ] && [ -f $(dg)/car-report-test.md ] && grep -qx aplog $(dg)/logs/ap.log && grep -qx svclog $(dg)/logs/service/ap.log && grep -qx hmgapi-install $(dg)/logs/hmgapi-install.log && grep -qx mapcar $(dg)/logs/map-car.txt && grep -qx status $(dg)/logs/nx4-kor-status.txt && grep -q "진단 기록을 모음: NX4/diag/" $K/install.log' || cat $(dg)/info.txt
+  'grep -qx "installed_mod: $V" $(dg)/info.txt && grep -qx "usb_mod: $V" $(dg)/info.txt && grep -qx "installed_wireless: $WV" $(dg)/info.txt && grep -qx "usb_wireless: $WV" $(dg)/info.txt && grep -q "^ro.build.product: NX4.KOR" $(dg)/info.txt && grep -qx "system_busybox: yes" $(dg)/info.txt && grep -qx "md5_busybox: $R/system/bin/busybox" $(dg)/info.txt && grep -qx "wifi_ap_on: 1" $(dg)/info.txt && grep -qx "hmgapid engine status" $T/calls && [ -f $(dg)/hmgapi-status.txt ] && grep -q "^saved: " $(dg)/car-report.txt && [ -f $(dg)/car-report-test.json ] && [ -f $(dg)/car-report-test.md ] && grep -qx aplog $(dg)/logs/ap.log && grep -qx svclog $(dg)/logs/service/ap.log && grep -qx hmgapi-install $(dg)/logs/hmgapi-install.log && grep -qx hmgapiwifi $(dg)/logs/hmgapi-wifi.log && grep -qx mapcar $(dg)/logs/map-car.txt && grep -qx status $(dg)/logs/nx4-kor-status.txt && grep -q "진단 기록을 모음: NX4/diag/" $K/install.log' || cat $(dg)/info.txt
 check "USB 설치기 진단 기록: 비밀번호가 든 파일(softap.conf, 백업 폴더)은 넣지 않음(이 회는 설치기가 아무것도 바꾸지 않음)" '! grep -rq SECRETPW $K/diag && ! engcalls'
 DG=$(dg)/dongle
 check "USB 설치기 진단 기록(동글 준비, #48): kernel.txt(커널 판·modules_disabled·sig_enforce·cfg80211·vbus 매개변수·boot_id), /proc/modules" \
@@ -1339,8 +1339,10 @@ streset; noap; rm -f $T/wifiseen $SH/wifi/ap.boot; cat $T/bootid > $SH/wifi/ap.f
 check "status.sh: 커널이 이번 부팅에 칩 켜기를 포기했고 칩을 본 적이 없으면 부팅 뒤 5분 전(100초)에도 verdict=nowifipart(켜는 중 아님)" \
   '[ "$(sv verdict)" = nowifipart ] && [ "$(sv nochip)" = yes ] && [ "$(sv nochip_mark)" = no ] && [ "$(sv s2)" = "무선 Wi-Fi: 부품 없음(USB 동글 필요)" ] && [ "$(sv verdict_lv)" = 1 ] && [ "$(sv verdict_end)" = no ]' || cat $T/status.txt
 streset; noap; rm -f $T/wifiseen; cat $T/bootid > $T/snochip; stsh
-check "  nochip.sh의 이번 부팅 기록이 있으면 커널 줄이 밀려나도 nowifipart, 그 ap.boot는 apoff로 보지 않음" \
-  '[ "$(sv verdict)" = nowifipart ] && [ "$(sv nochip)" = yes ] && [ "$(sv nochip_mark)" = yes ] && [ "$(sv ap_boot)" = yes ]' || cat $T/status.txt
+check "  nochip.sh의 이번 부팅 기록이 있으면 커널 줄이 밀려나도 nowifipart, 그 ap.boot는 ap_boot=no·ap_fail=no로 내보냄(관리 앱 표가 '켰다가 꺼짐'·'다시 시도 중'을 보이지 않음, PR #86 리뷰 1)" \
+  '[ "$(sv verdict)" = nowifipart ] && [ "$(sv nochip)" = yes ] && [ "$(sv nochip_mark)" = yes ] && [ "$(sv ap_boot)" = no ] && [ "$(sv ap_fail)" = no ]' || cat $T/status.txt
+cat $T/bootid > $SH/wifi/ap.fail; stsh
+check "  지기가 표시보다 먼저 한 번 시도해 ap.fail이 있어도 ap_fail=no(그 뒤 다시 시도하지 않음)" '[ "$(sv ap_fail)" = no ] && [ "$(sv verdict)" = nowifipart ]' || cat $T/status.txt
 grep -v wifihotspot $T/features > $T/f2; mv $T/f2 $T/features; stsh
 check "  순정 핫스팟 기능이 꺼진 드문 경우엔 부품 없음으로 보지 않고, nochip.sh의 ap.boot도 apoff로 보지 않음(부팅 뒤 5분 전: apwait)" \
   '[ "$(sv verdict)" = apwait ] && grep -qF "HMG-API가 무선 연결용 Wi-Fi를 켜는 중입니다" $T/status.txt' || cat $T/status.txt
@@ -1374,6 +1376,8 @@ case "\$1" in
     echo "\$*" > $T/ninoargs; d=\${3%:d}
     # NINO_PLUG: 지우기 전에 동글을 꽂은 것처럼(가짜 USB 장치 0bda:b812)
     [ -n "\$NINO_PLUG" ] && { mkdir -p $T/nusb/2-1; echo 0bda > $T/nusb/2-1/idVendor; echo b812 > $T/nusb/2-1/idProduct; }
+    # NINO_LATE: 지운 뒤 0.5초에 동글이 보임(포트 전원을 껐다 켜는 동안 안 보이던 것)
+    [ -n "\$NINO_LATE" ] && ( /bin/sleep 0.5; mkdir -p $T/nusb/2-1; echo 0bda > $T/nusb/2-1/idVendor; echo b812 > $T/nusb/2-1/idProduct ) &
     rm -f "\$d/ap.boot"; printf 'd\t%s\tap.boot\nd\t%s\tap.fail\n' "\$d" "\$d"; exit 0 ;;
 esac
 exec $T/bin/bb "\$@"
@@ -1382,7 +1386,7 @@ chmod +x $T/bin/bbi
 NH=$T/nh
 ncrun() {
   (env PATH=$P0 BB=$T/bin/bb NX4_APP=$TP NX4_ROOT=$T/nroot W=$T/nw BOOT_ID=$T/bootid UPTIME=$T/nuptime WIFI_SEEN=$T/nseen SDIO=$T/nosdio \
-     SYSNET=$T/nsysnet NX4_DMESG=$T/ndmesg HMGDATA=$NH NOCHIP=$T/nnochip HOTSPOT_XML=$T/nhot.xml USBDEV=$T/nusb NX4_NOCHIP_POLL=1 NX4_NOCHIP_MAX=120 \
+     SYSNET=$T/nsysnet NX4_DMESG=$T/ndmesg HMGDATA=$NH NOCHIP=$T/nnochip HOTSPOT_XML=$T/nhot.xml USBDEV=$T/nusb NX4_NOCHIP_POLL=1 NX4_NOCHIP_MAX=120 NX4_NOCHIP_RECHECK=0 \
      "$@" sh $TP/svc/nochip.sh) > $T/nc.out 2>&1; echo $? > $T/nc.rc
 }
 # 칩 없는 차(11-26 NX4HEV 260902): 칩을 본 기록·SDIO·wlan0 없음, 커널이 이번 부팅에 포기, 핫스팟 기능 권한 파일 있음, 공식 모드의 프로젝션 AP 요청
@@ -1391,7 +1395,7 @@ ncreset() {
   usbdev $T/nusb 1-1 1d74 3104; usbdev $T/nusb 4-1 058f 6387   # 순정 LG 모뎀, USB 저장장치(동글 아님)
   echo "projection wireless-carplay-aa" > $NH/state/wifi.txt; : > $T/nhot.xml
   printf '%s\n' "<4>[    9.709979] Power-up adapter 'DHD generic adapter'" "<4>[   11.772709] failed to power up DHD generic adapter, 3 retry left" "$DHDL" "<4>[   18.102925] dhd_module_init out" > $T/ndmesg
-  echo "30.00 10.00" > $T/nuptime
+  echo "60.00 10.00" > $T/nuptime
 }
 ncreset; ncrun
 check "nochip.sh: 칩 없는 부팅이면 이번 부팅 id를 이 모드의 기록(644)과 HMG-API의 wifi/ap.boot(600)에 쓰고, 한 줄로 알림" \
@@ -1402,14 +1406,21 @@ check "  지난 부팅의 기록·ap.boot는 이번 부팅 id로 바꿈" '[ "$(c
 ncreset; ncrun BB=$T/bin/bbi
 check "  inotifyd가 있으면 wifi 폴더의 지우기만 보고(- $NH/wifi:d), 지기가 깨어나 ap.boot를 지우면 다시 씀(ap.fail은 그대로), 한 번만 알림" \
   '[ "$(cat $T/ninoargs)" = "inotifyd - $NH/wifi:d" ] && [ "$(cat $NH/wifi/ap.boot)" = "$(cat $T/bootid)" ] && [ "$(grep -c "ap.boot를 지움(QuickBoot에서 깨어남): 다시 씀" $T/nc.out)" = 1 ] && grep -q "wifi 폴더 보기를 마침" $T/nc.out && [ ! -e $T/nw/nochip.fifo ]' || cat $T/nc.out
+ncreset; ncrun BB=$T/bin/bb BB_OWN=$T/bin/bbi
+check "  내비 busybox에 inotifyd가 없으면 함께 넣은 busybox(BB_OWN)의 inotifyd를 씀(PR #86 리뷰 3)" \
+  '[ "$(cat $T/ninoargs)" = "inotifyd - $NH/wifi:d" ] && [ "$(cat $NH/wifi/ap.boot)" = "$(cat $T/bootid)" ] && ! grep -q "inotifyd가 없어" $T/nc.out' || cat $T/nc.out
 ncreset; ncrun BB=$T/bin/bbi NINO_PLUG=1
 check "  기록 뒤에 동글을 꽂아 ap.boot가 지워지면 다시 쓰지 않고 칩 없음 기록을 지운 뒤 물러남(#80)" \
   '[ ! -e $NH/wifi/ap.boot ] && [ ! -e $T/nnochip ] && grep -q "동글이 보여 물러남" $T/nc.out && ! grep -q "다시 씀" $T/nc.out' || cat $T/nc.out
+ncreset; ncrun BB=$T/bin/bbi NINO_LATE=1 NX4_NOCHIP_RECHECK=1
+check "  ap.boot가 지워질 때 동글이 안 보여도 NX4_NOCHIP_RECHECK초 뒤 한 번 더 보고, 그때 보이면 물러남(포트 전원을 껐다 켜는 틈)" \
+  '[ ! -e $NH/wifi/ap.boot ] && [ ! -e $T/nnochip ] && grep -q "동글이 보여 물러남" $T/nc.out && ! grep -q "다시 씀" $T/nc.out' || cat $T/nc.out
 ncreset; usbdev $T/nusb 2-1 0bda b812; ncrun
 check "  부팅 때 동글일 수 있는 USB 장치(0bda:b812)가 있으면 아무것도 쓰지 않음(동글 부팅에도 순정 드라이버가 먼저 포기함, #80)" '[ ! -e $T/nnochip ] && [ ! -e $NH/wifi/ap.boot ] && grep -q "칩이나 USB Wi-Fi 동글이 있음" $T/nc.out' || cat $T/nc.out
-# 포기한 줄이 있어도 부팅 뒤 30초(NX4_NOCHIP_SETTLE)까지는 동글이 USB에 올라올 틈을 둔다: 20초에 줄이 있고, 1.5초 뒤 동글이 올라옴
-ncreset; echo "20.00 10.00" > $T/nuptime; (/bin/sleep 1.5; usbdev $T/nusb 2-1 0bda b831; echo "31.00 10.00" > $T/nuptime) & _ncw=$!; ncrun; wait $_ncw
-check "  부팅 뒤 30초 전이면 기다리고, 그사이 동글이 올라오면 아무것도 쓰지 않음" '[ ! -e $T/nnochip ] && [ ! -e $NH/wifi/ap.boot ] && grep -q "동글이 있음" $T/nc.out' || cat $T/nc.out
+# 포기한 줄이 있어도 부팅 뒤 50초(NX4_NOCHIP_SETTLE)까지는 동글이 USB에 올라올 틈을 둔다(이 차는 약 40초에 포트 전원을 껐다 켜
+# 43~44초에 다시 보임): 41초에 줄이 있고 동글이 안 보이다가, 1.5초 뒤 동글이 보이고 51초가 됨
+ncreset; echo "41.00 10.00" > $T/nuptime; (/bin/sleep 1.5; usbdev $T/nusb 2-1 0bda b831; echo "51.00 10.00" > $T/nuptime) & _ncw=$!; ncrun; wait $_ncw
+check "  부팅 뒤 50초 전이면 기다리고(포트 전원을 껐다 켜는 틈), 그사이 동글이 보이면 아무것도 쓰지 않음" '[ ! -e $T/nnochip ] && [ ! -e $NH/wifi/ap.boot ] && grep -q "동글이 있음" $T/nc.out' || cat $T/nc.out
 ncreset; : > $T/nseen; ncrun
 check "  칩을 본 적이 있으면(public/wifi-chip) 아무것도 쓰지 않음" '[ ! -e $T/nnochip ] && [ ! -e $NH/wifi/ap.boot ] && grep -q "Wi-Fi 칩이나 USB Wi-Fi 동글이 있음: 할 일 없음" $T/nc.out' || cat $T/nc.out
 ncreset; mkdir -p $T/nsysnet/wlan0; ncrun
