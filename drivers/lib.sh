@@ -39,3 +39,23 @@ make_retry() {
   cat "$_log.try" >> "$_log"
   rm -f "$_log.try"
 }
+
+# 컴파일 옵션 확인. 커널 arch/arm/Makefile은 make마다 컴파일러로 -march=armv7-a를 되는지 물어(cc-option), 안 되면 조용히
+# -march=armv5t로 넘어간다. 에뮬레이션에서는 이 물음 중에 컴파일러가 멈춰 다른 옵션으로 컴파일된 적이 있다(PR #69 리뷰 14,
+# 572128e의 조용한 차이). 그래서 컴파일한 모든 오브젝트(.cmd 첫 줄이 arm-eabi-gcc)의 옵션(-m·-f·-W·-O·-g·-std·
+# -D__LINUX_ARM_ARCH__) 묶음이 서로 같고 -march=armv7-a이며 armv5t가 없는지 본다. 그 묶음의 sha256을 CFLAGS_SUM에 둔다
+check_cflags() {
+  _sets=/tmp/cflags.sets; : > $_sets
+  for _c in $(find $1 -name '.*.o.cmd'); do
+    head -1 "$_c" | grep -q 'arm-eabi-gcc' || continue
+    head -1 "$_c" | tr ' ' '\n' | grep -E '^-(m|f|W|O|g$|std|D__LINUX_ARM_ARCH__)' | grep -v -E '^-Wp,' | LC_ALL=C sort -u | tr '\n' ' ' >> $_sets
+    echo >> $_sets
+  done
+  [ -s $_sets ] || die "컴파일한 오브젝트의 .cmd를 찾지 못함"
+  [ "$(LC_ALL=C sort -u $_sets | grep -c .)" = 1 ] \
+    || die "오브젝트마다 컴파일 옵션이 다릅니다(에뮬레이션에서 kbuild cc-option 검사가 실패한 것으로 보임). 다시 돌려 주세요"
+  grep -q -- '-march=armv7-a ' $_sets && ! grep -q -- 'armv5t' $_sets \
+    || die "컴파일 옵션이 -march=armv7-a가 아닙니다(에뮬레이션에서 kbuild cc-option 검사가 실패한 것으로 보임). 다시 돌려 주세요"
+  CFLAGS_SUM=$(head -1 $_sets | sha256sum | cut -d' ' -f1)
+  echo "컴파일 옵션 확인: 오브젝트 $(grep -c . $_sets)개가 같음, -march=armv7-a ($CFLAGS_SUM)"
+}

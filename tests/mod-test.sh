@@ -1481,20 +1481,20 @@ check "drivers/lib.sh make_retry: 다른 오류는 다시 돌리지 않고 바�
   '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 1 ] && [ -e $MR/k/scripts/dtc/flattree.o ] && grep -q "error: something" $MR/out.txt' || cat $MR/out.txt
 check "drivers/kernel/prepare.sh: 커널 준비의 make(olddefconfig, modules_prepare)는 모두 make_retry로(리뷰 10·17)" \
   'grep -q "^make_retry .*olddefconfig" $B/drivers/kernel/prepare.sh && grep -q "^make_retry .*modules_prepare" $B/drivers/kernel/prepare.sh && ! grep -q "^make " $B/drivers/kernel/prepare.sh'
-# build-in-container.sh check_cflags(리뷰 14): 가짜 .cmd(첫 줄이 컴파일 명령)로. 함수만 떼어 lib.sh와 함께 돌린다
+# lib.sh check_cflags(리뷰 14): 가짜 .cmd(첫 줄이 컴파일 명령)로
 CF=$T/cf
-cfrun() { (bash -c '. "$1"; eval "$(sed -n "/^check_cflags() {/,/^}/p" "$2")"; check_cflags "$3"' x $B/drivers/lib.sh $B/drivers/build-in-container.sh $CF) > $CF.out 2>&1; echo $? > $CF.rc; }
+cfrun() { (bash -c '. "$1"; check_cflags "$2"' x $B/drivers/lib.sh $CF) > $CF.out 2>&1; echo $? > $CF.rc; }
 cfobj() { mkdir -p $CF/$1; printf 'cmd_%s/x.o := /work/tc/bin/arm-eabi-gcc -Wp,-MD,%s/.x.o.d -O2 %s -fno-common -Wall -c -o %s/x.o %s/x.c\n' $CF/$1 $CF/$1 "$2" $CF/$1 $CF/$1 > $CF/$1/.x.o.cmd; }
 rm -rf $CF; cfobj a "-march=armv7-a -mabi=aapcs-linux"; cfobj b "-march=armv7-a -mabi=aapcs-linux"
 printf 'cmd_%s/built-in.o := arm-eabi-ld -EL -r -o built-in.o a.o\n' $CF > $CF/.built-in.o.cmd
 cfrun
-check "drivers/build-in-container.sh check_cflags: 모든 오브젝트의 옵션이 같고 -march=armv7-a면 통과(링크 .cmd·-Wp 경로는 보지 않음)" \
+check "drivers/lib.sh check_cflags: 모든 오브젝트의 옵션이 같고 -march=armv7-a면 통과(링크 .cmd·-Wp 경로는 보지 않음)" \
   '[ "$(cat $CF.rc)" = 0 ] && grep -q "오브젝트 2개가 같음, -march=armv7-a" $CF.out' || cat $CF.out
 cfobj b "-march=armv5t -Wa,-march=armv7-a -mabi=aapcs-linux"; cfrun
-check "drivers/build-in-container.sh check_cflags: 한 오브젝트라도 옵션이 다르면(cc-option이 armv5t로 넘어감) 실패" \
+check "drivers/lib.sh check_cflags: 한 오브젝트라도 옵션이 다르면(cc-option이 armv5t로 넘어감) 실패" \
   '[ "$(cat $CF.rc)" != 0 ] && grep -q "오브젝트마다 컴파일 옵션이 다릅니다" $CF.out' || cat $CF.out
 cfobj a "-march=armv5t -Wa,-march=armv7-a -mabi=aapcs-linux"; cfrun
-check "drivers/build-in-container.sh check_cflags: 모두 같아도 armv7-a가 아니면 실패" \
+check "drivers/lib.sh check_cflags: 모두 같아도 armv7-a가 아니면 실패" \
   '[ "$(cat $CF.rc)" != 0 ] && grep -q "\-march=armv7-a가 아닙니다" $CF.out' || cat $CF.out
 
 # --- 끝까지: 빌드 → HMG-API 엔진에 설치(HMGAPI_SRC가 있을 때만) ---
