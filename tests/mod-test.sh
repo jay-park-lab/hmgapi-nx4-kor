@@ -22,7 +22,8 @@ T=$(mktemp -d /tmp/nx4-kor-test.XXXXXX)
 if [ -n "$KEEP" ]; then echo "시험 폴더: $T"; else trap 'rm -rf $T' EXIT; fi
 fails=0
 ok() { echo "ok   $1"; }
-bad() { echo "FAIL $1"; fails=$((fails+1)); }
+# bad는 1을 돌려준다: check "…" '…' || cat <출력> 의 cat이 실패할 때만 돈다(PR #74 리뷰 7. 전에는 늘 0이라 돌지 않았음)
+bad() { echo "FAIL $1"; fails=$((fails+1)); return 1; }
 check() { if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 V=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' $PKG/mod.json | head -1)
 
@@ -79,8 +80,14 @@ for x in s["settings"]:
 PY'
 # 한국 길안내 소스(#67): KP·seogaemo·공식 모드에서 가져온 파일은 출처 줄을 남기고, 진입 클래스·DiPO 부분이 설정 이름과 같은 이름을 쓴다
 HK=$B/hooks/src/io/github/jayparklab/nx4kor/hook
-check "hooks 소스: KP(korea-build 6258357)에서 온 CpTurnsFit·CpTbt·CpIcons·PhoneBarOut, 공식 모드 스텁 4개에 출처·바꾼 것 줄" \
-  'for f in CpTurnsFit CpTbt CpIcons PhoneBarOut; do grep -q "6258357" $HK/dipo/$f.java && grep -q "Modified by NX4 KOR" $HK/dipo/$f.java || exit 1; done; for f in IIap2Listener IIap2Service Iap2ListenerInfo Iap2NotiMsg; do head -n 1 $B/hooks/stubs/com/tcc/iap2/$f.java | grep -q "hmgapi-wireless-cp-aa v2.2.0-rc.9" || exit 1; done; grep -q "HMG-Seogaemo" $HK/dipo/CpTurnsFit.java'
+check "hooks 소스: KP(korea-build ebca56f, 모드 2.4.10)에서 온 CpTurnsFit·CpTbt·CpIcons와 6258357 꼴의 PhoneBarOut, 공식 모드 스텁 4개에 출처·바꾼 것 줄(2026-11-26 다시 가져온 줄 포함), 진단 줄 한도 300" \
+  '( for f in CpTurnsFit CpTbt CpIcons; do grep -q "korea-build ebca56f3824a2234e48b336abda927d7a635e243" $HK/dipo/$f.java && grep -q "Modified by NX4 KOR" $HK/dipo/$f.java || exit 1; done
+     grep -q "6258357" $HK/dipo/PhoneBarOut.java && grep -q "Modified by NX4 KOR" $HK/dipo/PhoneBarOut.java || exit 1
+     grep -q "static int distStrState" $HK/dipo/CpIcons.java && grep -q "CpIcons.distStrState" $HK/dipo/CpTurnsFit.java || exit 1
+     for f in CpTurnsFit CpTbt CpIcons; do grep -q "^// Updated by NX4 KOR, 2026-11-26: taken again from KP.s mod 2.4.10" $HK/dipo/$f.java || exit 1; done
+     grep -q "^    static final int DIAG_LOGS_MAX = 300;$" $HK/dipo/CpTurnsFit.java || exit 1
+     for f in IIap2Listener IIap2Service Iap2ListenerInfo Iap2NotiMsg; do head -n 1 $B/hooks/stubs/com/tcc/iap2/$f.java | grep -q "hmgapi-wireless-cp-aa v2.2.0-rc.9" || exit 1; done
+     grep -q "HMG-Seogaemo" $HK/dipo/CpTurnsFit.java )'
 check "hooks 소스: 설정 kor_tbt·kor_tbt_log, DiPO 패키지, 앱 파트 클래스 이름, 리스너 종류 4096, 계기판 호출 8곳이 mod.json과 같음" 'python3 - "$PKG/mod.json" "$HK" <<PY
 import json, re, sys
 m = json.load(open(sys.argv[1]))
@@ -1460,8 +1467,22 @@ if [ -n "$HMGAPI_SRC" ]; then
       check "  hooks.jar 덱스에는 우리 클래스만(HMG-API 런타임·iAP2 스텁 없음), 진입 클래스와 DiPO 부분이 있음" \
         '[ -s $T/hooks.classes ] && ! grep -v "^Lio/github/jayparklab/nx4kor/hook/" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/Nx4KorHooks;" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/dipo/KorTbt;" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/dipo/CpTurnsFit;" $T/hooks.classes' || cat $T/hooks.classes
     fi
+    # KP 2.4.10에서 더해진 곧 회전 그림 판단(회전교차로 32, 각도 없는 진입 램프, 지하차도·고가)과 CpIcons를 PC에서 돌린다(PR #74 리뷰 6).
+    # hooks/src를 build-hooks.sh와 같은 클래스 경로(android.jar, HMG-API 런타임·스텁, iAP2 스텁)로 컴파일한다
+    AJ=$(ls "$ANDROID_HOME"/platforms/*/android.jar 2>/dev/null | head -n 1)
+    F=$T/fit
+    mkdir -p $F/rtstubs $F/rt $F/stubs $F/classes
+    ( set -e
+      J="javac --release 8 -Xlint:-options -nowarn -encoding UTF-8"
+      $J -cp "$AJ" -d $F/rtstubs $(find "$HS/core/runtime/stubs" -name '*.java')
+      $J -cp "$AJ:$F/rtstubs" -d $F/rt $(find "$HS/core/runtime/java" -name '*.java')
+      $J -cp "$AJ" -d $F/stubs $(find "$B/hooks/stubs" -name '*.java')
+      $J -cp "$AJ:$F/rt:$F/rtstubs:$F/stubs" -d $F/classes $(find "$B/hooks/src" -name '*.java') $B/tests/tools/NearFitTest.java
+      java -cp "$AJ:$F/rt:$F/rtstubs:$F/stubs:$F/classes" io.github.jayparklab.nx4kor.hook.dipo.NearFitTest ) > $T/fit.out 2>&1
+    check "  곧 회전 그림(KP 2.4.10) $(grep -c '^ok ' $T/fit.out)개: 회전교차로 32는 오른쪽 통행·출구 각도 있을 때만(들어가기 6은 그대로), 각도 없는 진입 램프는 오른쪽 진입 모양, 지하차도 46(좌·우)·고가 44(왼쪽만)는 시설 낱말이 있고 부정·옆길 낱말이 없을 때만, CpIcons" \
+      'tail -n 1 $T/fit.out | grep -qx ok && ! grep -q "^FAIL" $T/fit.out' || cat $T/fit.out
   else
-    echo "skip hooks.jar 빌드(ANDROID_HOME 없음): 빌드 시험은 자리만 채운 hooks.jar로 봄"
+    echo "skip hooks.jar 빌드·곧 회전 그림 테스트(NearFitTest)(ANDROID_HOME 없음): 빌드 시험은 자리만 채운 hooks.jar로 봄"
     echo "placeholder hooks.jar" > $T/hooks.jar
   fi
   # 공식 무선 모드는 위 가짜 zip을 준다(받지 않음). 받는 길은 아래 NX4_WIRELESS_URL 테스트에서 본다
@@ -1583,7 +1604,7 @@ J
   java -cp $T/eh VerChk 2.0.3-beta.2 2.0.3 > $T/verchk.out 2>&1
   check "  정식 2.0.3이 들어간 차에는 2.0.3-beta.2가 낮은 판(그래서 새 방식은 2.0.4-beta.1부터)" 'grep -qx ok $T/verchk.out' || cat $T/verchk.out
 else
-  echo "skip 빌드·HMG-API 엔진 시험(HMGAPI_SRC 없음)"
+  echo "skip 빌드·HMG-API 엔진 시험·곧 회전 그림 테스트(NearFitTest)(HMGAPI_SRC 없음)"
 fi
 
 echo

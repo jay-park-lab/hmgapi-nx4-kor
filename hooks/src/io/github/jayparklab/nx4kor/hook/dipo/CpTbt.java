@@ -1,6 +1,7 @@
 package io.github.jayparklab.nx4kor.hook.dipo;
-// From StopDragon/HMG-API korea-build 6258357444cdd07539fc2bcc416b76eb8e07fc5a, mods/wireless-carplay-aa/src/hmgapi/mods/wireless/dipo/CpTbt.java (AGPL-3.0).
-// Modified by NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-25: package only (the nx4-kor mod's DiPO part, #67).
+// From StopDragon/HMG-API korea-build ebca56f3824a2234e48b336abda927d7a635e243, mods/wireless-carplay-aa/src/hmgapi/mods/wireless/dipo/CpTbt.java (AGPL-3.0).
+// Modified by NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-25 (#67): package only (the nx4-kor mod's DiPO part).
+// Updated by NX4 KOR, 2026-11-26: taken again from KP's mod 2.4.10 (Korea Projection 1.8.1), the file itself unchanged.
 // Korea Projection 1.7.4(2026-11-15, 모드 2.4.3, 계획 D-20).
 
 import com.tcc.iap2.Iap2NotiMsg;
