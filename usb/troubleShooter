@@ -630,8 +630,8 @@ diag_bb() {
 #   kernel.txt          커널 판(osrelease, /proc/version), 모듈 적재 조건(modules_disabled, sig_enforce), cfg80211,
 #                       USB 포트 전원 매개변수(vbus*), boot_id(시동 끄고 켜기가 새 부팅인지 견줌), Wi-Fi 속성
 #   modules.txt         /proc/modules(지금 올라온 모듈)
-#   config.gz, config.txt, config-sum.txt  차 커널 설정(/proc/config.gz)과 그 md5·sha256. 드라이버 빌드에 쓰고,
-#                       Korea Projection 빌드의 설정(sha256 d35af8a0…, 출처 저장소가 404)과 견준다
+#   config.gz, config.txt, config-sum.txt  차 커널 설정(/proc/config.gz)과 그 md5·sha256. 드라이버 빌드의 커널 설정과
+#                       같은지 PC에서 견준다(sh drivers/config-sum.sh config.txt)
 #   system-wifi-ls.txt, system-wifi-md5.txt, ko-vermagic.txt  /system/wifi(순정 bcmdhd.ko 등)와 순정 모듈의 vermagic
 #   wifi-strings.txt    순정 HAL(libhardware_legacy.so)·hostapd·wpa_supplicant·netd의 드라이버 관련 문자열(모듈 이름,
 #                       insmod 인자, nl80211 등). 동글 드라이버를 HAL이 올리는 bcmdhd 자리에 맞추는 데 쓴다

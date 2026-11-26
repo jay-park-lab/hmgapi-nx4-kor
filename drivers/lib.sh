@@ -1,11 +1,20 @@
-# drivers/build-in-container.sh와 drivers/kernel/prepare.sh가 함께 쓰는 함수(. 으로 읽음). 컨테이너 안에서만 돈다.
+# drivers/build-in-container.sh, drivers/kernel/prepare.sh, drivers/config-sum.sh가 함께 쓰는 함수(. 으로 읽음).
+# config-sum.sh(kconfig_sum)는 PC에서도 돈다. 나머지는 컨테이너 안에서만 돈다.
 
 say() { echo "== $*"; }
 die() { echo "빌드 실패: $*" >&2; exit 2; }
 sha_ok() { [ "$(sha256sum "$2" | cut -d' ' -f1)" = "$1" ]; }
 
+# 커널 설정의 값: 값이 있는 CONFIG_ 줄(꺼진 것은 "# ... is not set"이라 빠짐)을 정렬한 것의 sha256. 머리말·빈 줄·줄 차례와
+# 상관없이 설정 값이 같으면 같다. 차의 /proc/config.gz는 -fstack-protector-strong(STRONG)이고 빌드는 gcc 4.7에 맞춰 REGULAR로
+# 바꾸므로, STRONG=y는 REGULAR=y로 보고 센다. 빌드한 설정(prepare.sh)과 차 설정(USB 진단 기록 dongle/config.txt)을 견주는 데 쓴다
+kconfig_sum() {
+  sed -e 's/^CONFIG_CC_STACKPROTECTOR_STRONG=y$/CONFIG_CC_STACKPROTECTOR_REGULAR=y/' "$1" \
+    | grep -E '^CONFIG_[A-Za-z0-9_]+=' | LC_ALL=C sort -u | sha256sum | cut -d' ' -f1
+}
+
 # 폴더 하나의 값: 모든 파일의 sha256과 경로, 모든 링크의 경로와 대상을 이름 차례로 늘어놓은 것의 sha256.
-# 툴체인처럼 묶음 파일의 sha256이 고정되지 않는 자료를 받은 뒤 확인하는 데 쓴다
+# 묶음을 푼 결과가 원본과 같은 파일인지(모비스 커널 소스 자산) 확인하는 데 쓴다
 tree_sum() {
   ( cd "$1"
     { find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum

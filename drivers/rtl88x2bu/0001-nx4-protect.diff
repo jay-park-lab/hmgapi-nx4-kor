@@ -1,0 +1,123 @@
+nx4-protect: 동글을 쓰다 뽑거나 동글이 망가졌을 때 내비 커널이 멈추지 않게 하는 보호(이 저장소가 새로 씀, GPL-2.0).
+대상: cilynx/rtl88x2bu fc158d1f. drivers/build-in-container.sh가 0002-nx4-hal.diff보다 먼저 넣는다.
+차에서 아직 확인하지 않았다(#48 차 확인: 꽂은 채 뽑기, Wi-Fi 끄고 켜기). 하는 일(drivers/README.md "보호 패치"):
+  1. 뽑힘(rtw_dev_remove): USB 장치가 이미 떨어졌으면 네트워크 장치를 내리기 전에 surprise removed로 둔다
+  2. 정리(rtw_usb_primary_adapter_deinit): 어댑터를 풀기 전에 수신·송신 tasklet을 끝낸다
+  3. 열기(netdev_open): 내리는 중이거나 USB 장치가 떨어졌으면 -ENODEV
+  4. 수신 오류(usb_read_port_complete): 1초 안에 100번을 넘으면 수신을 다시 걸지 않고 멈춘다
+기록은 dmesg의 "nx4-protect:" 줄(드라이버의 RTW_PRINT는 디버그 빌드에서만 찍혀 printk를 쓴다).
+
+--- a/include/drv_types.h
++++ b/include/drv_types.h
+@@ -1173,6 +1173,9 @@
+ 
+ 	u8	irq_alloc;
+ 	ATOMIC_T continual_io_error;
++	/* nx4-protect: 1초 창 안의 수신 오류 수(usb_ops_linux.c nx4_rx_error_flood) */
++	unsigned long nx4_rxerr_since;
++	u32 nx4_rxerr_cnt;
+ 
+ 	ATOMIC_T disable_func;
+ 
+--- a/os_dep/linux/usb_intf.c
++++ b/os_dep/linux/usb_intf.c
+@@ -1428,6 +1428,11 @@
+ #endif /* CONFIG_WOWLAN */
+ 
+ 	rtw_dev_unload(padapter);
++
++	/* nx4-protect: 수신·송신 완료 콜백은 tasklet을 예약한다. 드라이버는 이 둘을 끝내지 않고 어댑터 메모리를 풀어, 예약된 것이
++	 * 풀린 메모리에서 돌 수 있다. 위 rtw_dev_unload가 USB 요청을 거둔 뒤이므로 더 예약되지 않는다. 남은 것까지 끝낸다 */
++	tasklet_kill(&padapter->recvpriv.recv_tasklet);
++	tasklet_kill(&padapter->xmitpriv.xmit_tasklet);
+ 
+ 	RTW_INFO("+r871xu_dev_remove, hw_init_completed=%d\n", rtw_get_hw_init_completed(padapter));
+ 
+@@ -1566,6 +1571,14 @@
+ 
+ 	dvobj->processing_dev_remove = _TRUE;
+ 
++	/* nx4-protect: 동글을 뽑았으면(USB 장치가 이미 떨어짐) 바로 아래 rtw_os_ndevs_unregister가 부르는 닫기가 없는 장치의
++	 * 레지스터를 읽고 쓰며 기다리지 않게 먼저 surprise removed로 둔다. 드라이버는 원래 이 표시를 네트워크 장치를 내린 뒤에야
++	 * 한다. rmmod처럼 장치가 붙어 있으면 그대로 둔다(정상 정리) */
++	if (interface_to_usbdev(pusb_intf)->state == USB_STATE_NOTATTACHED) {
++		printk(KERN_INFO "nx4-protect: device already gone, skip hw access while removing\n");
++		rtw_set_surprise_removed(padapter);
++	}
++
+ 	/* TODO: use rtw_os_ndevs_deinit instead at the first stage of driver's dev deinit function */
+ 	rtw_os_ndevs_unregister(dvobj);
+ 
+--- a/os_dep/linux/os_intfs.c
++++ b/os_dep/linux/os_intfs.c
+@@ -3834,6 +3834,17 @@
+ 		return 0;
+ 	}
+ 
++#ifdef CONFIG_USB_HCI
++	/* nx4-protect: 장치를 내리는 중이거나(뽑힘·rmmod) USB 장치가 이미 떨어졌으면 열지 않는다. 열기는 surprise removed 표시를
++	 * 지우고 하드웨어를 다시 초기화하므로, 없는 장치에 쓰며 기다리게 된다. 수신 오류로 멈춘 것(nx4_rx_error_flood)은 장치가
++	 * 붙어 있으면 여기서 다시 열려 되살아난다 */
++	if (adapter_to_dvobj(padapter)->processing_dev_remove == _TRUE
++	    || adapter_to_dvobj(padapter)->pusbdev->state == USB_STATE_NOTATTACHED) {
++		printk(KERN_INFO "nx4-protect: " ADPT_FMT " open refused, device going away\n", ADPT_ARG(padapter));
++		return -ENODEV;
++	}
++#endif
++
+ 	_enter_critical_mutex(&(adapter_to_dvobj(padapter)->hw_init_mutex), NULL);
+ #ifdef CONFIG_NEW_NETDEV_HDL
+ 	ret = _netdev_open(pnetdev);
+--- a/os_dep/linux/usb_ops_linux.c
++++ b/os_dep/linux/usb_ops_linux.c
+@@ -743,6 +743,30 @@
+ }
+ 
+ int recvbuf2recvframe(PADAPTER padapter, void *ptr);
++
++/* nx4-protect: 수신이 오류로 끝나면 드라이버는 수신 요청을 곧바로 다시 건다(완료 콜백, 인터럽트 문맥). 장치가 망가졌거나 반쯤
++ * 뽑혀 오류와 성공이 섞여 오면, 드라이버의 연속 오류 세기(continual_io_error, 한 번 성공하면 0)로는 멈추지 않고 계속 돈다.
++ * 그래서 성공과 상관없이 1초 안에 NX4_RXERR_LIMIT번을 넘으면 장치를 쓸 수 없는 것으로 보고(surprise removed, drv stopped)
++ * 수신을 다시 걸지 않는다. 장치가 붙어 있으면 인터페이스를 내렸다 올리거나(netdev_open이 표시를 지우고 다시 초기화)
++ * 모듈을 다시 올려 되살린다 */
++#define NX4_RXERR_LIMIT 100
++static int nx4_rx_error_flood(_adapter *padapter)
++{
++	struct dvobj_priv *d = adapter_to_dvobj(padapter);
++	unsigned long now = jiffies;
++
++	if (d->nx4_rxerr_cnt == 0 || time_after(now, d->nx4_rxerr_since + HZ)) {
++		d->nx4_rxerr_since = now;
++		d->nx4_rxerr_cnt = 0;
++	}
++	if (++d->nx4_rxerr_cnt <= NX4_RXERR_LIMIT)
++		return 0;
++	if (!rtw_is_surprise_removed(padapter))
++		printk(KERN_WARNING "nx4-protect: %u rx errors within 1s, rx stopped\n", d->nx4_rxerr_cnt);
++	rtw_set_surprise_removed(padapter);
++	rtw_set_drv_stopped(padapter);
++	return 1;
++}
+ 
+ #ifdef CONFIG_USE_USB_BUFFER_ALLOC_RX
+ void usb_recv_tasklet(void *priv)
+@@ -822,7 +846,8 @@
+ 				pHalData->srestpriv.Wifi_Error_Status = USB_READ_PORT_FAIL;
+ 			}
+ 			#endif
+-			rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
++			if (!nx4_rx_error_flood(padapter))
++				rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+ 			break;
+ 		case -EINPROGRESS:
+ 			RTW_INFO("ERROR: URB IS IN PROGRESS!/n");
+@@ -981,7 +1006,8 @@
+ 				pHalData->srestpriv.Wifi_Error_Status = USB_READ_PORT_FAIL;
+ 			}
+ 			#endif
+-			rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
++			if (!nx4_rx_error_flood(padapter))
++				rtw_read_port(padapter, precvpriv->ff_hwaddr, 0, (unsigned char *)precvbuf);
+ 			break;
+ 		case -EINPROGRESS:
+ 			RTW_INFO("ERROR: URB IS IN PROGRESS!/n");

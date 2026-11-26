@@ -1422,36 +1422,66 @@ check "fetch-wireless: 기본 주소는 Open-HMG/hmgapi-wireless-cp-aa 릴리스
 # --- drivers/(USB Wi-Fi 동글 드라이버, #48) --- Docker 빌드는 scripts/build-driver.sh가 한다(오래 걸리고 인터넷이 필요해 여기서는
 # 돌리지 않음). 여기서는 Docker 없이 볼 수 있는 것만: 구문, 바깥 자료 고정 값, 패치 차례와 꼴, 문서와 값이 같은지
 DI=$B/drivers/inputs.sh
-# inputs.sh의 꼴: 주소는 https, sha256은 64자리, 커밋은 40자리, 툴체인·차 설정 주소는 커밋으로 고정(브랜치 이름이면 바뀔 수 있음)
+# inputs.sh의 꼴: 주소는 https, sha256은 64자리, 커밋은 40자리. 커널 소스 자산은 이 저장소 릴리스(v가 아닌 태그)의 파일
 drv_inputs_ok() (
   . $DI
-  for u in "$KERNEL_URL" "$TOOLCHAIN_URL" "$CARCFG_URL" "$RTL88X2BU_GIT"; do case "$u" in https://*) ;; *) exit 1 ;; esac; done
-  for h in "$KERNEL_SHA256" "$TOOLCHAIN_TREE_SHA256" "$CARCFG_SHA256" "$EXPECTED_CFLAGS_SHA256"; do echo "$h" | grep -qx '[0-9a-f]\{64\}' || exit 1; done
-  echo "$RTL88X2BU_COMMIT" | grep -qx '[0-9a-f]\{40\}' && echo "$CARCFG_URL" | grep -q '/[0-9a-f]\{40\}/' \
-    && echo "$TOOLCHAIN_URL" | grep -q '/+archive/[0-9a-f]\{40\}\.tar\.gz$' && echo "$KP_88X2BU_MD5" | grep -qx '[0-9a-f]\{32\}'
+  for u in "$KERNEL_URL" "$MOBIS_ZIP_URL" "$MOBIS_SRC_URL" "$RTL88X2BU_GIT"; do case "$u" in https://*) ;; *) exit 1 ;; esac; done
+  for h in "$KERNEL_SHA256" "$MOBIS_ZIP_SHA256" "$MOBIS_SRC_SHA256" "$MOBIS_TREE_SHA256" "$KCONFIG_SUM" "$TOOLCHAIN_SHA256" "$EXPECTED_CFLAGS_SHA256"; do
+    echo "$h" | grep -qx '[0-9a-f]\{64\}' || exit 1
+  done
+  echo "$RTL88X2BU_COMMIT" | grep -qx '[0-9a-f]\{40\}' || exit 1
+  [ "$MOBIS_SRC_URL" = "https://github.com/jay-park-lab/hmgapi-nx4-kor/releases/download/$MOBIS_SRC_TAG/$MOBIS_SRC_FILE" ] || exit 1
+  case "$MOBIS_SRC_TAG" in v*) exit 1 ;; esac
+  case "$MOBIS_ZIP_URL" in https://www.mobis.com/*) ;; *) exit 1 ;; esac
 )
 # 앞 8자리
 p8() { echo "$1" | cut -c1-8; }
-# README·NOTICE에 적은 값이 inputs.sh와 같은가: 커널·툴체인·차 설정 값과 차 설정·툴체인 커밋은 앞 8자리, 드라이버 커밋과 KP md5는 전부
+# README·NOTICE에 적은 값이 inputs.sh와 같은가: sha256은 앞 8자리, 드라이버 커밋·defconfig·자산 태그와 파일 이름은 전부
 drv_docs_ok() (
   . $DI
-  _cc=$(echo "$CARCFG_URL" | grep -o '/[0-9a-f]\{40\}/' | tr -d /)
-  _tc=$(echo "$TOOLCHAIN_URL" | grep -o '[0-9a-f]\{40\}')
-  for v in $(p8 $KERNEL_SHA256) $(p8 $TOOLCHAIN_TREE_SHA256) $(p8 $CARCFG_SHA256) $(p8 $_cc) $(p8 $_tc) $(p8 $EXPECTED_CFLAGS_SHA256) $RTL88X2BU_COMMIT $KP_88X2BU_MD5; do
+  for v in $(p8 $KERNEL_SHA256) $(p8 $MOBIS_ZIP_SHA256) $(p8 $MOBIS_SRC_SHA256) $(p8 $MOBIS_TREE_SHA256) $(p8 $KCONFIG_SUM) \
+      $(p8 $TOOLCHAIN_SHA256) $(p8 $EXPECTED_CFLAGS_SHA256) $RTL88X2BU_COMMIT $MOBIS_DEFCONFIG $MOBIS_SRC_TAG $MOBIS_SRC_FILE $MOBIS_DIR; do
     grep -q "$v" $B/drivers/README.md || { echo "drivers/README.md에 없음: $v"; exit 1; }
   done
-  grep -q "$RTL88X2BU_COMMIT" $B/NOTICE.md && grep -q "$(p8 $_tc)" $B/NOTICE.md
+  for v in $RTL88X2BU_COMMIT $MOBIS_ZIP_SHA256 $MOBIS_SRC_TAG $MOBIS_DIR; do
+    grep -q "$v" $B/NOTICE.md || { echo "NOTICE.md에 없음: $v"; exit 1; }
+  done
 )
+# 드라이버 쪽 문서·코드에 다른 프로젝트(Korea Projection, JMK) 언급이 없는가(2026-11-26 사용자 결정: 드라이버는 그 둘과 관계없음)
+drv_noref_ok() {
+  ! grep -rn -i -E "korea ?projection|(^|[^a-z])kp([^a-z]|$)|kp-(check|protect)|jmk|jongmin" $B/drivers $B/scripts/build-driver.sh $B/.github/workflows/drivers.yml \
+    && ! sed -n '/^## USB Wi-Fi 동글 드라이버/,/^## [^U]/p' $B/NOTICE.md | grep -i -E "korea ?projection|(^|[^a-z])kp([^a-z]|$)|jmk"
+}
 check "drivers: 빌드 스크립트 구문(bash -n·sh -n)" \
-  'bash -n $B/drivers/build-in-container.sh && bash -n $B/drivers/lib.sh && bash -n $B/drivers/kernel/prepare.sh && sh -n $B/scripts/build-driver.sh && bash -n $B/drivers/kernel/hdr-patch.sh && bash -n $B/drivers/kernel/hdr-patch-803x.sh && bash -n $DI'
-check "drivers/inputs.sh: 바깥 자료마다 https 주소와 sha256(또는 커밋), 툴체인·차 커널 설정 주소는 커밋으로 고정" 'drv_inputs_ok'
+  'bash -n $B/drivers/build-in-container.sh && bash -n $B/drivers/lib.sh && bash -n $B/drivers/kernel/prepare.sh && sh -n $B/scripts/build-driver.sh && sh -n $B/drivers/config-sum.sh && bash -n $DI'
+check "drivers/inputs.sh: 바깥 자료마다 https 주소와 sha256(또는 커밋), 커널 소스 자산은 이 저장소 릴리스(v가 아닌 태그), 원본은 mobis.com" 'drv_inputs_ok'
 check "drivers: GPL-2.0 전문(drivers/COPYING), build-driver.sh는 빌드 날짜를 LC_ALL=C·UTC로, drivers/를 바꾼 마지막 커밋 시각에서" \
   'head -2 $B/drivers/COPYING | grep -q "GNU GENERAL PUBLIC LICENSE" && grep -q "Version 2, June 1991" $B/drivers/COPYING && [ "$(grep -o "LC_ALL=C TZ=UTC date" $B/scripts/build-driver.sh | grep -c .)" = 4 ] && [ "$(grep -o "date -[rd]" $B/scripts/build-driver.sh | grep -c .)" = 4 ] && grep -q "log -1 --format=%ct -- drivers scripts/build-driver.sh" $B/scripts/build-driver.sh && grep -q "fetch-depth: 0" $B/.github/workflows/drivers.yml'
-check "drivers/rtl88x2bu: 패치는 번호 차례(0001 KP 보호 패치, 0002 HAL 맞춤)이고 -p1 꼴, nx4 빌드는 모듈 이름 bcmdhd·iface_name을 ifname으로 받음" \
-  '[ "$(ls $B/drivers/rtl88x2bu/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-kp-protect.diff 0002-nx4-hal.diff " ] && ! grep -h "^+++ " $B/drivers/rtl88x2bu/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_88x2bu \$D bcmdhd" $B/drivers/build-in-container.sh && grep -q "module_param_named(iface_name, ifname" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "module_param_string(firmware_path" $B/drivers/rtl88x2bu/0002-nx4-hal.diff'
-check "drivers: README·NOTICE의 값(커널·툴체인·차 설정 값과 커밋, 드라이버 커밋, KP md5)이 inputs.sh와 같음" 'drv_docs_ok'
-check "drivers: 차에 넣을 .ko는 CI 것만 — build-driver.sh가 빌드한 CPU를 넘기고 x86_64가 아니면 알림, 정보 파일에 build host, README에 규칙" \
-  'grep -q -- "-e HOST_ARCH=\"\$HOST_ARCH\" -e BUILD_EMU=\$EMU" $B/scripts/build-driver.sh && grep -q "docker info --format .{{.Architecture}}." $B/scripts/build-driver.sh && grep -q "^\[ \"\$(sysctl -n hw.optional.arm64 2>/dev/null)\" = 1 \] && EMU=yes" $B/scripts/build-driver.sh && grep -q "^case \"\$DARCH\" in x86_64|amd64) ;; \*) EMU=yes ;; esac" $B/scripts/build-driver.sh && grep -q "이 .ko는 차에 넣지 마세요" $B/scripts/build-driver.sh && grep -q "(emulated: check against CI, do not ship)" $B/drivers/build-in-container.sh && grep -q "차에 넣을 \`.ko\`는 CI에서 만든 것만" $B/drivers/README.md'
+check "drivers/rtl88x2bu: 패치는 번호 차례(0001 보호, 0002 HAL 맞춤)이고 -p1 꼴, nx4 빌드는 모듈 이름 bcmdhd·iface_name을 ifname으로 받음" \
+  '[ "$(ls $B/drivers/rtl88x2bu/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-nx4-protect.diff 0002-nx4-hal.diff " ] && ! grep -h "^+++ " $B/drivers/rtl88x2bu/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_88x2bu \$D bcmdhd" $B/drivers/build-in-container.sh && grep -q "module_param_named(iface_name, ifname" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "module_param_string(firmware_path" $B/drivers/rtl88x2bu/0002-nx4-hal.diff'
+# 보호 패치의 네 곳(drivers/README.md "보호 패치")과 기록 방식(RTW_PRINT는 CONFIG_RTW_DEBUG=n이면 컴파일되지 않아 printk)
+PD=$B/drivers/rtl88x2bu/0001-nx4-protect.diff
+check "drivers 보호 패치: 뽑힘 때 USB_STATE_NOTATTACHED면 먼저 surprise removed, 풀기 전 tasklet_kill 둘, 열기 거부(-ENODEV), 수신 오류 1초 100번이면 다시 걸지 않음(두 곳), 기록은 printk" \
+  '[ "$(grep -c "^+.*interface_to_usbdev(pusb_intf)->state == USB_STATE_NOTATTACHED" $PD)" = 1 ] && [ "$(grep -c "^+	tasklet_kill(&padapter->\(recvpriv.recv\|xmitpriv.xmit\)_tasklet);" $PD)" = 2 ] && grep -q "^+		return -ENODEV;" $PD && grep -q "^+#define NX4_RXERR_LIMIT 100$" $PD && [ "$(grep -c "^+			if (!nx4_rx_error_flood(padapter))" $PD)" = 2 ] && ! grep -q "^+.*RTW_PRINT" $PD && [ "$(grep -c "^+.*printk(KERN_[A-Z]* \"nx4-protect: " $PD)" = 3 ]'
+check "drivers: README·NOTICE의 값(커널 뼈대·모비스 원본·자산·폴더 값, 설정 값, 툴체인, 컴파일 옵션 지문, 드라이버 커밋)이 inputs.sh와 같음" 'drv_docs_ok'
+check "drivers: 드라이버 쪽 문서·스크립트·CI와 NOTICE 드라이버 절에 Korea Projection·JMK 언급 없음" 'drv_noref_ok'
+check "drivers: 커널 소스 자산 — build-driver.sh --src-asset, 원본 zip sha256·폴더 값 확인, 이름 차례·시각·소유자 고정 tar와 한 스레드 xz, 빌드는 받은 자산의 sha256과 푼 폴더 값을 확인" \
+  'grep -q "^  --src-asset) MODE=src-asset ;;" $B/scripts/build-driver.sh && grep -q "sha_ok \$MOBIS_ZIP_SHA256" $B/drivers/build-in-container.sh && grep -q "\[ \"\$GOT\" = \"\$MOBIS_TREE_SHA256\" \]" $B/drivers/build-in-container.sh && grep -q -- "--sort=name --mtime=" $B/drivers/build-in-container.sh && grep -q "xz -9 -T1" $B/drivers/build-in-container.sh && grep -q "sha_ok \$MOBIS_SRC_SHA256" $B/drivers/build-in-container.sh && grep -q "tree_sum \$MS/\$MOBIS_DIR)\" = \"\$MOBIS_TREE_SHA256\"" $B/drivers/build-in-container.sh && grep -q "sha_ok \$TOOLCHAIN_SHA256" $B/drivers/build-in-container.sh'
+check "drivers/kernel/prepare.sh: kernel.org 뼈대에 모비스 폴더를 tar로 덮고(toolchain 빼고) defconfig → 조정 → olddefconfig, 설정 값이 KCONFIG_SUM과 같아야 함" \
+  'grep -q "tar -C \"\$MSRC\" --exclude=./toolchain -cf - . | tar -C \"\$K\" -xf -" $B/drivers/kernel/prepare.sh && grep -q "^M defconfig \"\$MOBIS_DEFCONFIG\"" $B/drivers/kernel/prepare.sh && grep -q -- "--disable USB_NET_CDC_NCM --disable USB_NET_CDC_SUBSET --disable USB_NET_NET1080" $B/drivers/kernel/prepare.sh && grep -q -- "--disable CC_STACKPROTECTOR_STRONG --enable CC_STACKPROTECTOR_REGULAR" $B/drivers/kernel/prepare.sh && grep -q "\[ \"\$GOT\" = \"\$KCONFIG_SUM\" \]" $B/drivers/kernel/prepare.sh'
+# lib.sh kconfig_sum, config-sum.sh: 머리말·꺼진 줄·차례와 상관없이 값이 같으면 같음, 차 설정의 STRONG은 REGULAR로 봄
+KS=$T/ks; mkdir -p $KS/d
+printf '#\n# Linux/arm 3.18.24 Kernel Configuration\n#\nCONFIG_ARM=y\nCONFIG_CC_STACKPROTECTOR=y\nCONFIG_CC_STACKPROTECTOR_STRONG=y\n# CONFIG_CC_STACKPROTECTOR_REGULAR is not set\nCONFIG_LOCALVERSION="-tcc"\nCONFIG_HZ=100\n' > $KS/car.txt
+printf 'CONFIG_HZ=100\n# CONFIG_CC_STACKPROTECTOR_STRONG is not set\nCONFIG_CC_STACKPROTECTOR_REGULAR=y\nCONFIG_LOCALVERSION="-tcc"\n\nCONFIG_CC_STACKPROTECTOR=y\nCONFIG_ARM=y\n# CONFIG_USB_NET_NET1080 is not set\n' > $KS/built.config
+sed 's/^CONFIG_HZ=100$/CONFIG_HZ=200/' $KS/built.config > $KS/other.config
+ksum() { bash -c '. "$1"; kconfig_sum "$2"' x $B/drivers/lib.sh "$1"; }
+check "drivers/lib.sh kconfig_sum: 차 설정(STRONG, 머리말)과 빌드 설정(REGULAR, 다른 차례·꺼진 줄)이 같은 값, 값 하나가 다르면 다른 값" \
+  '[ "$(ksum $KS/car.txt)" = "$(ksum $KS/built.config)" ] && [ "$(ksum $KS/car.txt)" != "$(ksum $KS/other.config)" ] && ksum $KS/car.txt | grep -qx "[0-9a-f]\{64\}"'
+cp $B/drivers/lib.sh $B/drivers/config-sum.sh $KS/d/; sed "s/^KCONFIG_SUM=.*/KCONFIG_SUM=$(ksum $KS/car.txt)/" $DI > $KS/d/inputs.sh
+(sh $KS/d/config-sum.sh $KS/built.config) > $KS/same.out 2>&1; echo $? > $KS/same.rc
+(sh $KS/d/config-sum.sh $KS/other.config) > $KS/diff.out 2>&1; echo $? > $KS/diff.rc
+check "drivers/config-sum.sh: 진단 기록 config.txt가 KCONFIG_SUM과 같으면 \"같음\"(0), 다르면 \"다름\"(3)" \
+  '[ "$(cat $KS/same.rc)" = 0 ] && grep -q "^같음: " $KS/same.out && [ "$(cat $KS/diff.rc)" = 3 ] && grep -q "^다름: " $KS/diff.out' || cat $KS/same.out $KS/diff.out
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc
@@ -1479,8 +1509,8 @@ check "drivers/lib.sh make_retry: MAKE_TRIES(build-driver.sh NX4_DRV_TRIES, 기�
 mr err ok
 check "drivers/lib.sh make_retry: 다른 오류는 다시 돌리지 않고 바로 실패, 대상은 지우지 않음" \
   '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 1 ] && [ -e $MR/k/scripts/dtc/flattree.o ] && grep -q "error: something" $MR/out.txt' || cat $MR/out.txt
-check "drivers/kernel/prepare.sh: 커널 준비의 make(olddefconfig, modules_prepare)는 모두 make_retry로(리뷰 10·17)" \
-  'grep -q "^make_retry .*olddefconfig" $B/drivers/kernel/prepare.sh && grep -q "^make_retry .*modules_prepare" $B/drivers/kernel/prepare.sh && ! grep -q "^make " $B/drivers/kernel/prepare.sh'
+check "drivers/kernel/prepare.sh: 커널 준비의 make(defconfig, olddefconfig, modules_prepare)는 모두 make_retry로(리뷰 10·17)" \
+  'grep -q "^M() { make_retry " $B/drivers/kernel/prepare.sh && grep -q "^M defconfig " $B/drivers/kernel/prepare.sh && grep -q "^M olddefconfig olddefconfig" $B/drivers/kernel/prepare.sh && grep -q "^M modules_prepare .*modules_prepare" $B/drivers/kernel/prepare.sh && ! grep -q "^ *make " $B/drivers/kernel/prepare.sh'
 # lib.sh check_cflags(리뷰 14): 가짜 .cmd(첫 줄이 컴파일 명령)로
 CF=$T/cf
 cfrun() { (env $CFX bash -c '. "$1"; check_cflags "$2"' x $B/drivers/lib.sh $CF) > $CF.out 2>&1; echo $? > $CF.rc; }

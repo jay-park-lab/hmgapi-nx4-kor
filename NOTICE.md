@@ -73,9 +73,11 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
 - 2.2.0에서 USB Wi-Fi 동글을 지원하려고 넣었습니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)). 이 폴더는 저장소의 다른 부분(AGPL-3.0)과 달리 **GNU GPL 2.0**입니다(전문 `drivers/COPYING`). 리눅스 커널 모듈인 드라이버가 GPL-2.0이기 때문입니다.
   - `drivers/` 밖의 `scripts/build-driver.sh`(이 폴더를 Docker로 돌리는 PC 스크립트)와 `.github/workflows/drivers.yml`은 저장소와 같은 AGPL-3.0입니다.
 - 드라이버 원본: RTL88x2BU, https://github.com/cilynx/rtl88x2bu (Realtek, GPL-2.0), 커밋 `fc158d1f71b9e5dfcd1fccaf4d28725b65086e3b`. 저장소에는 넣지 않고 빌드할 때 받습니다.
-- Korea Projection 1.8.0-beta.2(StopDragon)의 동글 드라이버 소스 묶음(`rtl88x2bu-source-1.8.0-beta.2.tar.gz`, GPL-2.0)에서 그대로 가져온 것: 보호 패치 `drivers/rtl88x2bu/0001-kp-protect.diff`, 헤더 배치 패치 `drivers/kernel/hdr-patch.sh`·`hdr-patch-803x.sh`. 커널 준비 단계(`drivers/kernel/prepare.sh`)는 그 묶음의 `build-tcc803x.sh`를 바탕으로 고쳤습니다.
-- 이 저장소가 쓴 것: 순정 HAL에 맞추는 패치 `drivers/rtl88x2bu/0002-nx4-hal.diff`, `drivers/Dockerfile`·`inputs.sh`·`lib.sh`·`build-in-container.sh`(GPL-2.0), `scripts/build-driver.sh`(AGPL-3.0)
-- 빌드에 받는 것(저장소에 넣지 않음): kernel.org `linux-3.18.24`(GPL-2.0), AOSP `arm-eabi-4.7` 툴체인(GPL, 커밋 `8b880805`로 고정), tcc803x 내비 커널 설정(공개 저장소 `JMK-labs/jmk-gen5w`의 `driver/config_tcc803x.txt`, sha256으로 확인). 자세한 것은 `drivers/README.md`.
+- 내비 커널 소스: 현대모비스가 GPL에 따라 공개한 AVNT STD G50 WIDE(R9) 오픈소스(https://www.mobis.com/kr/tech/rnd.do#open)의 커널 폴더 `AVNT5W_TCC803XKK_kernel/`(Linux Kernel, GPL-2.0, 저작권 Hyundai Mobis·Telechips 등). 드라이버를 내비 커널과 같은 트리로 빌드하는 데 씁니다.
+  - 원본 묶음은 sha256 `e7533517e65fb0af24a989ea4a7877cffcb29bed02a21c99b9277b1668c3bb20`입니다. 그 커널 폴더를 고치지 않고 묶어 이 저장소의 릴리스 `src-mobis-avnt5w-r9`에 모비스 고지 원본(`OSB_202606110414354220.zip`)과 함께 올려 두고, 빌드는 그것을 받습니다(`drivers/README.md` "커널 소스 자산"). 저장소에는 넣지 않습니다.
+  - 그 안의 툴체인 묶음 `toolchain/arm-eabi-4.7.tar.gz`(GCC 4.7, GPL)로 컴파일합니다.
+- 커널 뼈대: kernel.org `linux-3.18.24`(GPL-2.0). 모비스 커널 폴더에 없는 맨 위 `Makefile`·`scripts/` 등을 채웁니다. 빌드할 때 받습니다.
+- 이 저장소가 쓴 것: 보호 패치 `drivers/rtl88x2bu/0001-nx4-protect.diff`, 순정 HAL에 맞추는 패치 `drivers/rtl88x2bu/0002-nx4-hal.diff`, `drivers/kernel/prepare.sh`·`Dockerfile`·`inputs.sh`·`lib.sh`·`config-sum.sh`·`build-in-container.sh`(GPL-2.0), `scripts/build-driver.sh`(AGPL-3.0). 자세한 것은 `drivers/README.md`.
 
 ## BusyBox (GPL-2.0)
 

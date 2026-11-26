@@ -1,8 +1,8 @@
 #!/bin/sh
 # USB Wi-Fi 동글 드라이버(.ko)를 Docker로 빌드한다(#48, drivers/README.md). PC에서만 돈다. 내비에는 아무것도 하지 않는다.
 # 쓰는 법(저장소 맨 위에서):
-#   sh scripts/build-driver.sh              이 저장소의 드라이버 → out/drivers/tcc803x/
-#   sh scripts/build-driver.sh --kp-check   Korea Projection 1.8.0-beta.2의 88x2bu.ko와 md5까지 같은지 → out/drivers/kp-check/
+#   sh scripts/build-driver.sh               이 저장소의 드라이버 → out/drivers/tcc803x/
+#   sh scripts/build-driver.sh --src-asset   모비스 원본 묶음에서 커널 소스 자산을 만든다 → out/drivers/src/(drivers/README.md "커널 소스 자산")
 # 필요한 것: docker(linux/amd64를 돌릴 수 있어야 함. Apple Silicon은 colima 등의 qemu 에뮬레이션). 받은 자료와 준비한 커널은
 # Docker 볼륨 nx4kor-drivers에 두고 다시 쓴다(처음은 받기·커널 준비로 오래 걸림). 지우려면 docker volume rm nx4kor-drivers.
 # 빌드 날짜·시각(.ko에 문자열로 들어감)은 drivers/나 이 스크립트를 마지막으로 바꾼 커밋의 시각으로 고정한다. 그래서 같은
@@ -14,9 +14,9 @@ set -eu
 B=$(cd "$(dirname "$0")/.." && pwd)
 MODE=nx4
 case "${1:-}" in
-  --kp-check) MODE=kp-check ;;
+  --src-asset) MODE=src-asset ;;
   "") ;;
-  *) echo "쓰는 법: sh scripts/build-driver.sh [--kp-check]"; exit 1 ;;
+  *) echo "쓰는 법: sh scripts/build-driver.sh [--src-asset]"; exit 1 ;;
 esac
 command -v docker >/dev/null 2>&1 || { echo "docker가 없습니다"; exit 1; }
 docker info >/dev/null 2>&1 || { echo "Docker가 돌고 있지 않습니다(colima start 등)"; exit 1; }
@@ -61,8 +61,10 @@ docker run --rm --platform linux/amd64 \
   -e MODE=$MODE -e JOBS="${NX4_DRV_JOBS:-}" -e MAKE_TRIES="${NX4_DRV_TRIES:-8}" -e BUILD_DATE="$BDATE" -e BUILD_TIME="$BTIME" \
   -e HOST_ARCH="$HOST_ARCH" -e BUILD_EMU=$EMU \
   "$IMG" bash /src/drivers/build-in-container.sh
-case "$EMU" in
-  no) ;;
-  *) echo "알림: 이 PC($HOST_ARCH)에서는 에뮬레이션으로 빌드했습니다. 에뮬레이션은 멈추지 않고도 다른 코드를 낼 수 있어, 이 .ko는 차에 넣지 마세요."
+case "$MODE $EMU" in
+  "nx4 yes") echo "알림: 이 PC($HOST_ARCH)에서는 에뮬레이션으로 빌드했습니다. 에뮬레이션은 멈추지 않고도 다른 코드를 낼 수 있어, 이 .ko는 차에 넣지 마세요."
      echo "      확인용입니다. 같은 커밋의 CI(drivers 워크플로) md5와 견주고, 차에는 CI·release 워크플로가 만든 .ko를 씁니다(drivers/README.md)." ;;
 esac
+if [ "$MODE" = src-asset ]; then
+  echo "만든 자산: $OUT/src/ (올리는 법은 drivers/README.md \"커널 소스 자산\")"
+fi
