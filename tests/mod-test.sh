@@ -145,13 +145,16 @@ check "관리 앱 아이콘(android:icon) = 앱 메뉴 타일의 낮·밤 그림
 #   설치기의 폴더 경로 한 줄(KORPROJ=…), 설치기의 문구 정의 한 줄(KORPROJ_MSG="…", 줄 전체가 아래 KORPROJ_TEXT와 같을 때만),
 #   스틱 README에서 "NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤"가 든 안내 줄.
 # 2.1.1부터 스틱 README의 HMG-API 지우기 경고(NEMESIS 1.17, Open-HMG/HMG-API#397)도 받는다: 스틱 README에서
-#   "NEMESIS 1.16"·"NEMESIS 1.17"·"NEMESIS 비상 USB"·"NEMESIS를 지우지"가 든 줄. 모드·설치기·빌드 스크립트에는 여전히 두지 않는다.
+#   "NEMESIS 1.16"·"NEMESIS 1.17"·"NEMESIS 비상 USB"·"NEMESIS를 지우"가 든 줄. 모드·설치기·빌드 스크립트에는 여전히 두지 않는다.
+# 2.1.2부터 NEMESIS가 깔린 차를 거절하는 확인(#75)도 받는다: 설치기의 실행 파일 경로 한 줄(NMS=…), 문구 정의 한 줄(NMS_MSG="…",
+#   줄 전체가 아래 NMS_TEXT와 같을 때만), "#75"를 적은 설치기의 주석 줄, 스틱 README에서 "NEMESIS가 깔린 차"가 든 줄.
 # 설치기의 다른 줄(문구를 주석으로 단 코드 줄 등)은 잡는다(PR #57 리뷰 3). 다른 흔적(KP_*, wireless.projection, 제보 등)은
-# 그 세 줄에서도 잡는다(앞의 grep은 예외 없이 본다)
+# 그 줄들에서도 잡는다(앞의 grep은 예외 없이 본다)
 KORPROJ_TEXT="NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다. NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
+NMS_TEXT="NEMESIS가 깔린 차에는 NX4 KOR를 설치하지 않습니다. NEMESIS를 지우기 전에 USB의 README.txt를 꼭 읽어 주세요. 아무것도 바꾸지 않았습니다."
 TRACE_IN="$PKG $B/usb $B/scripts --include=*.sh --include=troubleShooter --include=*.json --include=*.txt"
-check "NEMESIS·다른 차·제보 흔적 없음(모드·USB·빌드 스크립트. 설치기의 Korea Projection 패키지 확인 두 줄과 스틱 README 안내(#13)·HMG-API 지우기 경고(#397)만 뺌)" \
-  '! grep -rnE "KP_[A-Z]|korea-projection|KoreaProjection|CARS_OK|CARS_TRY|CARS_SEEN|req_tick|report\.req|carreport|wireless\.projection|제보|QR" $TRACE_IN && ! grep -rnE "NEMESIS|nemesis|korea\.projection" $TRACE_IN | grep -v "NEMESIS\.data" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+:KORPROJ=[$]ROOT/data/nemesis/apps/korea[.]projection$" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+:KORPROJ_MSG=\"$KORPROJ_TEXT\"$" | grep -vE "^[^:]*/usb/README[.]txt:[0-9]+:.*NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤" | grep -vE "^[^:]*/usb/README[.]txt:[0-9]+:.*(NEMESIS 1[.]1[67]|NEMESIS 비상 USB|NEMESIS를 지우지)"'
+check "NEMESIS·다른 차·제보 흔적 없음(모드·USB·빌드 스크립트. 설치기의 Korea Projection 패키지 확인(#13)·NEMESIS 거절(#75)과 스틱 README 안내·HMG-API 지우기 경고(#397)만 뺌)" \
+  '! grep -rnE "KP_[A-Z]|korea-projection|KoreaProjection|CARS_OK|CARS_TRY|CARS_SEEN|req_tick|report\.req|carreport|wireless\.projection|제보|QR" $TRACE_IN && ! grep -rnE "NEMESIS|nemesis|korea\.projection" $TRACE_IN | grep -v "NEMESIS\.data" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+:KORPROJ=[$]ROOT/data/nemesis/apps/korea[.]projection$" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+:KORPROJ_MSG=\"$KORPROJ_TEXT\"$" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+:NMS=[$]ROOT/system/xbin/nemesis$" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+:NMS_MSG=\"$NMS_TEXT\"$" | grep -vE "^[^:]*/usb/troubleShooter:[0-9]+: *#.*#75" | grep -vE "^[^:]*/usb/README[.]txt:[0-9]+:.*NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤" | grep -vE "^[^:]*/usb/README[.]txt:[0-9]+:.*(NEMESIS 1[.]1[67]|NEMESIS 비상 USB|NEMESIS를 지우|NEMESIS가 깔린 차)"'
 # 정적 검사: 맨 위(함수 밖) 기본값 대입이 아래에서 정해지는 변수를 먼저 쓰지 않음, "> 파일 2>/dev/null" 순서가 없음
 python3 $B/tests/tools/defuse-check.py $PKG > $T/defuse.out 2>&1; DEFRC=$?
 check "정적 검사: 정의 전에 쓰는 변수·'> 파일 2>/dev/null' 순서가 모드 스크립트에 없음(tests/tools/defuse-check.py)" '[ $DEFRC = 0 ] && [ ! -s $T/defuse.out ]'
@@ -900,6 +903,35 @@ ts $U
 check "  지우기(UNINSTALL)는 Korea Projection 패키지가 있어도 막지 않음" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "hmgapid engine remove nx4-kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && grep -q "NX4 KOR 모드를 지웠습니다" $T/ts.out && ! grep -qF "$KPMSG" $T/ts.out' || cat $T/ts.out
 rm -f $K/UNINSTALL; rm -rf $R/data/nemesis; cp -R $F $HD/mods/nx4-kor; : > $T/app-ready; echo yes > $T/diag.reply
+# NEMESIS가 깔린 차(#75): 실행 파일 /system/xbin/nemesis가 있으면 설치·업데이트(같은 판 포함)를 아무것도 바꾸기 전에 멈춘다.
+# Korea Projection 확인과 같은 자리라 HMG-API 기다리기·HMG-API 설치기로 넘기기보다 앞이다. 지우기 갈래는 막지 않는다
+NMB=$R/system/xbin/nemesis
+NMMSG="NX4 KOR: $NMS_TEXT"
+mkdir -p $R/system/xbin; printf '#!/system/bin/sh\necho 1.17\n' > $NMB; chmod 755 $NMB
+echo no > $T/diag.reply; pset plan-new; cp $HD/mods/nx4-kor/mod.json $T/nm-nx4.json
+ts $U
+check "USB 설치기(#75): NEMESIS(/system/xbin/nemesis)가 있으면 같은 판이어도 아무것도 바꾸지 않고 멈춤(종료 1, 안내 문구, 진단 기록은 멈추기 전에 물음, HMG-API 명령 없음, 관리 앱을 열지 않음, 진행 기록 없음)" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -qxF "$NMMSG" $T/ts.out && grep -q DiagActivity $T/calls && ! grep -q "^hmgapid" $T/calls && ! grep -q StatusActivity $T/calls && [ ! -f $PG ] && [ ! -d $R/data/local/tmp/nx4-kor-usb ] && cmp -s $T/nm-nx4.json $HD/mods/nx4-kor/mod.json && grep -q "system/xbin/nemesis 있음: 설치하지 않음" $K/install.log' || { cat $T/ts.out; cat $T/calls; }
+: > $K/REINSTALL
+ts $U
+rm -f $K/REINSTALL
+check "  같은 판 다시 설치(REINSTALL)도 멈춤" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -qxF "$NMMSG" $T/ts.out && ! grep -q "^hmgapid" $T/calls && cmp -s $T/nm-nx4.json $HD/mods/nx4-kor/mod.json' || cat $T/ts.out
+modset $HD/mods/nx4-kor/mod.json version=1.9.9; cp $HD/mods/nx4-kor/mod.json $T/nm-nx4.json
+ts $U
+check "  업데이트(설치된 판이 다름)도 멈춤(HMG-API 명령 없음, 설치된 nx4-kor 그대로)" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -qxF "$NMMSG" $T/ts.out && ! grep -q "^hmgapid" $T/calls && cmp -s $T/nm-nx4.json $HD/mods/nx4-kor/mod.json && [ ! -f $PG ]' || { cat $T/ts.out; cat $T/calls; }
+mv $HD $T/hd.away; mkdir -p $K/hmgapi $U/HMGAPI/install/payload; echo "# hmg-api" > $K/hmgapi/troubleShooter
+ts $U
+check "  새 설치(HMG-API 없음)는 스틱에 HMG-API 설치기가 있어도 그것으로 넘기기 전에 멈춤(HMG-API를 설치하지 않음)" \
+  '[ "$(cat $T/ts.rc)" = 1 ] && grep -qxF "$NMMSG" $T/ts.out && ! grep -q "HMG-API 설치기로 넘김" $T/ts.out && ! grep -q "HMG-API를 먼저 설치합니다" $T/ts.out' || cat $T/ts.out
+rm -rf $K/hmgapi $U/HMGAPI; mv $T/hd.away $HD
+# 지우기(UNINSTALL)는 막지 않는다
+: > $K/UNINSTALL; rm -f $T/stublog
+ts $U
+check "  지우기(UNINSTALL)는 NEMESIS가 있어도 막지 않음" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "hmgapid engine remove nx4-kor" $T/calls && [ ! -d $HD/mods/nx4-kor ] && grep -q "NX4 KOR 모드를 지웠습니다" $T/ts.out && ! grep -qF "$NMMSG" $T/ts.out' || cat $T/ts.out
+rm -f $K/UNINSTALL $NMB; cp -R $F $HD/mods/nx4-kor; : > $T/app-ready; echo yes > $T/diag.reply
 # map: HMG-API가 이 차 map을 이미 가짐 / 만들지 못함 / 확인 실패(이번에 만든 map만 지움)
 pset plan-new; mapnew; echo "not written: HMG-API has a map for this car (nx4hev_kr): \`hmgapid engine map-car --local\` adds the points it lacks" > $T/mapcar.out; rm -f $T/mapcar.writes
 ts $U
