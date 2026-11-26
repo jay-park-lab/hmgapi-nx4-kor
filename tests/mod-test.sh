@@ -1519,11 +1519,12 @@ DI=$B/drivers/inputs.sh
 # inputs.sh의 꼴: 주소는 https, sha256은 64자리, 커밋은 40자리. 커널 소스 자산은 이 저장소 릴리스(v가 아닌 태그)의 파일
 drv_inputs_ok() (
   . $DI
-  for u in "$KERNEL_URL" "$MOBIS_ZIP_URL" "$MOBIS_SRC_URL" "$RTL88X2BU_GIT"; do case "$u" in https://*) ;; *) exit 1 ;; esac; done
-  for h in "$KERNEL_SHA256" "$MOBIS_ZIP_SHA256" "$MOBIS_SRC_SHA256" "$MOBIS_TREE_SHA256" "$KCONFIG_SUM" "$TOOLCHAIN_SHA256" "$EXPECTED_CFLAGS_SHA256"; do
+  for u in "$KERNEL_URL" "$MOBIS_ZIP_URL" "$MOBIS_SRC_URL" "$RTL88X2BU_GIT" "$RTL8831BU_GIT"; do case "$u" in https://*) ;; *) exit 1 ;; esac; done
+  for h in "$KERNEL_SHA256" "$MOBIS_ZIP_SHA256" "$MOBIS_SRC_SHA256" "$MOBIS_TREE_SHA256" "$KCONFIG_SUM" "$TOOLCHAIN_SHA256" "$EXPECTED_CFLAGS_SHA256" "$EXPECTED_CFLAGS_SHA256_8831BU"; do
     echo "$h" | grep -qx '[0-9a-f]\{64\}' || exit 1
   done
   echo "$RTL88X2BU_COMMIT" | grep -qx '[0-9a-f]\{40\}' || exit 1
+  echo "$RTL8831BU_COMMIT" | grep -qx '[0-9a-f]\{40\}' || exit 1
   [ "$MOBIS_SRC_URL" = "https://github.com/jay-park-lab/hmgapi-nx4-kor/releases/download/$MOBIS_SRC_TAG/$MOBIS_SRC_FILE" ] || exit 1
   case "$MOBIS_SRC_TAG" in v*) exit 1 ;; esac
   case "$MOBIS_ZIP_URL" in https://www.mobis.com/*) ;; *) exit 1 ;; esac
@@ -1534,10 +1535,11 @@ p8() { echo "$1" | cut -c1-8; }
 drv_docs_ok() (
   . $DI
   for v in $(p8 $KERNEL_SHA256) $(p8 $MOBIS_ZIP_SHA256) $(p8 $MOBIS_SRC_SHA256) $(p8 $MOBIS_TREE_SHA256) $(p8 $KCONFIG_SUM) \
-      $(p8 $TOOLCHAIN_SHA256) $(p8 $EXPECTED_CFLAGS_SHA256) $RTL88X2BU_COMMIT $MOBIS_DEFCONFIG $MOBIS_SRC_TAG $MOBIS_SRC_FILE $MOBIS_DIR; do
+      $(p8 $TOOLCHAIN_SHA256) $(p8 $EXPECTED_CFLAGS_SHA256) $(p8 $EXPECTED_CFLAGS_SHA256_8831BU) $RTL88X2BU_COMMIT $RTL8831BU_COMMIT \
+      $MOBIS_DEFCONFIG $MOBIS_SRC_TAG $MOBIS_SRC_FILE $MOBIS_DIR; do
     grep -q "$v" $B/drivers/README.md || { echo "drivers/README.md에 없음: $v"; exit 1; }
   done
-  for v in $RTL88X2BU_COMMIT $MOBIS_ZIP_SHA256 $MOBIS_SRC_TAG $MOBIS_DIR; do
+  for v in $RTL88X2BU_COMMIT $RTL8831BU_COMMIT $MOBIS_ZIP_SHA256 $MOBIS_SRC_TAG $MOBIS_DIR; do
     grep -q "$v" $B/NOTICE.md || { echo "NOTICE.md에 없음: $v"; exit 1; }
   done
 )
@@ -1552,7 +1554,21 @@ check "drivers/inputs.sh: 바깥 자료마다 https 주소와 sha256(또는 커�
 check "drivers: GPL-2.0 전문(drivers/COPYING), build-driver.sh는 빌드 날짜를 LC_ALL=C·UTC로, drivers/를 바꾼 마지막 커밋 시각에서" \
   'head -2 $B/drivers/COPYING | grep -q "GNU GENERAL PUBLIC LICENSE" && grep -q "Version 2, June 1991" $B/drivers/COPYING && [ "$(grep -o "LC_ALL=C TZ=UTC date" $B/scripts/build-driver.sh | grep -c .)" = 4 ] && [ "$(grep -o "date -[rd]" $B/scripts/build-driver.sh | grep -c .)" = 4 ] && grep -q "log -1 --format=%ct -- drivers scripts/build-driver.sh" $B/scripts/build-driver.sh && grep -q "fetch-depth: 0" $B/.github/workflows/drivers.yml'
 check "drivers/rtl88x2bu: 패치는 번호 차례(0001 보호, 0002 HAL 맞춤)이고 -p1 꼴, nx4 빌드는 모듈 이름 bcmdhd·iface_name을 ifname으로 받음" \
-  '[ "$(ls $B/drivers/rtl88x2bu/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-nx4-protect.diff 0002-nx4-hal.diff " ] && ! grep -h "^+++ " $B/drivers/rtl88x2bu/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_88x2bu \$D bcmdhd" $B/drivers/build-in-container.sh && grep -q "module_param_named(iface_name, ifname" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "module_param_string(firmware_path" $B/drivers/rtl88x2bu/0002-nx4-hal.diff'
+  '[ "$(ls $B/drivers/rtl88x2bu/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-nx4-protect.diff 0002-nx4-hal.diff " ] && ! grep -h "^+++ " $B/drivers/rtl88x2bu/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_driver rtl88x2bu \"\$RTL88X2BU_COMMIT\" /work/nx4/rtl88x2bu bcmdhd .*\"\$EXPECTED_CFLAGS_SHA256\" EXTRA_CFLAGS \$P1" $B/drivers/build-in-container.sh && grep -q "module_param_named(iface_name, ifname" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "module_param_string(firmware_path" $B/drivers/rtl88x2bu/0002-nx4-hal.diff'
+# 3단계: RTL8831BU도 같은 커널 트리로, 모듈 이름 bcmdhd, 자기 지문으로, 패치 셋(보호·HAL·빌드)
+P8=$B/drivers/rtl8831bu
+check "drivers/rtl8831bu: 패치는 번호 차례(0001 보호, 0002 HAL 맞춤, 0003 빌드 맞춤)이고 -p1 꼴, nx4 빌드는 모듈 이름 bcmdhd·자기 지문·결과 tcc803x/rtl8831bu" \
+  '[ "$(ls $P8/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-nx4-protect.diff 0002-nx4-hal.diff 0003-nx4-build.diff " ] && ! grep -h "^+++ " $P8/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_driver rtl8831bu \"\$RTL8831BU_COMMIT\" /work/nx4/rtl8831bu bcmdhd .*\"\$EXPECTED_CFLAGS_SHA256_8831BU\" USER_EXTRA_CFLAGS \$P2" $B/drivers/build-in-container.sh && grep -q "report_driver rtl8831bu" $B/drivers/build-in-container.sh && grep -q "get_driver rtl8831bu \"\$RTL8831BU_GIT\" \"\$RTL8831BU_COMMIT\"" $B/drivers/build-in-container.sh && grep -q "cat out/drivers/tcc803x/rtl8831bu/bcmdhd.ko.txt" $B/.github/workflows/drivers.yml'
+check "drivers/rtl8831bu: HAL 인자(iface_name을 ifname으로, firmware_path·nvram_path는 받아 두기만), 빌드 맞춤(디버그 로그 끔, rtw_warn_on_cnt를 ATOMIC_INC에 넘기지 않음)" \
+  'grep -q "^+module_param_named(iface_name, ifname, charp, 0644);" $P8/0002-nx4-hal.diff && grep -q "^+module_param_string(firmware_path" $P8/0002-nx4-hal.diff && grep -q "^+module_param_string(nvram_path" $P8/0002-nx4-hal.diff && grep -q "^+CONFIG_RTW_DEBUG = n$" $P8/0003-nx4-build.diff && grep -q "^-CONFIG_RTW_DEBUG = y$" $P8/0003-nx4-build.diff && grep -q "^-		ATOMIC_INC((ATOMIC_T \*)&rtw_warn_on_cnt);" $P8/0003-nx4-build.diff && grep -q "^+		rtw_warn_on_cnt++;" $P8/0003-nx4-build.diff'
+# 리뷰 81-1: 3.18에 없는 strscpy를 부르지 않게(drv_conf.h의 strlcpy→strscpy 정의를 빼고 os_intfs.c 다섯 곳을 strlcpy로)
+check "drivers/rtl8831bu 빌드 맞춤: strlcpy를 strscpy로 바꾸던 정의를 빼고, rtw_ethtool_get_drvinfo의 strscpy 다섯 곳을 strlcpy로" \
+  'grep -q "^-#define strlcpy(a, b, c) strscpy(a, b, c)$" $P8/0003-nx4-build.diff && [ "$(grep -c "^+[[:space:]]*strlcpy(info->" $P8/0003-nx4-build.diff)" = 5 ] && [ "$(grep -c "^-[[:space:]]*strscpy(info->" $P8/0003-nx4-build.diff)" = 5 ] && ! grep -q "^+[[:space:]]*strscpy(" $P8/0003-nx4-build.diff'
+check "drivers/rtl8831bu 보호 패치: 뽑힘 때 USB_STATE_NOTATTACHED면 먼저 surprise removed, 열기 거부(-ENODEV), 수신 오류 1초 100번이면 surprise removed·drv stopped, 기록은 printk, 되살리기는 모듈 다시 올리기" \
+  '[ "$(grep -c "^+.*interface_to_usbdev(pusb_intf)->state == USB_STATE_NOTATTACHED" $P8/0001-nx4-protect.diff)" = 1 ] && grep -q "^+		dev_set_surprise_removed(dvobj);" $P8/0001-nx4-protect.diff && grep -q "^+		return -ENODEV;" $P8/0001-nx4-protect.diff && grep -q "^+#define NX4_RXERR_LIMIT 100$" $P8/0001-nx4-protect.diff && [ "$(grep -c "^+		nx4_rx_error_flood(dvobj);" $P8/0001-nx4-protect.diff)" = 1 ] && grep -q "^+	dev_set_drv_stopped(d);" $P8/0001-nx4-protect.diff && ! grep -q "^+.*RTW_PRINT" $P8/0001-nx4-protect.diff && [ "$(grep -c "^+.*printk(KERN_[A-Z]* \"nx4-protect: " $P8/0001-nx4-protect.diff)" = 3 ] && grep -q "되살리려면 모듈을 다시 올린다" $P8/0001-nx4-protect.diff && grep -q "두 드라이버와 자리 하나" $B/drivers/README.md'
+# 리뷰 81-3: phl은 오류 뒤 다시 걸지 않는다(성공·INVALID_PARAM 뒤에만). 수신이 기록 없이 멈출 수 있다고 적고 차 확인에 둔다
+check "drivers/rtl8831bu 보호 패치·README: 수신 설명이 phl 동작(오류 뒤 다시 걸지 않아 요청이 줄어 멈춤)과 맞고, 기록 없이 멈추는지 차 확인에 있음" \
+  'grep -q "다시 걸지 않는다(phl_pend_rxbuf_usb는" $P8/0001-nx4-protect.diff && ! grep -q "phl이 수신 요청을 다시 건다" $P8/0001-nx4-protect.diff && grep -q "수신이 기록 없이 멈춥니다" $B/drivers/README.md && grep -q "RTL8831BU: \`nx4-protect:\` 줄 없이 수신만 멈추는지" $B/drivers/README.md'
 # 보호 패치의 네 곳(drivers/README.md "보호 패치")과 기록 방식(RTW_PRINT는 CONFIG_RTW_DEBUG=n이면 컴파일되지 않아 printk)
 PD=$B/drivers/rtl88x2bu/0001-nx4-protect.diff
 check "drivers 보호 패치: 뽑힘 때 USB_STATE_NOTATTACHED면 먼저 surprise removed, 풀기 전 tasklet_kill 둘, 열기 거부(-ENODEV), 수신 오류 1초 100번이면 다시 걸지 않음(두 곳), 기록은 printk" \
@@ -1597,6 +1613,40 @@ if [ -e $KS/nb/shasum ]; then
   check "drivers/config-sum.sh: sha256sum이 없으면 shasum -a 256으로 세어 같은 결과(\"같음\")" \
     '[ "$(cat $KS/sha.rc)" = 0 ] && grep -q "^같음: " $KS/sha.out' || cat $KS/sha.out
 fi
+# 리뷰 81-2: lib.sh kernel_exports·check_ksyms. 가짜 커널 트리(EXPORT_SYMBOL 여러 꼴, .S, params.c의 STANDARD_PARAM_DEF)로
+KX=$T/kx; mkdir -p $KX/k/kernel $KX/k/lib $KX/k/arch
+printf 'EXPORT_SYMBOL(foo);\nEXPORT_SYMBOL_GPL( bar );\nint baz; /* EXPORT_SYMBOL(no_such) 같은 주석은 들어가도 됨 */\n' > $KX/k/lib/a.c
+printf 'EXPORT_SYMBOL(__aeabi_x)\n' > $KX/k/arch/b.S
+# 리뷰 81-5: EXPORT_PER_CPU_SYMBOL(_GPL)도 내보내는 것(SMP), EXPORT_UNUSED_SYMBOL은 이 설정에서 내보내지 않음
+printf 'EXPORT_PER_CPU_SYMBOL(softnet_data);\nEXPORT_PER_CPU_SYMBOL_GPL(irq_regs);\nEXPORT_UNUSED_SYMBOL(unused_one);\n' > $KX/k/kernel/percpu.c
+printf 'STANDARD_PARAM_DEF(int, int, "%%i", kstrtoint);\nSTANDARD_PARAM_DEF(uint, unsigned int, "%%u", kstrtouint);\n' > $KX/k/kernel/params.c
+bash -c '. "$1"; kernel_exports "$2"' x $B/drivers/lib.sh $KX/k > $KX/exports.txt
+printf 'foo\nbar\n__aeabi_x\nparam_ops_int\nparam_ops_uint\nfoo\n' > $KX/ok.txt
+printf 'foo\nstrscpy\nparam_ops_int\n' > $KX/bad.txt
+(bash -c '. "$1"; check_ksyms "$2" "$3"' x $B/drivers/lib.sh $KX/ok.txt $KX/exports.txt) > $KX/ok.out 2>&1; echo $? > $KX/ok.rc
+(bash -c '. "$1"; check_ksyms "$2" "$3"' x $B/drivers/lib.sh $KX/bad.txt $KX/exports.txt) > $KX/bad.out 2>&1; echo $? > $KX/bad.rc
+check "drivers/lib.sh kernel_exports: EXPORT_SYMBOL·EXPORT_SYMBOL_GPL(빈칸 포함)·.S·EXPORT_PER_CPU_SYMBOL(_GPL)의 이름과 STANDARD_PARAM_DEF의 param_ops_*를 정렬해 냄, EXPORT_UNUSED_SYMBOL은 넣지 않음" \
+  'for n in __aeabi_x bar foo param_ops_int param_ops_uint softnet_data irq_regs; do grep -qx "$n" $KX/exports.txt || exit 1; done; ! grep -qx unused_one $KX/exports.txt && [ "$(LC_ALL=C sort -u $KX/exports.txt | cmp -s - $KX/exports.txt; echo $?)" = 0 ]' || cat $KX/exports.txt
+check "drivers/lib.sh check_ksyms: 부르는 것이 모두 내보내는 것이면 통과(개수), 하나라도 없으면 그 이름을 보이고 실패" \
+  '[ "$(cat $KX/ok.rc)" = 0 ] && grep -q "부르는 것 5개가 모두 커널이 내보내는 것" $KX/ok.out && [ "$(cat $KX/bad.rc)" != 0 ] && grep -q "커널이 내보내지 않는 심볼을 부릅니다.*strscpy" $KX/bad.out' || cat $KX/ok.out $KX/bad.out
+check "drivers: 빌드는 드라이버마다 nm -u로 커널 심볼을 확인하고, 내보내는 이름 목록은 준비한 트리마다 한 번 만듦. README·차 확인에 Unknown symbol" \
+  '! grep -q "\$K.stamp -nt \$K.exports" $B/drivers/build-in-container.sh && grep -q "check_ksyms /tmp/undef.txt \$K.exports" $B/drivers/build-in-container.sh && grep -q "\$TC/bin/arm-eabi-nm -u \$D/\$MNAME.ko" $B/drivers/build-in-container.sh && grep -q "kernel_exports \$K > \$K.exports.tmp" $B/drivers/build-in-container.sh && grep -q "\*\*커널 심볼 확인\*\*" $B/drivers/README.md && grep -q "dmesg에 \`Unknown symbol\`이 없는지" $B/drivers/README.md'
+# .env.local의 NX4_DRV_DOCKER_CONTEXT: build-driver.sh가 이 빌드의 docker 명령에만 DOCKER_CONTEXT로 준다(명령 앞 값이 앞섬).
+# 가짜 docker는 받은 DOCKER_CONTEXT를 적고 docker info에서 실패해, 스크립트가 그 앞에서 멈춘다
+DX=$T/dx; mkdir -p $DX/bin
+printf '#!/bin/sh\necho "ctx=${DOCKER_CONTEXT:-none}" >> %s/calls\nexit 1\n' $DX > $DX/bin/docker; chmod +x $DX/bin/docker
+printf 'NX4_DRV_DOCKER_CONTEXT=ctx-from-file\n' > $DX/env
+# 셸에 export된 값을 물려받지 않게 세 변수를 뺀다(리뷰 81-9)
+dxrun() { rm -f $DX/calls; (env -u DOCKER_CONTEXT -u NX4_DRV_DOCKER_CONTEXT -u DOCKER_HOST PATH=$DX/bin:$PATH "$@" sh $B/scripts/build-driver.sh) > $DX/out 2>&1; echo $? > $DX/rc; }
+dxrun NX4_ENV_FILE=$DX/env; cp $DX/calls $DX/calls.file 2>/dev/null; cp $DX/out $DX/out.file
+dxrun NX4_ENV_FILE=$DX/env NX4_DRV_DOCKER_CONTEXT=ctx-cmd; cp $DX/calls $DX/calls.cmd 2>/dev/null
+dxrun NX4_ENV_FILE=; cp $DX/calls $DX/calls.none 2>/dev/null
+# 리뷰 81-7: DOCKER_HOST가 있으면 docker가 DOCKER_CONTEXT보다 먼저 쓰므로, context를 쓸 때는 알리고 멈춘다(docker를 부르지 않음).
+# context가 없으면 DOCKER_HOST를 그대로 둔다
+dxrun NX4_ENV_FILE=$DX/env DOCKER_HOST=unix:///nx4-test.sock; cp $DX/rc $DX/rc.host; cp $DX/out $DX/out.host; [ -e $DX/calls ] && cp $DX/calls $DX/calls.host
+dxrun NX4_ENV_FILE= DOCKER_HOST=unix:///nx4-test.sock; cp $DX/calls $DX/calls.hostonly 2>/dev/null
+check "scripts/build-driver.sh: .env.local의 NX4_DRV_DOCKER_CONTEXT를 이 빌드의 docker에만 DOCKER_CONTEXT로 줌(명령 앞 값이 앞섬, 없으면 셸 기본), 알림에 context, DOCKER_HOST가 있으면 알리고 멈춤" \
+  '[ "$(cat $DX/rc.host)" = 1 ] && grep -q "DOCKER_HOST(unix:///nx4-test.sock)가 있어 NX4_DRV_DOCKER_CONTEXT(ctx-from-file)가 무시됩니다" $DX/out.host && [ ! -e $DX/calls.host ] && grep -qx "ctx=none" $DX/calls.hostonly && grep -qx "ctx=ctx-from-file" $DX/calls.file && grep -q "Docker context: ctx-from-file" $DX/out.file && grep -q "context ctx-from-file" $DX/out.file && grep -qx "ctx=ctx-cmd" $DX/calls.cmd && grep -qx "ctx=none" $DX/calls.none && ! grep -q "docker context use" $B/scripts/build-driver.sh && grep -q "^# NX4_DRV_DOCKER_CONTEXT=" $B/.env.example' || cat $DX/out.file $DX/calls.file
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc
@@ -1616,11 +1666,11 @@ mr() { rm -f $MR/calls; printf '%s\n' "$@" > $MR/plan; mkdir -p $MR/out; : > $MR
 mr segv ok
 check "drivers/lib.sh make_retry: 에뮬레이션 충돌(Segmentation fault)이면 실패한 대상(make 폴더 기준 상대 경로, 절대 경로 .ko)을 지우고 이어서 다시 돌려 성공" \
   '[ "$(cat $MR/rc)" = 0 ] && [ "$(cat $MR/calls)" = 2 ] && [ ! -e $MR/k/scripts/dtc/flattree.o ] && [ ! -e $MR/out/bcmdhd.ko ] && grep -q "다시 돌림(1번째 실패" $MR/out.txt && grep -q built $MR/log && grep -q "Segmentation fault" $MR/log' || cat $MR/out.txt
-mr segv segv segv segv segv segv segv segv ok
-check "drivers/lib.sh make_retry: 기본은 모두 8번까지(여덟 번째도 충돌이면 실패)" '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 8 ] && grep -q "모두 8번까지" $MR/out.txt' || cat $MR/out.txt
+mr $(i=0; while [ $i -lt 30 ]; do printf 'segv '; i=$((i+1)); done) ok
+check "drivers/lib.sh make_retry: 기본은 모두 30번까지(서른 번째도 충돌이면 실패)" '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 30 ] && grep -q "모두 30번까지" $MR/out.txt' || cat $MR/out.txt
 MRX=MAKE_TRIES=4; mr segv segv segv ok; MRX=
-check "drivers/lib.sh make_retry: MAKE_TRIES(build-driver.sh NX4_DRV_TRIES, 기본 8)로 횟수를 바꿈" \
-  '[ "$(cat $MR/rc)" = 0 ] && [ "$(cat $MR/calls)" = 4 ] && grep -q "모두 4번까지" $MR/out.txt && grep -q "MAKE_TRIES=\"\${NX4_DRV_TRIES:-8}\"" $B/scripts/build-driver.sh' || cat $MR/out.txt
+check "drivers/lib.sh make_retry: MAKE_TRIES(build-driver.sh NX4_DRV_TRIES, 기본 30)로 횟수를 바꿈" \
+  '[ "$(cat $MR/rc)" = 0 ] && [ "$(cat $MR/calls)" = 4 ] && grep -q "모두 4번까지" $MR/out.txt && grep -q "MAKE_TRIES=\"\${NX4_DRV_TRIES:-30}\"" $B/scripts/build-driver.sh' || cat $MR/out.txt
 mr err ok
 check "drivers/lib.sh make_retry: 다른 오류는 다시 돌리지 않고 바로 실패, 대상은 지우지 않음" \
   '[ "$(cat $MR/rc)" = 1 ] && [ "$(cat $MR/calls)" = 1 ] && [ -e $MR/k/scripts/dtc/flattree.o ] && grep -q "error: something" $MR/out.txt' || cat $MR/out.txt

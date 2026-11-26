@@ -37,8 +37,15 @@ TOOLCHAIN_SHA256=769600669848d789bbc2b587f3c0e43d7009d0b12cafa87564c91d082761338
 RTL88X2BU_GIT=https://github.com/cilynx/rtl88x2bu.git
 RTL88X2BU_COMMIT=fc158d1f71b9e5dfcd1fccaf4d28725b65086e3b
 
+# RTL8831BU 드라이버: hyeondg/rtl8831bu(Realtek v1.19.10 G6/phl, 0bda:b831이 이미 있음). 저장소에 LICENSE 파일은 없고 소스 머리말이
+# Realtek GPL-2.0이다(drivers/README.md "출처와 라이선스")
+RTL8831BU_GIT=https://github.com/hyeondg/rtl8831bu.git
+RTL8831BU_COMMIT=fed914c8931f3a768afe087dea9998965816f37e
+
 # 오브젝트 컴파일 옵션 묶음의 지문(lib.sh check_cflags: -m·-f·-W·-O·-g·-std·-D__LINUX_ARM_ARCH__의 sha256). 커널은 make마다
 # 컴파일러에 물어(cc-option) 옵션을 정하므로, 에뮬레이션에서 물음이 실패하면 모든 오브젝트가 똑같이 다른 옵션으로 컴파일될 수
 # 있다. 그래서 리눅스 x86(CI)에서 나온 값으로 고정하고 다르면 실패한다(PR #69 리뷰 18).
-# 커널 소스·설정·툴체인·드라이버 Makefile·EXTRA_CFLAGS를 바꾸면 CI의 "컴파일 옵션 확인" 줄의 값으로 함께 바꾼다
+# 커널 소스·설정·툴체인·드라이버 Makefile·EXTRA_CFLAGS를 바꾸면 CI의 "컴파일 옵션 확인" 줄의 값으로 함께 바꾼다.
+# 드라이버마다 Makefile이 붙이는 옵션이 달라 따로 둔다(RTL88x2BU, RTL8831BU)
 EXPECTED_CFLAGS_SHA256=d81069ca7b7c0ec8cc22190bbfd4a500d981d2b34d876342b96fb3840ecd877f
+EXPECTED_CFLAGS_SHA256_8831BU=9772552f095197510adedc7d43c2efd0cb877e088707b2ca4f7a2be692f53d73
