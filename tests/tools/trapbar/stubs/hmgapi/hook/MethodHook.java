@@ -1,0 +1,45 @@
+package hmgapi.hook;
+// From StopDragon/HMG-API korea-build ebca56f3824a2234e48b336abda927d7a635e243, mods/wireless-carplay-aa/tools/trapbar/stubs/hmgapi/hook/MethodHook.java
+// (Korea Projection, AGPL-3.0): a PC test stub for TrapBarTest (#96).
+
+import java.lang.reflect.Member;
+
+/** PC 시험용 가짜(HMG-API MethodHook과 같은 모양). Param 만들기만 시험이 할 수 있게 public */
+public abstract class MethodHook {
+    protected void beforeHookedMethod(Param param) throws Throwable {}
+
+    protected void afterHookedMethod(Param param) throws Throwable {}
+
+    public static final class Param {
+        public final Member method;
+        public final Object thisObject;
+        public final Object[] args;
+        private Object result;
+        private boolean returnEarly;
+
+        public Param(Member method, Object thisObject, Object[] args) {
+            this.method = method;
+            this.thisObject = thisObject;
+            this.args = args;
+        }
+
+        public Object getResult() { return result; }
+
+        public void setResult(Object r) {
+            result = r;
+            returnEarly = true;
+        }
+
+        public boolean returnEarly() { return returnEarly; }
+
+        /** 진짜 HMG-API Param처럼(모드 2.4.10 AaWifi의 뒤 훅이 씀). 가짜는 예외를 받지 않는다 */
+        public Throwable getThrowable() { return null; }
+
+        public boolean hasThrowable() { return false; }
+    }
+
+    /** 시험용: 훅을 부른다(protected를 같은 패키지에서 부를 수 있게) */
+    public void before(Param p) throws Throwable { beforeHookedMethod(p); }
+
+    public void after(Param p) throws Throwable { afterHookedMethod(p); }
+}

@@ -57,8 +57,8 @@
 |---|---|
 | HMG-API(1.1.0-rc.10 이상) | 훅, 이 차의 map, 순정 핫스팟 기능, 프로젝션 AP |
 | 공식 무선 모드 `wireless-carplay-aa`(2.2.0-rc.9 이상) | 무선 카플레이·안드로이드 오토, 계기판·HUD 길안내. 고치지 않고 NX4에는 "Install anyway"(`--any-car`)로 넣습니다 |
-| HMG-API 모드 `nx4-kor` | 관리 앱과 서비스 `launch`(화면이 열릴 때 `bin/status.sh`로 상태 파일을 새로 씀), 서비스 `nochip`(Wi-Fi 칩이 없는 차에서만 HMG-API가 운전 내내 30초마다 Wi-Fi를 다시 켜려는 것을 멈춤, 2.1.2-beta.4부터), 한국 카플레이 길안내 훅(`hooks.jar`, DiPO 안에서만). 시스템 파일·Wi-Fi 설정을 바꾸지 않습니다 |
-| 한국 카플레이 길안내 | 공식 무선 모드는 카플레이 안내 중 자기 아이콘 표에 없는 것(차선 유지, 각도 없는 "약간 좌회전" 등)을 계기판에 보내지 않아, 앞 안내(예: 좌회전 0 m)에서 멈출 수 있습니다. 이 모드가 Korea Projection의 보정(HMG-Seogaemo 차선 그림 포함)으로 모든 안내에 화살표를 주고 1초마다 다시 보내, 공식 모드가 보내는 값을 그것으로 바꿉니다([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67), [`docs/design.md`](docs/design.md) "한국 카플레이 길안내") |
+| HMG-API 모드 `nx4-kor` | 관리 앱과 서비스 `launch`(화면이 열릴 때 `bin/status.sh`로 상태 파일을 새로 씀), 서비스 `nochip`(Wi-Fi 칩이 없는 차에서만 HMG-API가 운전 내내 30초마다 Wi-Fi를 다시 켜려는 것을 멈춤, 2.1.2-beta.4부터), 한국 카플레이 길안내 훅(`hooks.jar`, DiPO 안, 그리고 곧 회전 게이지 막대만 순정 내비 안). 시스템 파일·Wi-Fi 설정을 바꾸지 않습니다 |
+| 한국 카플레이 길안내 | 공식 무선 모드는 카플레이 안내 중 자기 아이콘 표에 없는 것(차선 유지, 각도 없는 "약간 좌회전" 등)을 계기판에 보내지 않아, 앞 안내(예: 좌회전 0 m)에서 멈출 수 있습니다. 이 모드가 Korea Projection의 보정(HMG-Seogaemo 차선 그림 포함)으로 모든 안내에 화살표를 주고 1초마다 다시 보내, 공식 모드가 보내는 값을 그것으로 바꿉니다([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67), [`docs/design.md`](docs/design.md) "한국 카플레이 길안내"). 곧 회전 큰 그림의 거리 게이지는 계기판이 순정 내비의 단속 정보 프레임에서 그리므로, 그 막대 칸만 폰 막대로 바꿉니다(단속 카메라·제한속도는 그대로, [#96](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/96)) |
 | 관리 앱 | "NX4 KOR"(`io.github.jayparklab.nx4kor`). 앱 메뉴에 타일이 생깁니다 |
 | USB 설치기 | `usb/troubleShooter` |
 

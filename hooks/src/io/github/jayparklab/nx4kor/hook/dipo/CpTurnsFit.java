@@ -5,7 +5,8 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 // Modified by NX4 KOR (jay-park-lab/hmgapi-nx4-kor), 2026-11-25 (#67): moved into the nx4-kor mod's DiPO part,
 //   which runs beside the official mod (its tbt stays on) and overrides what it sends to the cluster;
 //   Dipo.log -> KorTbt.log; CpTurns.exactIcon and CpTurns.distStrState -> CpIcons (copied from KP's CpTurns);
-//   PhoneBarOut is a no-op here (its receiver, KP's TrapBar in the car navigation, isn't in this mod);
+//   PhoneBarOut was a no-op (its receiver, KP's TrapBar in the car navigation, wasn't in this mod; since 2026-11-27,
+//   #96, it sends again to this mod's TrapBar, because the cluster draws the near-turn gauge from the trap frame);
 //   make() removed (only the fitted layer: KP's stock layer CpTurns isn't ported).
 // Updated by NX4 KOR, 2026-11-26: taken again from KP's mod 2.4.10 (Korea Projection 1.8.1) with the same changes,
 //   and DIAG_LOGS_MAX kept at 300 (KP 2.4.10: 1200; HMG-API's Logs tab shows the last 64 KB of the shared log).

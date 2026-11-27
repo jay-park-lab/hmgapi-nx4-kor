@@ -174,8 +174,23 @@ if command -v javac >/dev/null 2>&1; then
 else
   echo "skip TbtGate 테스트(javac 없음)"
 fi
-check "hooks 소스: 순정 내비 쪽 막대 방송(PhoneBarOut)은 보내지 않음, KP의 순정 층(CpTurns)은 옮기지 않음" \
-  '! grep -q "sendBroadcast" $HK/dipo/PhoneBarOut.java && [ ! -e $HK/dipo/CpTurns.java ] && ! grep -qE "new CpTurns\(|[^/ ]CpTurns\.[A-Za-z]+\(" $HK/dipo/*.java'
+check "hooks 소스: KP의 순정 층(CpTurns)은 옮기지 않음" \
+  '[ ! -e $HK/dipo/CpTurns.java ] && ! grep -qE "new CpTurns\(|[^/ ]CpTurns\.[A-Za-z]+\(" $HK/dipo/*.java'
+# #96(2026-11-27): 계기판 곧 회전 게이지는 순정 내비의 단속 정보 프레임 막대 칸으로 그려진다. DiPO가 막대를 방송하고(PhoneBarOut)
+# 순정 내비 프로세스의 TrapBar가 그 칸만 바꾼다(KP 1.7.2 시험판 3과 같음). 진입 클래스가 순정 내비에서 TrapBar를 건다
+check "hooks 소스(#96): DiPO의 PhoneBarOut이 이 모드의 방송 이름으로 막대를 보내고, 진입 클래스가 순정 내비(com.mnsoft.navi)에서 kor_tbt일 때 TrapBar를 검, KP 출처·바꾼 것 줄" \
+  'grep -q "sendBroadcast" $HK/dipo/PhoneBarOut.java && grep -q "\"io.github.jayparklab.nx4kor.PHONE_BAR\"" $HK/dipo/PhoneBarOut.java && grep -q "\"io.github.jayparklab.nx4kor.PHONE_BAR\"" $HK/PhoneBar.java && grep -q "NAVIGATION = \"com.mnsoft.navi\"" $HK/Nx4KorHooks.java && grep -q "TrapBar.install(mod, app)" $HK/Nx4KorHooks.java && grep -q "barOut.send(context" $HK/dipo/CpTurnsFit.java && ( for f in TrapBar PhoneBar TrapArgs dipo/PhoneBarOut; do grep -q "korea-build ebca56f3824a2234e48b336abda927d7a635e243" $HK/$f.java && grep -q "Modified by NX4 KOR" $HK/$f.java || exit 1; done )'
+# TrapBar를 KP의 PC 시험 틀(가짜 시계·대기열·계기판, tests/tools/trapbar/stubs)로 돌린다. 안드로이드 SDK 없이 javac만
+if command -v javac >/dev/null 2>&1; then
+  mkdir -p $T/trapbar
+  javac --release 8 -Xlint:-options -nowarn -encoding UTF-8 -d $T/trapbar $(find $B/tests/tools/trapbar -name '*.java') \
+    $HK/Nx4KorHooks.java $HK/TrapBar.java $HK/PhoneBar.java $HK/TrapArgs.java $HK/dipo/PhoneBarOut.java > $T/trapbar.err 2>&1
+  java -Dfile.encoding=UTF-8 -cp $T/trapbar io.github.jayparklab.nx4kor.hook.TrapBarTest > $T/trapbar.out 2>&1
+  check "TrapBar(#96, 곧 회전 게이지) $(grep -c '^ok ' $T/trapbar.out)개: 순정 내비의 단속 정보 프레임 두 판에 훅, kor_tbt를 끄면 아무것도 안 함, 폰 안내 중 막대 칸만 폰 막대(카메라 칸 그대로), 200ms 간격, NONE·3분 끊김·폰 안내 끝이면 순정 막대, 끼어든 순정 호출, 로그 30줄, DiPO PhoneBarOut과 이름·값·간격이 같고 끝에서 끝까지 닿음" \
+    'tail -n 1 $T/trapbar.out | grep -qx ok && ! grep -q "^FAIL" $T/trapbar.out' || cat $T/trapbar.err $T/trapbar.out
+else
+  echo "skip TrapBar 테스트(javac 없음)"
+fi
 check "lib.sh: 모드 id·HMG-API 최소 판이 mod.json과 같음, 공식 무선 모드 최소 판, env.sh의 NX4_MOD_ID도 같음, 앱 Report의 최소 판도 같음" \
   'grep -q "^MOD_ID=\${NX4_MOD_ID:-nx4-kor}$" $PKG/svc/lib.sh && grep -q "^HMG_MIN=1.1.0-rc.10$" $PKG/svc/lib.sh && grep -q "^WM_ID=wireless-carplay-aa$" $PKG/svc/lib.sh && grep -q "^WM_MIN=2.2.0-rc.9$" $PKG/svc/lib.sh && grep -q "^NX4_MOD_ID=nx4-kor$" $PKG/svc/env.sh && grep -q "MIN_HMGAPI = \"1.1.0-rc.10\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java && grep -q "MIN_WIRELESS = \"2.2.0-rc.9\"" $B/app/java/io/github/jayparklab/nx4kor/Report.java'
 check "launch 서비스 이름 = 앱이 부르는 이름" 'grep -q "\"service-start\", \"launch\"" $B/app/java/io/github/jayparklab/nx4kor/StatusActivity.java'
