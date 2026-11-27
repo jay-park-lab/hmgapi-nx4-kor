@@ -7,7 +7,7 @@
       "default": true,
       "apply": "restart",
       "title": "Korean CarPlay turn-by-turn on the cluster and HUD",
-      "description": "Korea Projection's fit, beside the official Wireless CarPlay + Android Auto mod (keep its Turn-by-turn on): an arrow for every maneuver, the near-turn view and distance bar as the car's own navigation draws them, lanes, rerouting text, and a resend every second. While it has guidance, the official mod's cluster calls in DiPO get its values. Off: the official mod's turn-by-turn as it is."
+      "description": "Korea Projection's fit, beside the official Wireless CarPlay + Android Auto mod (keep its Turn-by-turn on): an arrow for every maneuver, the near-turn view and distance bar as the car's own navigation draws them, lanes, rerouting text, and a resend every second. While it has guidance, the official mod's cluster calls in DiPO get its values, and in the car navigation only the bar slot of its trap frame (where the cluster draws the near-turn gauge) gets the phone's bar; cameras and speed limits stay as they are. Off: the official mod's turn-by-turn as it is."
     },
     {
       "key": "kor_tbt_far_big",

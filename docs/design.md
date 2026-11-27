@@ -24,7 +24,7 @@
 
 ## 2.1.0 모드 구성 (`mod/`)
 
-`nx4-kor`는 관리 앱과 그 앱이 부르는 서비스, 한국 카플레이 길안내 훅(아래 "[한국 카플레이 길안내](#한국-카플레이-길안내-hooks-67)", [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67))을 담은 HMG-API 모드입니다(2.1.0 할 일 #45 "지금 `nx4-kor` 모드에서 빼기"로 줄인 뒤 #67에서 길안내 훅을 더함). 무선 카플레이·안드로이드 오토는 HMG-API와 공식 무선 모드가 맡습니다. 이 모드의 훅은 DiPO(카플레이 앱) 안에서만 걸고, 시스템 파일·Wi-Fi 설정을 바꾸지 않습니다.
+`nx4-kor`는 관리 앱과 그 앱이 부르는 서비스, 한국 카플레이 길안내 훅(아래 "[한국 카플레이 길안내](#한국-카플레이-길안내-hooks-67)", [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67))을 담은 HMG-API 모드입니다(2.1.0 할 일 #45 "지금 `nx4-kor` 모드에서 빼기"로 줄인 뒤 #67에서 길안내 훅을 더함). 무선 카플레이·안드로이드 오토는 HMG-API와 공식 무선 모드가 맡습니다. 이 모드의 훅은 DiPO(카플레이 앱) 안과, 곧 회전 게이지 막대 칸을 바꾸려고 순정 내비(`com.mnsoft.navi`) 안의 단속 정보 프레임 두 메서드에만 겁니다([#96](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/96), 아래 "곧 회전 게이지"). 시스템 파일·Wi-Fi 설정은 바꾸지 않습니다.
 
 > 2.1.0 구성은 2026-11-25 차(NX4HEV 260902, 2.1.0-beta.3)에서 무선을 빼고 확인했습니다: USB 설치, map 확인, 적용, 관리 앱과 [지금 재부팅], 재부팅 뒤 훅 켜짐([#23 기록](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23#issuecomment-7157758896)). 이 차는 Wi-Fi 부품이 없어 무선은 동글로 확인합니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)). PC 테스트의 HMG-API 엔진은 2.1.1부터 1.1.0-rc.10입니다.
 
@@ -34,7 +34,7 @@
 | `hmgapi` | `>=1.1.0-rc.10`(2.1.1부터, 2026-11-25·26 사용자 결정. 2.1.0은 공식 무선 모드 2.2.0-rc.9가 요구하는 rc.8이었음). rc.8 이하는 NEMESIS 1.17(LivePatch)을 몰라, 그 위에서 지우면 재부팅 한두 번 뒤 Android가 뜨지 않고, 업데이트도 zygote 래퍼를 실제로 바꾸지 못하며, NEMESIS 1.17이 먼저 깔린 차에는 설치를 거절합니다(rc.9 `install/common/lib.sh` `nemesis_livepatch`가 고침). rc.9는 그 거절을 `FORCE`로 넘겨 설치한 차를 올리면 마지막 순정 파일을 덮어써 Android가 뜨지 않습니다(rc.10이 고침, HMG-API 1.1.0-rc.10 릴리스 노트). 근거는 [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397). 처음에 rc.9로 정했다가, 리뷰 중 rc.10이 나오며 rc.9 릴리스가 지워져 rc.10으로 올렸습니다(PR #70). 최소 판을 올려 두면 USB 설치기가 rc.8·rc.9 차의 HMG-API를 스틱의 rc.10으로 먼저 올립니다(업데이트는 안전). 2.1.2부터 NEMESIS가 깔린 차에서는 설치기가 HMG-API도 올리지 않고 멈추므로, 그런 차는 HMG-API 릴리스의 USB·update zip으로 올립니다([#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75)). `svc/lib.sh` `HMG_MIN`, 관리 앱 `Report.MIN_HMGAPI`, 설치기 `HMG_MIN`도 같은 판 |
 | `services` | `launch`(`svc/launch.sh`, root, 앱이 부를 때만), `nochip`(`svc/nochip.sh`, root, 부팅 때 한 번, 2.1.2-beta.4부터. 아래 "[Wi-Fi 칩이 없는 차](#wi-fi-칩이-없는-차의-hmg-api-다시-시도-멈추기-svcnochipsh)"). `car_events`는 쓰지 않습니다(쓰면 HMG-API 차량 서비스가 새로 뜸) |
 | `apps`, `provides.launcher` | 관리 앱(`app/NX4KOR.apk`)과 앱 메뉴 타일. 타일 그림은 `icons/`의 순정 꼴 넷(낮·밤, 모드를 껐을 때의 회색 낮·밤)이고, 저장소의 `art/tile.svg`를 HMG-API `tools/mkicon.sh`로 만든 것입니다([#47](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/47)) |
-| `hooks` | 한국 카플레이 길안내(#67): `hooks.jar`(저장소의 `hooks/src`를 `scripts/build-hooks.sh`로 만듦), 진입 클래스 `io.github.jayparklab.nx4kor.hook.Nx4KorHooks`, 훅 지점 9곳. DiPO 안 계기판 호출 `framework.navigation_cluster.*` 8곳은 `change`, DiPO의 길안내 멈춤 `dipo.iap2_proxy.stop_route_guidance`는 `observe`. `replace`는 쓰지 않습니다 |
+| `hooks` | 한국 카플레이 길안내(#67): `hooks.jar`(저장소의 `hooks/src`를 `scripts/build-hooks.sh`로 만듦), 진입 클래스 `io.github.jayparklab.nx4kor.hook.Nx4KorHooks`, 훅 지점 9곳. DiPO 안 계기판 호출 `framework.navigation_cluster.*` 8곳은 `change`, DiPO의 길안내 멈춤 `dipo.iap2_proxy.stop_route_guidance`는 `observe`. `replace`는 쓰지 않습니다. 이 밖에 순정 내비 안 `NavigationCluster.updateTBTTrapInfo`·`updateTBTTrapInfoNew`에 이름으로 훅을 겁니다(map에 없는 메서드라 `points`에 없음, 단속 정보 프레임의 막대 칸만 바꿈, #96) |
 | `settings.json` | `kor_tbt`(한국 카플레이 길안내, 기본 켬), `kor_tbt_far_big`(먼 회전도 큰 그림, 기본 켬, [#89](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/89)), `kor_tbt_log`(그 진단 줄, 2.1.2-beta.2부터 기본 끔, [#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)). 모두 HMG-API 앱에서 바꾸고 다시 시작하면 적용됩니다 |
 
 - **빠진 것:** 한국 포크 무선 모드 2.4.5(`parts`·`feature_flags`, 그 `hooks.jar`·`settings.json`, 레시피 5개, `files/libleafiaaac.so`, `patches.json`, 저장소의 `wireless/`), `"wifi": {"hotspot": true}`, `conflicts: ["wireless-carplay-aa"]`, 서비스 `ap`(`svc/ap.sh` → `svc/hotspot.sh`의 순정 `hostapd`·`dnsmasq` 핫스팟, Wi-Fi 설정 잠금, 칩 깨우기, 자동 설정 `setup_hmgapi`)와 `scripts/post.sh`. 공식 모드와 `replace`로 겹치는 훅이 없습니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)).
@@ -121,7 +121,24 @@
     - **끄면:** KP 그대로(D 밖은 먼 회전 칸, 미루기·묵은 거리도 먼 회전 칸)입니다. 클래스의 기본값은 KP 쪽(`farBig` false)이고, `KorTbt`가 설정에서 켭니다.
     - **근거·테스트:** 2.1.2-beta.5 로그(#64). `NearFitTest`의 farBig 경우를 봅니다(2,400 m·5,000 m의 막대 90, 600 m부터 그대로, 목적지·거리 없음은 아이콘, 미루기 붙잡기와 그린 것이 없을 때의 아이콘, 묵은 거리의 그림, 뛴 거리 붙잡기, 끄면 KP).
   - KP 2.4.10은 진단 줄 한도를 300에서 1200으로 올렸지만 이 모드는 300으로 둡니다(PR #74). `kor_tbt_log`를 켜면 그 줄이 쌓이고, HMG-API 앱 Logs 탭은 공식 모드와 함께 쓰는 `log.log`의 마지막 64KB만 보여 주기 때문입니다.
-  - `PhoneBarOut`은 아무것도 보내지 않습니다. KP는 곧 회전 막대를 순정 내비 쪽 `TrapBar` 훅으로 방송했지만, 그 훅은 선언하지 않은 원시 훅이라 가져오지 않았습니다.
+  - **곧 회전 게이지(단속 정보 프레임 막대, 2026-11-27, [#96](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/96)):** 계기판은 곧 회전 큰 그림 옆의 거리 게이지를 `updateTBTInfo`의 막대 인자가 아니라, 순정 내비(`com.mnsoft.navi`)가 보내는 **단속 정보 프레임**(`NavigationCluster.updateTBTTrapInfo`·`updateTBTTrapInfoNew`)의 막대 칸(`barGraphLevel`)으로 그립니다. KP가 2026-11-09 차 로그로 찾았고, 회전 프레임 막대만 보낸 시험판에서는 게이지가 늘 비어 있었습니다.
+    - 이 모드도 2.1.2까지는 KP의 `TrapBar`를 가져오지 않아 같았습니다(`PhoneBarOut`은 아무것도 보내지 않음). 그래서 2.1.2-beta.5 주행에서 게이지가 비어 있었고, 로그의 막대 값(90→10)은 보낸 값일 뿐이었습니다.
+    - 지금은 KP와 같게 합니다.
+      - DiPO의 `CpTurnsFit`이 막대(곧 회전이면 10~90, 먼 회전 칸이면 0, 안내가 끝나면 `NONE`)를 `PhoneBarOut`으로 방송합니다(`io.github.jayparklab.nx4kor.PHONE_BAR`, 값이 바뀔 때와 10초마다).
+      - 진입 클래스가 순정 내비 프로세스에서 `TrapBar`를 겁니다(`kor_tbt` 켬). `TrapBar`는 단속 정보 프레임의 **막대 칸만** 폰 막대로 바꿉니다. 단속 카메라·제한속도 같은 다른 칸은 순정 값 그대로입니다.
+      - 방송이 오면 순정이 마지막으로 보낸 단속 정보에 막대만 바꿔 다시 보냅니다(200 ms 간격 이상, 순정 호출을 한 번도 못 봤으면 보내지 않음). 다시 보내는 사이 순정 호출이 끼어들면 최신 순정 값으로 한 번 더 보냅니다.
+      - 순정 막대로 되돌리는 때: 안내가 끝난 `NONE` 방송, 폰 안내가 끝난 뒤의 다음 순정 단속 정보 호출, 방송이 3분 끊긴 때(시계). 그리고 이 모드에만 있는 두 경우(PR #98 리뷰 2·3, KP에는 없음):
+        - DiPO가 공식 모드에 비켜 줄 때(`TbtGate.yielding`). 그동안은 `turn()`이 돌지 않아 막대도 보내지 않으므로, 비켜 주기에 들어갈 때 `NONE`을 보냅니다. 다시 들으면 바뀐 막대를 바로 보냅니다.
+        - HMG-API 앱에서 모드를 끌 때. DiPO가 `NONE`을 보냅니다. 이름 훅은 HMG-API의 모드 끔 감싸기(`mod.hook` 지점만)가 없어 `TrapBar`가 직접 `mod.enabled()`를 봅니다. 꺼져 있으면 순정 호출을 폰 안내가 아닌 것처럼 그대로 보내고(최신 순정 값은 기억), 방송은 `NONE`으로 봅니다.
+      - 폰 안내 여부는 카플레이만 봅니다(`Car.carPlayGuiding`, PR #98 리뷰 5). 막대를 보내는 쪽이 DiPO뿐이기 때문입니다. KP는 안드로이드 오토도 보내 `Car.phoneGuiding`을 썼습니다.
+    - 두 메서드는 HMG-API map에 없어 그 프로세스에서 이름으로 겁니다(`Hooks.findAndHookMethod`, KP와 같음). 그래서 `mod.json` `hooks.points`에는 없습니다. 이 차에 그 메서드가 없으면 한 줄 남기고 아무것도 하지 않습니다(객체 판은 칸이 모두 `public int`일 때만).
+    - KP는 순정 내비의 다른 계기판 호출에도 훅을 걸어 거기서도 되돌릴지 봤지만(`Wireless.navigation`), 이 모드는 그 호출에 훅을 걸지 않습니다(순정 내비가 폰 안내 중 계기판에 끼어드는 것은 공식 모드가 막음). 위의 경우(세 가지와 이 모드에만 있는 두 경우, 모두 다섯)로 되돌립니다.
+    - 공식 무선 모드는 단속 정보 프레임을 건드리지 않습니다(2.2.0-rc.9 `hooks.jar`에 그 이름이 없음).
+    - 기록(모두 숫자만)
+      - 설치: `navigation (NX4 KOR): phone turn bar goes into the stock trap frame (N hooks)`
+      - 처음 받은 방송: `… first phone turn bar heard (B), stock trap frame seen: yes|no`. 처음 본 순정 호출: `… first stock trap frame (17 ints|object, bar B)`. 둘 다 한 번씩입니다(PR #98 리뷰 4). 차에서 게이지가 비어 있을 때 "방송이 오지 않음"과 "순정 단속 정보 프레임을 아직 못 봄"을 가르려는 것입니다.
+      - 막대를 바꾸거나 다시 보낸 줄은 프로세스마다 30줄까지입니다.
+    - 테스트: `tests/tools/trapbar/`(KP의 PC 테스트 틀, 가짜 시계·대기열·계기판)로 `TrapBarTest`를 돌립니다. `PhoneBarOut`이 `PhoneBar`와 이름·값·간격이 같은지, DiPO 방송이 방송 이름으로 `TrapBar`까지 닿는지, 모드 끔(`modOff`), 처음 방송·처음 순정 호출 줄(`firstLines`)도 봅니다.
   - KP의 순정 층 `CpTurns`(설정 `tbt_fit` 끔)와 무선 전환 뒤 다시 요청 `RgAsk`는 가져오지 않았습니다(무선 전환 뒤 다시 요청은 공식 모드가 함).
   - 공식 모드의 iAP2 스텁 4개(`hooks/stubs/com/tcc/iap2`, 컴파일할 때만 쓰고 `hooks.jar`에는 넣지 않음).
 - **빌드:** `scripts/build-hooks.sh`가 `hooks/src`를 HMG-API 런타임 소스(`HMGAPI_SRC`의 `core/runtime`)에 대고 컴파일해 d8로 `hooks.jar`를 만듭니다(Android SDK, `ANDROID_HOME`). `scripts/build.sh`가 그것을 모드에 넣어 서명합니다.
@@ -351,7 +368,9 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 
 ## 다른 패키지·모드와 함께 쓸 때
 
-이 모드의 훅은 DiPO 안 한국 카플레이 길안내뿐이고(`change`·`observe`, 위 "[한국 카플레이 길안내](#한국-카플레이-길안내-hooks-67)"), Wi-Fi를 직접 쓰지 않습니다. 부딪히는 것은 공식 무선 모드와 HMG-API 프로젝션 AP 쪽이고, 이 모드는 관리 앱으로 알리기만 합니다.
+이 모드의 훅은 한국 카플레이 길안내뿐이고(위 "[한국 카플레이 길안내](#한국-카플레이-길안내-hooks-67)"), Wi-Fi를 직접 쓰지 않습니다. 부딪히는 것은 공식 무선 모드와 HMG-API 프로젝션 AP 쪽이고, 이 모드는 관리 앱으로 알리기만 합니다.
+- DiPO 안 계기판 호출 8곳(`change`)과 길안내 멈춤(`observe`). `mod.json` `hooks.points`에 선언해 HMG-API 계획(충돌 검사)에 보입니다.
+- 순정 내비 안 단속 정보 프레임 두 메서드(`NavigationCluster.updateTBTTrapInfo`·`updateTBTTrapInfoNew`). map에 없는 메서드라 이름으로 걸고 선언하지 않아, **HMG-API 계획에 보이지 않습니다**(#96). 막대 칸(`barGraphLevel`)만 바꿉니다. 같은 메서드를 바꾸는 다른 모드(Korea Projection의 `TrapBar` 등)가 있으면 그 칸이 겹칩니다. 공식 무선 모드는 이 프레임을 건드리지 않습니다.
 
 | 함께 있는 것 | 일어나는 일 | 관리 앱 판정 |
 |---|---|---|
@@ -417,7 +436,14 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
     - **새로 생기는 동작:** 앞 회전을 지나자마자 다음 회전이 350~600 m 앞이면, 이제 바로 큰 그림(막대 90)으로 시작합니다(그 전에는 350 m까지 먼 회전 칸). 자연스러운지 봅니다
     - **전부터 있던 동작이 600 m까지 넓어짐:** 네이버 지도에서 두 곧 회전 사이에 미루기(`put-off`, 새 회전의 첫 거리를 앞 회전 값으로 보고 한 번 미룸)로 먼 회전 칸이 약 1초 끼는 일이, 전에는 다음 회전이 350 m 안일 때만이었고 이제 600 m 안이면 생깁니다. 자주 보이면 `CarPlay diag: … -> far (put-off)` 줄을 #67에 적습니다
     - 가까운 두 회전이 이어질 때 그림이 번갈아 바뀌지 않는지(위 네이버 지도의 약 1초 먼 회전 칸 말고)
-    - 600 m 확인 결과(2.1.2-beta.5, 2026-11-27, #64): 600 m에서 바로 큰 그림, 앞 회전 직후에도 바로 큰 그림, 막대 60 m마다 한 칸. 회전이 바뀔 때 잠깐 깜빡임이 보여 아래 "먼 회전도 큰 그림"으로 이어졌습니다
+    - 600 m 확인 결과(2.1.2-beta.5, 2026-11-27, #64): 600 m에서 바로 큰 그림, 앞 회전 직후에도 바로 큰 그림. 막대는 로그에서 60 m마다 한 칸씩 줄었지만 계기판 게이지는 늘 비어 있었습니다(아래 "곧 회전 게이지", #96). 회전이 바뀔 때 잠깐 깜빡임이 보여 아래 "먼 회전도 큰 그림"으로 이어졌습니다
+  - **곧 회전 게이지**(#96, 위 "곧 회전 게이지"). 결과는 #96에 적습니다.
+    - 곧 회전 큰 그림 옆 거리 게이지가 거리에 따라 차고 줄어드는지(600 m에서 가득, 60 m마다 한 칸). 먼 회전 큰 그림(#89)에서는 가득 찬 채인지
+    - 길안내 중 단속 카메라·제한속도 표시가 그대로인지
+    - 단속 카메라를 지나 경고가 사라진 뒤, 곧 회전 막대가 바뀔 때 그 카메라 경고·제한속도가 다시 뜨지 않는지(다시 보내기는 순정이 마지막으로 보낸 단속 정보 프레임을 막대만 바꿔 보냄, PR #98 리뷰 6)
+    - 내비를 켠 직후 단속 카메라가 없는 길에서 카플레이 안내를 시작해도 게이지가 차는지. 순정 단속 정보 프레임을 한 번도 못 봤으면 보내지 않으므로, 비어 있으면 `first phone turn bar heard (…), stock trap frame seen: no` 줄이 있는지 봅니다(PR #98 리뷰 4)
+    - 카플레이를 끊거나 안내를 끝내면 순정 막대로 돌아오는지. HMG-API 앱에서 NX4 KOR를 끄거나 `giving way` 줄이 나올 때도 돌아오는지
+    - HMG-API 앱 Logs 탭에 `navigation (NX4 KOR): phone turn bar goes into the stock trap frame (N hooks)`가 나오는지(N이 0이면 이 차에 그 메서드가 없음)
   - **먼 회전도 큰 그림**(`kor_tbt_far_big` 켬, [#89](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/89)). 결과는 #89에 적습니다. 위 600 m 항목의 "먼 회전"·"먼 회전 칸"은 이 설정을 끈 때의 일입니다.
     - 600 m(고속도로 출구 1,050 m)보다 먼 회전에 네모 칸 아이콘 대신 큰 도로 그림이 나오는지. 그 그림에서 거리가 km 단위("2.4 km")로 맞게 보이는지. 진단 줄은 `-> near (far-big)`입니다
     - 막대가 가득 찬 채로 있다가 600 m부터 한 칸씩 줄어드는지

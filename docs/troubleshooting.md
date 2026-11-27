@@ -137,6 +137,7 @@ HMG-API는 훅 때문에 내비가 제대로 뜨지 못한다고 보면 스스�
 3. `route guidance reaches this listener` 줄이 한 번도 없으면 이 모드가 길안내를 받지 못한 것입니다. 그때는 공식 모드 혼자 보냅니다. `giving way until it hears again` 줄이 있으면 그 뒤 이 모드가 다시 받을 때까지 공식 모드의 값이 그대로 갑니다. 공식 모드의 그림이 몇 초씩 보였다면 그 시각 앞뒤에 이 줄이나 `maneuver N unknown … asked again` 줄이 있는지도 적어 주세요.
 4. 공식 모드 그대로 쓰려면 HMG-API 앱에서 NX4 KOR의 `kor_tbt`를 끄고 변경 사항을 적용한 뒤 재부팅합니다. 공식 무선 모드의 `tbt`는 켜 둡니다.
    - 먼 회전(600 m, 고속도로 출구 1,050 m 밖)의 큰 그림만 이상하면, `kor_tbt`는 켜 둔 채 `kor_tbt_far_big`만 끄고 다시 시작합니다. 먼 회전이 예전처럼 네모 칸 아이콘으로 돌아갑니다([#89](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/89)). `kor_tbt_log`를 켜면 먼 회전은 `-> near (far-big)`, 회전이 바뀌는 순간 붙잡은 것은 `-> held (put-off)` 줄로 보입니다.
+   - 길안내 중 단속 카메라·제한속도 표시가 이상하거나 곧 회전 게이지가 엉뚱하게 차 있으면, 그 시각과 HMG-API 앱 Logs 탭의 `navigation (NX4 KOR): …` 줄을 [#96](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/96)에 적어 주세요. 이 모드는 순정 내비가 보내는 단속 정보 프레임에서 게이지 막대 칸만 바꿉니다. `kor_tbt`를 끄면 이것도 하지 않습니다.
 5. 기록과 시각을 [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)에 적어 주세요.
 
 ## 내비가 재부팅을 반복하거나 화면이 이상할 때
