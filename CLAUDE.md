@@ -10,7 +10,7 @@
   - 다음 판 2.2.0(마일스톤 2.2.0)은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))과 관리 앱 동글 켜기([#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60))입니다. 우리 모드에 넣을 다른 한국 맞춤과 남은 차 확인은 [#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64)에 있습니다.
   - 모드(`mod/`)와 관리 앱 판정은 2.1.0 구조로 바꿨습니다(한국 포크 무선 모드 2.4.5와 `svc/hotspot.sh`를 빼고 관리 앱·`launch` 서비스·`svc/lib.sh`만 남김). USB 설치기(`usb/troubleShooter`, `scripts/build.sh`)도 2.1.0 구조로 바꿨습니다(HMG-API 쪽 일, 공식 무선 모드 설치, 옛 2.0.x 되돌리기, map·적용, PR #52). 2.0.x는 정식 없이 끝냅니다.
   - 2.0.x의 마지막 `release/2.0.4`(`v2.0.4-beta.1`)는 `main`에 합치지 않고 지웠습니다.
-- 관리 앱은 지금 UI를 그대로 둡니다(사용자 결정).
+- 관리 앱은 지금 UI를 그대로 둡니다(사용자 결정). 예외로 결과 화면 제목 줄 왼쪽 위의 `<`는 차 화면 맨 위 시스템 줄의 `<`와 겹쳐 뺐습니다(2026-11-27 사용자 결정).
 
 ## 문서 위치
 

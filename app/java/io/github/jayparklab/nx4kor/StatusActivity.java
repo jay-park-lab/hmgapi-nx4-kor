@@ -300,7 +300,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
     }
 
     /**
-     * 결과 화면(본보기: 순정 설정 상세 화면). 위에 제목 줄([닫기]는 왼쪽 위 뒤로 버튼), 아래는 두 칸이다.
+     * 결과 화면(본보기: 순정 설정 상세 화면). 위에 제목 줄(가운데 제목만. 닫기는 차 화면 맨 위 시스템 줄의 `<`), 아래는 두 칸이다.
      * 왼쪽(1280): 요약 3줄과 "자세히" 표를 목록 줄로, 맨 아래 정보 줄. 오른쪽(640, 분할 칸): 판정, 지우는 법, 상태 안내, 알림,
      * 버튼 안내, [지금 재부팅]. 설치 결과가 재부팅 필요·실패면 판정을 그 문구로 바꾼다
      */
@@ -312,8 +312,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         ui = new Ui(this);
 
         LinearLayout root = ui.screen();
-        // 익명 클래스 대신 이 화면이 직접 받는다 (JDK 21 + d8 8.2가 익명 클래스에서 멈춤). 뒤로 버튼은 onClick에서 닫기
-        root.addView(ui.header("NX4 KOR " + r.get("pkgver"), this), new LinearLayout.LayoutParams(-1, ui.px(Ui.HEAD_H)));
+        root.addView(ui.header("NX4 KOR " + r.get("pkgver")), new LinearLayout.LayoutParams(-1, ui.px(Ui.HEAD_H)));
         root.addView(ui.line(Ui.LINE_HEAD), new LinearLayout.LayoutParams(-1, ui.thin()));
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.HORIZONTAL);
