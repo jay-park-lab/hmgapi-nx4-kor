@@ -81,27 +81,50 @@ else
   echo "3. QEMU($MODE, 동글 $USB를 VM으로 넘김, AP 하나에 ${AP}초)"
 fi
 # 게스트가 멈춰도 끝나게(PR #93 리뷰 1): 게스트는 panic=1(패닉 1초 뒤 재부팅 → -no-reboot라 QEMU가 끝남), 호스트는 LIMIT초가
-# 지나면 QEMU를 끝낸다(지킴이는 2초마다 끝났는지 보고, QEMU가 끝나면 함께 끝남)
-PIDF=$OUT/qemu.pid; DONE=$OUT/qemu.done; TOF=$OUT/qemu.timeout
+# 지나면 QEMU를 끝낸다(지킴이는 2초마다 끝났는지 보고, QEMU가 끝나면 함께 끝남).
+# 이 스크립트가 끝나면(Ctrl-C·TERM 포함) 지킴이와 QEMU도 함께 끝낸다(PR #93 리뷰 9). 작업 제어가 없는 sh에서 뒤로 돌린
+# ( … ) &는 SIGINT를 무시해, 그대로 두면 지킴이가 LIMIT초까지 남아 다음 실행의 QEMU를 끝낼 수 있다. 그래서
+#   - trap EXIT·INT·TERM으로 지킴이와 이번 QEMU를 끝내고 파일을 지운다
+#   - 지킴이는 이 스크립트($$)가 살아 있는지도 보고, 없으면 이번 QEMU를 끝내고 끝난다(SIGKILL로 끝난 경우)
+#   - 파일 이름에 이 실행의 pid를 넣어, 다른 실행의 QEMU를 건드리지 않는다
+RUN=$$
+PIDF=$OUT/qemu.$RUN.pid; DONE=$OUT/qemu.$RUN.done; TOF=$OUT/qemu.$RUN.timeout
 rm -f "$PIDF" "$DONE" "$TOF"
+WD=
+# set -e 아래라 실패해도 되는 명령(이미 끝난 지킴이·QEMU에 kill)은 || true로 둔다. 그렇지 않으면 정리 도중에 셸이 끝나
+# 파일이 남고 종료 코드가 1이 된다
+cleanup() {
+  : > "$DONE" 2>/dev/null || true
+  if [ -n "$WD" ]; then kill "$WD" 2>/dev/null || true; fi
+  if [ -f "$PIDF" ]; then kill "$(cat "$PIDF")" 2>/dev/null || true; fi
+  rm -f "$PIDF" "$DONE"
+}
+trap 'cleanup; rm -f "$TOF"' EXIT
+trap 'cleanup; rm -f "$TOF"; trap - EXIT; exit 130' INT
+trap 'cleanup; rm -f "$TOF"; trap - EXIT; exit 143' TERM
 (
   i=0
-  while [ $i -lt $LIMIT ] && [ ! -f "$DONE" ]; do sleep 2; i=$((i + 2)); done
+  while [ $i -lt $LIMIT ] && [ ! -f "$DONE" ] && kill -0 $RUN 2>/dev/null; do sleep 2; i=$((i + 2)); done
   if [ ! -f "$DONE" ] && [ -f "$PIDF" ]; then
-    : > "$TOF"
+    kill -0 $RUN 2>/dev/null && : > "$TOF"
     kill "$(cat "$PIDF")" 2>/dev/null || true
   fi
 ) &
 WD=$!
 # QEMU의 libusb는 장치마다 macOS에서 "libusb_kernel_driver_active: -5"를 여러 번 찍는다(맥에는 이 동글의 커널 드라이버가 없음).
-# 뜻이 없는 줄이라 거른다
+# 뜻이 없는 줄이라 거른다.
+# 파이프라인을 뒤로 돌리고 wait로 기다린다: sh는 앞에서 도는 명령이 끝날 때까지 trap을 미루지만, wait는 신호가 오면 바로 풀려
+# trap(위)이 QEMU를 끝낸다
 qemu-system-arm -M virt,highmem=off -cpu cortex-a15 -smp 2 -m 1024 -display none -monitor none -serial stdio -no-reboot \
   -pidfile "$PIDF" -kernel "$OUT/zImage" \
   -append "console=ttyAMA0 root=/dev/vda rw rootfstype=ext4 panic=1 init=/sbin/nx4init MODE=$MODE AP_SECS=$AP UNPLUG_SECS=$UN" \
   -drive if=none,file="$OUT/rootfs.img",format=raw,id=hd0 -device virtio-blk-device,drive=hd0 \
   -device usb-ehci,id=ehci -device usb-host,bus=ehci.0,vendorid=0x"${USB%%:*}",productid=0x"${USB#*:}" </dev/null 2>&1 \
-  | grep -av 'libusb_kernel_driver_active' | tee "$LOG"
+  | grep -av 'libusb_kernel_driver_active' | tee "$LOG" &
+wait $! || true
 : > "$DONE"
+# QEMU는 끝났다: 그 pid가 다른 프로세스에 다시 쓰여도 끝내지 않게 pid 파일을 먼저 지운다
+rm -f "$PIDF"
 wait $WD 2>/dev/null || true
 echo
 echo "기록: $LOG"
@@ -109,4 +132,3 @@ echo "기록: $LOG"
 grep -aq "^== 끝" "$LOG" || echo "알림: 게스트가 끝까지 돌지 못했습니다(기록에 \"== 끝\"이 없음. 패닉·멈춤·시간 제한)"
 grep -aq "^1-1 $USB " "$LOG" || echo "알림: VM에 동글($USB)이 보이지 않았습니다. PC에 꽂혀 있는지, 다른 프로그램(가상 머신 등)이 잡고 있지 않은지 봐 주세요"
 grep -aE '^(== |-- )' "$LOG" | grep -av '^== 끝' || true
-rm -f "$PIDF" "$DONE" "$TOF"
