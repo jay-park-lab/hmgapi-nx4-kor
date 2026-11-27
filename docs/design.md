@@ -84,11 +84,12 @@ Wi-Fi 칩이 없는 차(NX4HEV 260902)의 무선은 USB Wi-Fi 동글로 합니�
 - **싣는 것:** `drivers/rtl88x2bu/bcmdhd.ko`, `drivers/rtl8831bu/bcmdhd.ko`(빌드 정보 `bcmdhd.ko.txt` 함께), 받는 USB ID 목록 `drivers/usb-ids.txt`, GPL-2.0 전문 `drivers/COPYING`과 대응 소스 안내 `drivers/SOURCE.txt`. `scripts/build.sh`가 `NX4_DRIVERS`(CI 빌드)에서 넣습니다. 드라이버는 `drivers/README.md`.
 - **`dongle` 서비스**(start `boot`, `restart` false, root). 부팅 때 한 번 돌고 끝납니다.
   1. Wi-Fi 칩이 있는 내비(SDIO, HMG-API `public/wifi-chip`)이거나 묶음에 드라이버가 없으면 아무것도 하지 않습니다.
-  2. 꽂힌 USB 장치에서 `usb-ids.txt`의 동글을 찾습니다(부팅 뒤 9초까지 1초마다). HMG-API 데몬은 부팅 약 2.6초에 서비스를 띄우고, 순정 HAL은 약 9.8초에 `bcmdhd`를 올립니다(#80 차 기록).
+  2. 꽂힌 USB 장치에서 `usb-ids.txt`의 동글을 찾습니다(부팅 뒤 30초까지 1초마다, 횟수 상한도 있음). 차의 데이터 포트 장치는 부팅 뒤 11.5~12초에 처음 보입니다(11-26·27 진단 기록 5개, PR #99 리뷰 1). HMG-API 데몬은 부팅 약 2.6초에 서비스를 띄웁니다(#80 차 기록).
   3. 맞는 `.ko`를 `/system/wifi/bcmdhd.ko` 위에 bind mount합니다. 루트 이름공간의 `/system`이 `shared`라 `system_server`(HAL) 쪽에도 보입니다. 다른 것이 이미 걸려 있으면 건드리지 않습니다. 이번 부팅에 건 것을 `/data/local/tmp/nx4-kor-dongle.txt`에 한 줄 남깁니다(부팅 id, USB ID, 드라이버, 건 때).
-  4. 순정은 호스트 세션마다 USB 포트 전원을 한 번 껐다 켭니다(꽂은 채 부팅 약 40초). 그때 동글이 떨어졌다 다시 붙고, AP가 꺼진 채 남을 수 있습니다(Android는 AP가 켜져 있다고 보고, HMG-API 지기는 이번 부팅에 띄웠다고 적어 둠. HMG-API #386). 서비스는 동글이 다시 붙을 때까지(장치 번호가 바뀜, 부팅 뒤 75초까지) 기다린 뒤 `wlan0`(20초)과 AP(30초)를 봅니다. AP가 없고 지기가 이번 부팅에 띄웠다고 적었으면 AP를 한 번 껐다 켭니다(`hooks.jar`의 `ApTool`, Android Wi-Fi 서비스로. HMG-API `WifiAp`과 같은 호출을 우리 것으로 둠). 지기가 아직 다시 시도 중이면 맡깁니다. 프로젝션 AP를 요청한 모드가 없으면 4는 하지 않습니다.
-- **하지 않는 것:** 시스템 파일을 바꾸지 않습니다(`patches.json`·순정 md5 확인 없음, 재부팅하면 풀림). 드라이버를 직접 `insmod`·`rmmod`하지 않습니다(순정 HAL이 같은 자리를 올리고 내림). 상주하지 않습니다(#48 부하 점검의 설계 규칙).
-- **지우기:** `scripts/preun.sh`가 이 모드가 건 mount를 풀고 기록을 지웁니다. 업데이트 때는 둡니다(다음 부팅에 새 판이 다시 겁니다).
+  4. 순정 HAL은 동글이 보이기 전(약 9.8초)에 순정 `bcmdhd`를 올리고, 그 모듈은 18초까지 칩을 찾다 포기한 채 남습니다. HAL은 그 모듈이 올라 있다고 보고 다시 올리지 않습니다(11-26 진단: 그 줄은 부팅 때 한 번뿐). 그래서 순정(또는 이 모드의 다른 드라이버)이 올라 있으면, 칩 찾기가 끝난 뒤(`/sys/module/bcmdhd/initstate`가 `live`, 30초까지) `rmmod`합니다. 그러면 다음 Wi-Fi 요청(HMG-API 지기는 처음 1분 동안 2초마다)에 HAL이 이 자리의 우리 것을 올립니다. 칩이 있는 내비는 1에서 빠지므로, 내리는 순정 모듈에는 칩이 없습니다. 올라 있는 것이 어느 것인지는 우리 HAL 패치의 매개변수 `rtw_country_code`와 드라이버의 proc 폴더(`/proc/net/rtl88x2bu`, `rtl8851bu`)로 가립니다.
+  5. 순정은 호스트 세션마다 USB 포트 전원을 한 번 껐다 켭니다(꽂은 채 부팅 약 40초). 그때 동글이 떨어졌다 다시 붙고, AP가 꺼진 채 남을 수 있습니다(Android는 AP가 켜져 있다고 보고, HMG-API 지기는 이번 부팅에 띄웠다고 적어 둠. HMG-API #386). 서비스는 동글이 다시 붙을 때까지(장치 번호가 바뀜, 부팅 뒤 75초까지, 횟수 상한도 있음) 기다린 뒤 `wlan0`(20초)과 AP(30초)를 봅니다. AP가 없고 지기가 이번 부팅에 띄웠다고 적었으면 AP를 한 번 껐다 켭니다(`hooks.jar`의 `ApTool`, Android Wi-Fi 서비스로. HMG-API `WifiAp`과 같은 호출을 우리 것으로 둠. 차의 Wi-Fi 클라이언트가 켜져 있거나 되살릴 것이면 둠). 껐다 켜지 못하면 지기의 이번 부팅 기록(`ap.boot`·`ap.fail`)을 지워 지기가 다시 시도하게 합니다(PR #99 리뷰 4). 지기가 아직 다시 시도 중이면 맡깁니다. 프로젝션 AP를 요청한 모드가 없으면 5는 하지 않습니다.
+- **하지 않는 것:** 시스템 파일을 바꾸지 않습니다(`patches.json`·순정 md5 확인 없음, 재부팅하면 풀림). 드라이버를 직접 `insmod`하지 않습니다(순정 HAL이 같은 자리를 올림). `rmmod`는 4의 경우(먼저 올라 칩 없이 남은 순정, 또는 꽂힌 동글의 것이 아닌 우리 드라이버)에 한 번만 합니다. 상주하지 않습니다(#48 부하 점검의 설계 규칙).
+- **지우기:** `scripts/preun.sh`가 이 모드가 건 mount를 풀고 기록을 지웁니다. 업데이트 때는 둡니다(다음 부팅에 새 판이 다시 겁니다). 같은 부팅에 업데이트해 원본이 `stage/package-prev`로 옮겨져 지워진 것(mountinfo의 `//deleted`)도 이 모드 것으로 봅니다. USB 설치기(`UNINSTALL`)는 DSP OTA 프로세스에서 지우므로, 그 프로세스의 mount 이름공간에 따라 푼 것이 `system_server` 쪽에 미치지 않을 수 있습니다[추정, 차 확인]. 재부팅하면 풀립니다.
 - **기록:** hmgapid 서비스 기록 `logs/nx4-kor/dongle.log`(USB 진단 `logs/service/`).
 - **차에서 확인할 것:** 아래 "차에서 확인할 것"의 동글 항목.
 
@@ -418,7 +419,9 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - `system_server`가 그 파일을 보는지: dmesg에 우리 드라이버의 줄(`rtl88x2bu`·`rtl8851bu`·`nx4-hal`)과 `wlan0`이 생기고, `bcmdhd: unknown parameter 'clm_path' ignored` 말고 `Unknown symbol`이 없는지
   - HAL이 우리 `.ko`를 받는지(`mac_address_read`가 없어도), HMG-API `wifi.log`에 `projection AP: up in mode 2`가 남는지, 5GHz 149번 채널인지
   - 순정이 포트 전원을 껐다 켠 뒤(꽂은 채 부팅 약 40초): `dongle.log`의 "동글이 다시 붙음(… 장치 번호 a → b)"과 그 뒤 줄. AP가 스스로 다시 서면 "AP 떠 있음", 아니면 "AP를 껐다 켬"과 그 결과. 폰의 무선 카플레이가 다시 붙는지와 걸린 시간
+  - `dongle.log`에 "먼저 올라 있던 bcmdhd(stock)를 내림(부팅 뒤 N초)"이 순정이 포기한 뒤(약 18초) 남고, 그 뒤 HAL이 우리 드라이버를 올리는지(순정 HAL이 실패한 뒤 스스로 내렸으면 "이미 내려감")
   - 동글을 뽑았다 꽂았을 때, 동글 없이 시동을 켰을 때(아무것도 걸지 않음), 칩이 있는 차에서 아무것도 하지 않는지
+  - USB `UNINSTALL`로 지운 뒤 재부팅 전에 `/system/wifi/bcmdhd.ko`가 순정으로 돌아왔는지(`system_server` 쪽 `/proc/<pid>/mountinfo`에 그 줄이 없는지)
 - **칩이 있는 차(또는 동글 뒤)에서 HMG-API 프로젝션 AP를 관리 앱이 바르게 읽는지.**
   - 부팅 뒤 `wifi.log`에 `projection AP: up in mode 2 (requested by wireless-carplay-aa)`(또는 `already up`)가 남고, 관리 앱 판정이 `ready`, 표의 "무선 연결용 Wi-Fi"가 "켜짐"인지. 이 판정은 netd가 띄운 `hostapd` 설정의 `ssid=`가 softap.conf의 카플레이 SSID(S2)인지로 합니다(`svc/lib.sh` `ap_ssid`). 순정 일반 핫스팟 SSID(S1)면 `aphotspot`입니다.
   - 폰을 무선으로 붙이면 `connected`와 "카플레이 N대 연결됨"이 나오는지(로컬 포트 7000, Wi-Fi 쪽 주소)

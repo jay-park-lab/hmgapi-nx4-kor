@@ -1677,12 +1677,19 @@ awk -v p="\$1" '\$5 == p { last = NR } { l[NR] = \$0 } END { for (i = 1; i <= NR
 mv "\$MOUNTINFO.t" "\$MOUNTINFO"
 E
 # 가짜 AP 도구(hooks.jar ApTool 자리): 받은 인자를 적고 Android처럼 두 줄을 낸다
-printf '#!/bin/sh\necho "aptool $*" >> %s/mcalls\necho "projection AP on"\necho "(it was 13)"\n' $T > $T/bin/fakeaptool
-chmod +x $T/bin/mount $T/bin/umount $T/bin/fakeaptool
+printf '#!/bin/sh\necho "aptool $*" >> %s/mcalls\n[ -n "$APTOOL_FAIL" ] && { echo "projection AP didn'"'"'t come on (state 14)"; exit 1; }\necho "projection AP on"\necho "(it was 13)"\n' $T > $T/bin/fakeaptool
+# 가짜 rmmod: 받은 명령과 그때의 initstate를 적고, 가짜 /proc/modules($PROCMOD)에서 그 줄을 뺀다(RMMOD_FAIL이면 실패)
+cat > $T/bin/rmmod <<E
+#!/bin/sh
+echo "rmmod \$* \$(cat \$SYSMOD/\$1/initstate 2>/dev/null)" >> $T/mcalls
+[ -n "\$RMMOD_FAIL" ] && exit 1
+grep -v "^\$1 " "\$PROCMOD" > "\$PROCMOD.t"; mv "\$PROCMOD.t" "\$PROCMOD"
+E
+chmod +x $T/bin/mount $T/bin/umount $T/bin/fakeaptool $T/bin/rmmod
 DM=$T/dm; DA=$DM/data/hmgapi/mods/nx4-kor
 dgreset() {
-  rm -rf $DM $T/dusb $T/dnet $T/dh $T/dsysmod $T/dslot $T/ddongle $T/mcalls $T/ps.out
-  mkdir -p $DM/data/hmgapi/mods $T/dnet $T/dh/state $T/dh/wifi $T/dsysmod $T/dslot
+  rm -rf $DM $T/dusb $T/dnet $T/dh $T/dsysmod $T/dslot $T/ddongle $T/mcalls $T/ps.out $T/dprocnet
+  mkdir -p $DM/data/hmgapi/mods $T/dnet $T/dh/state $T/dh/wifi $T/dsysmod $T/dslot $T/dprocnet
   cp -R $TP $DA
   for d in rtl88x2bu rtl8831bu; do mkdir -p $DA/drivers/$d; echo "fake $d" > $DA/drivers/$d/bcmdhd.ko; chmod 600 $DA/drivers/$d/bcmdhd.ko; done
   printf '0bda:b812 rtl88x2bu\n2357:012d rtl88x2bu\n0bda:b831 rtl8831bu\n0bda:b851 rtl8831bu\n' > $DA/drivers/usb-ids.txt
@@ -1696,11 +1703,14 @@ dgreset() {
 dgrun() {
   (env PATH=$P0 BB=$T/bin/bb NX4_APP=$DA NX4_ROOT=$T/droot W=$T/dw BOOT_ID=$T/bootid UPTIME=$T/duptime WIFI_SEEN=$T/dseen SDIO=$T/nosdio \
      SYSNET=$T/dnet HMGDATA=$T/dh USBDEV=$T/dusb KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/dmountinfo FAKEDATA=$DM/data PROCMOD=$T/dmodules \
-     SYSMOD=$T/dsysmod DONGLE=$T/ddongle NX4_APTOOL=$T/bin/fakeaptool NX4_DONGLE_POLL=0.1 NX4_DONGLE_SPOLL=0.1 NX4_DONGLE_WLAN=1 NX4_DONGLE_AP=1 \
+     SYSMOD=$T/dsysmod PROCNET=$T/dprocnet DONGLE=$T/ddongle NX4_APTOOL=$T/bin/fakeaptool NX4_DONGLE_POLL=0.1 NX4_DONGLE_SPOLL=0.1 \
+     NX4_DONGLE_FTRIES=100 NX4_DONGLE_STRIES=200 NX4_DONGLE_LIVE=3 NX4_DONGLE_WLAN=1 NX4_DONGLE_AP=1 \
      "$@" sh $DA/svc/dongle.sh) > $T/dg.out 2>&1; echo $? > $T/dg.rc
 }
-# dgcycle: 0.3초 뒤 포트 전원을 껐다 켠 것처럼 동글이 떨어졌다(0.3초) 장치 번호 3으로 다시 붙고, 그 뒤 wlan0이 생김($1: flags, 기본 0x1003 올라옴)
-dgcycle() { ( /bin/sleep 0.3; rm -rf $T/dusb/4-1; /bin/sleep 0.3; usbdev $T/dusb 4-1 0bda b831; echo 3 > $T/dusb/4-1/devnum; mkdir -p $T/dnet/wlan0; echo ${1:-0x1003} > $T/dnet/wlan0/flags ) & }
+# dgcycle: 서비스가 동글을 건 뒤(기록이 생긴 뒤, 최대 10초) 포트 전원을 껐다 켠 것처럼 동글이 떨어졌다(0.3초) 장치 번호 3으로 다시 붙고,
+# 그 뒤 wlan0이 생김($1: flags, 기본 0x1003 올라옴). 기록을 기다리는 것은 바쁜 PC에서 서비스가 늦게 시작해 이미 바뀐 장치 번호를
+# 처음 값으로 읽지 않게 하려는 것(PR #99 리뷰 중 그렇게 멈춤)
+dgcycle() { ( _w=0; until [ -s $T/ddongle ] || [ $_w -ge 200 ]; do /bin/sleep 0.05; _w=$((_w+1)); done; /bin/sleep 0.2; rm -rf $T/dusb/4-1; /bin/sleep 0.3; usbdev $T/dusb 4-1 0bda b831; echo 3 > $T/dusb/4-1/devnum; mkdir -p $T/dnet/wlan0; echo ${1:-0x1003} > $T/dnet/wlan0/flags ) & }
 mounted() { awk -v p=$T/dslot/bcmdhd.ko '$5 == p { r = $4 } END { print r }' $T/dmountinfo; }
 dgreset; echo "1234 root 0:00 hostapd -e /data/misc/wifi/entropy.bin /data/misc/wifi/hostapd.conf" > $T/ps.out; dgcycle; _dc=$!; dgrun; wait $_dc
 check "dongle.sh: 꽂힌 동글(0bda:b831)에 맞는 rtl8831bu를 순정 자리에 bind mount(644), 기록 한 줄(부팅 id·USB ID·드라이버·부팅 뒤 초, 644), 포트 끄고 켜기(장치 번호 2→3) 뒤 wlan0 올라옴·hostapd 돎이면 AP는 두고 끝남" \
@@ -1720,8 +1730,12 @@ check "  Wi-Fi 칩이 있는 내비(public/wifi-chip)면 아무것도 걸지 않
 rm -f $T/dseen
 dgreset; rm -f $DA/drivers/usb-ids.txt; dgrun
 check "  묶음에 동글 드라이버가 없으면(NX4_DRIVERS 없이 만든 묶음) 아무것도 하지 않음" '[ ! -s $T/mcalls ] && grep -q "이 묶음에 동글 드라이버가 없음" $T/dg.out' || cat $T/dg.out
-dgreset; rm -rf $T/dusb/4-1; echo "9.00 1.00" > $T/duptime; dgrun
-check "  우리 드라이버가 받는 동글이 없으면(LG 모뎀만) 부팅 뒤 NX4_DONGLE_FIND(9)초에 끝냄" '[ "$(cat $T/dg.rc)" = 0 ] && [ ! -s $T/mcalls ] && [ ! -e $T/ddongle ] && grep -q "우리 드라이버가 받는 동글이 없음(부팅 뒤 9초)" $T/dg.out' || cat $T/dg.out
+dgreset; rm -rf $T/dusb/4-1; echo "30.00 1.00" > $T/duptime; dgrun
+check "  우리 드라이버가 받는 동글이 없으면(LG 모뎀만) 부팅 뒤 NX4_DONGLE_FIND(30)초에 끝냄(차의 데이터 포트 장치는 11.5~12초에 보임, PR #99 리뷰 1)" '[ "$(cat $T/dg.rc)" = 0 ] && [ ! -s $T/mcalls ] && [ ! -e $T/ddongle ] && grep -q "우리 드라이버가 받는 동글이 없음(부팅 뒤 30초)" $T/dg.out' || cat $T/dg.out
+dgreset; rm -rf $T/dusb/4-1; dgrun NX4_DONGLE_FTRIES=3
+check "  부팅 뒤 초가 멈춰 있어도(3초) 찾기는 NX4_DONGLE_FTRIES번 뒤 끝남" '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "우리 드라이버가 받는 동글이 없음(부팅 뒤 3초)" $T/dg.out' || cat $T/dg.out
+dgreset; mkdir -p $T/dnet/wlan0; echo 0x1003 > $T/dnet/wlan0/flags; echo "1 root 0:00 hostapd x.conf" > $T/ps.out; dgrun NX4_DONGLE_STRIES=3
+check "  부팅 뒤 초가 멈춰 있어도 포트 끄고 켜기 기다림은 NX4_DONGLE_STRIES번 뒤 끝나고 AP를 봄" '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "부팅 뒤 3초까지 동글이 다시 붙지 않음" $T/dg.out && grep -q "AP 떠 있음" $T/dg.out' || cat $T/dg.out
 dgreset; rm -rf $T/dusb/4-1; ( /bin/sleep 0.4; usbdev $T/dusb 4-1 2357 012d; echo 2 > $T/dusb/4-1/devnum ) & _dc=$!; dgrun NX4_DONGLE_SETTLE=0; wait $_dc
 check "  부팅 뒤 FIND초 전이면 기다리다 늦게 보인 동글(TP-Link 2357:012d)에 rtl88x2bu를 걺" 'grep -qx "mount -o bind $DA/drivers/rtl88x2bu/bcmdhd.ko $T/dslot/bcmdhd.ko" $T/mcalls && grep -q "동글 2357:012d(4-1): rtl88x2bu" $T/dg.out' || cat $T/dg.out
 dgreset; echo "99 20 179:13 /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko $T/dslot/bcmdhd.ko rw shared:20 - ext4 /dev/block/data rw" >> $T/dmountinfo; dgrun NX4_DONGLE_SETTLE=0
@@ -1734,13 +1748,29 @@ dgreset; dgrun MOUNT_FAIL=1 NX4_DONGLE_SETTLE=0
 check "  mount가 실패하면 알리고 끝냄(기록 없음)" '[ "$(cat $T/dg.rc)" = 0 ] && [ ! -e $T/ddongle ] && grep -q "rtl8831bu 드라이버를 $T/dslot/bcmdhd.ko에 걸지 못함" $T/dg.out' || cat $T/dg.out
 dgreset; : > $T/dh/state/wifi.txt; dgrun
 check "  프로젝션 AP를 요청한 모드가 없으면 걸기만 하고 끝냄(포트 끄고 켜기를 기다리지 않음)" '[ -s $T/ddongle ] && grep -q "프로젝션 AP를 요청한 모드가 없음: 걸기만 하고 끝냄" $T/dg.out && ! grep -q "다시 붙" $T/dg.out' || cat $T/dg.out
-dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; dgrun NX4_DONGLE_SETTLE=0
-check "  순정 bcmdhd가 이미 올라 있으면(늦게 걺, rtw_country_code 매개변수 없음) 그대로 두고 알림" 'grep -q "순정 bcmdhd가 이미 올라 있음(늦게 걺)" $T/dg.out && ! grep -q "rmmod" $T/mcalls' || cat $T/dg.out
-dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; : > $T/dsysmod/bcmdhd/parameters/rtw_country_code; dgrun NX4_DONGLE_SETTLE=0
-check "  올라 있는 bcmdhd가 우리 드라이버면 알리지 않음" '! grep -q "순정 bcmdhd가 이미 올라 있음" $T/dg.out' || cat $T/dg.out
+# 순정 bcmdhd가 먼저 올라 칩을 찾는 중(initstate coming, 차: 9.8~18초) → 끝난 뒤(live) 내림. HAL은 올라 있는 모듈을 다시 올리지 않으므로
+dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo coming > $T/dsysmod/bcmdhd/initstate
+( /bin/sleep 1.2; echo live > $T/dsysmod/bcmdhd/initstate ) & _dc=$!; dgrun NX4_DONGLE_SETTLE=0; wait $_dc
+check "  순정 bcmdhd(rtw_country_code 매개변수 없음)가 먼저 올라 칩을 찾는 중이면 끝나기(initstate live)를 기다려 rmmod 한 번(다음 Wi-Fi 요청에 HAL이 우리 것을 올림, PR #99 리뷰 1)" \
+  '[ "$(grep -c "^rmmod" $T/mcalls)" = 1 ] && grep -qx "rmmod bcmdhd live" $T/mcalls && ! grep -q "^bcmdhd " $T/dmodules && grep -q "먼저 올라 있던 bcmdhd(stock)를 내림" $T/dg.out' || cat $T/dg.out $T/mcalls
+dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters $T/dprocnet/rtl88x2bu; : > $T/dsysmod/bcmdhd/parameters/rtw_country_code; echo live > $T/dsysmod/bcmdhd/initstate; dgrun NX4_DONGLE_SETTLE=0
+check "  이 모드의 다른 드라이버(rtl88x2bu, /proc/net/rtl88x2bu)가 올라 있고 꽂힌 동글은 rtl8831bu면 내림" 'grep -qx "rmmod bcmdhd live" $T/mcalls && grep -q "먼저 올라 있던 bcmdhd(rtl88x2bu)를 내림" $T/dg.out' || cat $T/dg.out $T/mcalls
+dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters $T/dprocnet/rtl8851bu; : > $T/dsysmod/bcmdhd/parameters/rtw_country_code; dgrun NX4_DONGLE_SETTLE=0
+check "  올라 있는 것이 꽂힌 동글의 드라이버(rtl8831bu, /proc/net/rtl8851bu)면 내리지 않음" '! grep -q "^rmmod" $T/mcalls && ! grep -q "먼저 올라 있던" $T/dg.out' || cat $T/dg.out
+dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo live > $T/dsysmod/bcmdhd/initstate; dgrun RMMOD_FAIL=1 NX4_DONGLE_SETTLE=0
+check "  내리지 못하면 알리고 이어 감" '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "먼저 올라 있던 bcmdhd(stock)를 내리지 못함(live)" $T/dg.out' || cat $T/dg.out
 dgreset; ( /bin/sleep 0.3; rm -rf $T/dusb/4-1 ) & _dc=$!; echo "3.00 1.00" > $T/duptime; ( /bin/sleep 0.8; echo "80.00 1.00" > $T/duptime ) & _du=$!; dgrun; wait $_dc $_du
 check "  기다리는 동안 동글이 빠지면 끝냄(다시 꽂으면 관리 앱 [동글 켜기])" '! grep -q aptool $T/mcalls && grep -q "동글이 빠짐: 끝냄" $T/dg.out' || cat $T/dg.out
+dgreset; cat $T/bootid > $T/dh/wifi/ap.boot; cat $T/bootid > $T/dh/wifi/ap.fail; dgcycle 0x1002; _dc=$!; dgrun APTOOL_FAIL=1; wait $_dc
+check "  AP를 껐다 켜지 못하면 HMG-API 지기의 이번 부팅 기록(ap.boot·ap.fail)을 지워 지기가 다시 시도하게 함(PR #99 리뷰 4)" \
+  'grep -q "(종료 코드 1)" $T/dg.out && [ ! -e $T/dh/wifi/ap.boot ] && [ ! -e $T/dh/wifi/ap.fail ] && grep -q "지기가 다시 시도함" $T/dg.out' || cat $T/dg.out
 rm -f $T/ps.out
+# lib.sh dongle_present(nochip·관리 앱 판정): 만든 곳 패턴(0bda·2357) 밖이어도 이 묶음의 드라이버가 받는 USB ID면 동글로 봄(PR #99 리뷰 2)
+dgreset; rm -rf $T/dusb/4-1; usbdev $T/dusb 4-1 0b05 1841; echo "0b05:1841 rtl88x2bu" >> $DA/drivers/usb-ids.txt
+_dp1=$(env PATH=$P0 BB=$T/bin/bb APP=$DA USBDEV=$T/dusb sh -c '. $APP/svc/lib.sh; dongle_present && echo yes || echo no')
+rm -f $DA/drivers/usb-ids.txt
+_dp2=$(env PATH=$P0 BB=$T/bin/bb APP=$DA USBDEV=$T/dusb sh -c '. $APP/svc/lib.sh; dongle_present && echo yes || echo no')
+check "lib.sh dongle_present: 만든 곳이 0bda·2357이 아니어도(ASUS 0b05:1841) drivers/usb-ids.txt에 있으면 동글로 봄, 목록이 없으면 보지 않음" '[ "$_dp1" = yes ] && [ "$_dp2" = no ]' || echo "  $_dp1 $_dp2"
 
 # preun.sh: 지울 때 이 모드가 순정 자리에 건 mount를 풀고 기록을 지운다. 업데이트 때는 둔다. 다른 것이 걸려 있으면 두고
 pumount() { printf '%s\n' "21 1 179:13 / /data rw shared:21 - ext4 /dev/block/data rw" "99 20 179:13 $1 $T/dslot/bcmdhd.ko rw shared:20 - ext4 /dev/block/data rw" > $T/umountinfo; echo x > $T/udongle; : > $T/mcalls; }
@@ -1749,6 +1779,8 @@ check "preun.sh: 지울 때 이 모드가 건 동글 드라이버 mount를 풀�
   'grep -qx "umount $T/dslot/bcmdhd.ko" $T/mcalls && [ ! -e $T/udongle ] && grep -q "USB Wi-Fi 동글 드라이버(rtl8831bu)를 순정 자리에서 풂" $T/pu.out && ! grep -q "bcmdhd.ko" $T/umountinfo' || cat $T/pu.out
 pureset; pumount /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko; prun NX4_UPDATE=1 KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/umountinfo DONGLE=$T/udongle
 check "  업데이트 때는 mount와 기록을 둠(다음 부팅에 새 판이 다시 걺)" '[ ! -s $T/mcalls ] && [ -e $T/udongle ]' || cat $T/pu.out
+pureset; pumount /hmgapi/stage/package-prev/drivers/rtl8831bu/bcmdhd.ko//deleted; prun KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/umountinfo DONGLE=$T/udongle
+check "  같은 부팅에 업데이트해 원본이 옮겨져 지워졌어도(stage/package-prev/…//deleted) 이 모드 것으로 보고 풂(PR #99 리뷰 6)" 'grep -qx "umount $T/dslot/bcmdhd.ko" $T/mcalls && grep -q "(rtl8831bu)를 순정 자리에서 풂" $T/pu.out' || cat $T/pu.out
 pureset; pumount /data/other-mod/bcmdhd.ko; prun KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/umountinfo DONGLE=$T/udongle
 check "  다른 것이 걸려 있으면 풀지 않음" '[ ! -s $T/mcalls ] && ! grep -q "동글 드라이버" $T/pu.out' || cat $T/pu.out
 pureset; pumount /hmgapi/mods/nx4-kor/drivers/rtl88x2bu/bcmdhd.ko; prun UMOUNT_FAIL=1 KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/umountinfo DONGLE=$T/udongle

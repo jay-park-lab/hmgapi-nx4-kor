@@ -12,7 +12,7 @@ import java.lang.reflect.Method;
  * Off: the stock Wi-Fi service stops hostapd and unloads bcmdhd; on: it loads bcmdhd again (the
  * dongle driver bound on the stock slot) and starts hostapd. The same IWifiManager calls as
  * HMG-API's WifiAp (rc.10), our own copy so an HMG-API update can't change them under us.
- * The car's own Wi-Fi client (home Wi-Fi while parked) has the radio: left alone.
+ * The car's own Wi-Fi client (home Wi-Fi while parked) has the radio, or Android will restore it: left alone.
  * Not loaded by HMG-API (only Nx4KorHooks is the entry); it rides in hooks.jar to be one dex.
  */
 public final class ApTool {
@@ -39,8 +39,8 @@ public final class ApTool {
         Method clientState = i.getMethod("getWifiEnabledState");
         Method set = i.getMethod("setWifiApEnabledForConnectivity", conf, boolean.class);
         int client = (Integer) clientState.invoke(wifi);
-        if (client == CLIENT_ENABLED || client == CLIENT_ENABLING) {
-            System.out.println("the car's own Wi-Fi client is on, left alone");
+        if (client == CLIENT_ENABLED || client == CLIENT_ENABLING || clientSavedOn(i, wifi)) {
+            System.out.println("the car's own Wi-Fi client is on or set to restore, left alone");
             System.exit(0);
         }
         int ap = (Integer) apState.invoke(wifi);
@@ -54,5 +54,14 @@ public final class ApTool {
         System.out.println("projection AP " + (now == AP_ENABLED ? "on" : "didn't come on (state " + now + ")")
                 + " (it was " + ap + ")");
         System.exit(now == AP_ENABLED ? 0 : 1);
+    }
+
+    /** Android will turn the car's client back on (vendor getPersistedWifiEnabled, as HMG-API's WifiAp checks); absent on some builds. */
+    static boolean clientSavedOn(Class<?> type, Object wifi) throws ReflectiveOperationException {
+        try {
+            return Boolean.TRUE.equals(type.getMethod("getPersistedWifiEnabled").invoke(wifi));
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
     }
 }

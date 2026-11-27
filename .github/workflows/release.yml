@@ -273,6 +273,15 @@ jobs:
           echo "NX4_BUSYBOX=$RUNNER_TEMP/busybox/busybox" >> "$GITHUB_ENV"
 
       # secret은 화면에 내지 않는다(set -x 금지). 파일은 umask 077, 러너 임시 폴더, 마지막 step에서 지운다
+      # USB Wi-Fi 동글 드라이버(#48·#80): drivers 워크플로와 같은 방법(scripts/build-driver.sh, Docker, 리눅스 x86)으로 이 커밋에서
+      # 빌드해 모드에 싣는다(scripts/build.sh NX4_DRIVERS). 배포 키를 꺼내기 전에 한다(PR #99 리뷰 3). 빌드 날짜는 drivers/를 마지막으로 바꾼 커밋의 시각이라 같은 커밋이면
+      # drivers 워크플로·PC와 같은 md5가 나온다. 키·비밀값을 쓰지 않는다
+      - name: 동글 드라이버(bcmdhd.ko)
+        run: |
+          set -eu
+          sh scripts/build-driver.sh
+          echo "NX4_DRIVERS=$PWD/out/drivers/tcc803x" >> "$GITHUB_ENV"
+
       - name: 배포 키를 파일로
         env:
           NX4_APP_KEYSTORE_B64: ${{ secrets.NX4_APP_KEYSTORE_B64 }}
@@ -313,15 +322,6 @@ jobs:
             | sed -n 's/.*certificate SHA-256 digest: *//p' | sort -u)
           [ "$GOT" = "$EXP" ] || { echo "::error::앱 서명 인증서($GOT)가 .github/release/app-cert.sha256($EXP)과 다릅니다. 차가 앱 업데이트를 받지 않습니다"; exit 1; }
           echo "app_cert=$GOT" >> "$GITHUB_OUTPUT"
-
-      # USB Wi-Fi 동글 드라이버(#48·#80): drivers 워크플로와 같은 방법(scripts/build-driver.sh, Docker, 리눅스 x86)으로 이 커밋에서
-      # 빌드해 모드에 싣는다(scripts/build.sh NX4_DRIVERS). 빌드 날짜는 drivers/를 마지막으로 바꾼 커밋의 시각이라 같은 커밋이면
-      # drivers 워크플로·PC와 같은 md5가 나온다. 키·비밀값을 쓰지 않는다
-      - name: 동글 드라이버(bcmdhd.ko)
-        run: |
-          set -eu
-          sh scripts/build-driver.sh
-          echo "NX4_DRIVERS=$PWD/out/drivers/tcc803x" >> "$GITHUB_ENV"
 
       - name: 모드 zip과 USB 묶음
         env:

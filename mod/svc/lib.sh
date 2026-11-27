@@ -290,7 +290,8 @@ dhd_gave_up() { klog 2>/dev/null | $BB grep -q "$DHD_GAVEUP"; }
 # (drivers/README.md: RTL88x2BU 0bda:b812·2357:012d, RTL8831BU 0bda:b831·0bda:b851)의 만든 곳(Realtek 0bda, TP-Link 2357)이면
 # 모두 동글로 본다. 동글을 꽂은 부팅에도 순정 드라이버가 먼저 올라 칩 켜기를 포기한 줄과 "wlan0 없음"이 생긴 뒤에 동글 드라이버가
 # 순정 자리에 올라 wlan0이 생기므로(#80, 동글 세션 지적), 동글이 있으면 칩 없음으로 보지 않는다. 잘못 동글로 보면 HMG-API가
-# 예전처럼 다시 시도할 뿐이고, 잘못 칩 없음으로 보면 동글 AP를 막으므로 넓게 잡는다
+# 예전처럼 다시 시도할 뿐이고, 잘못 칩 없음으로 보면 동글 AP를 막으므로 넓게 잡는다. 이 묶음의 드라이버가 받는 USB ID(drivers/usb-ids.txt,
+# ASUS·D-Link 등 다른 만든 곳도 있음)도 동글로 본다(아래 dongle_find, PR #99 리뷰 2)
 DONGLE_USB=${DONGLE_USB:-'0bda:* 2357:*'}
 USBDEV=${USBDEV:-/sys/bus/usb/devices}
 dongle_present() {
@@ -298,7 +299,7 @@ dongle_present() {
     [ -r "$_ud/idVendor" ] && [ -r "$_ud/idProduct" ] || continue
     car_in "$(cat "$_ud/idVendor" 2>/dev/null):$(cat "$_ud/idProduct" 2>/dev/null)" "$DONGLE_USB" && return 0
   done
-  return 1
+  dongle_find
 }
 # Wi-Fi 칩이나 동글이 있는가: 이 내비에서 칩을 본 적이 있음(SDIO, HMG-API public/wifi-chip), wlan0이 있음, 동글일 수 있는 USB 장치
 chip_or_dongle() { wifi_chip_seen || [ -d $SYSNET/$WIF ] || dongle_present; }
@@ -341,14 +342,16 @@ dongle_find() {
 }
 # KO_SLOT 위에 걸린 mount를 _KO에: 이 모드의 드라이버면 그 이름(rtl8831bu 등), 다른 것이면 other, 없으면 빈 값(1).
 # mountinfo의 4번째 칸은 원본 파일 시스템 안의 경로다(/data에서 걸었으면 /hmgapi/mods/nx4-kor/drivers/<드라이버>/bcmdhd.ko).
-# 여러 번 걸렸으면 맨 위(마지막 줄)
+# 같은 부팅에 이 모드를 업데이트하면 HMG-API가 옛 폴더를 stage/package-prev로 옮긴 뒤 지워(rc.10 Packages.install) 그 경로에
+# "//deleted"(또는 " (deleted)") 꼬리가 붙는다. 그것도 이 모드 것으로 본다(PR #99 리뷰 6). 여러 번 걸렸으면 맨 위(마지막 줄)
 ko_on() {
   _KO=
   [ -r "$MOUNTINFO" ] || return 1
   while read -r _m1 _m2 _m3 _mr _mp _mx; do
     [ "$_mp" = "$KO_SLOT" ] || continue
+    _mr=${_mr%//deleted}; _mr=${_mr%\\040(deleted)}
     case "$_mr" in
-      */$MOD_ID/drivers/*/bcmdhd.ko) _mr=${_mr%/bcmdhd.ko}; _KO=${_mr##*/} ;;
+      */$MOD_ID/drivers/*/bcmdhd.ko|*/package-prev/drivers/*/bcmdhd.ko) _mr=${_mr%/bcmdhd.ko}; _KO=${_mr##*/} ;;
       *) _KO=other ;;
     esac
   done < "$MOUNTINFO"
@@ -374,9 +377,17 @@ ko_umount() {
   [ "$_KO" = other ] && return 0
   bbx umount "$KO_SLOT" 2>/dev/null
 }
-# bcmdhd 모듈이 올라 있는가, 그것이 이 모드의 드라이버인가(우리 HAL 패치의 드라이버만 rtw_country_code 매개변수가 있음)
+# bcmdhd 모듈이 올라 있는가
 bcmdhd_loaded() { $BB grep -q '^bcmdhd ' "$PROCMOD" 2>/dev/null; }
-bcmdhd_ours() { [ -e "$SYSMOD/bcmdhd/parameters/rtw_country_code" ]; }
+# 올라 있는 bcmdhd가 무엇인가: none(없음), stock(순정: 우리 HAL 패치의 rtw_country_code 매개변수가 없음), rtl88x2bu·rtl8831bu
+# (드라이버의 proc 폴더 /proc/net/<DRV_NAME>: rtl88x2bu, rtl8851bu), ours(우리 것인데 어느 쪽인지 모름)
+bcmdhd_drv() {
+  bcmdhd_loaded || { echo none; return 0; }
+  [ -e "$SYSMOD/bcmdhd/parameters/rtw_country_code" ] || { echo stock; return 0; }
+  if [ -d "$PROCNET/rtl88x2bu" ]; then echo rtl88x2bu
+  elif [ -d "$PROCNET/rtl8851bu" ]; then echo rtl8831bu
+  else echo ours; fi
+}
 # wlan0이 올라와 있는가(IFF_UP: flags의 마지막 16진 자리가 홀수)
 wlan_up() {
   [ -r $SYSNET/$WIF/flags ] || return 1
