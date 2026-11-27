@@ -145,6 +145,16 @@ public class NearFitTest {
                 "refresh with the same old distance: stale-dist, turn 33's picture with bar 90 (no icon card)");
         int[] real = nearAt(h, uc, rturn, 61);
         is(real != null && real[3] == 90 && real[4] == 61 && "in-d".equals(h.nearWhy), "the real 61 m: in D, D 61, bar 90");
+        // PR #94 리뷰 4: 아직 그린 것이 없으면(shown false) farBig이어도 미루기는 붙잡지 않는다(KP처럼 아이콘)
+        CpTurnsFit s = new CpTurnsFit(null, null, null);
+        s.farBig = true;
+        s.clock = 1000L;
+        CpTurnsFit.Update us = new CpTurnsFit.Update(0, null);
+        us.list = new int[] { 30 };
+        nearAt(s, us, turn, 93);
+        us.list = new int[] { 33 };
+        is(nearAt(s, us, rturn, 93) == null && "put-off".equals(s.nearWhy) && !s.nearHeld,
+                "farBig, nothing shown yet: put-off is not held (the icon, as KP)");
         CpTurnsFit k = new CpTurnsFit(null, null, null);
         k.shown = true;
         k.clock = 1000L;

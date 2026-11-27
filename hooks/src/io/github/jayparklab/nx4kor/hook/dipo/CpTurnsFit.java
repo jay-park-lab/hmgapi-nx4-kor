@@ -290,7 +290,10 @@ final class CpTurnsFit implements CpTbt {
      */
     static final int RISE_SKIP_MIN = 10;
     static final long RISE_SKIP_MS = 500L;
-    /** 마지막 near()가 "뛴 거리 붙잡기"였다(turn()이 이번 갱신은 계기판에 아무것도 다시 그리지 않음) */
+    /**
+     * 마지막 near()가 계기판을 붙잡았다: "뛴 거리 붙잡기"(jump-hold), 또는 farBig의 미루기(put-off, NX4 KOR #89).
+     * turn()이 이번 갱신은 계기판·HUD에 아무것도 다시 그리지 않음. 이유는 nearWhy
+     */
     boolean nearHeld;
 
     /** 이 회전의 D(m): 위 규칙 */
@@ -1145,7 +1148,8 @@ final class CpTurnsFit implements CpTbt {
         // refresh()에서 지금처럼 D를 늘려 받아들인다.
         // 4차 리뷰 중간 1: 뛴 값을 받아도 곧 회전이 유지될 때만 붙잡는다. 받으면 멀리 있음이 될 값이면 바로 보낸다
         // (잘못 나간 큰 그림을 한 번 더 붙잡지 않게. D 밖이라 멀리 있음이 바른 출력인 경우도 바로 나감: KP의 D 350m 때 카카오 6@485,
-        // D 600m인 지금은 예컨대 6@700)
+        // D 600m인 지금은 예컨대 6@700). NX4 KOR (#89): 이것은 farBig을 껐을 때다. 켜면(기본) 먼 값도 그림이라 staysNear가 늘 참이고
+        // 한 번 붙잡는다
         if (!newKey && u.distNextFresh && !jumpPending && u.nearPrevLast >= 0
                 && ((u.nearPrevLast <= D_MIN && remain > u.nearPrevLast + NEAR_PASS_RISE) || remain > u.nearPrevLast + NEAR_NEW_TURN_JUMP)
                 && staysNear(x, icon, u, remain)) {

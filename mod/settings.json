@@ -15,7 +15,7 @@
       "default": true,
       "apply": "restart",
       "title": "Far turns as the road picture too",
-      "description": "With Korean turn-by-turn on: a turn farther than the near-turn distance (600 m, expressway exits 1050 m) shows the same road picture with the distance bar full, not the turn icon in a box; the bar shrinks from there as before. At a turn change, the icon box no longer flashes between two pictures. Destinations, waypoints, the start and ferries keep their icon. Off: far turns as the icon box (Korea Projection's way)."
+      "description": "With Korean turn-by-turn on: a turn farther than the near-turn distance (600 m, expressway exits 1050 m) shows the same road picture with the distance bar full, not the turn icon in a box (a long straight stretch too, as the straight-ahead picture, with the next road's name); the bar shrinks from there as before. At a turn change, the icon box no longer flashes between two pictures. Destinations, waypoints, the start and ferries keep their icon. Off: far turns as the icon box (Korea Projection's way)."
     },
     {
       "key": "kor_tbt_log",
