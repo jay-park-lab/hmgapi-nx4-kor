@@ -2037,13 +2037,31 @@ if [ -z "$(cd $B && git status --porcelain -- drivers scripts/build-driver.sh sc
   check "  묶음에 build-driver.sh가 읽는 local-env.sh와 .ko의 빌드 날짜·시각(BUILD_DATE·BUILD_TIME, drivers/를 마지막으로 바꾼 커밋 시각 UTC)" \
     'cmp -s $DR/nx4-kor/scripts/local-env.sh $B/scripts/local-env.sh && grep -qF "BUILD_DATE=\"$DSD\" BUILD_TIME=\"$DSH\"" $DR/SOURCE.txt' || grep -n BUILD_ $DR/SOURCE.txt
   # 릴리스 워크플로의 SOURCE.txt 확인 줄을 그대로 꺼내 만든 묶음에 bash -eo pipefail로 돌린다(build job과 같은 셸, PR #101 리뷰 1)
-  sed -n '/tar -tzf "out\/hmgapi-nx4-kor-\$V-driver-source.tar.gz"/,/::error::대응 소스 묶음에 SOURCE.txt가 없습니다/p' $B/.github/workflows/release.yml > $DS/wfcheck.sh
-  rm -rf $DS/wf; mkdir -p $DS/wf/out $DS/wf/tmp; cp $DS/out/src.tar.gz $DS/wf/out/hmgapi-nx4-kor-9.9.9-driver-source.tar.gz
-  (cd $DS/wf && V=9.9.9 RUNNER_TEMP=$DS/wf/tmp bash -eo pipefail $DS/wfcheck.sh) > $DS/wf.out 2>&1; echo $? > $DS/wf.rc
-  check "  릴리스 워크플로의 SOURCE.txt 확인 줄이 pipefail 셸에서 만든 묶음을 통과시킴" '[ -s $DS/wfcheck.sh ] && [ "$(cat $DS/wf.rc)" = 0 ]' || { cat $DS/wfcheck.sh; cat $DS/wf.out; }
+  # 빌드 날짜 맞춰 보기(리뷰 8)까지 꺼내, 같은 날짜의 bcmdhd.ko.txt 둘로는 통과하고 다른 날짜면 멈추는지 본다
+  sed -n '/tar -tzf "out\/hmgapi-nx4-kor-\$V-driver-source.tar.gz"/,/^          done$/p' $B/.github/workflows/release.yml > $DS/wfcheck.sh
+  rm -rf $DS/wf; mkdir -p $DS/wf/out $DS/wf/tmp $DS/wf/drv/rtl88x2bu $DS/wf/drv/rtl8831bu; cp $DS/out/src.tar.gz $DS/wf/out/hmgapi-nx4-kor-9.9.9-driver-source.tar.gz
+  for d in rtl88x2bu rtl8831bu; do printf 'driver %s x\nbuild date %s %s\ncflags y\n' $d "$DSD" "$DSH" > $DS/wf/drv/$d/bcmdhd.ko.txt; done
+  (cd $DS/wf && V=9.9.9 RUNNER_TEMP=$DS/wf/tmp NX4_DRIVERS=$DS/wf/drv bash -eo pipefail $DS/wfcheck.sh) > $DS/wf.out 2>&1; echo $? > $DS/wf.rc
+  printf 'driver rtl8831bu x\nbuild date Jan  1 2000 00:00:00\n' > $DS/wf/drv/rtl8831bu/bcmdhd.ko.txt
+  (cd $DS/wf && V=9.9.9 RUNNER_TEMP=$DS/wf/tmp NX4_DRIVERS=$DS/wf/drv bash -eo pipefail $DS/wfcheck.sh) > $DS/wf2.out 2>&1; echo $? > $DS/wf2.rc
+  check "  릴리스 워크플로의 SOURCE.txt 확인 줄(pipefail 셸)이 만든 묶음을 통과시키고, .ko의 build date가 SOURCE.txt와 다르면 멈춤(PR #101 리뷰 8)" \
+    'grep -q "bcmdhd.ko.txt" $DS/wfcheck.sh && [ "$(cat $DS/wf.rc)" = 0 ] && [ "$(cat $DS/wf2.rc)" != 0 ] && grep -q "빌드 날짜가 .*rtl8831bu/bcmdhd.ko.txt의 build date(Jan  1 2000 00:00:00)와 다릅니다" $DS/wf2.out' || { cat $DS/wfcheck.sh; cat $DS/wf.out $DS/wf2.out; }
+  # 같은 .ko(md5)를 얻을 경로·커널 판: build-in-container.sh의 값 그대로(PR #101 리뷰 7)
+  check "  SOURCE.txt의 손 빌드에 build-in-container.sh의 커널 트리·KVER·드라이버 폴더(-g라 .ko에 경로가 들어감)" \
+    'grep -qF "KSRC=/work/k/linux-3.18.24 KVER=3.18.24-tcc" $DR/SOURCE.txt && grep -qF "/work/nx4/<드라이버>" $DR/SOURCE.txt && grep -q "^K=/work/k/linux-3.18.24$" $B/drivers/build-in-container.sh && grep -q "^KREL=3.18.24-tcc$" $B/drivers/build-in-container.sh' || grep -n "KSRC\|/work" $DR/SOURCE.txt
 else
   check "driver-source.sh: drivers/에 커밋하지 않은 수정이 있으면 만들지 않음(묶음이 커밋과 달라짐)" '[ "$(cat $DS/run.rc)" != 0 ] && grep -q "커밋하지 않은 수정이 있습니다" $DS/run.out && [ ! -f $DS/out/src.tar.gz ]' || cat $DS/run.out
 fi
+# 얕은 클론에서는 빌드 날짜를 정할 수 없어 멈춤(build-driver.sh와 같게, PR #101 리뷰 8). 이 저장소의 지금 파일을 얕은 클론에 커밋해 돌린다
+rm -rf $DS/sh0 $DS/sh; git init -q $DS/sh0; echo a > $DS/sh0/a; git -C $DS/sh0 add a; git -C $DS/sh0 -c user.name=t -c user.email=t@example.invalid commit -qm one
+echo b > $DS/sh0/a; git -C $DS/sh0 -c user.name=t -c user.email=t@example.invalid commit -qam two
+git clone -q --depth 1 file://$DS/sh0 $DS/sh 2>/dev/null
+mkdir -p $DS/sh/scripts; cp -R $B/drivers $DS/sh/drivers; cp $B/scripts/driver-source.sh $B/scripts/build-driver.sh $B/scripts/local-env.sh $DS/sh/scripts/
+git -C $DS/sh add -A; git -C $DS/sh -c user.name=t -c user.email=t@example.invalid commit -qm three
+(env NX4_DRVSRC_RTL88X2BU_GIT=$DS/a NX4_DRVSRC_RTL88X2BU_COMMIT=$(cat $DS/a.c1) NX4_DRVSRC_RTL8831BU_GIT=$DS/b NX4_DRVSRC_RTL8831BU_COMMIT=$(cat $DS/b.c1) sh $DS/sh/scripts/driver-source.sh $DS/out/sh.tar.gz) > $DS/sh.out 2>&1; echo $? > $DS/sh.rc
+check "  얕은 클론에서는 틀린 빌드 날짜를 적지 않고 멈춤" '[ "$(git -C $DS/sh rev-parse --is-shallow-repository)" = true ] && [ "$(cat $DS/sh.rc)" != 0 ] && grep -q "얕은 클론에서는 빌드 날짜를 정할 수 없습니다" $DS/sh.out && [ ! -f $DS/out/sh.tar.gz ]' || cat $DS/sh.out
+check "  릴리스 워크플로가 SOURCE.txt의 BUILD_DATE·BUILD_TIME을 빌드한 .ko의 bcmdhd.ko.txt build date와 맞춰 봄" \
+  'grep -q "tar -xzOf \"out/hmgapi-nx4-kor-\$V-driver-source.tar.gz\" hmgapi-nx4-kor-driver-source/SOURCE.txt" $B/.github/workflows/release.yml && grep -q "s/^build date //p" $B/.github/workflows/release.yml && grep -q "echo \"build date \$BUILD_DATE \$BUILD_TIME\"" $B/drivers/build-in-container.sh'
 dsrun NX4_DRVSRC_RTL8831BU_COMMIT=0123456789abcdef0123456789abcdef01234567
 check "  원본 저장소에 고정 커밋이 없으면 만들지 않음" '[ "$(cat $DS/run.rc)" != 0 ] && grep -q "커밋 0123456789abcdef0123456789abcdef01234567이 없습니다\|커밋하지 않은 수정이 있습니다" $DS/run.out' || cat $DS/run.out
 check "  릴리스 워크플로가 이 묶음을 만들어(SOURCE.txt 확인) 넘기고 릴리스 자산으로 올림, 모드의 drivers/SOURCE.txt가 그 자산을 가리킴" \

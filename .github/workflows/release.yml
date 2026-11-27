@@ -290,6 +290,13 @@ jobs:
           tar -tzf "out/hmgapi-nx4-kor-$V-driver-source.tar.gz" > "$RUNNER_TEMP/driver-source.list"
           grep -qx 'hmgapi-nx4-kor-driver-source/SOURCE.txt' "$RUNNER_TEMP/driver-source.list" \
             || { echo "::error::대응 소스 묶음에 SOURCE.txt가 없습니다"; exit 1; }
+          # SOURCE.txt의 빌드 날짜·시각이 방금 빌드한 .ko(bcmdhd.ko.txt의 build date)와 같은지(두 스크립트가 날짜를 정하는 길이 어긋나면 잡음, PR #101 리뷰 8)
+          tar -xzOf "out/hmgapi-nx4-kor-$V-driver-source.tar.gz" hmgapi-nx4-kor-driver-source/SOURCE.txt > "$RUNNER_TEMP/driver-source.txt"
+          for f in "$NX4_DRIVERS"/*/bcmdhd.ko.txt; do
+            BD=$(sed -n 's/^build date //p' "$f")
+            grep -qF "BUILD_DATE=\"${BD% *}\" BUILD_TIME=\"${BD##* }\"" "$RUNNER_TEMP/driver-source.txt" \
+              || { echo "::error::대응 소스 SOURCE.txt의 빌드 날짜가 $f의 build date($BD)와 다릅니다"; exit 1; }
+          done
 
       # secret은 화면에 내지 않는다(set -x 금지). 파일은 umask 077, 러너 임시 폴더, 마지막 step에서 지운다
       - name: 배포 키를 파일로

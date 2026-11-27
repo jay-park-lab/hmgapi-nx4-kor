@@ -39,7 +39,16 @@ get rtl8831bu "$RTL8831BU_GIT" "$RTL8831BU_COMMIT"
 (cd "$B" && git archive --prefix=nx4-kor/ HEAD drivers scripts/build-driver.sh scripts/local-env.sh) | tar -x -C "$R"
 # .ko에 들어가는 빌드 날짜·시각(__DATE__·__TIME__): scripts/build-driver.sh와 같게, drivers/나 그 스크립트를 마지막으로 바꾼 커밋의
 # 시각(UTC). 묶음만으로 빌드할 때 같은 .ko를 얻으려면 이 값이 필요하다(PR #101 리뷰 2)
+# 얕은 클론이면 잘린 첫 커밋이 모든 파일을 바꾼 것으로 보여 틀린 시각이 나온다. build-driver.sh처럼 멈춘다(PR #101 리뷰 8)
+[ "$(cd "$B" && git rev-parse --is-shallow-repository 2>/dev/null)" != true ] \
+  || { echo "얕은 클론에서는 빌드 날짜를 정할 수 없습니다(git fetch --unshallow, CI는 checkout fetch-depth: 0)" >&2; exit 1; }
 BT=$(cd "$B" && git log -1 --format=%ct -- drivers scripts/build-driver.sh)
+# 같은 .ko를 얻으려면 빌드 경로도 같아야 한다(-g라 .ko에 절대 경로가 들어감). 값은 build-in-container.sh에서 읽는다(PR #101 리뷰 7)
+CK=$(sed -n 's/^K=//p' "$B/drivers/build-in-container.sh" | head -1)
+CKREL=$(sed -n 's/^KREL=//p' "$B/drivers/build-in-container.sh" | head -1)
+CDRV=$(sed -n 's#.*build_driver rtl88x2bu "[^"]*" \(/[^ ]*\)/rtl88x2bu .*#\1#p' "$B/drivers/build-in-container.sh" | head -1)
+[ -n "$CK" ] && [ -n "$CKREL" ] && [ -n "$CDRV" ] \
+  || { echo "drivers/build-in-container.sh에서 커널 트리·커널 판·드라이버 폴더를 읽지 못했습니다" >&2; exit 1; }
 BDATE=$(LC_ALL=C TZ=UTC date -r "$BT" '+%b %e %Y' 2>/dev/null || LC_ALL=C TZ=UTC date -d "@$BT" '+%b %e %Y')
 BTIME=$(LC_ALL=C TZ=UTC date -r "$BT" '+%H:%M:%S' 2>/dev/null || LC_ALL=C TZ=UTC date -d "@$BT" '+%H:%M:%S')
 cat > "$R/SOURCE.txt" <<EOF
@@ -68,9 +77,11 @@ NX4 KOR USB Wi-Fi 동글 드라이버의 대응 소스 (GNU GPL-2.0, 전문은 n
   결과는 out/drivers/tcc803x/<드라이버>/bcmdhd.ko와 빌드 정보 bcmdhd.ko.txt입니다.
 - 이 묶음의 파일로 직접(원본 저장소가 없어져도): 커널 트리를 nx4-kor/drivers/kernel/prepare.sh로 준비하고, 원본 폴더에
   nx4-kor/drivers/<드라이버>/*.diff를 파일 이름 차례로 patch -p1 한 뒤 nx4-kor/drivers/build-in-container.sh의 build_driver처럼
-  make ARCH=arm CROSS_COMPILE=<툴체인>/bin/arm-eabi- KSRC=<커널 트리> KVER=<커널 판> USER_MODULE_NAME=bcmdhd
+  make ARCH=arm CROSS_COMPILE=<툴체인>/bin/arm-eabi- KSRC=$CK KVER=$CKREL USER_MODULE_NAME=bcmdhd
   <변수>="-g -Wno-builtin-macro-redefined -include pin.h" 한다. <변수>는 rtl88x2bu가 EXTRA_CFLAGS, rtl8831bu가 USER_EXTRA_CFLAGS,
   pin.h는 __DATE__·__TIME__을 아래 값으로 다시 정의하는 머리 파일.
+- 같은 .ko(md5)를 얻으려면 경로도 같아야 합니다(-g라 .ko에 절대 경로가 들어감): 커널 트리는 $CK,
+  드라이버 폴더는 $CDRV/<드라이버>(rtl88x2bu·rtl8831bu)에 두고 그 폴더에서 make 합니다.
 - 만든 .ko의 md5·sha256은 같은 판 모드의 drivers/<드라이버>/bcmdhd.ko.txt와 릴리스 실행 요약에 있습니다.
 - .ko에 들어가는 빌드 날짜·시각(__DATE__·__TIME__, 같은 .ko를 얻으려면 필요): BUILD_DATE="$BDATE" BUILD_TIME="$BTIME"
   (drivers/나 scripts/build-driver.sh를 마지막으로 바꾼 커밋의 시각, UTC. build-driver.sh가 git에서 이렇게 정함)
