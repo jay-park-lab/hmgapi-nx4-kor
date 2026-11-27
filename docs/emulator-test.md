@@ -257,7 +257,7 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
 - 순정 화면과 얼마나 같은지. 색·크기는 매뉴얼 그림에서 잰 근사값입니다([#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)).
 - 차의 실제 재부팅. 이 시험의 `watch.sh`는 감시자의 답만 흉내 냅니다.
 - 진단 확인 창이 DSP OTA 화면 위에 뜨는지, USB 설치기가 답을 기다리는 흐름. 설치기 쪽은 `tests/mod-test.sh`가 가짜 `am`으로 봅니다.
-- 차 화면 맨 위 시스템 줄의 `<`가 앱에 뒤로 키로 가는지. 이 시험은 `keyevent 4`만 봅니다(차에서 확인, [`design.md`](design.md) "차에서 확인할 것", 결과는 #64).
+- 차 화면 맨 위 시스템 줄의 `<`가 앱에 뒤로 키로 가는지. 이 시험은 `keyevent 4`만 봅니다(차에서 확인, [`design.md`](design.md) "차에서 확인할 것", 결과는 [#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64)).
 
 ## 마지막 결과
 
