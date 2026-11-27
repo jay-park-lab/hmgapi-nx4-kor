@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # NX4 KOR USB 설치기(2.1.0 구조). Engineering Mode > USB Copy > DSP > Update OTA가 스틱의 ota_package.tar에서
 # 이 파일을 꺼내 root로 돌린다(HMG-API의 USB 설치기와 같은 길). 그 뒤 OTA 화면에 오류 684가 나오는 것은 정상이다.
-# 2.1.0은 HMG-API + 공식 무선 모드(wireless-carplay-aa, 고치지 않음) + NX4 추가분(nx4-kor)이다(docs/design.md "2.1.0 새 구조").
+# 2.1.0은 HMG-API + 공식 무선 모드(wireless-carplay-aa, 고치지 않음) + NX4 추가분(nx4-kor)이다(docs/design.md "2.1.0 구조").
 # HMG-API 쪽 일은 모두 이 설치기가 한다: HMG-API 설치·업데이트(같은 스틱의 HMG-API 설치기로 넘김), 옛 NX4 KOR 2.0.x 정리,
 # 공식 무선 모드 설치(--any-car), nx4-kor 설치, 이 차의 map 만들기·확인, 계획 확인 뒤 적용. nx4-kor 모드는 부팅 때 이 일을 하지 않는다.
 # 스틱의 NX4 폴더를 본다:
@@ -20,7 +20,8 @@
 #   NX4/hmgapi/troubleShooter           HMG-API USB 묶음을 같은 스틱에 함께 풀어 둔 경우의 HMG-API 설치기.
 #                                       HMG-API가 없거나 최소 판보다 낮으면 이것을 대신 돌린다(재부팅 뒤 Update OTA를 한 번 더)
 # 설치 순서(설치·업데이트·같은 판 모두 같다. 이미 된 단계는 건너뛴다):
-#   0. 시작 전 확인(멈추면 아무것도 바꾸지 않음): 스틱의 묶음, 원본 Korea Projection 패키지(있으면 멈춤, KORPROJ_MSG, #13),
+#   0. 시작 전 확인(멈추면 아무것도 바꾸지 않음): 스틱의 묶음, NEMESIS(있으면 멈춤, NMS_MSG, #75),
+#      원본 Korea Projection 패키지(있으면 멈춤, KORPROJ_MSG, #13),
 #      HMG-API가 있으면 응답할 때까지 기다림(부팅 직후에 눌러도 됨, hmg_ready) → 진단 기록 묻기,
 #      HMG-API(없거나 낮으면 스틱의 HMG-API 설치기로 넘김), 2.0.x 기록. 같은 판이면 그 뒤 관리 앱을 먼저 연다
 #   1. 시작 전 계획 확인: HMG-API에 다른 모드의 적용하지 않은 변경이 있으면 아무것도 바꾸지 않고 멈춘다(끝에서 적용할 수 없으므로)
@@ -74,6 +75,8 @@ HMG_MIN=1.1.0-rc.10
 LOCALMAP=$HMGDATA/state/local-map.json
 MAPCHK=$HMGDATA/state/map-check.json
 PROG=$ROOT/data/local/tmp/nx4-kor-progress.txt
+# NEMESIS의 실행 파일(#75). HMG-API가 NEMESIS가 있다고 보는 기준(engine NemesisSync)과 같다. 있으면 설치·업데이트하지 않는다(아래 "NMS")
+NMS=$ROOT/system/xbin/nemesis
 # 원본 Korea Projection 패키지의 앱 폴더(#13). 있으면 설치·업데이트하지 않는다(아래 "원본 Korea Projection 패키지")
 KORPROJ=$ROOT/data/nemesis/apps/korea.projection
 BOOT_ID=${BOOT_ID:-/proc/sys/kernel/random/boot_id}
@@ -88,7 +91,7 @@ P_ON=0
 ST_OPEN=0
 
 # 끝 문구(진행 기록 stage). 상태 판정이 문장으로 가르므로 바꾸면 mod/bin/status.sh도 함께 본다
-DONE_REBOOT_MSG="무선 카플레이 설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요."
+DONE_REBOOT_MSG="무선 카플레이 설정을 마쳤습니다. [지금 재부팅]을 눌러 내비를 재부팅해 주세요."
 DONE_MSG="무선 카플레이 설정이 끝나 있습니다."
 OTHERPLAN_MSG="HMG-API에 다른 모드의 바뀐 내용이 함께 있어 자동으로 적용하지 않았습니다. 차를 세운 뒤 HMG-API 앱에서 변경 사항을 적용하고 내비를 재부팅해 주세요."
 HOOKS_MSG="HMG-API 계획에 켜지지 않는 훅이나 문제가 있어 적용하지 않았습니다. HMG-API 앱에서 변경 사항을 확인해 주세요."
@@ -108,6 +111,9 @@ OLDLEFT_MSG="옛 NX4 KOR 2.0.x가 남긴 설정(Wi-Fi 잠금 등)이 있어 이 
 # 설치·업데이트 갈래에서 아무것도 바꾸기 전에 멈추므로 진행 기록에는 쓰지 않는다(OLDLEFT_MSG와 같음).
 # 지운 뒤 재부팅까지 안내한다: 패키지 폴더가 재부팅 때 없어지거나 그 hostapd가 재부팅 전까지 남는 차가 있을 수 있다(PR #57 리뷰 1)
 KORPROJ_MSG="NEMESIS에 Korea Projection이 설치되어 있어 설치하지 않았습니다. NEMESIS에서 Korea Projection을 지우고 내비를 재부팅한 뒤 다시 해 주세요. 아무것도 바꾸지 않았습니다."
+# NEMESIS가 깔린 차(#75). KORPROJ_MSG와 같이 아무것도 바꾸기 전에 멈추므로 진행 기록에는 쓰지 않는다.
+# 지우는 차례에 Android가 뜨지 않을 수 있는 차(1.17, HMG-API #397)가 있어, 지우는 법은 스틱 README로 안내한다
+NMS_MSG="NEMESIS가 깔린 차에는 NX4 KOR를 설치하지 않습니다. NEMESIS를 지우기 전에 USB의 README.txt를 꼭 읽어 주세요. 아무것도 바꾸지 않았습니다."
 
 log() { echo "$(date '+%m-%d %H:%M:%S') $1" >> $LOG; }
 toast() {
@@ -569,7 +575,9 @@ old_revert() {
 #   hmgapi-status.txt   HMG-API가 바꾼 파일마다 순정·기대·지금 md5(hmgapid engine status). 모드가 적용된 뒤에도 순정 md5를 안다
 #   car-report*         HMG-API Car Report(hmgapid engine report: 이 차에서 찾은 훅 지점, map 확인, 기능, 오류).
 #                       HMG-API가 VIN·일련번호를 넣지 않고 기록 줄을 가린다
-#   logs/               이 모드의 기록(ap.log, 서비스 기록, map 만들기·확인·계획·적용 결과, 상태 파일)과 HMG-API 설치 기록
+#   logs/               이 모드의 기록(ap.log, 서비스 기록, map 만들기·확인·계획·적용 결과, 상태 파일)과 HMG-API 설치 기록,
+#                       HMG-API Wi-Fi 지기 기록(hmgapi-wifi.log: 프로젝션 AP를 띄웠는지·다시 시도하는지·깨어났는지)
+#   dongle/             USB Wi-Fi 동글 드라이버를 이 차 커널에 맞춰 빌드하고 순정 HAL에 잇는 데 필요한 것(#48, 아래 diag_dongle)
 # HMG-API 명령은 HMG-API가 응답할 때만 돌린다. 비밀번호가 든 Wi-Fi 설정 파일(softap.conf·hostapd-nx4.conf·
 # wpa_supplicant.conf)과 이 모드의 백업 폴더($NX4_ROOT/backup)는 넣지 않는다. 못 모은 것은 기록만 하고 넘어간다.
 DIAGBB=$ROOT/data/local/tmp/nx4-kor-diag-busybox
@@ -625,6 +633,229 @@ diag_bb() {
   $DIAGBB true >/dev/null 2>&1 || return 1
   echo $DIAGBB
 }
+# 진단 기록의 동글 준비 정보(#48 1단계). 읽기만 한다. $1 폴더, $2 busybox(없으면 빈 값: md5·압축 풀기·문자열은 빠짐)
+#   kernel.txt          커널 판(osrelease, /proc/version), 모듈 적재 조건(modules_disabled, sig_enforce), cfg80211,
+#                       USB 포트 전원 매개변수(vbus*), boot_id(시동 끄고 켜기가 새 부팅인지 견줌), Wi-Fi 속성
+#   modules.txt         /proc/modules(지금 올라온 모듈)
+#   config.gz, config.txt, config-sum.txt  차 커널 설정(/proc/config.gz)과 그 md5·sha256. 드라이버 빌드에 쓰고,
+#                       Korea Projection 빌드의 설정(sha256 d35af8a0…, 출처 저장소가 404)과 견준다
+#   system-wifi-ls.txt, system-wifi-md5.txt, ko-vermagic.txt  /system/wifi(순정 bcmdhd.ko 등)와 순정 모듈의 vermagic
+#   wifi-strings.txt    순정 HAL(libhardware_legacy.so)·hostapd·wpa_supplicant·netd의 드라이버 관련 문자열(모듈 이름,
+#                       insmod 인자, nl80211 등). 동글 드라이버를 HAL이 올리는 bcmdhd 자리에 맞추는 데 쓴다
+#   usb.txt, usb-ls.txt, usb-drivers.txt  USB 장치(ID·속도·전력·종류·제품 이름, 일련번호는 넣지 않음), 버스·컨트롤러 경로,
+#                       드라이버에 붙은 인터페이스
+#   net-ls.txt          네트워크 장치 이름과 경로(MAC은 넣지 않음)
+#   dmesg-usb-wifi.txt  커널 로그 중 USB·Wi-Fi 줄(SerialNumber 줄과 MAC이 든 줄은 뺌)
+#   mount.txt           두 동글 드라이버 중 하나를 순정 bcmdhd.ko 자리에 bind mount하는 안(#80)을 차에서 가르는 값. SELinux 모드,
+#                       init·이 설치기·system_server(Wi-Fi HAL이 insmod하는 곳)·이름에 hmgapi가 든 프로세스 모두(데몬 표시)의
+#                       ppid·시작 시각(부팅 뒤 초)·mount 이름공간·SELinux 도메인, init과 이름공간이 다른 프로세스 목록,
+#                       init·설치기·system_server·HMG-API 데몬의 /·/system·/data mountinfo 줄(전파 표시 shared·master),
+#                       커널 기록의 avc: 줄. busybox 없이 /proc와 커널 기록만 읽는다(diag_mount)
+# busybox에 gunzip·sha256sum·strings·grep이 없으면 빈 값 대신 그 까닭을 적는다(bbok)
+# mount 이름공간 이름(ls -l의 링크 대상, 예: mnt:[4026531840]). readlink가 없는 툴박스에서도 되게 ls로 읽는다.
+# 링크 대상을 못 읽으면 링크가 없는 것과 거절(SELinux 포함)을 가른다(PR #84 리뷰 3):
+# - 차의 툴박스 ls(KitKat toolbox/ls.c)는 readlink가 실패하면 아무것도 찍지 않는다. 커널(3.18 fs/proc/namespaces.c)은 ns 링크의
+#   readlink에만 ptrace 권한을 보고 lstat은 막지 않으므로, 거절이면 링크는 있는데(-L, lstat) 대상을 못 읽는다
+# - 링크가 없으면 ls가 lstat 오류 문구(No such file …)를 찍는다. 그 문구를 그대로 적는다
+diag_ns() {
+  _nl=$(ls -l "$1" 2>&1)
+  case "$_nl" in
+    *' -> '*) echo "${_nl##* -> }" ;;
+    *) if [ -L "$1" ]; then echo "읽지 못함(링크는 있음, 대상을 못 읽음: 거절일 수 있음)"
+       elif [ -n "$_nl" ]; then echo "읽지 못함($_nl)"
+       else echo "없음"; fi ;;
+  esac
+}
+# /proc/<pid>/stat에서 ppid(4번째 칸)를 _sp에, 부팅 뒤 시작 시각(22번째 칸 starttime, 1/100초 USER_HZ)을 _st에 둔다. 못 읽으면 ?.
+# 2번째 칸 (comm)에는 공백·글롭 문자가 들 수 있어 마지막 ") " 뒤(3번째 칸 state부터)만 나눈다(PR #84 리뷰 4).
+# 순정 bcmdhd가 부팅 약 9.7초에 올라가므로(#80), 부팅 서비스를 띄우는 HMG-API 데몬이 그보다 늦는지 본다
+diag_stat() {
+  _sp=?; _st=?
+  _sl=; read -r _sl 2>/dev/null < "$1/stat" || return 0
+  case "$_sl" in *") "*) _sl=${_sl##*") "} ;; *) return 0 ;; esac
+  set -- $_sl
+  [ $# -ge 20 ] || return 0
+  case "$2" in ''|*[!0-9]*) ;; *) _sp=$2 ;; esac
+  shift 19
+  case "$1" in ''|*[!0-9]*) ;; *) _st="$(($1 / 100)).$(($1 / 10 % 10))s" ;; esac
+  return 0
+}
+# 프로세스 한 줄: 이름(comm), ppid, 시작 시각, mount 이름공간, SELinux 도메인(attr/current, 못 읽으면 ?). $1 꼬리표, $2 pid(self 포함).
+# HMG-API 데몬(comm hmgapid이고 ppid 1)에는 "데몬"을 붙인다
+diag_proc() {
+  _pc=; read -r _pc 2>/dev/null < $ROOT/proc/$2/comm
+  diag_stat $ROOT/proc/$2
+  _pa=; read -r _pa 2>/dev/null < $ROOT/proc/$2/attr/current
+  _pk=; [ "$_pc" = hmgapid ] && [ "$_sp" = 1 ] && _pk=" 데몬"
+  echo "proc $1: pid=$2 comm=${_pc:-?} ppid=$_sp start=$_st ns=$(diag_ns $ROOT/proc/$2/ns/mnt) se=${_pa:-?}$_pk"
+}
+# mountinfo에서 마운트 지점이 /·/system·/data인 줄
+diag_mi() {
+  [ -f "$1" ] || { echo "(mountinfo 없음)"; return 0; }
+  while read -r _m1 _m2 _m3 _m4 _m5 _mr; do
+    case "$_m5" in /|/system|/data) echo "$_m1 $_m2 $_m3 $_m4 $_m5 $_mr" ;; esac
+  done < "$1"
+}
+# #80 차 확인 값(mount.txt). 프로세스는 /proc/<pid>/comm(이름)으로 찾는다(명령줄은 NUL 처리가 셸마다 달라 보지 않음).
+# - init·이 설치기·system_server 한 줄씩, 이름에 hmgapi가 든 프로세스는 모두 한 줄씩 적는다(PR #84 리뷰 1). /proc 글롭은 사전 순이고
+#   차에는 데몬(comm hmgapid, ppid 1) 말고도 그 요청 worker·클라이언트(hmgapid), 차량 서비스(hmgapi.vehicle)가 있어 하나만
+#   고르면 데몬이 아닌 것을 고를 수 있다. 부팅 서비스(start boot)는 데몬이 띄우므로 데몬의 시작 시각이 그 시각에 가장 가깝다
+# - init과 mount 이름공간이 다른 프로세스를 모두 적는다(앱마다 이름공간을 나누는지. 순정 bcmdhd를 system_server가 아닌 곳이
+#   올렸을 수도 있어서, PR #84 리뷰 2). 앞 ${DIAG_NS_MAX:-100}줄만
+# - 커널 기록의 avc: 줄(SELinux 거절·허용 기록, 도메인마다 enforcing이 다를 수 있음). 앞 ${DIAG_AVC_MAX:-50}줄만, MAC·일련번호
+#   꼴이 든 줄은 뺀다(dmesg-usb-wifi.txt와 같은 규칙)
+diag_mount() {
+  _ss=; _dm=; _hgs=
+  for _pd in $ROOT/proc/[0-9]*; do
+    [ -f $_pd/comm ] || continue
+    read -r _cm 2>/dev/null < $_pd/comm || continue
+    case "$_cm" in
+      system_server) [ -n "$_ss" ] || _ss=${_pd##*/} ;;
+      *hmgapi*) _hgs="$_hgs ${_pd##*/}" ;;
+    esac
+  done
+  _ins=$(diag_ns $ROOT/proc/1/ns/mnt)
+  _h='[0-9a-fA-F][0-9a-fA-F]'
+  {
+    _se=$(getenforce 2>/dev/null) || _se=
+    echo "selinux_getenforce: ${_se:-없음}"
+    if [ -f $ROOT/sys/fs/selinux/enforce ]; then echo "selinux_enforce: $(cat $ROOT/sys/fs/selinux/enforce 2>/dev/null)"; else echo "selinux_enforce: 없음"; fi
+    diag_proc init 1
+    diag_proc self self
+    if [ -n "$_ss" ]; then diag_proc system_server $_ss; else echo "proc system_server: 프로세스 없음"; fi
+    if [ -z "$_hgs" ]; then echo "proc hmgapi: 프로세스 없음"; fi
+    for _p in $_hgs; do
+      diag_proc hmgapi $_p
+      [ -z "$_dm" ] && [ "$_pc" = hmgapid ] && [ "$_sp" = 1 ] && _dm=$_p
+    done
+    echo "== mount 이름공간이 init($_ins)과 다른 프로세스"
+    _n=0
+    for _pd in $ROOT/proc/[0-9]*; do
+      [ -f $_pd/comm ] || continue
+      _pn=$(diag_ns $_pd/ns/mnt)
+      [ "$_pn" = "$_ins" ] && continue
+      _n=$((_n + 1))
+      [ $_n -le ${DIAG_NS_MAX:-100} ] || continue
+      _cm=; read -r _cm 2>/dev/null < $_pd/comm
+      echo "pid=${_pd##*/} comm=${_cm:-?} ns=$_pn"
+    done
+    [ $_n -le ${DIAG_NS_MAX:-100} ] || echo "(… $((_n - ${DIAG_NS_MAX:-100}))개 더)"
+    echo "== mountinfo init(1)"; diag_mi $ROOT/proc/1/mountinfo
+    echo "== mountinfo self"; diag_mi $ROOT/proc/self/mountinfo
+    if [ -n "$_ss" ]; then echo "== mountinfo system_server($_ss)"; diag_mi $ROOT/proc/$_ss/mountinfo; fi
+    if [ -n "$_dm" ]; then echo "== mountinfo hmgapid 데몬($_dm)"; diag_mi $ROOT/proc/$_dm/mountinfo; else echo "== mountinfo hmgapid 데몬: 없음(comm hmgapid이고 ppid 1인 프로세스 없음)"; fi
+    echo "== avc(커널 기록, 앞 ${DIAG_AVC_MAX:-50}줄)"
+    kmsg 2>/dev/null | {
+      _n=0
+      while IFS= read -r _l; do
+        case "$_l" in
+          *SerialNumber*|*[Mm][Aa][Cc]=*|*$_h:$_h:$_h:$_h:$_h:$_h*|*$_h-$_h-$_h-$_h-$_h-$_h*|*$_h$_h$_h$_h$_h$_h*) ;;
+          *avc:*) _n=$((_n + 1)); [ $_n -le ${DIAG_AVC_MAX:-50} ] && echo "$_l" ;;
+        esac
+      done
+      [ $_n -le ${DIAG_AVC_MAX:-50} ] || echo "(… $((_n - ${DIAG_AVC_MAX:-50}))줄 더)"
+      [ $_n -gt 0 ] || echo "(avc 줄 없음)"
+    }
+  } > "$1" 2>&1
+}
+diag_dongle() {
+  _o=$1; _b=$2
+  mkdir -p $_o || { log "진단 기록: 동글 준비 정보 폴더를 만들지 못함"; return 0; }
+  {
+    echo "osrelease: $(cat $ROOT/proc/sys/kernel/osrelease 2>/dev/null)"
+    echo "version: $(cat $ROOT/proc/version 2>/dev/null)"
+    echo "modules_disabled: $(cat $ROOT/proc/sys/kernel/modules_disabled 2>/dev/null)"
+    echo "sig_enforce: $(cat $ROOT/sys/module/module/parameters/sig_enforce 2>/dev/null)"
+    if [ -e $ROOT/sys/module/cfg80211 ]; then echo "cfg80211: yes"; else echo "cfg80211: no"; fi
+    for _v in $ROOT/sys/module/*/parameters/vbus*; do
+      [ -f "$_v" ] && echo "${_v#$ROOT/sys/module/}: $(cat $_v 2>/dev/null)"
+    done
+    echo "boot_id: $(cat $BOOT_ID 2>/dev/null)"
+    for _p in wifi.interface wlan.driver.status ro.board.platform; do echo "$_p: $(getprop $_p 2>/dev/null)"; done
+  } > $_o/kernel.txt 2>&1
+  cat $ROOT/proc/modules > $_o/modules.txt 2>&1
+  # 커널 설정: /proc 파일은 cp가 크기 0으로 볼 수 있어 cat으로 옮긴다
+  if [ -f $ROOT/proc/config.gz ]; then
+    cat $ROOT/proc/config.gz > $_o/config.gz 2>/dev/null
+    if [ -n "$_b" ]; then
+      _gz=1
+      $_b gunzip -c $_o/config.gz > $_o/config.txt 2>/dev/null || { rm -f $_o/config.txt; _gz=; }
+      {
+        echo "busybox: $_b"
+        echo "config.gz md5: $(dsum $_b md5sum $_o/config.gz)"
+        if [ -z "$_gz" ]; then
+          echo "config.txt: busybox로 풀지 못함(gunzip이 없거나 실패, config.gz는 PC에서 풂)"
+        else
+          echo "config.txt md5: $(dsum $_b md5sum $_o/config.txt)"
+          if bbok $_b sha256sum; then
+            echo "config.txt sha256: $(dsum $_b sha256sum $_o/config.txt)"
+          else
+            echo "config.txt sha256: busybox에 sha256sum이 없음(PC에서 셈)"
+          fi
+        fi
+      } > $_o/config-sum.txt 2>&1
+    else
+      echo "md5를 셀 busybox가 없음: config.gz만 복사" > $_o/config-sum.txt
+    fi
+  else
+    echo "/proc/config.gz 없음(커널이 설정을 내보내지 않음)" > $_o/config-sum.txt
+    log "진단 기록: /proc/config.gz가 없음(동글 드라이버 빌드에 쓸 커널 설정을 못 모음)"
+  fi
+  ls -l $ROOT/system/wifi > $_o/system-wifi-ls.txt 2>&1
+  if [ -n "$_b" ]; then
+    for _f in $ROOT/system/wifi/*; do
+      [ -f "$_f" ] && echo "$(dsum $_b md5sum $_f)  ${_f#$ROOT}"
+    done > $_o/system-wifi-md5.txt 2>&1
+  fi
+  # vermagic·문자열은 busybox의 strings와 grep(-m, -E)이 있어야 한다. 없으면 빈 결과와 "문자열이 없음"이 구분되지 않으므로
+  # 그렇다고 적는다
+  if [ -z "$_b" ]; then
+    echo "busybox가 없어 vermagic을 못 읽음" > $_o/ko-vermagic.txt
+    echo "busybox가 없어 문자열을 못 읽음" > $_o/wifi-strings.txt
+  elif ! bbok $_b strings /dev/null || ! echo a | $_b grep -m 1 -E 'a|b' >/dev/null 2>&1; then
+    echo "busybox($_b)에 strings나 grep -m·-E가 없어 vermagic을 못 읽음" > $_o/ko-vermagic.txt
+    echo "busybox($_b)에 strings나 grep -m·-E가 없어 문자열을 못 읽음" > $_o/wifi-strings.txt
+    log "진단 기록: busybox($_b)에 strings·grep이 없어 동글 준비 정보의 vermagic·문자열은 빠짐"
+  else
+    for _f in $ROOT/system/wifi/*.ko $ROOT/system/lib/modules/*.ko; do
+      [ -f "$_f" ] && echo "${_f#$ROOT}: $($_b strings $_f 2>/dev/null | $_b grep -m 1 '^vermagic=')"
+    done > $_o/ko-vermagic.txt 2>&1
+    for _f in $ROOT/system/lib/libhardware_legacy.so $ROOT/system/bin/hostapd $ROOT/system/bin/wpa_supplicant $ROOT/system/bin/netd; do
+      [ -f "$_f" ] || continue
+      echo "== ${_f#$ROOT}"
+      # module_info·module_version·/proc/modules: HAL이 올린 모듈을 무엇으로 확인하는지(바꾼 .ko를 거절하는지, #80)
+      $_b strings $_f 2>/dev/null | $_b grep -E 'bcmdhd|\.ko|iface_name|firmware_path|nvram_path|/system/wifi|nl80211|wlan0|add_ie|wifi\.interface|wlan\.driver|DRIVER_|insmod|rmmod|init_module|module_info|module_version|/proc/modules'
+    done > $_o/wifi-strings.txt 2>&1
+  fi
+  [ -n "$_b" ] || echo "busybox가 없어 md5·vermagic·문자열은 빠짐(이름·크기는 system-wifi-ls.txt)" > $_o/system-wifi-md5.txt
+  ls -l $ROOT/sys/bus/usb/devices > $_o/usb-ls.txt 2>&1
+  for _u in $ROOT/sys/bus/usb/devices/*; do
+    [ -f $_u/idVendor ] || continue
+    echo "${_u##*/} $(cat $_u/idVendor 2>/dev/null):$(cat $_u/idProduct 2>/dev/null) speed=$(cat $_u/speed 2>/dev/null) maxpower=$(cat $_u/bMaxPower 2>/dev/null) class=$(cat $_u/bDeviceClass 2>/dev/null) manufacturer=$(cat $_u/manufacturer 2>/dev/null) product=$(cat $_u/product 2>/dev/null)"
+  done > $_o/usb.txt 2>&1
+  for _r in $ROOT/sys/bus/usb/drivers/*; do
+    [ -d "$_r" ] || continue
+    echo "== ${_r##*/}"
+    ls $_r
+  done > $_o/usb-drivers.txt 2>&1
+  ls -l $ROOT/sys/class/net > $_o/net-ls.txt 2>&1
+  diag_mount $_o/mount.txt
+  # 일련번호와 MAC이 든 줄은 뺀다(bcmdhd "Broadcom Dongle Host Driver mac=…", Realtek "rtw_macaddr_cfg MAC Address = …",
+  # "hwaddr …", 그 밖에 xx:xx:xx:xx:xx:xx·xx-xx-…·구분자 없는 12자리 꼴, PR #66 리뷰 1·3). 12자리 꼴은 같은 길이의 다른
+  # 16진수·숫자 줄도 빼지만, 기록을 공개 이슈에 올리므로 덜 남기는 쪽을 고른다. mksh case 패턴이라 busybox가 필요 없다
+  _h='[0-9a-fA-F][0-9a-fA-F]'
+  kmsg 2>/dev/null | while IFS= read -r _l; do
+    case "$_l" in
+      *SerialNumber*|*[Mm][Aa][Cc]=*|*[Mm][Aa][Cc]\ [Aa]ddr*|*[Mm][Aa][Cc][Aa]ddr*|*[Hh][Ww][Aa]ddr*|*$_h:$_h:$_h:$_h:$_h:$_h*|*$_h-$_h-$_h-$_h-$_h-$_h*|*$_h$_h$_h$_h$_h$_h*) ;;
+      *usb*|*USB*|*ehci*|*ohci*|*dwc*|*otg*|*dhd*|*DHD*|*wlan*|*cfg80211*|*80211*|*rtw*|*RTW*|*rtl*|*8822*|*88x2*|*8851*|*firmware*) echo "$_l" ;;
+    esac
+  done > $_o/dmesg-usb-wifi.txt
+  log "진단 기록: 동글 준비 정보를 모음(dongle/)"
+}
+# busybox $2(md5sum·sha256sum)로 센 값만(파일 이름 없이). 못 세면 빈 값
+dsum() { _s=$($1 $2 < $3 2>/dev/null); echo "${_s%% *}"; }
+# busybox $1에 애플릿 $2가 있어 도는가(입력은 /dev/null, 나머지 인자는 그대로)
+bbok() { _bb1=$1; shift; $_bb1 "$@" < /dev/null > /dev/null 2>&1; }
 diag() {
   _d=$K/diag/$(date '+%Y%m%d-%H%M%S')
   [ -e $_d ] && _d=$_d-$$
@@ -660,6 +891,7 @@ diag() {
     echo "md5를 셀 busybox가 없음(내비·설치된 모드·스틱 모두): 이름·크기는 system-lib-ls.txt" > $_d/system-lib-md5.txt
     log "진단 기록: md5를 셀 busybox가 없어 /system/lib는 이름·크기만 모음"
   fi
+  diag_dongle $_d/dongle "$_bb"
   rm -f $DIAGBB
   if [ -x $HMGAPID ] && [ -d $HMGDATA ] && $HMGAPID ping >/dev/null 2>&1; then
     $HMGAPID engine status > $_d/hmgapi-status.txt 2>&1
@@ -679,6 +911,7 @@ diag() {
   [ -f $NX4_ROOT/logs/ap.log ] && cp $NX4_ROOT/logs/ap.log $_d/logs/ap.log
   [ -d $HMGDATA/logs/$MOD ] && cp -r $HMGDATA/logs/$MOD $_d/logs/service
   [ -f $HMGDATA/install.log ] && cp $HMGDATA/install.log $_d/logs/hmgapi-install.log
+  [ -f $HMGDATA/logs/hmgapi/wifi.log ] && cp $HMGDATA/logs/hmgapi/wifi.log $_d/logs/hmgapi-wifi.log
   for _f in $ROOT/data/local/tmp/nx4-kor-*.txt $ROOT/data/local/tmp/nx4-kor/*.txt; do
     [ -f "$_f" ] && cp "$_f" $_d/logs/
   done
@@ -850,6 +1083,13 @@ fi
 #   재부팅하므로, 그보다 먼저 멈춰야 아무것도 바꾸지 않는다.
 # - 그래서 같은 판에서 관리 앱을 먼저 여는 것(아래, HMG-API가 응답해야 함)보다도 앞이고, 이때는 관리 앱을 열지 않는다
 #   (HMG-API 확인에서 멈출 때와 같다). 안내는 토스트로만 한다
+# NEMESIS가 깔린 차(#75, 2026-11-26 사용자 결정: 순정 시스템에 부하를 더하는 것과 함께 쓰지 않음)도 같은 자리, 같은 방법으로 멈춘다.
+# 설치·업데이트(같은 판 포함)를 하지 않고, HMG-API도 설치·업데이트하지 않는다. 지우기 갈래(위)는 막지 않는다.
+# Korea Projection 폴더 확인(아래)보다 앞이다. 그 폴더만 남고 실행 파일이 없는 차는 아래가 멈춘다
+if [ -f $NMS ]; then
+  log "$NMS 있음: 설치하지 않음"
+  stop_pre "NX4 KOR: $NMS_MSG"
+fi
 if [ -d $KORPROJ ]; then
   log "원본 Korea Projection 패키지가 있음($KORPROJ): 설치하지 않음"
   stop_pre "NX4 KOR: $KORPROJ_MSG"

@@ -535,6 +535,24 @@ final class Report {
         return head + ", 켜짐";
     }
 
+    /**
+     * 한국 카플레이 길안내 칸(#71, 이 모드의 훅 #67): 안 돎(HMG-API 훅 꺼짐) / 꺼 둠(설정 kor_tbt) / 훅이 안 켜짐(HMG-API가
+     * 건너뜀, 이유) / 켜짐(진단 기록 켬) / -(기록 없음). "켜짐"은 HMG-API가 이 모드의 훅을 올렸다는 뜻이다(DiPO 안에서 길안내를
+     * 시작했는지는 HMG-API 앱 Logs 탭, PR #83 리뷰 4). 어느 쪽이든 공식 모드의 길안내는 돌아가므로 판정은 바꾸지 않는다
+     */
+    private String korCell() {
+        // 이번 부팅에 HMG-API 훅이 꺼졌으면 이 모드의 훅도 돌지 않는다(지난 부팅 값이 남지 않게, PR #83 리뷰 3)
+        if ("off".equals(get("hooks"))) return "안 돎 (HMG-API 훅 꺼짐)";
+        if ("off".equals(get("kor_tbt"))) return "꺼 둠 (설정, 공식 모드 길안내로 동작)";
+        String k = get("kor_hooks");
+        if ("off".equals(k)) {
+            String why = get("kor_hooks_why");
+            return "훅이 안 켜짐 (공식 모드 길안내로 동작" + (why.isEmpty() ? "" : ": " + why) + ")";
+        }
+        if ("on".equals(k)) return "on".equals(get("kor_tbt_log")) ? "켜짐 (진단 기록 켬)" : "켜짐";
+        return "-";
+    }
+
     /** 무선 연결용 Wi-Fi 칸(HMG-API가 띄우는 프로젝션 AP) */
     private String apCell() {
         if (yes("ap")) {
@@ -569,6 +587,7 @@ final class Report {
         out.add(new String[] { "공식 무선 모드", wmCell() });
         String h = get("hooks");
         out.add(new String[] { "HMG-API 훅", "on".equals(h) ? "켜짐" : "off".equals(h) ? "꺼짐 (" + (get("hookmap").isEmpty() ? "?" : get("hookmap")) + ", 마지막 부팅 기록)" : "-" });
+        out.add(new String[] { "한국 카플레이 길안내", korCell() });
         out.add(new String[] { "무선 카플레이 기능", yn("feat_carplay") });
         out.add(new String[] { "무선 안드로이드 오토 기능", yn("feat_aa") });
         out.add(new String[] { "순정 핫스팟 기능 (Wi-Fi 칩 전원)", yn("feat_hotspot") });

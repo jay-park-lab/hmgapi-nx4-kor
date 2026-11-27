@@ -30,6 +30,10 @@ wm_hooks=on
 bridge=on
 hooks=on
 hookmap=verified
+kor_hooks=on
+kor_hooks_why=
+kor_tbt=on
+kor_tbt_log=off
 feat_carplay=yes
 feat_aa=yes
 feat_hotspot=yes
@@ -49,7 +53,7 @@ E
 # 무선 연결용 Wi-Fi(프로젝션 AP)가 꺼진 꼴
 noap() { sed -e 's/^ap=yes/ap=no/' -e 's/^ap_mode=projection/ap_mode=none/'; }
 # HMG-API 부팅 보호로 이번 시작의 훅이 꺼진 꼴: 이번 부팅에 무선 연결용 Wi-Fi를 띄우지 않음(ap·ap_boot는 가정).
-# hooks·wm_hooks는 base 그대로(on) 둔다. status.sh(hmg_hooks_load)는 이 둘을 HMG-API 기록의 마지막 "hook map: …, hooks on|off"와
+# hooks·wm_hooks·kor_hooks는 base 그대로(on) 둔다(kor_hooks는 #71). status.sh(hmg_hooks_load)는 이 셋을 HMG-API 기록의 마지막 "hook map: …, hooks on|off"와
 # "mods: loaded <id>" 줄에서 읽는데, 이 줄은 훅 런타임이 쓰고 부팅 보호로 꺼진 시작에는 훅 런타임이 올라오지 않는다. 그래서 앞
 # 시작이 남긴 켜짐 기록이 그대로 남을 것으로 본다(HMG-API rc.8 소스로 추론, PR #58 리뷰 1). 판정("훅 꺼짐")과 자세히 표의 훅 줄
 # ("켜짐")이 엇갈려 보이는 것은 그 때문이다. 차의 값은 docs/design.md "차에서 확인할 것"
@@ -70,8 +74,8 @@ case $S in
     prog 55 run "map을 확인하는 중입니다" 3/5 > $D/prog ;;
   reboot)
     { base | noap; echo "cp_conn=0"; echo "state=reboot"
-      verdict reboot 1 "내비를 3분 후 재부팅해 주세요." no "설치: 재부팅 필요" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
-    prog 100 reboot "무선 카플레이 설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요." "" > $D/prog ;;
+      verdict reboot 1 "[지금 재부팅]을 눌러 내비를 재부팅해 주세요." no "설치: 재부팅 필요" "무선 Wi-Fi: 꺼짐" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+    prog 100 reboot "무선 카플레이 설정을 마쳤습니다. [지금 재부팅]을 눌러 내비를 재부팅해 주세요." "" > $D/prog ;;
   failed)
     M="이 차의 map을 확인하지 못했습니다. USB의 NX4/install.log를 확인해 주세요."
     { base | noap | sed -e 's/^hooks=on/hooks=off/' -e 's/^hookmap=verified/hookmap=mismatch/'; echo "cp_conn=0"; echo "state=fail"
@@ -99,7 +103,7 @@ case $S in
     { base; echo "cp_conn=0"; echo "state=done"; verdict ready 0 "무선 카플레이·안드로이드 오토 준비됨." no "설치: 끝남" "무선 Wi-Fi: 켜짐(HMG-API)" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 done "무선 카플레이·안드로이드 오토 준비됨." "" > $D/prog
     printf 'boot=%s\niph=wifi\niph_t=%s\naa=cpwait\naa_t=%s\n' "$BOOT" $NOW $NOW > $D/hint
-    printf '%s %s %s\n' $NOW "$BOOT" "무선 카플레이 설정을 마쳤습니다. 내비를 3분 후 재부팅해 주세요." > $D/notice ;;
+    printf '%s %s %s\n' $NOW "$BOOT" "무선 카플레이 설정을 마쳤습니다. [지금 재부팅]을 눌러 내비를 재부팅해 주세요." > $D/notice ;;
   bootguard)
     # 수준 1: starts가 6보다 작아 재부팅만으로 훅이 다시 켜짐(status.sh st_verdict)
     M="HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). 내비를 재부팅하고 3분 넘게 켜 두세요. 또 생기면 마지막으로 넣거나 바꾼 모드를 HMG-API 앱에서 꺼 주세요."

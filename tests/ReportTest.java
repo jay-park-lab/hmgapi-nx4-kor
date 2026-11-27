@@ -18,6 +18,7 @@ public class ReportTest {
         "targetdir=/system/onebin/nx4_kr\n" +
         "pkgver=2.0.0\ntested=yes\nhmgapi=version 1.1.0-rc.10 build daa0837 2026-11-26\n" +
         "wm=yes\nwm_ver=2.2.0-rc.9\nwm_on=yes\nwm_hooks=on\nbridge=on\nhooks=on\nhookmap=mapped\n" +
+        "kor_hooks=on\nkor_hooks_why=\nkor_tbt=on\nkor_tbt_log=off\n" +
         "feat_carplay=yes\nfeat_aa=yes\nfeat_hotspot=yes\nfeat_wifi=no\nchip=yes\nwlan0=yes\n" +
         "proj=yes\nap_boot=yes\nap_fail=no\nap=yes\nap_mode=projection\nother_ap=no\nwpa=no\n" +
         "cp_conn=0\nstate=done\nmade=2026-11-23 06:00\n" +
@@ -95,7 +96,7 @@ public class ReportTest {
             && !hasMember("MAX_URL") && !hasMember("ISSUES") && !hasMember("hooksOffAdvice") && !hasMember("stockAp") && !hasMember("modCell"));
 
         // --- 상태표 ---
-        check("표는 14줄, 예/아니요로 표시, 'NX4 KOR' 줄은 pkgver", r.rows().size() == 14 && "예".equals(row(r, "지원 차종"))
+        check("표는 15줄(#71로 \"한국 카플레이 길안내\" 줄을 더함), 예/아니요로 표시, 'NX4 KOR' 줄은 pkgver", r.rows().size() == 15 && "예".equals(row(r, "지원 차종"))
             && "2.0.0".equals(row(r, "NX4 KOR")) && "예".equals(row(r, "무선 카플레이 기능")) && "예".equals(row(r, "순정 핫스팟 기능 (Wi-Fi 칩 전원)")));
         check("  판정 코드 줄(verdict), 카플레이 연결 수", "ready".equals(row(r, "판정 코드")) && "0개".equals(row(r, "카플레이 연결"))
             && "-".equals(row(Report.parse(GOOD.replace("cp_conn=0\n", "")), "카플레이 연결")));
@@ -132,6 +133,17 @@ public class ReportTest {
             && "2.2.0-rc.9, 훅이 안 켜짐".equals(row(Report.parse(GOOD.replace("wm_hooks=on", "wm_hooks=off")), "공식 무선 모드"))
             && row(Report.parse(GOOD.replace("bridge=on", "bridge=off")), "공식 무선 모드").contains("Wireless CarPlay 설정 꺼짐")
             && "-".equals(row(Report.parse(GOOD.replace("wm=yes\n", "")), "공식 무선 모드")));
+        // #71: 이 모드의 한국 카플레이 길안내(훅·설정). 판정은 바꾸지 않고 표에만 보인다
+        Report koff = Report.parse(GOOD.replace("kor_hooks=on", "kor_hooks=off").replace("kor_hooks_why=", "kor_hooks_why=hook point framework.navigation_cluster.update_lane_info isn't mapped on this car (none): its hooks are off here, its other parts still apply"));
+        check("한국 카플레이 길안내 칸(#71): 켜짐, 진단 기록 켬, 설정으로 꺼 둠(훅이 켜졌어도), 훅이 안 켜짐(rc.10의 이유 그대로), HMG-API 훅 꺼짐이면 안 돎, 기록 없음 '-', 판정은 그대로",
+            "켜짐".equals(row(r, "한국 카플레이 길안내"))
+            && "켜짐 (진단 기록 켬)".equals(row(Report.parse(GOOD.replace("kor_tbt_log=off", "kor_tbt_log=on")), "한국 카플레이 길안내"))
+            && "꺼 둠 (설정, 공식 모드 길안내로 동작)".equals(row(Report.parse(GOOD.replace("kor_tbt=on", "kor_tbt=off")), "한국 카플레이 길안내"))
+            && "훅이 안 켜짐 (공식 모드 길안내로 동작: hook point framework.navigation_cluster.update_lane_info isn't mapped on this car (none): its hooks are off here, its other parts still apply)".equals(row(koff, "한국 카플레이 길안내"))
+            && "안 돎 (HMG-API 훅 꺼짐)".equals(row(Report.parse(GOOD.replace("\nhooks=on", "\nhooks=off")), "한국 카플레이 길안내"))
+            && "훅이 안 켜짐 (공식 모드 길안내로 동작)".equals(row(Report.parse(GOOD.replace("kor_hooks=on", "kor_hooks=off")), "한국 카플레이 길안내"))
+            && "-".equals(row(Report.parse(GOOD.replace("kor_hooks=on\n", "").replace("kor_tbt=on\n", "")), "한국 카플레이 길안내"))
+            && "ready".equals(koff.get("verdict")));
         Report hoff = Report.parse(GOOD.replace("hooks=on", "hooks=off").replace("hookmap=mapped", "hookmap=mismatch"));
         check("훅 칸: 꺼짐이면 map 상태와 '마지막 부팅 기록', 기록 없음 '-'", row(hoff, "HMG-API 훅").startsWith("꺼짐 (mismatch")
             && "-".equals(row(Report.parse(GOOD.replace("hooks=on\n", "hooks=\n")), "HMG-API 훅")) && "켜짐".equals(row(r, "HMG-API 훅")));
@@ -168,8 +180,8 @@ public class ReportTest {
         check("  15분 넘게 새로 쓰이지 않은 기록은 멈춘 것으로 봄, 한참 미래 시각도", pr.progRunning("abc-123", 1100 + 900) && !pr.progRunning("abc-123", 1100 + 901)
             && !pr.progRunning("abc-123", 1100 - 901));
         check("  진행 중이면 판정을 바꾸지 않음", pr.progVerdict("abc-123") == null);
-        Report rb = Report.parse(PR.replace("state=run", "state=reboot").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=내비를 3분 후 재부팅해 주세요."));
-        check("  재부팅 필요 → 그 문구가 판정, 노랑", "내비를 3분 후 재부팅해 주세요.".equals(rb.progVerdict("abc-123")) && rb.progLevel() == 1);
+        Report rb = Report.parse(PR.replace("state=run", "state=reboot").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=무선 카플레이 설정을 마쳤습니다. [지금 재부팅]을 눌러 내비를 재부팅해 주세요."));
+        check("  재부팅 필요 → 그 문구가 판정, 노랑", "무선 카플레이 설정을 마쳤습니다. [지금 재부팅]을 눌러 내비를 재부팅해 주세요.".equals(rb.progVerdict("abc-123")) && rb.progLevel() == 1);
         Report rf = Report.parse(PR.replace("state=run", "state=fail").replace("stage=이 차의 map을 만드는 중입니다(1~2분)", "stage=HMG-API가 없습니다."));
         check("  실패 → 그 문구가 판정, 빨강", "HMG-API가 없습니다.".equals(rf.progVerdict("abc-123")) && rf.progLevel() == 2);
         check("  준비됨(done)은 판정을 바꾸지 않음", Report.parse(PR.replace("state=run", "state=done")).progVerdict("abc-123") == null);

@@ -53,27 +53,40 @@ WMDIR=${WMDIR:-$HMGDATA/mods/$WM_ID}
 WMSET=${WMSET:-$HMGDATA/settings/$WM_ID.json}
 wm_on_state() { if [ -f $WMDIR/mod.json ] && [ ! -f $WMDIR/.disabled ]; then echo yes; else echo no; fi; }
 bridge_state() { if $BB grep -q '"bridge" *: *false' $WMSET 2>/dev/null; then echo off; else echo on; fi; }
+# 이 모드의 설정(HMG-API가 /data/hmgapi/settings/<id>.json에 소유자 값만 둔다. 없으면 mod/settings.json 기본: kor_tbt 켬,
+# kor_tbt_log 끔(2.1.2-beta.2부터, mod-test가 settings.json과 같은지 봄), #71). 저장된 값이다: 두 설정은 "apply": "restart"라,
+# HMG-API 앱에서 바꾼 뒤 DiPO가 다시 시작하기 전에는 실제 동작과 다를 수 있다(bridge와 같음, PR #83 리뷰 5)
+KSET=${KSET:-$HMGDATA/settings/$MOD_ID.json}
+kor_tbt_state() { if $BB grep -q '"kor_tbt" *: *false' $KSET 2>/dev/null; then echo off; else echo on; fi; }
+kor_log_state() { if $BB grep -q '"kor_tbt_log" *: *true' $KSET 2>/dev/null; then echo on; else echo off; fi; }
 # HMG-API가 부팅 때마다 남기는 줄(log.log.1이 더 오래됨)에서 마지막 것으로 본다. 이번 부팅의 줄을 놓치면 지난 부팅
 # 기록일 수 있다(HMG-API 로그는 logcat에서 옮겨 적는다). map-check.json은 HMG-API 업데이트로 map이 바뀌어도 ok로 남을 수 있어 로그를 본다.
 #   "hook map: <상태> for …, hooks on|off"(engine/CarMap.java): HMG-API 훅이 켜졌는가와 이 차 map의 상태(none, mismatch, mapped, verified 등)
 #   "mods: loaded <id> <판>" / "mods: <id> not loaded: <이유>"(hook/Mods.java): 공식 무선 모드의 훅이 켜졌는가.
 #     HMG-API는 모드가 선언한 훅 지점이 그 차 map에 없거나(change·replace는 HMG-API map에 있어야 함), 같은 지점을 replace하는
 #     다른 모드와 겹치면(#17) 그 모드를 통째로 건너뛴다. 이유는 HMG-API가 남긴 영문 그대로(지점·모드 이름뿐, 개인정보 없음)
-# _MH: "on", "off <이유>"(200자까지) 또는 빈 값(기록 없음). _HK: "on|off <상태>" 또는 빈 값. 로그는 한 번만 읽는다.
+#   같은 줄로 이 모드(nx4-kor)의 훅(한국 카플레이 길안내, #67)이 켜졌는가도 본다(#71).
+#   부팅마다 그 부팅의 "hook map:" 줄이 "mods:" 줄보다 먼저 온다(HmgApi.zygoteInit). 훅이 꺼진 부팅은 "mods:" 줄을 남기지
+#   않으므로, "hook map:" 줄에서 두 모드의 값을 비운다. 그래야 지난 부팅의 "loaded"가 남지 않는다(PR #83 리뷰 3).
+# _MH·_KH: "on", "off <이유>"(200자까지) 또는 빈 값(기록 없음). _HK: "on|off <상태>" 또는 빈 값. 로그는 한 번만 읽는다.
 HMGLOG=${HMGLOG:-$HMGDATA/logs/hmgapi}
 hmg_hooks_load() {
   [ "$HK_LOADED" = 1 ] && return 0
   HK_LOADED=1
-  _hh=$($BB cat $HMGLOG/log.log.1 $HMGLOG/log.log 2>/dev/null | $BB awk -v id="$WM_ID" '
+  _hh=$($BB cat $HMGLOG/log.log.1 $HMGLOG/log.log 2>/dev/null | $BB awk -v id="$WM_ID" -v kid="$MOD_ID" '
     index($0, "mods: loaded " id " ") > 0 { s = "on"; w = "" }
     index($0, "mods: " id " not loaded") > 0 { s = "off"; w = $0; if (index(w, "not loaded: ") > 0 || index(w, "not loaded live: ") > 0) sub(/.*not loaded( live)?: */, "", w); else w = "(예외, 자세한 이유는 HMG-API 로그)" }
+    index($0, "mods: loaded " kid " ") > 0 { k = "on"; kw = "" }
+    index($0, "mods: " kid " not loaded") > 0 { k = "off"; kw = $0; if (index(kw, "not loaded: ") > 0 || index(kw, "not loaded live: ") > 0) sub(/.*not loaded( live)?: */, "", kw); else kw = "(예외, 자세한 이유는 HMG-API 로그)" }
+    /hook map: / { s = ""; w = ""; k = ""; kw = "" }
     /hook map: .*, hooks on/ { h = "on"; i = index($0, "hook map: "); m = substr($0, i + 10); sub(/[ ,].*/, "", m) }
     /hook map: .*, hooks off/ { h = "off"; i = index($0, "hook map: "); m = substr($0, i + 10); sub(/[ ,].*/, "", m) }
     END { if (s == "off") print "MH off " substr(w, 1, 200); else print "MH " s
+          if (k == "off") print "KH off " substr(kw, 1, 200); else print "KH " k
           if (h != "") print "HK " h " " m; else print "HK " }')
-  _MH=; _HK=
+  _MH=; _HK=; _KH=
   while IFS= read -r _hl; do
-    case "$_hl" in "MH "*) _MH=${_hl#MH } ;; "HK "*) _HK=${_hl#HK } ;; esac
+    case "$_hl" in "MH "*) _MH=${_hl#MH } ;; "HK "*) _HK=${_hl#HK } ;; "KH "*) _KH=${_hl#KH } ;; esac
   done <<HKE
 $_hh
 HKE
@@ -139,14 +152,15 @@ up_s() { $BB awk '{ print int($1) }' $UPTIME 2>/dev/null; }
 # 프로젝션 AP를 기다리는 시간(부팅 뒤 초). HMG-API Wi-Fi 지기는 Android Wi-Fi 서비스가 뜨자마자 한 번 띄우고, 안 되면 약 1분 동안
 # 자주, 그 뒤 30초마다 다시 시도한다. 이 시간 전에는 AP가 없어도(ap.fail이 있어도) "켜는 중"으로 보고, 지나면 "부품 없음"·"못 켬"을 낸다
 AP_WAIT=${AP_WAIT:-300}
+NOWIFI_MSG="이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 무선 카플레이·안드로이드 오토를 쓸 수 없습니다. 유선 연결과 계기판 길안내는 그대로 쓸 수 있습니다."
 
 # --- 판정은 한 곳에서 ---
 # st_collect가 판정에 쓰는 값을 한 번만 구하고(K_*), st_verdict가 차례대로 판정해 V_*에 둔다. 상태 파일(status_kv)에 쓰고,
 # 관리 앱은 상태 파일의 verdict·verdict_lv·verdict_msg를 그대로 보인다.
 # 판정 순서: HMG-API 부팅 보호 → 설치 중 → 이 모드의 차가 아님 → HMG-API 판 → 설치기가 남긴 재부팅 필요·실패 →
 # 공식 무선 모드(설치·켜짐·판) → HMG-API 훅(map) → 공식 모드의 훅 → 무선 카플레이 설정 → 무선 기능 → 프로젝션 AP 요청 →
-# 연결됨 → 다른 Wi-Fi 패키지 → AP 켜짐(준비됨·일반 핫스팟) → Wi-Fi 클라이언트 → AP 꺼짐 → 켜는 중(부팅 뒤 5분 전) →
-# Wi-Fi 부품 없음 → 못 켬.
+# 연결됨 → 다른 Wi-Fi 패키지 → AP 켜짐(준비됨·일반 핫스팟) → Wi-Fi 클라이언트 → 이번 부팅 칩 없음(Wi-Fi 부품 없음) →
+# AP 꺼짐 → 켜는 중(부팅 뒤 5분 전) → Wi-Fi 부품 없음(5분 뒤) → 못 켬.
 st_collect() {
   [ "$SC_DONE" = 1 ] && return 0
   SC_DONE=1
@@ -159,10 +173,17 @@ st_collect() {
   _kv=${K_HMG#*version }; [ "$_kv" = "$K_HMG" ] && _kv=; K_HMGV=${_kv%% *}
   K_WM=$(yesno [ -f $WMDIR/mod.json ]); K_WMV=$(mod_ver $WMDIR/mod.json); K_WMON=$(wm_on_state); K_BRIDGE=$(bridge_state)
   hmg_hooks_load; K_MH=${_MH%% *}; K_MHWHY=; [ "$K_MH" = off ] && K_MHWHY=${_MH#off}; K_HK=${_HK%% *}; K_HKMAP=${_HK#* }
+  K_KH=${_KH%% *}; K_KHWHY=; [ "$K_KH" = off ] && K_KHWHY=${_KH#off }; K_KTBT=$(kor_tbt_state); K_KLOG=$(kor_log_state)
   K_AP=$(yesno ap_on); K_APMODE=$(ap_ssid); K_FOREIGN=$(yesno foreign_hostapd)
   K_CP=$(cp_count); K_WPA=$(yesno running wpa_supplicant)
   K_WLAN=$(yesno [ -d $SYSNET/$WIF ]); K_CHIP=$(yesno wifi_chip_seen)
+  # 이번 부팅에 칩이 없음(svc/nochip.sh의 이번 부팅 기록, 없으면 지금 커널 기록으로 lib.sh nochip_now), 그리고 nochip.sh가 ap.boot를 썼는가
+  # 기록 뒤에 동글을 꽂았으면(칩·wlan0·동글이 보임) 기록을 믿지 않는다(lib.sh nochip_mark)
+  K_NOCHIPW=$(yesno nochip_mark); K_NOCHIP=$K_NOCHIPW; [ $K_NOCHIP = yes ] || K_NOCHIP=$(yesno nochip_now)
   K_PROJ=$(yesno proj_asked $WM_ID); K_APBOOT=$(yesno this_boot $HMGWIFI/ap.boot); K_APFAIL=$(yesno this_boot $HMGWIFI/ap.fail)
+  # nochip.sh가 쓴 ap.boot는 AP가 뜬 것이 아니고, 그 뒤 지기는 다시 시도하지 않는다. 그래서 ap_boot·ap_fail을 둘 다 no로 둔다:
+  # 관리 앱 표가 "이번 부팅에 켰다가 꺼짐"·"다시 시도 중"을 보이지 않고, apoff 판정에도 들지 않는다(PR #86 리뷰 1)
+  [ $K_NOCHIPW = yes ] && { K_APBOOT=no; K_APFAIL=no; }
   K_UP=$(up_s); case "$K_UP" in ''|*[!0-9]*) K_UP= ;; esac
   # HMG-API 부팅 보호. HMG-API가 설치돼 있을 때만 본다(지운 차·disable로 끈 차는 starts가 남아도 아님).
   # 이번 부팅 커널 로그에 zygote 줄이 있으면 그것을 따른다(마지막 줄: guard면 맞음, on·다른 off면 아님). 줄이 없을 때만(로그가
@@ -210,7 +231,10 @@ st_verdict() {
   elif [ -z "$K_HMGV" ]; then _vs nohmgapi 2 "$NOHMG_MSG"
   elif ver_lt "$K_HMGV" $HMG_MIN; then _vs oldhmgapi 2 "지원하지 않는 HMG-API 버전입니다. $HMG_MIN 이상으로 업데이트해 주세요."
   # 설치기가 이번 부팅에 남긴 결과(진행 기록). 실패 이유는 설치기가 stage에 한국어 문장으로 쓴다
-  elif [ "$K_PST" = reboot ]; then _vs reboot 1 "내비를 3분 후 재부팅해 주세요."
+  # 재부팅 문구에 몇 분 기다리라는 말을 두지 않는다: 설치기는 재부팅을 안내하기 전에 부팅 보호 확인을 기다리고, [지금 재부팅]은
+  # 보호에 걸릴 때 스스로 막는다(take_rbreq). 보호는 켜진 지 2분 안의 재부팅이 6번 이어져야 걸린다(2.0.x의 3분 기다리기는
+  # HMG-API rc.4의 3번 규칙 때 것)
+  elif [ "$K_PST" = reboot ]; then _vs reboot 1 "[지금 재부팅]을 눌러 내비를 재부팅해 주세요."
   elif [ "$K_PST" = fail ] && [ -n "$K_PSTAGE" ]; then _vs failed 2 "$K_PSTAGE"
   # 공식 무선 모드(wireless-carplay-aa). 이 모드는 requires로 걸지 않으므로(lib.sh WM_ID) 없거나 꺼진 것을 여기서 알린다
   elif [ "$K_WM" = no ]; then
@@ -224,18 +248,18 @@ st_verdict() {
       mapped) _vs hooksoff 1 "HMG-API 훅이 꺼져 있습니다. HMG-API 앱 Settings에서 'Check the map on this car'를 누른 뒤 내비를 재부팅해 주세요." ;;
       none) _vs hooksoff 1 "HMG-API에 이 차의 map이 없어 훅이 꺼져 있습니다. NX4 KOR USB 설치기를 다시 실행해 주세요(map을 만들고 확인합니다)." ;;
       mismatch) _vs hooksoff 1 "HMG-API map이 이 차의 소프트웨어와 맞지 않아 훅이 꺼져 있습니다. 내비 소프트웨어를 업데이트했다면 HMG-API와 NX4 KOR를 다시 설치해 주세요." ;;
-      *) _vs hooksoff 1 "HMG-API 훅이 꺼져 있습니다(마지막 부팅 기록). 내비를 3분 후 재부팅한 뒤 다시 확인해 주세요." ;;
+      *) _vs hooksoff 1 "HMG-API 훅이 꺼져 있습니다(마지막 부팅 기록). 내비를 재부팅한 뒤 다시 확인해 주세요." ;;
     esac
   elif [ "$K_MH" = off ]; then
     # 같은 지점을 replace하는 다른 모드와 겹치면(#17) HMG-API는 load 차례가 뒤인 모드를 끄고 이유에 "conflict"를 남긴다
     case "$K_MHWHY" in
       *conflict*) _vs wmhooksoff 2 "$WM_NAME가 다른 모드와 같은 훅을 써서 꺼졌습니다. HMG-API 앱의 Mods에서 겹치는 모드를 끈 뒤 내비를 재부팅해 주세요." ;;
-      *) _vs wmhooksoff 2 "HMG-API가 이 차에서 $WM_NAME의 훅을 켜지 못했습니다. 내비를 3분 후 재부팅해도 같으면 HMG-API 앱의 Mods에서 이유를 확인해 주세요." ;;
+      *) _vs wmhooksoff 2 "HMG-API가 이 차에서 $WM_NAME의 훅을 켜지 못했습니다. 내비를 재부팅해도 같으면 HMG-API 앱의 Mods에서 이유를 확인해 주세요." ;;
     esac
   elif [ "$K_BRIDGE" = off ]; then
     _vs bridgeoff 2 "HMG-API 앱의 $WM_NAME 설정에서 'Wireless CarPlay'가 꺼져 있습니다. 켜고 변경 사항을 적용한 뒤 내비를 재부팅해 주세요."
   elif ! k_feat com.hkmc.software.connectivity.carplay_wireless; then
-    _vs nofeat 2 "무선 카플레이 기능이 아직 켜지지 않았습니다. HMG-API 앱에서 변경 사항을 적용했는지 확인하고 내비를 3분 후 재부팅해 주세요."
+    _vs nofeat 2 "무선 카플레이 기능이 아직 켜지지 않았습니다. HMG-API 앱에서 변경 사항을 적용했는지 확인하고 내비를 재부팅해 주세요."
   elif [ "$K_PROJ" = no ]; then
     _vs noproj 2 "HMG-API가 무선 연결용 Wi-Fi(프로젝션 AP)를 띄우도록 설정되지 않았습니다. HMG-API 앱에서 변경 사항을 적용한 뒤 내비를 재부팅해 주세요."
   elif [ "$_vconn" = yes ]; then _vs connected 0 "무선 카플레이 연결됨"
@@ -244,28 +268,34 @@ st_verdict() {
     _vs otherwifi 2 "다른 Wi-Fi 패키지가 Wi-Fi를 쓰고 있어 함께 쓸 수 없습니다. 그 패키지를 지운 뒤 내비를 재부팅해 주세요."
   elif [ "$K_AP" = yes ] && [ "$K_APMODE" = hotspot ]; then
     # 순정 일반 핫스팟(S1)으로 떠 있음: 폰이 카플레이 Wi-Fi(S2)를 찾지 못한다. HMG-API 지기는 이미 떠 있는 AP는 그대로 둔다
-    _vs aphotspot 1 "내비 Wi-Fi가 일반 핫스팟으로 켜져 있어 무선 카플레이가 붙지 않을 수 있습니다. 순정 핫스팟을 끄고 내비를 3분 후 재부팅해 주세요."
+    _vs aphotspot 1 "내비 Wi-Fi가 일반 핫스팟으로 켜져 있어 무선 카플레이가 붙지 않을 수 있습니다. 순정 핫스팟을 끄고 내비를 재부팅해 주세요."
   elif [ "$K_AP" = yes ]; then _vs ready 0 "무선 카플레이·안드로이드 오토 준비됨."
   elif [ "$K_WPA" = yes ]; then
     # 내비의 Wi-Fi 클라이언트(HMG-API 집 Wi-Fi 포함)가 켜져 있으면 HMG-API 지기는 라디오를 건드리지 않는다(Wi-Fi 칩은 하나)
     _vs wificlient 1 "내비가 일반 Wi-Fi에 접속하는 중이라 무선 연결용 Wi-Fi가 꺼져 있습니다. HMG-API 앱의 Home Wi-Fi를 쓰면 주차를 풀 때 돌아옵니다."
+  elif [ "$K_NOCHIP" = yes ] && k_feat com.hkmc.software.wifihotspot; then
+    # 이번 부팅에 칩이 없음(nochip.sh 기록 또는 lib.sh nochip_now: 이 내비에서 칩을 본 적 없음, wlan0 없음, 순정 드라이버가 이번 부팅에 칩 켜기를
+    # 포기함). 그 부팅에는 칩이 올라오지 않으므로 아래 "켜는 중"(부팅 뒤 5분)을 기다리지 않는다. 핫스팟 기능은 아래와 같이 본다
+    _vs nowifipart 1 "$NOWIFI_MSG"
   elif [ "$K_APBOOT" = yes ]; then
-    # 이번 부팅에 떴다가 지금은 꺼짐(차가 끈 것은 HMG-API 지기가 다시 켜지 않는다). 폰이 붙을 때 공식 모드가 다시 켠다(HMG-API rc.8)
-    _vs apoff 1 "무선 연결용 Wi-Fi가 지금 꺼져 있습니다. 폰을 연결해 보고, 안 되면 내비를 3분 후 재부팅해 주세요."
+    # 이번 부팅에 떴다가 지금은 꺼짐(차가 끈 것은 HMG-API 지기가 다시 켜지 않는다). 폰이 붙을 때 공식 모드가 다시 켠다(HMG-API rc.8).
+    # svc/nochip.sh가 쓴 ap.boot는 위 st_collect에서 빼 두었다(칩 없는 부팅, 핫스팟 기능이 꺼진 드문 경우도 여기에 들지 않음)
+    _vs apoff 1 "무선 연결용 Wi-Fi가 지금 꺼져 있습니다. 폰을 연결해 보고, 안 되면 내비를 재부팅해 주세요."
   elif [ -z "$K_UP" ] || [ "$K_UP" -lt "$AP_WAIT" ]; then
     # 부팅 뒤 AP_WAIT(5분) 전: 지기는 첫 시도가 실패하면 바로 ap.fail을 쓰고 다시 시도한다. 칩이 SDIO에 늦게 올라오는 첫 부팅도 있어
-    # 그 사이에는 "부품 없음"·"못 켬"으로 굳히지 않는다(PR #50 리뷰 3)
-    _vs apwait 1 "무선 연결용 Wi-Fi를 켜는 중입니다. 1~2분 뒤 화면을 다시 열어 주세요."
+    # 그 사이에는 "부품 없음"·"못 켬"으로 굳히지 않는다(PR #50 리뷰 3). 켜는 것은 이 모드가 아니라 HMG-API다
+    _vs apwait 1 "HMG-API가 무선 연결용 Wi-Fi를 켜는 중입니다. 1~2분 뒤 화면을 다시 열어 주세요."
   elif [ "$K_CHIP" = no ] && [ "$K_WLAN" = no ] && [ "$K_APFAIL" = yes ] && k_feat com.hkmc.software.wifihotspot; then
     # 부팅 뒤 5분이 지났고, 칩 전원이 달린 순정 핫스팟 기능은 켜졌는데(HMG-API가 켬) 칩이 SDIO에 한 번도 보이지 않았고(HMG-API의
     # public/wifi-chip도 없음), wlan0이 없고, HMG-API가 이번 부팅에 AP를 띄우지 못했다. 2026-11-23 NX4HEV 260902가 이랬다(커널
     # "failed to power up DHD generic adapter", #38). 무선은 USB Wi-Fi 동글(#48)로. 동글이 wlan0을 만들면 이 판정으로 가지 않는다.
-    # 유선 카플레이·안드로이드 오토와 계기판 길안내(공식 모드)는 그대로라 "이 차는 안 됨"(지우는 법)으로 끝내지 않는다
-    _vs nowifipart 1 "이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 무선 카플레이·안드로이드 오토를 쓸 수 없습니다. 유선 연결과 계기판 길안내는 그대로 쓸 수 있습니다."
+    # 유선 카플레이·안드로이드 오토와 계기판 길안내(공식 모드)는 그대로라 "이 차는 안 됨"(지우는 법)으로 끝내지 않는다.
+    # 커널 줄이 밀려나 위 "이번 부팅 칩 없음"을 못 본 경우의 판정이다
+    _vs nowifipart 1 "$NOWIFI_MSG"
   elif [ "$K_APFAIL" = yes ]; then
-    _vs apfail 1 "HMG-API가 무선 연결용 Wi-Fi를 아직 켜지 못했습니다(다시 시도하는 중). 내비를 3분 후 재부팅해도 같으면 HMG-API 기록(/data/hmgapi/logs/hmgapi/wifi.log)을 확인해 주세요."
+    _vs apfail 1 "HMG-API가 무선 연결용 Wi-Fi를 아직 켜지 못했습니다(다시 시도하는 중). 내비를 재부팅해도 같으면 HMG-API 기록(/data/hmgapi/logs/hmgapi/wifi.log)을 확인해 주세요."
   else
-    _vs apfail 1 "HMG-API가 이번 부팅에 무선 연결용 Wi-Fi를 켜지 않았습니다. 내비를 3분 후 재부팅해도 같으면 HMG-API 기록(/data/hmgapi/logs/hmgapi/wifi.log)을 확인해 주세요."
+    _vs apfail 1 "HMG-API가 이번 부팅에 무선 연결용 Wi-Fi를 켜지 않았습니다. 내비를 재부팅해도 같으면 HMG-API 기록(/data/hmgapi/logs/hmgapi/wifi.log)을 확인해 주세요."
   fi
   # 차주용 요약 3줄
   case "$V_CODE" in
@@ -303,6 +333,11 @@ status_kv() {
   echo "bridge=$K_BRIDGE"
   echo "hooks=$K_HK"
   echo "hookmap=$K_HKMAP"
+  # 이 모드의 한국 카플레이 길안내(#67, #71): 훅(on|off|빈 값)과 그 이유(HMG-API 영문 그대로), 설정 kor_tbt·kor_tbt_log
+  echo "kor_hooks=$K_KH"
+  echo "kor_hooks_why=$K_KHWHY"
+  echo "kor_tbt=$K_KTBT"
+  echo "kor_tbt_log=$K_KLOG"
   echo "feat_carplay=$(yesno k_feat com.hkmc.software.connectivity.carplay_wireless)"
   echo "feat_aa=$(yesno k_feat com.hkmc.software.connectivity.androidauto_wireless)"
   # 칩 전원이 달린 순정 핫스팟 기능(HMG-API가 공식 모드의 요청으로 켬)
@@ -310,6 +345,9 @@ status_kv() {
   echo "feat_wifi=$(yesno k_feat android.hardware.wifi)"
   echo "chip=$K_CHIP"
   echo "wlan0=$K_WLAN"
+  # 이번 부팅에 칩이 없음(순정 드라이버가 포기함, svc/nochip.sh), 그래서 nochip.sh가 HMG-API의 다시 시도를 멈춤(ap.boot를 씀)
+  echo "nochip=$K_NOCHIP"
+  echo "nochip_mark=$K_NOCHIPW"
   # HMG-API 프로젝션 AP: 요청됨(state/wifi.txt), 이번 부팅에 띄움(ap.boot)·못 띄움(ap.fail), 지금 hostapd가 돎, 어느 SSID로 떴는지
   echo "proj=$K_PROJ"
   echo "ap_boot=$K_APBOOT"

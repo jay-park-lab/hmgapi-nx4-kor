@@ -3,18 +3,21 @@
 투싼 NX4 한국 내비(260902) 전용 HMG-API 모드. 사용 안내는 `README.md`에 있습니다.
 
 - 앱 이름: 지금까지 '상태 화면 앱'이라 부르던 `io.github.jayparklab.nx4kor`는 '관리 앱'이라고 부릅니다(2026-11-25 사용자 결정. 상태만 보는 앱이 아니라 [지금 재부팅], 진단 기록 확인 창, 앞으로 동글 켜기 등도 하기 때문).
-- **방향(2026-11-23 결정):** 2.1.0부터 "HMG-API + 공식 무선 모드(고치지 않음) + 이 저장소의 NX4 추가분(USB 설치기, 관리 앱, 나중에 동글)"으로 다시 짭니다.
-  - 근거와 역할 표는 [#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38)과 `docs/design.md` "2.1.0 새 구조", 할 일은 [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)(마일스톤 2.1.0)에 있습니다.
+- **구조(2026-11-23 결정. 2.1.0은 2026-11-25 태그만 있고 릴리스 묶음 없음, 2.1.1 정식 2026-11-26, 2.1.2 정식 2026-11-27):** "HMG-API + 공식 무선 모드(고치지 않음) + 이 저장소의 NX4 추가분(USB 설치기, 관리 앱, 한국 카플레이 길안내 훅, 2.2.0에서 동글)"입니다.
+  - **다른 프로젝트(공식 무선 모드, HMG-API, Korea Projection)에 기여하는 길은 선택지에 넣지 않습니다**(2026-11-25 사용자 결정). 고침과 한국 맞춤은 이 저장소의 모드에 넣습니다. 공식 모드와 같은 훅 지점은 `change`·`observe`로만 겁니다(`replace`로 겹치면 공식 모드가 꺼짐, #17).
+  - 한국 카플레이 길안내([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)): KP·HMG-Seogaemo의 보정을 `hooks/`로 가져와 공식 모드 옆 DiPO에서 돌립니다(`docs/design.md` "한국 카플레이 길안내").
+  - 근거와 역할 표는 [#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38)과 `docs/design.md` "2.1.0 구조"에 있습니다. 2.1.0의 할 일 [#45](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/45)와 첫 차 확인 [#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)은 닫았습니다.
+  - 다음 판 2.2.0(마일스톤 2.2.0)은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))과 관리 앱 동글 켜기([#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60))입니다. 우리 모드에 넣을 다른 한국 맞춤과 남은 차 확인은 [#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64)에 있습니다.
   - 모드(`mod/`)와 관리 앱 판정은 2.1.0 구조로 바꿨습니다(한국 포크 무선 모드 2.4.5와 `svc/hotspot.sh`를 빼고 관리 앱·`launch` 서비스·`svc/lib.sh`만 남김). USB 설치기(`usb/troubleShooter`, `scripts/build.sh`)도 2.1.0 구조로 바꿨습니다(HMG-API 쪽 일, 공식 무선 모드 설치, 옛 2.0.x 되돌리기, map·적용, PR #52). 2.0.x는 정식 없이 끝냅니다.
-  - 2.0.x의 마지막 `release/2.0.4`(`v2.0.4-beta.1`)는 `main`에 합치지 않고 지웁니다.
-- 관리 앱은 지금 UI를 그대로 둡니다(사용자 결정).
+  - 2.0.x의 마지막 `release/2.0.4`(`v2.0.4-beta.1`)는 `main`에 합치지 않고 지웠습니다.
+- 관리 앱은 지금 UI를 그대로 둡니다(사용자 결정). 예외로 결과 화면 제목 줄 왼쪽 위의 `<`는 차 화면 맨 위 시스템 줄의 `<`와 겹쳐 뺐습니다(2026-11-27 사용자 결정).
 
 ## 문서 위치
 
 | 경로 | 내용 |
 |---|---|
 | `README.md` | 설치·상태 확인·삭제 안내, 저장소 구성, 만들기와 시험 |
-| `docs/design.md` | 2.1.0 새 구조, 모드 구성, 관리 앱(판정 차례·재부팅 요청), 설치기, 다른 패키지·모드와 함께 쓸 때, 차에서 확인할 것 |
+| `docs/design.md` | 2.1.0 구조, 모드 구성, 관리 앱(판정 차례·재부팅 요청), 설치기, 다른 패키지·모드와 함께 쓸 때, 차에서 확인할 것 |
 | `docs/flow.md` | 2.1.0 처리 흐름 그림(mermaid): 누가 무엇을 하나, USB 설치·업데이트, 재부팅 뒤 무선 연결, 관리 앱, 지우기. `design.md`의 요약 |
 | `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때(설치기·관리 앱 문구별 할 일, 부팅 보호, 되돌리기, 남길 기록) |
 | `docs/emulator-test.md` | 에뮬레이터에서 관리 앱 테스트(SDK·AVD 준비, 시나리오, [지금 재부팅] 흐름, 이 테스트가 보지 않는 것) |
@@ -27,7 +30,7 @@
 - 설계·시험 문서는 `docs/`에 둡니다. 새로 만들면 위 표와 `README.md`의 "만들기와 시험" 표에 함께 적습니다.
 - 동작을 바꾸면 같은 변경에서 해당 문서도 고칩니다.
 - 정하지 않은 일(사용자의 결정을 기다리는 안, 지원할지 정하지 않은 판 등)과 이후 할 일은 GitHub 이슈로 관리합니다(`gh issue create --label "결정 필요"` 등). 저장소 문서에는 따로 목록을 두지 않고 이슈 링크(`[#번호](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/번호)`)로 가리킵니다. 이슈에는 지금 상태, 정할 것, 아는 선택지, 근거(문서·코드·PR)를 적습니다. 정해지면 결정·날짜·반영한 PR을 이슈에 적고 닫습니다. 정하지 않기로 하면 그 이유를 적고 닫습니다. 예전 `docs/open-issue.md`의 OI-1~10은 #13~#22로 옮겼습니다.
-- 해야 할 것이 정해진 확인 목록(예: `docs/design.md` "차에서 확인할 것")은 그 문서에 그대로 둡니다. 확인 결과는 `차 확인` 이슈(#23)에 적고, 결과로 무엇을 할지 정해야 하면 `결정 필요` 이슈를 엽니다.
+- 해야 할 것이 정해진 확인 목록(예: `docs/design.md` "차에서 확인할 것")은 그 문서에 그대로 둡니다. 확인 결과는 그 항목을 맡은 이슈(무선·동글은 #48, 그 밖은 #64, 새 항목이면 `차 확인` 라벨로 새 이슈)에 적고, 결과로 무엇을 할지 정해야 하면 `결정 필요` 이슈를 엽니다.
 
 ## 스킬
 
@@ -61,4 +64,4 @@
 - PC 스크립트는 `scripts/local-env.sh`(`nx4_env`, `nx4_need`)로 저장소 맨 위 `.env.local`(git 제외)에서 읽고, 값이 없으면 멈춥니다. 명령 앞에 준 값이 `.env.local`보다 앞섭니다.
 - 새 경로 변수는 `.env.example`에 설명과 함께 더합니다.
 - 워크트리에는 `.env.local`이 없습니다. 메인 체크아웃의 것을 명령 앞에 `NX4_ENV_FILE=<메인 체크아웃>/.env.local`로 가리킵니다. 주지 않으면 빌드 스크립트는 멈추고 `tests/mod-test.sh`는 빌드·HMG-API 엔진 시험을 건너뜁니다.
-- `tests/mod-test.sh`는 `.env.local`에서 `HMGAPI_SRC`만 읽고, 시험이 부르는 스크립트는 `.env.local`을 읽지 않게 합니다(`NX4_ENV_FILE=`).
+- `tests/mod-test.sh`는 `.env.local`에서 `HMGAPI_SRC`·`ANDROID_HOME`만 읽고(`ANDROID_HOME`은 `hooks.jar`를 진짜로 만들 때), 시험이 부르는 스크립트는 `.env.local`을 읽지 않게 합니다(`NX4_ENV_FILE=`).

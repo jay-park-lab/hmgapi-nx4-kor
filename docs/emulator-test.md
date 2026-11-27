@@ -115,7 +115,7 @@ done
 
 결과 화면은 순정 설정 상세 화면 모양입니다([`design.md`](design.md) "관리 앱").
 
-- 위 제목 줄: 가운데 "NX4 KOR 2.0.0", 왼쪽 위 `<`([닫기])
+- 위 제목 줄: 가운데 "NX4 KOR 2.0.0"만(앱 안 `<`는 2026-11-27에 뺌. 닫기는 뒤로 키)
 - 왼쪽 칸: 요약 3줄(흰 제목, 회색 값)과 "자세히" 표, 맨 아래 확인 시각·앱 판·화면 크기 줄
 - 오른쪽 칸: 판정과 안내, 맨 아래 [지금 재부팅] 블록(시안 글자)
 
@@ -123,17 +123,17 @@ done
 
 | 시나리오 | 넣는 것 | 볼 것 |
 |---|---|---|
-| `ready` | `verdict=ready`, 진행 100% | 시안 세로 표시와 시안 글자 "무선 카플레이·안드로이드 오토 준비됨."(띠 없음), [지금 재부팅]. 왼쪽 칸에 설치 "끝남", 무선 Wi-Fi "켜짐(HMG-API)", 폰 연결 "지금 연결된 폰 없음", "자세히" 표(공식 무선 모드 "2.2.0-rc.9, 켜짐", 무선 연결용 Wi-Fi "켜짐") |
+| `ready` | `verdict=ready`, 진행 100% | 시안 세로 표시와 시안 글자 "무선 카플레이·안드로이드 오토 준비됨."(띠 없음), [지금 재부팅]. 왼쪽 칸에 설치 "끝남", 무선 Wi-Fi "켜짐(HMG-API)", 폰 연결 "지금 연결된 폰 없음", "자세히" 표(공식 무선 모드 "2.2.0-rc.9, 켜짐", 한국 카플레이 길안내 "켜짐"(#71), 무선 연결용 Wi-Fi "켜짐") |
 | `connected` | `cp_conn=1`, `verdict=connected` | 시안 표시와 시안 "무선 카플레이 연결됨", 왼쪽 칸 폰 연결 "카플레이 1대 연결됨" |
 | `installing` | 진행 `pct=55`, `step=3/5`, `state=run` | 결과 화면 대신 설치 진행 화면(가운데 정렬): "NX4 KOR 2.0.0 설치 중", "단계 3/5 · map을 확인하는 중입니다", 시안 막대 55%, 시안 "55%"와 회색 "경과 2분 02초", 회색 "보통 5분 안에 끝납니다 …", 맨 아래 [닫기] 블록 |
-| `reboot` | `verdict=reboot` | 노란 띠 "내비를 3분 후 재부팅해 주세요." |
+| `reboot` | `verdict=reboot` | 노란 띠 "[지금 재부팅]을 눌러 내비를 재부팅해 주세요." |
 | `failed` | `verdict=failed`(설치기가 쓴 실패 문장), `hookmap=mismatch` | 빨간 띠(설치기 문장), 왼쪽 칸 설치 "안 됨(오른쪽 안내를 보세요)" |
 | `nowireless` | `verdict=nowireless`, `wm=no` | 빨간 띠 "공식 무선 모드(Wireless CarPlay + Android Auto)가 설치되어 있지 않습니다 …", 표의 공식 무선 모드 "없음 (설치 필요)" |
 | `nowifipart` | `verdict=nowifipart`(수준 1), `chip=no`, `ap_fail=yes` | 노란 띠 "이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 …"(지우는 법 줄 없음), 왼쪽 칸 무선 Wi-Fi "부품 없음(USB 동글 필요)", 표의 Wi-Fi 칩 "안 보임" |
 | `nocar` | 다른 차 `product`, `verdict_end=yes` | 빨간 띠 "지원하지 않는 차입니다 …"와 그 아래 회색 지우는 방법 안내 |
 | `nobb` | 짧은 상태 파일(`support=nobb`) | 노란 띠 "이 내비에서는 동작하지 않습니다(busybox를 실행하지 못함) …", 왼쪽 칸은 요약 없이 짧은 표, **[지금 재부팅] 없음** |
 | `hint` | `ready`와 같고 힌트(`iph=wifi`, `aa=cpwait`)·알림 | 시안 판정 아래 노란 띠 두 개(아이폰 Wi-Fi 다시 연결, 안드로이드 오토는 카플레이 연결 중이라 대기), 연노랑 띠 "알림 HH:MM …", 맨 아래 [지금 재부팅] |
-| `bootguard` | `verdict=bootguard`(수준 1, HMG-API 부팅 보호), 무선 연결용 Wi-Fi 꺼짐. `hooks`·`wm_hooks`는 앞 시작의 기록 그대로 `on`(`scen.sh` `guard()` 주석, 차의 값은 [`design.md`](design.md) "차에서 확인할 것") | 노란 띠 "HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). …"(5줄), 맨 아래 [지금 재부팅]. 왼쪽 칸 설치 "HMG-API 훅 꺼짐(부팅 보호)", 무선 Wi-Fi "꺼짐". 표의 공식 무선 모드 "2.2.0-rc.9, 켜짐", HMG-API 훅 "켜짐"(판정과 엇갈림) |
+| `bootguard` | `verdict=bootguard`(수준 1, HMG-API 부팅 보호), 무선 연결용 Wi-Fi 꺼짐. `hooks`·`wm_hooks`·`kor_hooks`는 앞 시작의 기록 그대로 `on`(`scen.sh` `guard()` 주석, 차의 값은 [`design.md`](design.md) "차에서 확인할 것") | 노란 띠 "HMG-API가 이번 부팅에만 무선 기능을 껐습니다(부팅 보호). …"(5줄), 맨 아래 [지금 재부팅]. 왼쪽 칸 설치 "HMG-API 훅 꺼짐(부팅 보호)", 무선 Wi-Fi "꺼짐". 표의 공식 무선 모드 "2.2.0-rc.9, 켜짐", HMG-API 훅 "켜짐", 한국 카플레이 길안내 "켜짐"(판정과 엇갈림) |
 | `bootguard2` | `bootguard`와 같고 수준 2 | 빨간 띠 "HMG-API가 재부팅이 너무 잦은 것으로 보고 무선 기능을 껐습니다. …"(5줄), 왼쪽 칸은 `bootguard`와 같음 |
 
 각 파일의 키는 `mod/bin/status.sh`(`status_kv`, `st_verdict`)와 `app/java/.../Report.java`를 따릅니다. 판정 코드를 더하거나 문구를 바꾸면 `scen.sh`에도 같은 경우를 넣습니다.
@@ -161,7 +161,7 @@ done
 
 - [지금 재부팅]은 오른쪽 칸 맨 아래에 붙어 있어 힌트·알림 줄과 관계없이 (1600, 672)입니다.
 - 확인 창의 [재부팅]은 (1200, 471)입니다.
-- 왼쪽 위 `<`([닫기])는 (60, 85)입니다.
+- 닫기는 뒤로 키(`keyevent 4`)입니다. 앱 안 왼쪽 위 `<`는 없습니다. 차에서는 시스템 줄의 `<`로 닫힐 것으로 보지만, 아직 차에서 확인하지 않았습니다(아래 "이 시험이 보지 않는 것").
 - 버튼 안내(보냄·거절·실패)는 버튼 바로 위에 나옵니다.
 
 ```sh
@@ -186,8 +186,9 @@ $ADB shell input tap 1600 672; sleep 1
 $ADB shell input tap 1200 471; sleep 1
 sh tests/emu/watch.sh answer cmd; sleep 2; shot rb-failed
 
-# 5. 왼쪽 위 < → 화면이 닫히고 런처로 돌아감
-$ADB shell input tap 60 85; sleep 1; shot closed
+# 5. 뒤로 키 → 화면이 닫히고 런처로 돌아감. 왼쪽 위(60, 85)를 눌러도 아무 일 없음(앱 안 < 없음)
+$ADB shell input tap 60 85; sleep 1; shot no-back
+$ADB shell input keyevent 4; sleep 1; shot closed
 ```
 
 `watch.sh answer`는 앱이 쓴 `reboot.req`의 id를 그대로 씁니다. [재부팅]을 누르기 전에 부르면 요청이 없다고 멈춥니다.
@@ -256,8 +257,18 @@ sh scripts/build-app.sh               # .env.local의 NX4_APP_KEYS(배포용 키
 - 순정 화면과 얼마나 같은지. 색·크기는 매뉴얼 그림에서 잰 근사값입니다([#28](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/28)).
 - 차의 실제 재부팅. 이 시험의 `watch.sh`는 감시자의 답만 흉내 냅니다.
 - 진단 확인 창이 DSP OTA 화면 위에 뜨는지, USB 설치기가 답을 기다리는 흐름. 설치기 쪽은 `tests/mod-test.sh`가 가짜 `am`으로 봅니다.
+- 차 화면 맨 위 시스템 줄의 `<`가 앱에 뒤로 키로 가는지. 이 시험은 `keyevent 4`만 봅니다(차에서 확인, [`design.md`](design.md) "차에서 확인할 것", 결과는 [#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64)).
 
 ## 마지막 결과
+
+2026-11-27, 제목 줄의 앱 안 `<`를 뺀 앱(테스트 키), 같은 에뮬레이터·이미지, 창 없이.
+
+- `nowifipart`: 제목 줄에 가운데 "NX4 KOR 2.0.0"만 보이고 왼쪽 위 `<`가 없음. 나머지(노란 띠, 요약 3줄, [지금 재부팅])는 전과 같음.
+- 왼쪽 위(60, 85)를 눌러도 관리 앱이 그대로 앞에 있음. 뒤로 키(`keyevent 4`)를 누르면 런처로 돌아감.
+- `installing`: 설치 진행 화면은 전과 같음(제목 줄이 없고 맨 아래 [닫기] 블록).
+- `logcat`에 이 앱의 크래시 없음(에뮬레이터가 켜질 때의 `BatteryService` 한 건뿐).
+
+아래는 그 전 결과입니다.
 
 2026-11-24, PR #50(2.1.0 상태 판정)의 앱(테스트 키), 에뮬레이터 37.2.13, Android 7.0 arm64 이미지, 창 없이(`-no-window`) 띄워 화면을 찍음.
 
