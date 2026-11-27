@@ -222,7 +222,7 @@ docker context use colima
 - 드라이버 원본: hyeondg/rtl8831bu(Realtek 드라이버 v1.19.10). 저장소에 LICENSE 파일은 없고, 소스 머리말이 Realtek의 GPL-2.0("version 2 of the GNU General Public License")입니다. LICENSE 없는 개인 저장소라 사라질 수 있으므로, 4단계에서 `.ko`를 내보낼 때 이 커밋의 소스 사본을 모비스 커널 소스처럼 이 저장소의 릴리스 자산으로 둡니다(GPL-2.0 대응 소스, PR #81 리뷰 4, #48)
 - 내비 커널 소스: 현대모비스 AVNT STD G50 WIDE(R9) 오픈소스(Linux Kernel, GPL-2.0). 위 "커널 소스 자산"
 - 커널 뼈대: kernel.org Linux 3.18.24(GPL-2.0)
-- 모드에 `.ko`를 넣어 내보낼 때는 이 폴더, 드라이버 원본 커밋, 커널 소스 자산·kernel.org 위치를 함께 냅니다(GPL-2.0 대응 소스, #48 4단계).
+- 모드에 `.ko`를 넣어 내보낼 때는 대응 소스를 함께 냅니다(GPL-2.0, #48 4단계). 릴리스마다 `scripts/driver-source.sh`가 만든 `hmgapi-nx4-kor-<판>-driver-source.tar.gz`를 릴리스 자산으로 올립니다. 담는 것은 원본 드라이버 둘(고정 커밋 그대로), 이 폴더와 `scripts/build-driver.sh`(그 커밋), `SOURCE.txt`입니다. `SOURCE.txt`에는 넣지 않은 커널 소스 자산·kernel.org·툴체인의 위치와 sha256, 빌드 방법을 적습니다. 모드의 `drivers/SOURCE.txt`가 이 자산을 가리킵니다.
 
 ## 차에서 확인할 것
 

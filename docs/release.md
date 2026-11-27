@@ -27,16 +27,17 @@
      - 옛 2.0.x 되돌리기 스크립트(`NX4/legacy-2.0/`)가 들었는지. `build.sh`가 태그 `v2.0.4-beta.1`에서 꺼내므로 `build` job도 저장소를 태그까지 받습니다(`fetch-depth: 0`)
      - 묶음의 nx4-kor(`payload/mod.json`)가 공식 무선 모드와 충돌을 선언하지 않는지(옛 2.0.x 꼴이면 2.1.0 설치기가 멈춤). 그래서 nx4-kor 2.1.0(PR #50)이 합쳐지기 전의 커밋으로는 릴리스를 낼 수 없습니다
      - 묶음의 nx4-kor에 `mod.json`이 선언한 `hooks.jar`가 있고 비지 않았는지(없으면 HMG-API가 이 모드의 훅을 올리지 못함)
+     - 동글 드라이버 대응 소스 묶음(`scripts/driver-source.sh`)에 `SOURCE.txt`가 들었는지
      - 묶음의 nx4-kor에 동글 드라이버 둘(`drivers/<드라이버>/bcmdhd.ko`)이 빌드한 그대로 들었고, 받는 USB ID 목록(`drivers/usb-ids.txt`), GPL-2.0 전문(`drivers/COPYING`)과 대응 소스 안내(`drivers/SOURCE.txt`)가 있는지. 두 `.ko`의 md5는 실행 요약에 남깁니다
-   - 키 파일을 지우고, 두 zip만 다음 job에 넘깁니다.
-5. `publish` job(배포 키 없음, 저장소 쓰기)이 릴리스를 만들어 두 파일을 올립니다. 릴리스 글에는 다음이 들어갑니다.
+   - 키 파일을 지우고, 두 zip과 동글 드라이버 대응 소스 묶음(`hmgapi-nx4-kor-<판>-driver-source.tar.gz`)을 다음 job에 넘깁니다.
+5. `publish` job(배포 키 없음, 저장소 쓰기)이 릴리스를 만들어 세 파일을 올립니다(두 zip과 동글 드라이버 대응 소스 묶음, GPL-2.0). 릴리스 글에는 다음이 들어갑니다.
    - 파일 설명
    - 모드 UUID, 앱 서명 인증서 SHA-256
    - 넣은 busybox(BusyBox 1.36.1, Alpine `busybox-static-1.36.1-r31`)
    - 필요한 HMG-API 최소 판, 함께 넣은 HMG-API 판과 그 대응 소스(커밋)
    - 함께 넣은 공식 무선 모드 판과 그 대응 소스(태그)
    - 소스 커밋
-   - 두 파일의 SHA-256
+   - 세 파일의 SHA-256
    - 자동 변경 목록
 
 PC에서 `.env.local`의 키로 `sh scripts/build.sh`를 돌려 만드는 길도 그대로 있습니다(`git-flow.md` 규칙 7).

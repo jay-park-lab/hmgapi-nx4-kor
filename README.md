@@ -240,7 +240,7 @@ NX4 KOR("NX4 KOR: Tucson NX4 (Korea)")의 설정은 셋입니다.
 | `art/` | 앱 메뉴 타일 모양의 원본(`tile.svg`). `mod/icons/`의 그림 넷은 이것을 HMG-API `tools/mkicon.sh`로 만든 것입니다 |
 | `app/` | 관리 앱 소스 |
 | `usb/` | USB 설치기(`troubleShooter`)와 USB 안내(`README.txt`) |
-| `scripts/` | `build-app.sh`(관리 앱), `build-hooks.sh`(`hooks.jar`), `build.sh`(서명한 모드 zip과 USB 묶음), `build-driver.sh`(USB Wi-Fi 동글 드라이버, Docker), `qemu-dongle-test.sh`(QEMU에서 동글 테스트) |
+| `scripts/` | `build-app.sh`(관리 앱), `build-hooks.sh`(`hooks.jar`), `build.sh`(서명한 모드 zip과 USB 묶음), `build-driver.sh`(USB Wi-Fi 동글 드라이버, Docker), `driver-source.sh`(그 대응 소스 묶음, 릴리스 자산), `qemu-dongle-test.sh`(QEMU에서 동글 테스트) |
 | `drivers/` | USB Wi-Fi 동글 드라이버의 패치·빌드 방법(GPL-2.0, [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)). 안내는 [`drivers/README.md`](drivers/README.md) |
 | `docs/design.md` | 설계와 차에서 확인할 것 |
 | `docs/flow.md` | 설치부터 무선 연결·관리 앱·지우기까지의 처리 흐름 그림(mermaid) |

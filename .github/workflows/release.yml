@@ -281,6 +281,14 @@ jobs:
           sh scripts/build-driver.sh
           echo "NX4_DRIVERS=$PWD/out/drivers/tcc803x" >> "$GITHUB_ENV"
 
+      # 그 .ko의 대응 소스(GPL-2.0): 원본 드라이버 고정 커밋, 우리 drivers/, 커널 소스 위치. 릴리스 자산으로 함께 낸다
+      - name: 동글 드라이버 대응 소스
+        run: |
+          set -eu
+          sh scripts/driver-source.sh "out/hmgapi-nx4-kor-$V-driver-source.tar.gz"
+          tar -tzf "out/hmgapi-nx4-kor-$V-driver-source.tar.gz" | grep -q '^hmgapi-nx4-kor-driver-source/SOURCE.txt$' \
+            || { echo "::error::대응 소스 묶음에 SOURCE.txt가 없습니다"; exit 1; }
+
       # secret은 화면에 내지 않는다(set -x 금지). 파일은 umask 077, 러너 임시 폴더, 마지막 step에서 지운다
       - name: 배포 키를 파일로
         env:
@@ -417,6 +425,7 @@ jobs:
           path: |
             nx4/out/hmgapi-nx4-kor-${{ needs.check.outputs.version }}.zip
             nx4/out/hmgapi-nx4-kor-${{ needs.check.outputs.version }}-usb.zip
+            nx4/out/hmgapi-nx4-kor-${{ needs.check.outputs.version }}-driver-source.tar.gz
           if-no-files-found: error
           retention-days: 3
 
@@ -454,7 +463,8 @@ jobs:
           set -eu
           F1=out/hmgapi-nx4-kor-$V.zip
           F2=out/hmgapi-nx4-kor-$V-usb.zip
-          for f in "$F1" "$F2"; do
+          F3=out/hmgapi-nx4-kor-$V-driver-source.tar.gz
+          for f in "$F1" "$F2" "$F3"; do
             [ -f "$f" ] || { echo "::error::$f가 없습니다"; exit 1; }
           done
           # check 뒤에 생긴 경우(승인을 기다리는 동안 다른 실행이 올림)도 이미 낸 파일을 바꾸지 않는다
@@ -473,6 +483,7 @@ jobs:
             echo "| 파일 | 설치 |"
             echo "|---|---|"
             echo "| \`hmgapi-nx4-kor-$V.zip\` | HMG-API 모드(작성자 키로 서명). HMG-API 앱·adb·USB |"
+            echo "| \`hmgapi-nx4-kor-$V-driver-source.tar.gz\` | 모드에 든 USB Wi-Fi 동글 드라이버(GPL-2.0)의 대응 소스: 원본 드라이버, 패치·빌드 스크립트, 커널 소스 위치(SOURCE.txt). 설치하지 않습니다 |"
             echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음(HMG-API $HMGAPI_VER, 공식 무선 모드 $WIRELESS_VER 포함). 빈 USB 맨 위에 풀고 Engineering Mode > USB Copy > DSP > Update OTA. HMG-API가 없거나 $NEED보다 낮은 차는 첫 번째에 HMG-API를 설치하고 재부팅하므로, 같은 USB로 한 번 더 누릅니다 |"
             echo
             echo "- 모드 UUID: \`$UUID\`"
@@ -483,12 +494,12 @@ jobs:
             echo "- 소스 커밋: $SRC"
             echo
             echo '```'
-            (cd out && sha256sum "hmgapi-nx4-kor-$V.zip" "hmgapi-nx4-kor-$V-usb.zip")
+            (cd out && sha256sum "hmgapi-nx4-kor-$V.zip" "hmgapi-nx4-kor-$V-usb.zip" "hmgapi-nx4-kor-$V-driver-source.tar.gz")
             echo '```'
             echo
           } > "$N"
           if [ "$PRE" = true ]; then
-            gh release create "$TAG" "$F1" "$F2" --verify-tag --title "$TITLE" --notes-file "$N" --generate-notes --prerelease
+            gh release create "$TAG" "$F1" "$F2" "$F3" --verify-tag --title "$TITLE" --notes-file "$N" --generate-notes --prerelease
           else
-            gh release create "$TAG" "$F1" "$F2" --verify-tag --title "$TITLE" --notes-file "$N" --generate-notes
+            gh release create "$TAG" "$F1" "$F2" "$F3" --verify-tag --title "$TITLE" --notes-file "$N" --generate-notes
           fi

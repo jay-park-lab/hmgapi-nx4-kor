@@ -156,6 +156,8 @@ if [ -n "$NX4_DRIVERS" ]; then
     echo "- 우리 패치·빌드 스크립트·커널 준비: https://github.com/jay-park-lab/hmgapi-nx4-kor/tree/${DREV:-main}/drivers"
     echo "- 커널: kernel.org linux-3.18.24와 현대모비스 GPL 공개 내비 커널 소스(https://github.com/jay-park-lab/hmgapi-nx4-kor/releases/tag/src-mobis-avnt5w-r9)"
     echo "- 각 .ko의 빌드 정보(원본 커밋, 패치·커널·툴체인 sha256, md5)는 <드라이버>/bcmdhd.ko.txt에 있습니다."
+    echo "- 대응 소스 묶음(원본 드라이버 고정 커밋, 우리 패치·빌드 스크립트, 커널 소스 위치): 이 판의 GitHub 릴리스 자산"
+    echo "  hmgapi-nx4-kor-$V-driver-source.tar.gz (https://github.com/jay-park-lab/hmgapi-nx4-kor/releases/tag/v$V, scripts/driver-source.sh)"
   } > "$M/drivers/SOURCE.txt"
   echo "동글 드라이버: $DRVS, USB ID $(wc -l < "$M/drivers/usb-ids.txt" | tr -d ' ')개"
 else
