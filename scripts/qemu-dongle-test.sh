@@ -1,8 +1,8 @@
 #!/bin/sh
 # QEMU에서 USB Wi-Fi 동글과 우리 드라이버를 테스트한다(#48, docs/qemu-dongle-test.md). PC에서만 돈다. 내비에는 아무것도 하지 않는다.
 # 쓰는 법(저장소 맨 위에서): sh scripts/qemu-dongle-test.sh [matrix|interactive] [rtl8831bu|rtl88x2bu]
-#   matrix(기본)   사람 손 없이: 차 HAL 인자로 올린 채널 표, rtw_country_code=KR로 올린 채널 표, 스캔, AP 조합
-#   interactive    KR로 올려 5GHz 149번 AP(SSID NX4-QEMU-TEST, 비밀번호 nx4-qemu-test)를 띄워 폰으로 붙어 보고,
+#   matrix(기본)   사람 손 없이: 국가 코드 없이 올린 채널 표, 차 HAL 인자만으로(우리 패치의 기본 KR) 올린 채널 표, 스캔, AP 조합
+#   interactive    HAL 인자만으로(KR) 올려 5GHz 149번 AP(SSID NX4-QEMU-TEST, 비밀번호 nx4-qemu-test)를 띄워 폰으로 붙어 보고,
 #                  그다음 쓰는 중에 동글을 뽑아 보호 패치를 본다
 # 무엇을 보고 무엇을 못 보는지는 docs/qemu-dongle-test.md. 차의 .ko 자체가 아니라, 같은 판(3.18.24) 커널을 QEMU virt용으로 빌드해
 # 같은 드라이버 소스와 우리 패치를 다시 빌드한 것을 올린다.

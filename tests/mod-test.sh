@@ -1766,6 +1766,8 @@ check "drivers/rtl88x2bu: 패치는 번호 차례(0001 보호, 0002 HAL 맞춤)�
 P8=$B/drivers/rtl8831bu
 check "drivers/rtl8831bu: 패치는 번호 차례(0001 보호, 0002 HAL 맞춤, 0003 빌드 맞춤)이고 -p1 꼴, nx4 빌드는 모듈 이름 bcmdhd·자기 지문·결과 tcc803x/rtl8831bu" \
   '[ "$(ls $P8/*.diff | xargs -n1 basename | tr "\n" " ")" = "0001-nx4-protect.diff 0002-nx4-hal.diff 0003-nx4-build.diff " ] && ! grep -h "^+++ " $P8/*.diff | grep -v "^+++ b/" | grep -q . && grep -q "build_driver rtl8831bu \"\$RTL8831BU_COMMIT\" /work/nx4/rtl8831bu bcmdhd .*\"\$EXPECTED_CFLAGS_SHA256_8831BU\" USER_EXTRA_CFLAGS \$P2" $B/drivers/build-in-container.sh && grep -q "report_driver rtl8831bu" $B/drivers/build-in-container.sh && grep -q "get_driver rtl8831bu \"\$RTL8831BU_GIT\" \"\$RTL8831BU_COMMIT\"" $B/drivers/build-in-container.sh && grep -q "cat out/drivers/tcc803x/rtl8831bu/bcmdhd.ko.txt" $B/.github/workflows/drivers.yml'
+check "drivers 두 HAL 패치: 기본 국가 코드를 KR로(원본의 국가 코드 없음 줄을 바꿈, 순정 HAL이 rtw_country_code를 주지 않아 5GHz AP가 막힘, docs/qemu-dongle-test.md)" \
+  'grep -q "^-char \*rtw_country_code = rtw_country_unspecified;$" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "^+char \*rtw_country_code = \"KR\";$" $B/drivers/rtl88x2bu/0002-nx4-hal.diff && grep -q "^-char \*rtw_country_code = CONFIG_RTW_COUNTRY_CODE;$" $P8/0002-nx4-hal.diff && grep -q "^+char \*rtw_country_code = \"KR\";$" $P8/0002-nx4-hal.diff'
 check "drivers/rtl8831bu: HAL 인자(iface_name을 ifname으로, firmware_path·nvram_path는 받아 두기만), 빌드 맞춤(디버그 로그 끔, rtw_warn_on_cnt를 ATOMIC_INC에 넘기지 않음)" \
   'grep -q "^+module_param_named(iface_name, ifname, charp, 0644);" $P8/0002-nx4-hal.diff && grep -q "^+module_param_string(firmware_path" $P8/0002-nx4-hal.diff && grep -q "^+module_param_string(nvram_path" $P8/0002-nx4-hal.diff && grep -q "^+CONFIG_RTW_DEBUG = n$" $P8/0003-nx4-build.diff && grep -q "^-CONFIG_RTW_DEBUG = y$" $P8/0003-nx4-build.diff && grep -q "^-		ATOMIC_INC((ATOMIC_T \*)&rtw_warn_on_cnt);" $P8/0003-nx4-build.diff && grep -q "^+		rtw_warn_on_cnt++;" $P8/0003-nx4-build.diff'
 # 리뷰 81-1: 3.18에 없는 strscpy를 부르지 않게(drv_conf.h의 strlcpy→strscpy 정의를 빼고 os_intfs.c 다섯 곳을 strlcpy로)
@@ -1862,7 +1864,7 @@ QARGS=bogus; qxrun PATH=$QX/noqemu:$P0; cp $QX/run.out $QX/usage.out; cp $QX/run
 QARGS=matrix; qxrun PATH=$QX/noqemu:$P0; cp $QX/run.out $QX/noq.out; cp $QX/run.rc $QX/noq.rc
 # 가짜 qemu: 받은 인자를 적고, 게스트처럼 libusb 잡음·USB 목록·단계 줄을 찍는다. 가짜 docker: 인자와 context를 적고, 폴더 공유
 # 확인(test -f, touch /out/.nx4-visible)은 QX_NOVIS·QX_NOOUT이 없으면 된 것처럼 한다
-printf '#!/bin/sh\necho "$*" > %s/qemu.args\necho "qemu-system-arm: libusb_kernel_driver_active: -5 [NOT_FOUND]"\necho "1-1 0bda:b831 speed=480 802.11ax WLAN Adapter"\necho "== A. 차 HAL 인자 그대로(국가 코드 없음)"\necho "-- a149 결과: AP로 섬=yes, 가장 많이 붙은 기기 0개, 채널: 149 (5745 MHz)"\necho "== 끝"\n' $QX > $QX/bin/qemu-system-arm
+printf '#!/bin/sh\necho "$*" > %s/qemu.args\necho "qemu-system-arm: libusb_kernel_driver_active: -5 [NOT_FOUND]"\necho "1-1 0bda:b831 speed=480 802.11ax WLAN Adapter"\necho "== HAL 인자만: 차 HAL 인자 그대로"\necho "-- a149 결과: AP로 섬=yes, 가장 많이 붙은 기기 0개, 채널: 149 (5745 MHz)"\necho "== 끝"\n' $QX > $QX/bin/qemu-system-arm
 cat > $QX/bin/docker <<'E'
 #!/bin/sh
 echo "ctx=${DOCKER_CONTEXT:-none} $*" >> @QX@/docker.calls
@@ -1876,7 +1878,7 @@ E
 sed -i.bak "s#@QX@#$QX#" $QX/bin/docker
 # 멈춘 게스트 흉내: pidfile에 자기 pid를 쓰고 끝나지 않음(exec라 그 pid를 끝내면 출력도 끝남)
 mkdir -p $QX/hang
-printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = -pidfile ] && echo $$ > "$2"; shift; done\necho "1-1 0bda:b831 speed=480 802.11ax WLAN Adapter"\necho "== A. 차 HAL 인자 그대로(국가 코드 없음)"\nexec sleep 60\n' > $QX/hang/qemu-system-arm
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = -pidfile ] && echo $$ > "$2"; shift; done\necho "1-1 0bda:b831 speed=480 802.11ax WLAN Adapter"\necho "== HAL 인자만: 차 HAL 인자 그대로"\nexec sleep 60\n' > $QX/hang/qemu-system-arm
 chmod +x $QX/bin/qemu-system-arm $QX/bin/docker $QX/hang/qemu-system-arm
 QARGS=matrix; qxrun PATH=$QX/bin:$P0 NX4_QEMU_NOBUILD=1; cp $QX/run.out $QX/nofile.out; cp $QX/run.rc $QX/nofile.rc
 : > $QX/out/zImage; for f in zImage rootfs.img bcmdhd.ko; do echo x > $QX/out/$f; done
@@ -1936,8 +1938,8 @@ apok() { PATH=$1:$P0 sh -c '. "$1"; ap_ok "$2" && echo yes || echo no' x $QX/apo
 _ap="$(apok $QX/pyes ' type AP channel 149 (5745 MHz)')$(apok $QX/pno ' type AP channel 149 (5745 MHz)')$(apok $QX/pyes ' type managed channel 36 (5180 MHz)')$(apok $QX/pno '')"
 check "  게스트 init: AP 판정은 끝까지 hostapd가 살아 있고 마지막 정보가 AP일 때만 섬(가짜 pidof로 넷: 살아 있음·AP=섬, 끝남·AP, 살아 있음·managed, 끝남·없음=아님)" \
   '[ "$_ap" = yesnonono ] && grep -q "if ap_ok \"\$t\"; then ok=yes; else ok=no; fi" $B/tests/qemu/nx4init' || echo "  $_ap"
-check "  게스트 init: 차 HAL 인자 그대로 insmod, matrix는 국가 코드 없음·KR 채널 표와 5GHz 149번 AP 넷(HAL 인자만 + hostapd KR 포함), 결과 줄에 insmod·채널·rmmod(경고·멈춤 수)" \
-  'grep -q "^HAL_ARGS=\"iface_name=wlan0 firmware_path=/data/misc/wifi/fw_bcmdhd.bin nvram_path=/data/misc/wifi/bcmdhd.cal clm_path=/system/wifi/89359.clm_blob\"" $B/tests/qemu/nx4init && grep -q "load B rtw_country_code=KR" $B/tests/qemu/nx4init && grep -q "ap a149hal a 149 \"\"" $B/tests/qemu/nx4init && grep -q "ap a149halkr a 149 KR" $B/tests/qemu/nx4init && grep -q "echo \"-- rmmod 결과(\$1): 종료 코드 \$rc, 경고" $B/tests/qemu/nx4init && grep -q "echo \"-- 채널 결과(\$1)" $B/tests/qemu/nx4init && grep -q "echo \"-- insmod 결과(" $B/tests/qemu/nx4init'
+check "  게스트 init: 차 HAL 인자 그대로 insmod(우리 패치의 기본 KR), matrix는 국가 코드 없음(rtw_country_code= 빈 값)·HAL 인자만 채널 표와 5GHz 149번 AP 넷(국가 코드 없음 + hostapd KR 포함), interactive는 HAL 인자만, 결과 줄에 insmod·채널·rmmod(경고·멈춤 수)" \
+  'grep -q "^HAL_ARGS=\"iface_name=wlan0 firmware_path=/data/misc/wifi/fw_bcmdhd.bin nvram_path=/data/misc/wifi/bcmdhd.cal clm_path=/system/wifi/89359.clm_blob\"" $B/tests/qemu/nx4init && grep -q "^  load none rtw_country_code=$" $B/tests/qemu/nx4init && grep -q "^  load none2 rtw_country_code=$" $B/tests/qemu/nx4init && [ "$(grep -c "^  load hal$" $B/tests/qemu/nx4init)" = 2 ] && ! grep -q "rtw_country_code=KR" $B/tests/qemu/nx4init && grep -q "ap a149 a 149 \"\"" $B/tests/qemu/nx4init && grep -q "ap a149none a 149 \"\"" $B/tests/qemu/nx4init && grep -q "ap a149nonekr a 149 KR" $B/tests/qemu/nx4init && grep -q "echo \"-- rmmod 결과(\$1): 종료 코드 \$rc, 경고" $B/tests/qemu/nx4init && grep -q "echo \"-- 채널 결과(\$1)" $B/tests/qemu/nx4init && grep -q "echo \"-- insmod 결과(" $B/tests/qemu/nx4init'
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc
