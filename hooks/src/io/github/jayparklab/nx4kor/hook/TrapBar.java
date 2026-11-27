@@ -7,7 +7,10 @@ package io.github.jayparklab.nx4kor.hook;
 //   "nx4kor-navi-trapbar"); log lines start with "navigation (NX4 KOR): ". KP also called check() from its hooks on the
 //   stock navigation's other cluster calls (Wireless.navigation); this mod doesn't hook those (the official mod does its
 //   own there), so only the expiry timer, a NONE broadcast and the next stock trap call (phone no longer guiding) put the
-//   stock bar back.
+//   stock bar back. PR #98 review: the name hooks pass and a broadcast counts as NONE while the mod is off in the
+//   HMG-API app (mod.enabled(); HMG-API's own guard is only on mod.hook points) (2); the first broadcast heard and the
+//   first stock trap frame seen leave one line each, numbers only (4); phone guidance is CarPlay's alone
+//   (Car.carPlayGuiding: only DiPO sends the bar here, KP's Android Auto side isn't in this mod) (5).
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -78,6 +81,13 @@ final class TrapBar {
     private int logs;
     /** 실패 종류별 처음 한 번만 남긴다(리뷰 8) */
     private boolean failStock, failSend;
+    /** PR #98 리뷰 4: 처음 받은 방송, 처음 본 순정 단속 정보 호출을 한 줄씩(차에서 게이지가 비었을 때 어느 쪽인지 가름) */
+    private boolean heardLogged, seenLogged;
+
+    /** PR #98 리뷰 5: 막대를 보내는 쪽은 카플레이(DiPO)뿐이라 카플레이 안내만 본다(KP는 AA도 보내 Car.phoneGuiding) */
+    private boolean guiding() {
+        return Car.carPlayGuiding(app.context);
+    }
 
     private final Runnable barRun = new Runnable() {
         @Override
@@ -87,10 +97,18 @@ final class TrapBar {
                 barPosted = false;
                 b = pendingBar;
             }
-            boolean phone = Car.phoneGuiding(app.context);
+            // PR #98 리뷰 2: HMG-API 앱에서 모드를 껐으면 NONE으로 본다(한 번 순정 막대로 되돌리고 더 보내지 않음)
+            if (!mod.enabled()) b = PhoneBar.NONE;
+            boolean phone = guiding();
             Integer r;
+            boolean seen;
             synchronized (TrapBar.this) {
                 r = navi.onBar(b, phone, now());
+                seen = navi.seen;
+            }
+            if (!heardLogged && b != PhoneBar.NONE) {
+                heardLogged = true;
+                mod.log(LOG + "first phone turn bar heard (" + b + "), stock trap frame seen: " + (seen ? "yes" : "no"));
             }
             if (r != null) send();
             // 폰 쪽이 사라져 방송이 끊기면 순정 호출이 없어도 EXPIRE_MS 뒤 한 번 되돌린다(리뷰 5)
@@ -102,7 +120,7 @@ final class TrapBar {
     private final Runnable expireRun = new Runnable() {
         @Override
         public void run() {
-            check(Car.phoneGuiding(app.context));
+            check(mod.enabled() && guiding());
         }
     };
 
@@ -180,7 +198,9 @@ final class TrapBar {
                 if (REPLAYING.get() != null) return;   // 우리가 다시 보내는 값: 그대로 통과
                 sentBar.remove();
                 try {
-                    stock(p, asNew);
+                    // PR #98 리뷰 2: 이름 훅은 HMG-API의 모드 끔 감싸기(mod.hook 지점만)가 없다. 꺼져 있으면 폰 안내가 아닌
+                    // 것처럼 순정 그대로 보내되 최신 순정 값은 기억한다(나중에 되돌릴 때 옛 단속 값을 다시 보내지 않게)
+                    stock(p, asNew, mod.enabled());
                 } catch (Throwable t) {
                     // 순정 호출은 그대로 나간다
                     if (!failStock) {
@@ -209,8 +229,8 @@ final class TrapBar {
         return android.os.SystemClock.elapsedRealtime();
     }
 
-    /** 순정 단속 정보 호출: 사본을 기억하고, 폰 막대가 있으면 막대 칸만 바꾼다 */
-    private void stock(MethodHook.Param p, boolean asNew) throws Exception {
+    /** 순정 단속 정보 호출: 사본을 기억하고, 폰 막대가 있으면 막대 칸만 바꾼다. on이 아니면(모드 끔) 바꾸지 않는다 */
+    private void stock(MethodHook.Param p, boolean asNew, boolean on) throws Exception {
         int stockBar;
         if (asNew) {
             if (p.args == null || p.args.length != 1 || p.args[0] == null || barField == null) return;
@@ -221,6 +241,10 @@ final class TrapBar {
         }
         Member m = p.method;
         if (!(m instanceof Method)) return;
+        if (!seenLogged) {
+            seenLogged = true;
+            mod.log(LOG + "first stock trap frame (" + (asNew ? "object" : "17 ints") + ", bar " + stockBar + ")");
+        }
         Object[] copy = asNew ? new Object[] { TrapArgs.copy(p.args[0]) } : p.args.clone();
         Slot slot = asNew ? slotNew : slotInt;
         if (stockBar < 0 || stockBar > PhoneBar.MAX) {
@@ -238,7 +262,7 @@ final class TrapBar {
         synchronized (this) {
             need = navi.phoneBar != PhoneBar.NONE;
         }
-        boolean phone = need && Car.phoneGuiding(app.context);
+        boolean phone = on && need && guiding();
         int b;
         synchronized (this) {
             slot.target = p.thisObject;

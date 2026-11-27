@@ -1,6 +1,7 @@
 package android.content;
 // From StopDragon/HMG-API korea-build ebca56f3824a2234e48b336abda927d7a635e243, mods/wireless-carplay-aa/tools/trapbar/stubs/android/content/Context.java
-// (Korea Projection, AGPL-3.0): a PC test stub for TrapBarTest (#96).
+// (Korea Projection, AGPL-3.0): a PC test stub for TrapBarTest (#96). Modified by NX4 KOR: deliver(), to receivers
+// whose filter has the broadcast's action (PR #98 review 7).
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,4 +25,16 @@ public class Context {
     }
 
     public void sendBroadcast(Intent i) { sent.add(i); }
+
+    /** 시험용: 방송 이름이 필터와 맞는 수신기에만 넘긴다(안드로이드처럼). 넘긴 수 */
+    public int deliver(Intent i) {
+        int n = 0;
+        for (int k = 0; k < receivers.size(); k++) {
+            if (filters.get(k).actions.contains(i.getAction())) {
+                receivers.get(k).onReceive(this, i);
+                n++;
+            }
+        }
+        return n;
+    }
 }

@@ -1,6 +1,7 @@
 package hmgapi.hook;
 // From StopDragon/HMG-API korea-build ebca56f3824a2234e48b336abda927d7a635e243, mods/wireless-carplay-aa/tools/trapbar/stubs/hmgapi/hook/ModContext.java
-// (Korea Projection, AGPL-3.0): a PC test stub for TrapBarTest (#96).
+// (Korea Projection, AGPL-3.0): a PC test stub for TrapBarTest (#96). Modified by NX4 KOR: enabled() is the test's
+// (on), so the mod turned off in the HMG-API app can be tested (PR #98 review 2).
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,7 +25,10 @@ public final class ModContext {
 
     public void nativePatch(LoadedApp app, String lib) {}
 
-    public boolean enabled() { return true; }
+    /** 시험용: HMG-API 앱에서 이 모드가 켜져 있는지 */
+    public boolean on = true;
+
+    public boolean enabled() { return on; }
 
     public boolean settingBoolean(String key, boolean fallback) {
         Boolean v = settings.get(key);

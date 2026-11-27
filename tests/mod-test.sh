@@ -180,13 +180,17 @@ check "hooks 소스: KP의 순정 층(CpTurns)은 옮기지 않음" \
 # 순정 내비 프로세스의 TrapBar가 그 칸만 바꾼다(KP 1.7.2 시험판 3과 같음). 진입 클래스가 순정 내비에서 TrapBar를 건다
 check "hooks 소스(#96): DiPO의 PhoneBarOut이 이 모드의 방송 이름으로 막대를 보내고, 진입 클래스가 순정 내비(com.mnsoft.navi)에서 kor_tbt일 때 TrapBar를 검, KP 출처·바꾼 것 줄" \
   'grep -q "sendBroadcast" $HK/dipo/PhoneBarOut.java && grep -q "\"io.github.jayparklab.nx4kor.PHONE_BAR\"" $HK/dipo/PhoneBarOut.java && grep -q "\"io.github.jayparklab.nx4kor.PHONE_BAR\"" $HK/PhoneBar.java && grep -q "NAVIGATION = \"com.mnsoft.navi\"" $HK/Nx4KorHooks.java && grep -q "TrapBar.install(mod, app)" $HK/Nx4KorHooks.java && grep -q "barOut.send(context" $HK/dipo/CpTurnsFit.java && ( for f in TrapBar PhoneBar TrapArgs dipo/PhoneBarOut; do grep -q "korea-build ebca56f3824a2234e48b336abda927d7a635e243" $HK/$f.java && grep -q "Modified by NX4 KOR" $HK/$f.java || exit 1; done )'
+# PR #98 리뷰 2·3·5: DiPO는 모드를 끌 때와 공식 모드에 비켜 줄 때 NONE을 보내고(그동안 turn()이 돌지 않음), TrapBar는 모드 끔을 직접 보고
+# 폰 안내는 카플레이만 본다
+check "hooks 소스(#96, PR #98 리뷰 2·3·5): KorTbt가 모드 끔·비켜 주기에 막대 NONE을 보냄, TrapBar가 mod.enabled()와 Car.carPlayGuiding을 봄(phoneGuiding 아님)" \
+  '[ "$(grep -c "turns.barOut.send(turns.context, PhoneBarOut.NONE" $HK/dipo/KorTbt.java)" = 2 ] && grep -q "mod.enabled()" $HK/TrapBar.java && grep -q "Car.carPlayGuiding(app.context)" $HK/TrapBar.java && ! grep -q "Car.phoneGuiding(" $HK/TrapBar.java'
 # TrapBar를 KP의 PC 시험 틀(가짜 시계·대기열·계기판, tests/tools/trapbar/stubs)로 돌린다. 안드로이드 SDK 없이 javac만
 if command -v javac >/dev/null 2>&1; then
   mkdir -p $T/trapbar
   javac --release 8 -Xlint:-options -nowarn -encoding UTF-8 -d $T/trapbar $(find $B/tests/tools/trapbar -name '*.java') \
     $HK/Nx4KorHooks.java $HK/TrapBar.java $HK/PhoneBar.java $HK/TrapArgs.java $HK/dipo/PhoneBarOut.java > $T/trapbar.err 2>&1
   java -Dfile.encoding=UTF-8 -cp $T/trapbar io.github.jayparklab.nx4kor.hook.TrapBarTest > $T/trapbar.out 2>&1
-  check "TrapBar(#96, 곧 회전 게이지) $(grep -c '^ok ' $T/trapbar.out)개: 순정 내비의 단속 정보 프레임 두 판에 훅, kor_tbt를 끄면 아무것도 안 함, 폰 안내 중 막대 칸만 폰 막대(카메라 칸 그대로), 200ms 간격, NONE·3분 끊김·폰 안내 끝이면 순정 막대, 끼어든 순정 호출, 로그 30줄, DiPO PhoneBarOut과 이름·값·간격이 같고 끝에서 끝까지 닿음" \
+  check "TrapBar(#96, 곧 회전 게이지) $(grep -c '^ok ' $T/trapbar.out)개: 순정 내비의 단속 정보 프레임 두 판에 훅, kor_tbt를 끄면 아무것도 안 함, 폰 안내 중 막대 칸만 폰 막대(카메라 칸 그대로), 200ms 간격, NONE·3분 끊김·폰 안내 끝이면 순정 막대, 끼어든 순정 호출, 로그 30줄, 모드를 끄면 순정 그대로·방송은 NONE, 처음 방송·처음 순정 호출 한 줄씩, DiPO PhoneBarOut과 이름·값·간격이 같고 방송 이름으로 끝에서 끝까지 닿음" \
     'tail -n 1 $T/trapbar.out | grep -qx ok && ! grep -q "^FAIL" $T/trapbar.out' || cat $T/trapbar.err $T/trapbar.out
 else
   echo "skip TrapBar 테스트(javac 없음)"

@@ -298,6 +298,8 @@ public final class KorTbt {
                 turns.reset();
                 turns.shown = false;
                 turns.hudShown = false;
+                // #96 (PR #98 review 2): the car navigation's TrapBar puts the stock gauge bar back now, not 3 minutes later
+                turns.barOut.send(turns.context, PhoneBarOut.NONE, SystemClock.elapsedRealtime());
                 wasOff = true;
                 noteActive();
                 refreshing = false;
@@ -309,6 +311,9 @@ public final class KorTbt {
             if (yielding && !yieldLogged) {
                 yieldLogged = true;
                 log("CarPlay (NX4 KOR): this listener hears nothing while the official mod sends: giving way until it hears again");
+                // #96 (PR #98 review 3): no turn() while giving way, so no bar either: the stock gauge bar goes back
+                // (hearing again, turn() sends the bar at once: PhoneBarOut sees it changed from NONE)
+                turns.barOut.send(turns.context, PhoneBarOut.NONE, now);
             } else if (!yielding) {
                 yieldLogged = false;
             }

@@ -113,6 +113,8 @@ public final class TrapBarTest {
         twoSlots();
         guards();
         logs();
+        modOff();
+        firstLines();
         phoneBarOut();
         System.out.println(n + " cases");
         if (fail == 0) System.out.println("ok");
@@ -377,6 +379,70 @@ public final class TrapBarTest {
         check("trap bar log lines stop at 30 (LOGS_MAX)", lines == TrapBar.LOGS_MAX && sentWith("replay").size() == 60);
     }
 
+    /** PR #98 리뷰 2: HMG-API 앱에서 모드를 끄면 이름 훅은 순정 그대로(기억은 함), 방송은 NONE으로 보고 한 번만 되돌림 */
+    static void modOff() throws Throwable {
+        boot(FakeNav.class, false);
+        Car.guiding = true;
+        stockInt(1, 50);
+        phoneBar(70);
+        run(10);
+        check("mod off (review 2): before, bar 70 on the cluster", last().endsWith("int bar=70 cam=1 replay"));
+        mod.on = false;
+        stockInt(2, 40);
+        check("mod off: the stock trap call passes untouched (bar 40, camera 2), no bar change logged",
+                last().endsWith("int bar=40 cam=2") && mod.count("bar 40 -> 70") == 0);
+        int k = FakeNav.SENT.size();
+        run(1000);
+        phoneBar(60);
+        run(1000);
+        check("mod off: a broadcast is NONE, and the stock bar is already on the cluster: nothing resent (no old camera 1)",
+                FakeNav.SENT.size() == k);
+        // 순정 호출이 그사이 없었으면: 방송을 NONE으로 보고 최신 순정 값으로 한 번 되돌린 뒤 더 보내지 않는다
+        boot(FakeNav.class, false);
+        Car.guiding = true;
+        stockInt(3, 50);
+        phoneBar(70);
+        run(10);
+        mod.on = false;
+        run(1000);
+        phoneBar(80);
+        run(1000);
+        check("mod off with no stock call since: the next broadcast puts the stock bar (50) back once", last().endsWith("int bar=50 cam=3 replay"));
+        k = FakeNav.SENT.size();
+        phoneBar(90);
+        run(1000);
+        check("mod off: later broadcasts send nothing", FakeNav.SENT.size() == k);
+        mod.on = true;
+        phoneBar(60);
+        run(1000);
+        check("mod on again: the phone bar goes in again (60)", last().endsWith("int bar=60 cam=3 replay"));
+    }
+
+    /** PR #98 리뷰 4: 처음 받은 방송과 처음 본 순정 단속 정보 호출을 한 줄씩(숫자만) */
+    static void firstLines() throws Throwable {
+        boot(FakeNav.class, false);
+        Car.guiding = true;
+        phoneBar(70);
+        run(10);
+        check("review 4: the first broadcast heard, before any stock trap frame: one line saying none seen yet",
+                mod.count(TrapBar.LOG + "first phone turn bar heard (70), stock trap frame seen: no") == 1);
+        stockInt(1, 50);
+        stockNew(2, 60);
+        phoneBar(80);
+        run(1000);
+        check("review 4: the first stock trap frame: one line (form and bar), not again for the other form or later calls",
+                mod.count(TrapBar.LOG + "first stock trap frame (17 ints, bar 50)") == 1 && mod.count("first stock trap frame") == 1
+                        && mod.count("first phone turn bar heard") == 1);
+        boot(FakeNav.class, false);
+        Car.guiding = true;
+        stockNew(5, 40);
+        phoneBar(70);
+        run(10);
+        check("review 4: a stock frame first, then the broadcast: 'seen: yes'",
+                mod.count(TrapBar.LOG + "first stock trap frame (object, bar 40)") == 1
+                        && mod.count(TrapBar.LOG + "first phone turn bar heard (70), stock trap frame seen: yes") == 1);
+    }
+
     /** DiPO 쪽 보내기(dipo.PhoneBarOut): PhoneBar와 같은 이름·값·간격, 바뀔 때와 10초마다만, 보낸 방송이 TrapBar에 닿음 */
     static void phoneBarOut() throws Throwable {
         Class<?> c = Class.forName("io.github.jayparklab.nx4kor.hook.dipo.PhoneBarOut");
@@ -413,9 +479,14 @@ public final class TrapBarTest {
         Context dipo2 = new Context();
         Object out2 = k.newInstance();
         send.invoke(out2, dipo2, 80, SystemClock.now);
-        ctx.receivers.get(0).onReceive(ctx, dipo2.sent.get(0));
+        // PR #98 리뷰 7: 수신기를 바로 부르지 않고 방송 이름이 필터와 맞을 때만 넘긴다(이름이 어긋나면 닿지 않음)
+        int got = ctx.deliver(dipo2.sent.get(0));
         run(10);
-        check("end to end: DiPO's PhoneBarOut broadcast reaches TrapBar: the stock frame is resent with bar 80 (camera 4 kept)",
-                last().endsWith("int bar=80 cam=4 replay"));
+        check("end to end: DiPO's PhoneBarOut broadcast reaches TrapBar by its action: the stock frame is resent with bar 80 (camera 4 kept)",
+                got == 1 && last().endsWith("int bar=80 cam=4 replay"));
+        int k2 = FakeNav.SENT.size();
+        int other = ctx.deliver(new Intent("hmgapi.mods.wireless.PHONE_BAR").putExtra(PhoneBar.EXTRA_BAR, 30));
+        run(1000);
+        check("end to end (review 7): another action (KP's) doesn't reach TrapBar", other == 0 && FakeNav.SENT.size() == k2);
     }
 }
