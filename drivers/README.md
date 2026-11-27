@@ -23,7 +23,7 @@ kernel.org linux-3.18.24 (빌드 뼈대)
 
 순정 Wi-Fi HAL이 Wi-Fi를 켤 때마다 `/system/wifi/bcmdhd.ko`를 `bcmdhd`라는 이름으로 올립니다(11-23 진단 기록 `nochip-wifi.txt`). 그래서 동글 드라이버를 그 자리에 둘 수 있게 만듭니다(#48 갈래 A).
 - 모듈 이름을 `bcmdhd`로 빌드합니다(드라이버 Makefile의 `USER_MODULE_NAME`). HAL은 `/proc/modules`에서 이 이름으로 올라왔는지 보고, 내릴 때도 이 이름을 씁니다.
-- 순정 HAL이 주는 인자를 받습니다(`rtl88x2bu/0002-nx4-hal.diff`, `rtl8831bu/0002-nx4-hal.diff`. 내용은 같고 넣는 파일만 다름: `os_intfs.c`, `rtw_cfg.c`).
+- 순정 HAL이 주는 인자를 받습니다(`rtl88x2bu/0002-nx4-hal.diff`, `rtl8831bu/0002-nx4-hal.diff`. 내용은 같고 넣는 파일만 다름: `os_intfs.c`, `rtw_cfg.c`. RTL88x2BU에는 아래 국가 코드의 `hal_com.c` 한 곳이 더 있음).
   - `iface_name`: 첫 인터페이스 이름입니다. 드라이버의 `ifname`과 같은 값으로 씁니다. 두 드라이버 모두 동시 모드를 켜지 않아(RTL88x2BU는 기본 플랫폼 설정, RTL8831BU는 Makefile `CONFIG_CONCURRENT_MODE = n`) 인터페이스는 `wlan0` 하나입니다.
   - `firmware_path`, `nvram_path`: 순정 `bcmdhd`의 매개변수입니다. 받아 두기만 합니다. AOSP는 AP를 켜기 전에 `/sys/module/bcmdhd/parameters/firmware_path`에 쓰고, 실패하면 AP를 켜지 않습니다[추정: 이 차 HAL·netd의 문자열은 USB 진단 기록 `dongle/wifi-strings.txt`로 확인].
   - HAL이 이 밖의 인자를 더 주어도 커널 3.18은 "unknown parameter … ignored"를 남기고 그대로 올립니다(`kernel/module.c` `unknown_module_param_cb`).
@@ -32,6 +32,8 @@ kernel.org linux-3.18.24 (빌드 뼈대)
   - 국가 코드 없이 올리면 5GHz 채널이 모두 `no IR`(전파를 먼저 낼 수 없음)이라, `hostapd` 설정에 국가 코드를 넣어도 5GHz 149번 AP가 서지 않았습니다. KR이면 섭니다([QEMU 동글 테스트](../docs/qemu-dongle-test.md), 2026-11-27).
   - 차 커널에는 내장 규제 DB가 없어(`CFG80211_INTERNAL_REGDB` 꺼짐) 채널을 풀 다른 길이 없다고 봅니다[추정: 안드로이드 4.4에는 보통 CRDA도 없음. 차에서 확인].
   - insmod 인자 `rtw_country_code=XX`를 주면 그 값을 씁니다.
+  - RTL88x2BU는 동글 efuse의 채널 계획에 HW 고정 비트(0x80)가 있으면 국가 코드를 보지 않습니다(`hal/hal_com.c` `hal_com_config_channel_plan`). 그래서 같은 패치가 그 파일에서 `CONFIG_FORCE_SW_CHANNEL_PLAN`을 켜, 우리 국가 코드가 늘 이기게 합니다(이 설정을 보는 곳은 그 파일뿐, PR #97 리뷰 1). RTL8831BU에는 이 길이 없습니다.
+  - 위 QEMU 결과는 RTL8831BU 동글로 본 것입니다. RTL88x2BU는 코드로만 봤습니다(RTL88x2BU 동글이 없음).
 - HAL 문자열에는 `/sys/module/bcmdhd/parameters/mac_address_read`도 있습니다(`dongle/wifi-strings.txt`). 우리 드라이버에는 이 매개변수가 없습니다. HAL이 이것을 어떻게 쓰는지(못 읽으면 실패로 보는지)는 문자열만으로 알 수 없어 차에서 확인합니다(아래 "차에서 확인할 것"). 뜻을 모르는 값을 만들어 두지 않습니다.
 
 ## 보호 패치
@@ -229,7 +231,7 @@ docker context use colima
 - HAL이 올릴 때 dmesg에 `Unknown symbol`이 없는지(두 드라이버, 빌드의 커널 심볼 확인이 못 잡는 설정 차이)
 - 순정 HAL이 주는 insmod 인자와 `bcmdhd` 매개변수 이름(`dongle/wifi-strings.txt`)
 - HAL이 우리 `.ko`를 받는지: `mac_address_read`가 없어도 HAL이 Wi-Fi를 켜는지(`wifi_check_module_info`, WifiHW logcat)
-- 국가 코드: 기본 KR로 올린 드라이버의 5GHz 채널(`iw phy`의 `no IR`), netd가 만드는 `hostapd.conf`의 `country_code` 줄(비밀번호가 든 파일이라 그 줄만), 순정 `bcmdhd.cal`의 `ccode` 줄
+- 국가 코드: 기본 KR로 올린 드라이버의 5GHz 채널(`iw phy`의 `no IR`), netd가 만드는 `hostapd.conf`의 `country_code` 줄(비밀번호가 든 파일이라 그 줄만), 순정 `bcmdhd.cal`의 `ccode` 줄. RTL88x2BU 동글은 QEMU로도 보지 못했으므로 차에서 5GHz 149번 AP가 서는지와 dmesg의 채널 계획 줄(`hal_com_config_channel_plan`, 디버그 빌드가 아니면 안 찍힐 수 있음)
 - HAL이 바꿔 둔 `bcmdhd.ko`를 올렸을 때 `wlan0`이 생기고 HMG-API가 AP를 띄우는지(149번 채널 포함)
 - RTL8831BU 동글을 꽂았을 때 USB ID(`0bda:b831`)와 이 드라이버가 붙는지, `wlan0`과 AP(149번 채널 포함). 동글이 실제로 RTL8831BU인지는 `lsusb` ID로 확인합니다(RTL8851BU `0bda:b851`도 이 드라이버가 받음)
 - 보호 패치(두 드라이버): 쓰는 중에 동글을 뽑아도 내비가 멈추지 않는지, Wi-Fi를 끄고 켜도 되는지, 수신 오류로 멈춘(`nx4-protect: … rx stopped`) 뒤 Wi-Fi를 끄고 켜면 AP가 돌아오는지, dmesg의 `nx4-protect:` 줄

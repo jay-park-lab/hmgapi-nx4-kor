@@ -32,3 +32,18 @@
  
  #ifdef CONFIG_PLATFORM_ANDROID
  	char *if2name = "p2p%d";
+--- a/hal/hal_com.c
++++ b/hal/hal_com.c
+@@ -350,6 +350,12 @@
+ }
+ 
+ #define	EEPROM_CHANNEL_PLAN_BY_HW_MASK	0x80
++/* nx4-hal: 동글 efuse의 채널 계획에 HW 고정 비트(0x80)가 있어도 우리 국가 코드(rtw_country_code, 기본 KR)를 쓴다.
++ * 이것이 없으면 hal_com_config_channel_plan이 그때 sw 설정(국가 코드)을 건너뛰어 KR이 적용되지 않는다(PR #97 리뷰 1).
++ * 이 드라이버에서 CONFIG_FORCE_SW_CHANNEL_PLAN을 보는 곳은 이 파일뿐이다 */
++#ifndef CONFIG_FORCE_SW_CHANNEL_PLAN
++#define CONFIG_FORCE_SW_CHANNEL_PLAN
++#endif
+ 
+ /*
+  * Description:

@@ -1,5 +1,6 @@
 nx4-hal: 순정 Wi-Fi HAL이 /system/wifi/bcmdhd.ko를 올릴 때 주는 인자를 받고, 기본 국가 코드를 KR로 둔다(이 저장소, GPL-2.0).
-대상: hyeondg/rtl8831bu fed914c8. RTL88x2BU의 0002-nx4-hal.diff와 같은 내용(넣는 파일만 rtw_cfg.c로 다름).
+대상: hyeondg/rtl8831bu fed914c8. RTL88x2BU의 0002-nx4-hal.diff와 같은 내용(넣는 파일만 rtw_cfg.c로 다름). RTL88x2BU 쪽의
+efuse HW 고정 채널 계획 처리(hal_com.c)는 이 드라이버에 그 길이 없어 넣지 않는다.
 
 --- a/os_dep/linux/rtw_cfg.c
 +++ b/os_dep/linux/rtw_cfg.c
