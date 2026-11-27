@@ -325,6 +325,9 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
      * 버튼 안내, [지금 재부팅]. 설치 결과가 재부팅 필요·실패면 판정을 그 문구로 바꾼다
      */
     void showStatus() {
+        // 이 화면에서 보낸 재부팅 기다림: 감시자가 reboot.req를 받자마자 지우므로, 다시 그릴 때(상태 파일이 새로 써짐) 파일이 없어도
+        // 메모리의 값으로 이어 간다(PR #100 리뷰 8)
+        long keepRb = rbEl, keepRbId = rbId;
         bar = null; pctText = null; stageText = null; timeText = null; noticeText = null; hintText = null; rebootBtn = null; rbEl = 0;
         msgText = null; dongleBtn = null; dgEl = 0;
         Report r = Report.parse(read(STATUS));
@@ -417,6 +420,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         File rbf = new File(getFilesDir(), RB_NAME);
         long[] rbq = Report.rbParse(read(rbf.getPath()), boot);
         long el = android.os.SystemClock.elapsedRealtime();
+        if (rbq == null && keepRb > 0) rbq = new long[] { keepRbId, keepRb };
         if (rbq != null && rebootBtn != null && el >= rbq[1] && (el - rbq[1]) / 1000 < Report.RB_WAIT) {
             rbEl = rbq[1]; rbId = rbq[0];
             rebootBtn.setEnabled(false);
