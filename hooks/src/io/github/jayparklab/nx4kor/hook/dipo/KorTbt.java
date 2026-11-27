@@ -61,7 +61,9 @@ import hmgapi.hook.ModContext;
  *    the phone sends again meanwhile: the official mod asks again with Stop and Start (a source
  *    change, its watchdog), and only DiPO's own Stop (CarPlay ends) is followed by silence.
  * 4. The mod turned off in the HMG-API app while DiPO runs: its hooks pass (HMG-API), and this
- *    part stops feeding and resending (mod.enabled()), so only the official mod draws.
+ *    part stops feeding and resending (mod.enabled()), so only the official mod draws. It also sends
+ *    the gauge bar NONE once (#96), so the car navigation's TrapBar puts the stock bar back; TrapBar's
+ *    name hooks have no HMG-API guard and check mod.enabled() themselves.
  * The decisions of 2 and 3 are in TbtGate (the PC tests run them).
  */
 public final class KorTbt {

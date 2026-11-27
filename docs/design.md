@@ -132,13 +132,13 @@
         - HMG-API 앱에서 모드를 끌 때. DiPO가 `NONE`을 보냅니다. 이름 훅은 HMG-API의 모드 끔 감싸기(`mod.hook` 지점만)가 없어 `TrapBar`가 직접 `mod.enabled()`를 봅니다. 꺼져 있으면 순정 호출을 폰 안내가 아닌 것처럼 그대로 보내고(최신 순정 값은 기억), 방송은 `NONE`으로 봅니다.
       - 폰 안내 여부는 카플레이만 봅니다(`Car.carPlayGuiding`, PR #98 리뷰 5). 막대를 보내는 쪽이 DiPO뿐이기 때문입니다. KP는 안드로이드 오토도 보내 `Car.phoneGuiding`을 썼습니다.
     - 두 메서드는 HMG-API map에 없어 그 프로세스에서 이름으로 겁니다(`Hooks.findAndHookMethod`, KP와 같음). 그래서 `mod.json` `hooks.points`에는 없습니다. 이 차에 그 메서드가 없으면 한 줄 남기고 아무것도 하지 않습니다(객체 판은 칸이 모두 `public int`일 때만).
-    - KP는 순정 내비의 다른 계기판 호출에도 훅을 걸어 거기서도 되돌릴지 봤지만(`Wireless.navigation`), 이 모드는 그 호출에 훅을 걸지 않습니다(순정 내비가 폰 안내 중 계기판에 끼어드는 것은 공식 모드가 막음). 위 세 가지로 되돌립니다.
+    - KP는 순정 내비의 다른 계기판 호출에도 훅을 걸어 거기서도 되돌릴지 봤지만(`Wireless.navigation`), 이 모드는 그 호출에 훅을 걸지 않습니다(순정 내비가 폰 안내 중 계기판에 끼어드는 것은 공식 모드가 막음). 위의 경우(세 가지와 이 모드에만 있는 두 경우, 모두 다섯)로 되돌립니다.
     - 공식 무선 모드는 단속 정보 프레임을 건드리지 않습니다(2.2.0-rc.9 `hooks.jar`에 그 이름이 없음).
     - 기록(모두 숫자만)
       - 설치: `navigation (NX4 KOR): phone turn bar goes into the stock trap frame (N hooks)`
       - 처음 받은 방송: `… first phone turn bar heard (B), stock trap frame seen: yes|no`. 처음 본 순정 호출: `… first stock trap frame (17 ints|object, bar B)`. 둘 다 한 번씩입니다(PR #98 리뷰 4). 차에서 게이지가 비어 있을 때 "방송이 오지 않음"과 "순정 단속 정보 프레임을 아직 못 봄"을 가르려는 것입니다.
       - 막대를 바꾸거나 다시 보낸 줄은 프로세스마다 30줄까지입니다.
-    - 테스트: `tests/tools/trapbar/`(KP의 PC 테스트 틀, 가짜 시계·대기열·계기판)로 `TrapBarTest`를 돌립니다. `PhoneBarOut`이 `PhoneBar`와 이름·값·간격이 같은지, DiPO 방송이 `TrapBar`까지 닿는지도 봅니다.
+    - 테스트: `tests/tools/trapbar/`(KP의 PC 테스트 틀, 가짜 시계·대기열·계기판)로 `TrapBarTest`를 돌립니다. `PhoneBarOut`이 `PhoneBar`와 이름·값·간격이 같은지, DiPO 방송이 방송 이름으로 `TrapBar`까지 닿는지, 모드 끔(`modOff`), 처음 방송·처음 순정 호출 줄(`firstLines`)도 봅니다.
   - KP의 순정 층 `CpTurns`(설정 `tbt_fit` 끔)와 무선 전환 뒤 다시 요청 `RgAsk`는 가져오지 않았습니다(무선 전환 뒤 다시 요청은 공식 모드가 함).
   - 공식 모드의 iAP2 스텁 4개(`hooks/stubs/com/tcc/iap2`, 컴파일할 때만 쓰고 `hooks.jar`에는 넣지 않음).
 - **빌드:** `scripts/build-hooks.sh`가 `hooks/src`를 HMG-API 런타임 소스(`HMGAPI_SRC`의 `core/runtime`)에 대고 컴파일해 d8로 `hooks.jar`를 만듭니다(Android SDK, `ANDROID_HOME`). `scripts/build.sh`가 그것을 모드에 넣어 서명합니다.

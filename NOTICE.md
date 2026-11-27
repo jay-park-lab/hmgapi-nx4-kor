@@ -54,7 +54,7 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
 | `hooks/src/.../hook/TrapBar.java` | 같은 커밋의 `mods/wireless-carplay-aa/src/hmgapi/mods/wireless/TrapBar.java`(Korea Projection 2026-11-09, 모드 2.3.3) | 패키지, 진입 클래스(`Nx4KorHooks`)가 순정 내비에서 `kor_tbt`일 때 검, `Wireless.REPLAYING`·`replayHandler()`를 이 클래스의 것으로, 기록 줄 머리 `navigation (NX4 KOR): `, KP가 순정 내비의 다른 계기판 호출 훅에서 부르던 `check`는 시계로만, 모드를 끄면 막대 칸을 바꾸지 않고 방송을 `NONE`으로 봄(`mod.enabled()`), 처음 받은 방송·처음 본 순정 호출을 한 줄씩, 폰 안내는 카플레이만(`Car.carPlayGuiding`)(2026-11-27, #96, PR #98 리뷰) |
 | `hooks/src/.../hook/PhoneBar.java` | 같은 커밋의 `PhoneBar.java` | 패키지, 방송 이름, 보내는 쪽(`Sender`·`send`)을 뺌(DiPO는 `PhoneBarOut`으로 보냄) |
 | `hooks/src/.../hook/TrapArgs.java` | 같은 커밋의 `TrapArgs.java` | 패키지 |
-| `tests/tools/trapbar/` (`TrapBarTest.java`, `FakeNav.java`, `stubs/`) | 같은 커밋의 `mods/wireless-carplay-aa/tools/trapbar/`(`test/`, `stubs/`) | 패키지, 진입 클래스로 띄움, KP의 `Wireless` 순정 값 다시 보내기 시험은 뺌, `PhoneBarOut` 시험을 더함, 스텁에서 쓰지 않는 것 뺌 |
+| `tests/tools/trapbar/` (`TrapBarTest.java`, `FakeNav.java`, `stubs/`) | 같은 커밋의 `mods/wireless-carplay-aa/tools/trapbar/`(`test/`, `stubs/`) | 패키지, 진입 클래스로 띄움, KP의 `Wireless` 순정 값 다시 보내기 시험은 뺌, `PhoneBarOut` 시험을 더함, 스텁에서 쓰지 않는 것 뺌. PR #98 리뷰에서 스텁 `Context.deliver`(방송 이름이 필터와 맞을 때만 넘김)·`ModContext.enabled()`를 값으로·`Car.carPlayGuiding`을 더하고, 모드 끔(`modOff`)·처음 줄(`firstLines`) 시험을 더함 |
 | `hooks/stubs/com/tcc/iap2/*.java` 4개 | 공식 무선 모드(VysseCodes) `Open-HMG/hmgapi-wireless-cp-aa` 태그 `v2.2.0-rc.9`의 `wireless-carplay-aa/stubs/com/tcc/iap2/` | 그대로(컴파일할 때만 쓰고 `hooks.jar`에는 넣지 않음) |
 | `tests/fixtures/wireless-carplay-aa-2.2.0-rc.9-hooks.json` | 같은 태그의 `wireless-carplay-aa/mod.json`에서 `id`·`version`·`hooks.points`만 | 그 셋만 남김 |
 
