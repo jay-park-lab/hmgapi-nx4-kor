@@ -1,6 +1,6 @@
 #!/system/bin/sh
-# NX4 KOR 공용 함수: 관리 앱 쪽(bin/status.sh), 칩 없는 차의 nochip 서비스(svc/nochip.sh), 지우기 전 정리(scripts/preun.sh)가
-# ". svc/lib.sh"로 읽는다(혼자 돌지 않음).
+# NX4 KOR 공용 함수: 관리 앱 쪽(bin/status.sh), 칩 없는 차의 nochip 서비스(svc/nochip.sh), USB Wi-Fi 동글의 dongle 서비스
+# (svc/dongle.sh), 지우기 전 정리(scripts/preun.sh)가 ". svc/lib.sh"로 읽는다(혼자 돌지 않음).
 # 2.1.0부터 무선 카플레이·안드로이드 오토는 HMG-API(2.1.1부터 1.1.0-rc.10 이상)와 공식 무선 모드 wireless-carplay-aa(2.2.0-rc.9 이상)가
 # 맡는다. 프로젝션 AP는 HMG-API가 공식 모드의 "wifi": {"projection": true} 요청으로 띄운다. 이 모드는 핫스팟을 띄우지 않고
 # 시스템 파일·Wi-Fi 설정도 바꾸지 않는다. 여기에는 상태를 읽는 함수, 관리 앱의 요청을 받는 데 쓰는 함수, 이번 부팅에 칩이
@@ -290,7 +290,8 @@ dhd_gave_up() { klog 2>/dev/null | $BB grep -q "$DHD_GAVEUP"; }
 # (drivers/README.md: RTL88x2BU 0bda:b812·2357:012d, RTL8831BU 0bda:b831·0bda:b851)의 만든 곳(Realtek 0bda, TP-Link 2357)이면
 # 모두 동글로 본다. 동글을 꽂은 부팅에도 순정 드라이버가 먼저 올라 칩 켜기를 포기한 줄과 "wlan0 없음"이 생긴 뒤에 동글 드라이버가
 # 순정 자리에 올라 wlan0이 생기므로(#80, 동글 세션 지적), 동글이 있으면 칩 없음으로 보지 않는다. 잘못 동글로 보면 HMG-API가
-# 예전처럼 다시 시도할 뿐이고, 잘못 칩 없음으로 보면 동글 AP를 막으므로 넓게 잡는다
+# 예전처럼 다시 시도할 뿐이고, 잘못 칩 없음으로 보면 동글 AP를 막으므로 넓게 잡는다. 이 묶음의 드라이버가 받는 USB ID(drivers/usb-ids.txt,
+# ASUS·D-Link 등 다른 만든 곳도 있음)도 동글로 본다(아래 dongle_find, PR #99 리뷰 2)
 DONGLE_USB=${DONGLE_USB:-'0bda:* 2357:*'}
 USBDEV=${USBDEV:-/sys/bus/usb/devices}
 dongle_present() {
@@ -298,7 +299,7 @@ dongle_present() {
     [ -r "$_ud/idVendor" ] && [ -r "$_ud/idProduct" ] || continue
     car_in "$(cat "$_ud/idVendor" 2>/dev/null):$(cat "$_ud/idProduct" 2>/dev/null)" "$DONGLE_USB" && return 0
   done
-  return 1
+  dongle_find
 }
 # Wi-Fi 칩이나 동글이 있는가: 이 내비에서 칩을 본 적이 있음(SDIO, HMG-API public/wifi-chip), wlan0이 있음, 동글일 수 있는 USB 장치
 chip_or_dongle() { wifi_chip_seen || [ -d $SYSNET/$WIF ] || dongle_present; }
@@ -307,6 +308,92 @@ chip_or_dongle() { wifi_chip_seen || [ -d $SYSNET/$WIF ] || dongle_present; }
 nochip_now() { ! chip_or_dongle && dhd_gave_up; }
 # svc/nochip.sh의 칩 없음 기록이 이번 부팅 것이고 지금도 칩·wlan0·동글이 없는가(그 뒤 동글을 꽂았으면 기록을 믿지 않는다)
 nochip_mark() { this_boot $NOCHIP && ! chip_or_dongle; }
+
+# --- USB Wi-Fi 동글 드라이버(#48, #80 결정, 2.2.0): svc/dongle.sh(부팅 서비스)가 쓴다 ---
+# 이 모드는 동글 드라이버 둘(RTL88x2BU, RTL8831BU, 모듈 이름 bcmdhd, drivers/README.md)을 drivers/<드라이버>/bcmdhd.ko로 싣는다
+# (scripts/build.sh가 CI 빌드를 넣음). 순정 Wi-Fi HAL은 Wi-Fi를 켤 때마다 KO_SLOT을 bcmdhd로 올리므로, 꽂힌 동글에 맞는 것을
+# 그 위에 bind mount한다. 시스템 파일은 바꾸지 않는다(재부팅하면 풀림).
+#   drivers/usb-ids.txt  드라이버가 받는 USB ID: 한 줄에 "<vid:pid> <드라이버>"(소문자, 드라이버의 modinfo alias에서 build.sh가 만듦)
+DRVDIR=${DRVDIR:-$APP/drivers}
+DONGLE_IDS=${DONGLE_IDS:-$DRVDIR/usb-ids.txt}
+KO_SLOT=${KO_SLOT:-/system/wifi/bcmdhd.ko}
+MOUNTINFO=${MOUNTINFO:-/proc/self/mountinfo}
+PROCMOD=${PROCMOD:-/proc/modules}
+SYSMOD=${SYSMOD:-/sys/module}
+# 이번 부팅에 건 드라이버(svc/dongle.sh가 씀, 644): "<부팅 id> <vid:pid> <드라이버> <건 때의 부팅 뒤 초>" 한 줄. 지울 때 지운다
+DONGLE=${DONGLE:-/data/local/tmp/nx4-kor-dongle.txt}
+
+# 꽂힌 USB 장치 중 우리 드라이버가 받는 동글을 찾는다. 찾으면 _DV(vid:pid) _DN(드라이버) _DD(sysfs 이름, 예: 4-1)
+# _DNUM(장치 번호: 포트 전원을 껐다 켜 다시 붙으면 바뀜). 여럿이면 처음 것
+dongle_find() {
+  _DV= _DN= _DD= _DNUM=
+  [ -r "$DONGLE_IDS" ] || return 1
+  for _ud in $USBDEV/*; do
+    [ -r "$_ud/idVendor" ] && [ -r "$_ud/idProduct" ] || continue
+    _uv=$(cat "$_ud/idVendor" 2>/dev/null):$(cat "$_ud/idProduct" 2>/dev/null)
+    while read -r _iv _in _ix; do
+      [ "$_iv" = "$_uv" ] && [ -n "$_in" ] || continue
+      _DV=$_uv _DN=$_in _DD=${_ud##*/}
+      _DNUM=$(cat "$_ud/devnum" 2>/dev/null)
+      return 0
+    done < "$DONGLE_IDS"
+  done
+  return 1
+}
+# KO_SLOT 위에 걸린 mount를 _KO에: 이 모드의 드라이버면 그 이름(rtl8831bu 등), 다른 것이면 other, 없으면 빈 값(1).
+# mountinfo의 4번째 칸은 원본 파일 시스템 안의 경로다(/data에서 걸었으면 /hmgapi/mods/nx4-kor/drivers/<드라이버>/bcmdhd.ko).
+# 같은 부팅에 이 모드를 업데이트하면 HMG-API가 옛 폴더를 stage/package-prev로 옮긴 뒤 지워(rc.10 Packages.install) 그 경로에
+# "//deleted"(또는 " (deleted)") 꼬리가 붙는다. 그것도 이 모드 것으로 본다(PR #99 리뷰 6). 여러 번 걸렸으면 맨 위(마지막 줄)
+ko_on() {
+  _KO=
+  [ -r "$MOUNTINFO" ] || return 1
+  while read -r _m1 _m2 _m3 _mr _mp _mx; do
+    [ "$_mp" = "$KO_SLOT" ] || continue
+    _mr=${_mr%//deleted}; _mr=${_mr%\\040(deleted)}
+    case "$_mr" in
+      */$MOD_ID/drivers/*/bcmdhd.ko|*/package-prev/drivers/*/bcmdhd.ko) _mr=${_mr%/bcmdhd.ko}; _KO=${_mr##*/} ;;
+      *) _KO=other ;;
+    esac
+  done < "$MOUNTINFO"
+  [ -n "$_KO" ]
+}
+# 드라이버($1)를 KO_SLOT에 건다. 이미 그것이면 그대로(0). 이 모드의 다른 드라이버가 걸려 있으면 풀고 건다.
+# 다른 것(다른 모드 등)이 걸려 있으면 건드리지 않는다(2). HAL(system_server, uid system)이 읽도록 파일은 644로 둔다
+ko_mount() {
+  _ks=$DRVDIR/$1/bcmdhd.ko
+  [ -f "$_ks" ] || return 1
+  chmod 644 "$_ks" 2>/dev/null
+  if ko_on; then
+    [ "$_KO" = "$1" ] && return 0
+    [ "$_KO" = other ] && return 2
+    bbx umount "$KO_SLOT" 2>/dev/null || return 1
+  fi
+  bbx mount -o bind "$_ks" "$KO_SLOT" 2>/dev/null || return 1
+  ko_on && [ "$_KO" = "$1" ]
+}
+# 이 모드가 건 것이면 푼다(지울 때). 다른 것이면 두고 0
+ko_umount() {
+  ko_on || return 0
+  [ "$_KO" = other ] && return 0
+  bbx umount "$KO_SLOT" 2>/dev/null
+}
+# bcmdhd 모듈이 올라 있는가
+bcmdhd_loaded() { $BB grep -q '^bcmdhd ' "$PROCMOD" 2>/dev/null; }
+# 올라 있는 bcmdhd가 무엇인가: none(없음), stock(순정: 우리 HAL 패치의 rtw_country_code 매개변수가 없음), rtl88x2bu·rtl8831bu
+# (드라이버의 proc 폴더 /proc/net/<DRV_NAME>: rtl88x2bu, rtl8851bu), ours(우리 것인데 어느 쪽인지 모름)
+bcmdhd_drv() {
+  bcmdhd_loaded || { echo none; return 0; }
+  [ -e "$SYSMOD/bcmdhd/parameters/rtw_country_code" ] || { echo stock; return 0; }
+  if [ -d "$PROCNET/rtl88x2bu" ]; then echo rtl88x2bu
+  elif [ -d "$PROCNET/rtl8851bu" ]; then echo rtl8831bu
+  else echo ours; fi
+}
+# wlan0이 올라와 있는가(IFF_UP: flags의 마지막 16진 자리가 홀수)
+wlan_up() {
+  [ -r $SYSNET/$WIF/flags ] || return 1
+  case "$(cat $SYSNET/$WIF/flags 2>/dev/null)" in *[13579bdfBDF]) return 0 ;; esac
+  return 1
+}
 
 # mod.json 꼴 파일($1, 없으면 이 모드의 mod.json)의 "version" 값. 못 읽으면 빈 값
 mod_ver() {

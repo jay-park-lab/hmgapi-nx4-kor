@@ -83,6 +83,7 @@ NX4 KOR는 GNU AGPL-3.0입니다(`LICENSE`). 아래는 다른 프로젝트에서
   - 원본 묶음은 sha256 `e7533517e65fb0af24a989ea4a7877cffcb29bed02a21c99b9277b1668c3bb20`입니다. 그 커널 폴더를 고치지 않고 묶어 이 저장소의 릴리스 `src-mobis-avnt5w-r9`에 모비스 고지 원본(`OSB_202606110414354220.zip`)과 함께 올려 두고, 빌드는 그것을 받습니다(`drivers/README.md` "커널 소스 자산"). 저장소에는 넣지 않습니다.
   - 그 안의 툴체인 묶음 `toolchain/arm-eabi-4.7.tar.gz`(GCC 4.7, GPL)로 컴파일합니다.
 - 커널 뼈대: kernel.org `linux-3.18.24`(GPL-2.0). 모비스 커널 폴더에 없는 맨 위 `Makefile`·`scripts/` 등을 채웁니다. 빌드할 때 받습니다.
+- 모드에 넣는 것(2.2.0): 빌드한 두 드라이버 `drivers/rtl88x2bu/bcmdhd.ko`·`drivers/rtl8831bu/bcmdhd.ko`와 각 빌드 정보(`bcmdhd.ko.txt`: 원본 커밋, 패치·커널·툴체인 sha256), GPL-2.0 전문 `drivers/COPYING`, 대응 소스 안내 `drivers/SOURCE.txt`(원본 드라이버 커밋, 이 저장소 `drivers/`의 커밋, 커널 소스 자산). 릴리스 워크플로가 같은 커밋에서 빌드해 넣습니다(`scripts/build.sh` `NX4_DRIVERS`).
 - 이 저장소가 쓴 것: 보호 패치 `drivers/rtl88x2bu/0001-nx4-protect.diff`·`drivers/rtl8831bu/0001-nx4-protect.diff`, 순정 HAL에 맞추는 패치 `drivers/rtl88x2bu/0002-nx4-hal.diff`·`drivers/rtl8831bu/0002-nx4-hal.diff`, 빌드 맞춤 `drivers/rtl8831bu/0003-nx4-build.diff`, `drivers/kernel/prepare.sh`·`Dockerfile`·`inputs.sh`·`lib.sh`·`config-sum.sh`·`build-in-container.sh`(GPL-2.0), `scripts/build-driver.sh`(AGPL-3.0). 자세한 것은 `drivers/README.md`.
 
 ## BusyBox (GPL-2.0)

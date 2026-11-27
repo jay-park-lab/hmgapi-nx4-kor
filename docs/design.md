@@ -32,7 +32,7 @@
 |---|---|
 | `system` | `NX4`·`NX4HEV`, `KOR`, `260902`에만 설치됩니다 |
 | `hmgapi` | `>=1.1.0-rc.10`(2.1.1부터, 2026-11-25·26 사용자 결정. 2.1.0은 공식 무선 모드 2.2.0-rc.9가 요구하는 rc.8이었음). rc.8 이하는 NEMESIS 1.17(LivePatch)을 몰라, 그 위에서 지우면 재부팅 한두 번 뒤 Android가 뜨지 않고, 업데이트도 zygote 래퍼를 실제로 바꾸지 못하며, NEMESIS 1.17이 먼저 깔린 차에는 설치를 거절합니다(rc.9 `install/common/lib.sh` `nemesis_livepatch`가 고침). rc.9는 그 거절을 `FORCE`로 넘겨 설치한 차를 올리면 마지막 순정 파일을 덮어써 Android가 뜨지 않습니다(rc.10이 고침, HMG-API 1.1.0-rc.10 릴리스 노트). 근거는 [Open-HMG/HMG-API#397](https://github.com/Open-HMG/HMG-API/issues/397). 처음에 rc.9로 정했다가, 리뷰 중 rc.10이 나오며 rc.9 릴리스가 지워져 rc.10으로 올렸습니다(PR #70). 최소 판을 올려 두면 USB 설치기가 rc.8·rc.9 차의 HMG-API를 스틱의 rc.10으로 먼저 올립니다(업데이트는 안전). 2.1.2부터 NEMESIS가 깔린 차에서는 설치기가 HMG-API도 올리지 않고 멈추므로, 그런 차는 HMG-API 릴리스의 USB·update zip으로 올립니다([#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75)). `svc/lib.sh` `HMG_MIN`, 관리 앱 `Report.MIN_HMGAPI`, 설치기 `HMG_MIN`도 같은 판 |
-| `services` | `launch`(`svc/launch.sh`, root, 앱이 부를 때만), `nochip`(`svc/nochip.sh`, root, 부팅 때 한 번, 2.1.2-beta.4부터. 아래 "[Wi-Fi 칩이 없는 차](#wi-fi-칩이-없는-차의-hmg-api-다시-시도-멈추기-svcnochipsh)"). `car_events`는 쓰지 않습니다(쓰면 HMG-API 차량 서비스가 새로 뜸) |
+| `services` | `launch`(`svc/launch.sh`, root, 앱이 부를 때만), `nochip`(`svc/nochip.sh`, root, 부팅 때 한 번, 2.1.2-beta.4부터. 아래 "[Wi-Fi 칩이 없는 차](#wi-fi-칩이-없는-차의-hmg-api-다시-시도-멈추기-svcnochipsh)"), `dongle`(`svc/dongle.sh`, root, 부팅 때 한 번, 2.2.0부터. 아래 "[USB Wi-Fi 동글](#usb-wi-fi-동글-드라이버-걸기-svcdonglesh-4880)"). `car_events`는 쓰지 않습니다(쓰면 HMG-API 차량 서비스가 새로 뜸) |
 | `apps`, `provides.launcher` | 관리 앱(`app/NX4KOR.apk`)과 앱 메뉴 타일. 타일 그림은 `icons/`의 순정 꼴 넷(낮·밤, 모드를 껐을 때의 회색 낮·밤)이고, 저장소의 `art/tile.svg`를 HMG-API `tools/mkicon.sh`로 만든 것입니다([#47](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/47)) |
 | `hooks` | 한국 카플레이 길안내(#67): `hooks.jar`(저장소의 `hooks/src`를 `scripts/build-hooks.sh`로 만듦), 진입 클래스 `io.github.jayparklab.nx4kor.hook.Nx4KorHooks`, 훅 지점 9곳. DiPO 안 계기판 호출 `framework.navigation_cluster.*` 8곳은 `change`, DiPO의 길안내 멈춤 `dipo.iap2_proxy.stop_route_guidance`는 `observe`. `replace`는 쓰지 않습니다. 이 밖에 순정 내비 안 `NavigationCluster.updateTBTTrapInfo`·`updateTBTTrapInfoNew`에 이름으로 훅을 겁니다(map에 없는 메서드라 `points`에 없음, 단속 정보 프레임의 막대 칸만 바꿈, #96) |
 | `settings.json` | `kor_tbt`(한국 카플레이 길안내, 기본 켬), `kor_tbt_far_big`(먼 회전도 큰 그림, 기본 켬, [#89](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/89)), `kor_tbt_log`(그 진단 줄, 2.1.2-beta.2부터 기본 끔, [#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)). 모두 HMG-API 앱에서 바꾸고 다시 시작하면 적용됩니다 |
@@ -40,7 +40,7 @@
 - **빠진 것:** 한국 포크 무선 모드 2.4.5(`parts`·`feature_flags`, 그 `hooks.jar`·`settings.json`, 레시피 5개, `files/libleafiaaac.so`, `patches.json`, 저장소의 `wireless/`), `"wifi": {"hotspot": true}`, `conflicts: ["wireless-carplay-aa"]`, 서비스 `ap`(`svc/ap.sh` → `svc/hotspot.sh`의 순정 `hostapd`·`dnsmasq` 핫스팟, Wi-Fi 설정 잠금, 칩 깨우기, 자동 설정 `setup_hmgapi`)와 `scripts/post.sh`. 공식 모드와 `replace`로 겹치는 훅이 없습니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)).
 - **`requires`로 공식 모드를 걸지 않습니다.** HMG-API는 요구한 모드가 없거나 꺼지면 이 모드의 앱·서비스까지 멈춥니다(rc.8 `docs/mod-reference.md` "Other mods", `engine/Engine.java` `visit`). 그러면 관리 앱이 그 사실을 알릴 수 없습니다. 대신 관리 앱이 공식 모드가 있는지·켜졌는지·판을 봅니다(아래 "관리 앱").
 - **map 만들기·확인과 적용은 USB 설치기가 합니다**(#45에서 정함, PR #52). 프로젝션 AP는 HMG-API가 공식 모드의 `"wifi": {"projection": true}` 요청으로 띄웁니다.
-- 이 모드는 HMG-API에 선언한 것만 바꾸므로 HMG-API 앱에서 지워도 남는 것이 없습니다(관리 앱의 작업 파일 `/data/local/tmp/nx4-kor*`와 기록 `/data/nx4-kor`는 남음. USB `NX4/UNINSTALL`이 지움).
+- 이 모드는 HMG-API에 선언한 것만 바꾸므로 HMG-API 앱에서 지워도 남는 것이 없습니다(관리 앱의 작업 파일 `/data/local/tmp/nx4-kor*`와 기록 `/data/nx4-kor`는 남음. USB `NX4/UNINSTALL`이 지움). 2.2.0부터 USB Wi-Fi 동글 드라이버를 순정 자리에 거는 bind mount가 있지만 재부팅하면 풀립니다(HMG-API 앱에서 지우면 다음 재부팅까지 남음).
 
 | 파일 | 하는 일 |
 |---|---|
@@ -48,6 +48,7 @@
 | `svc/lib.sh` | 관리 앱·`nochip` 서비스·지우기가 함께 쓰는 함수(busybox 고르기, 판 비교, 프로젝션 AP·Wi-Fi 칩 상태 읽기, 이번 부팅에 칩이 없는지, 카플레이 연결 수, 재부팅 요청 받기). 2.0.x의 `svc/hotspot.sh`를 줄인 것입니다 |
 | `svc/launch.sh` → `bin/status.sh` | 상태 파일(`/data/local/tmp/nx4-kor-status.txt`)과 재부팅 요청 감시자 |
 | `svc/nochip.sh` | 칩이 없는 부팅이면 HMG-API Wi-Fi 지기의 다시 시도를 멈춤(칩 없음 기록 `/data/local/tmp/nx4-kor-nochip.txt`, HMG-API `wifi/ap.boot`) |
+| `svc/dongle.sh`, `drivers/`(묶을 때 넣음) | 꽂힌 USB Wi-Fi 동글에 맞는 드라이버를 순정 Wi-Fi 드라이버 자리에 bind mount하고, 포트 끄고 켜기 뒤 AP가 꺼져 있으면 한 번 껐다 켬(기록 `/data/local/tmp/nx4-kor-dongle.txt`, AP 도구는 `hooks.jar`의 `ApTool`) |
 | `bin/uninstall.sh` → `scripts/preun.sh` | 지우기(`engine remove`)·업데이트 전 정리 |
 
 - **지우기**(`bin/uninstall.sh`): 관리 앱의 감시자를 멈추고 작업 파일을 지운 뒤 `hmgapid engine remove nx4-kor`를 합니다. HMG-API는 그때 앱·서비스 목록(`state/apps.txt`·`services.txt`)을 다시 써서 관리 앱과 서비스를 내립니다(rc.8 `Packages.remove` → `LiveState.publish`). 이 모드는 적용할 것이 없으므로 계획을 보거나 적용하지 않습니다. 그다음 기록 폴더 `/data/nx4-kor`를 지웁니다.
@@ -75,6 +76,22 @@
 - **위험:** HMG-API rc.10의 내부 파일(`wifi/ap.boot`)에 기댑니다. HMG-API가 이 파일을 바꾸면 효과만 없어지고 예전처럼 다시 시도합니다. rc.10에서 이 파일을 읽는 곳은 지기 자신과 이 모드의 관리 앱뿐입니다. 관리 앱은 이 모드가 쓴 `ap.boot`를 "떴다가 꺼짐"(`apoff`)으로 보지 않습니다.
 - **끄기·지우기:** 이 모드를 끄거나 지우면 hmgapid가 서비스의 프로세스 묶음(setsid)을 함께 내립니다. 칩 없음 기록은 지울 때 지우고 업데이트 때는 둡니다. `ap.boot`는 부팅마다 바뀌는 HMG-API 파일이라 둡니다.
 - **기록:** 줄은 hmgapid 서비스 기록 `logs/nx4-kor/nochip.log`(USB 진단 기록 `logs/service/`)에 남습니다. 지기의 기록 `wifi.log`도 2.1.2-beta.4부터 진단 기록 `logs/hmgapi-wifi.log`로 모읍니다.
+
+### USB Wi-Fi 동글 드라이버 걸기 (`svc/dongle.sh`, #48·#80)
+
+Wi-Fi 칩이 없는 차(NX4HEV 260902)의 무선은 USB Wi-Fi 동글로 합니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)). 2.2.0부터 이 모드가 동글 드라이버 둘을 싣고, 부팅마다 꽂힌 동글에 맞는 것을 순정 Wi-Fi 드라이버 자리에 겁니다([#80](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/80) 결정, 2026-11-27). 그 뒤는 순정 그대로입니다: 순정 HAL이 그 자리를 `bcmdhd`로 올리고, HMG-API가 공식 무선 모드의 요청으로 프로젝션 AP를 띄웁니다.
+
+- **싣는 것:** `drivers/rtl88x2bu/bcmdhd.ko`, `drivers/rtl8831bu/bcmdhd.ko`(빌드 정보 `bcmdhd.ko.txt` 함께), 받는 USB ID 목록 `drivers/usb-ids.txt`, GPL-2.0 전문 `drivers/COPYING`과 대응 소스 안내 `drivers/SOURCE.txt`. `scripts/build.sh`가 `NX4_DRIVERS`(CI 빌드)에서 넣습니다. 드라이버는 `drivers/README.md`.
+- **`dongle` 서비스**(start `boot`, `restart` false, root). 부팅 때 한 번 돌고 끝납니다.
+  1. Wi-Fi 칩이 있는 내비(SDIO, HMG-API `public/wifi-chip`)이거나 묶음에 드라이버가 없으면 아무것도 하지 않습니다.
+  2. 꽂힌 USB 장치에서 `usb-ids.txt`의 동글을 찾습니다(부팅 뒤 30초까지 1초마다, 횟수 상한도 있음). 차의 데이터 포트 장치는 부팅 뒤 11.5~12초에 처음 보입니다(11-26·27 진단 기록 5개, PR #99 리뷰 1). HMG-API 데몬은 부팅 약 2.6초에 서비스를 띄웁니다(#80 차 기록).
+  3. 맞는 `.ko`를 `/system/wifi/bcmdhd.ko` 위에 bind mount합니다. 루트 이름공간의 `/system`이 `shared`라 `system_server`(HAL) 쪽에도 보입니다. 다른 것이 이미 걸려 있으면 건드리지 않습니다. 이번 부팅에 건 것을 `/data/local/tmp/nx4-kor-dongle.txt`에 한 줄 남깁니다(부팅 id, USB ID, 드라이버, 건 때).
+  4. 순정 HAL은 동글이 보이기 전(약 9.8초)에 순정 `bcmdhd`를 올리고, 그 모듈은 18초까지 칩을 찾다 포기한 채 남습니다. HAL은 그 모듈이 올라 있다고 보고 다시 올리지 않습니다(11-26 진단: 그 줄은 부팅 때 한 번뿐). 그래서 순정(또는 이 모드의 다른 드라이버)이 올라 있으면, 칩 찾기가 끝난 뒤(`/sys/module/bcmdhd/initstate`가 `live`, 30초까지) `rmmod`합니다. 그러면 다음 Wi-Fi 요청(HMG-API 지기는 처음 1분 동안 2초마다)에 HAL이 이 자리의 우리 것을 올립니다. 내리기 전에 칩을 다시 봅니다. 칩이 있는 내비라도 HMG-API 표시 파일이 아직 없으면 1에서 빠지지 않고 SDIO 칩은 약 10초에야 보이므로, 그때 칩이 보이면 내리지 않고 건 것도 풉니다. 순정은 이번 부팅에 칩 켜기를 포기한 줄이 있을 때만 내립니다(PR #99 리뷰 8). 올라 있는 것이 어느 것인지는 우리 HAL 패치의 매개변수 `rtw_country_code`와 드라이버의 proc 폴더(`/proc/net/rtl88x2bu`, `rtl8851bu`)로 가립니다.
+  5. 순정은 호스트 세션마다 USB 포트 전원을 한 번 껐다 켭니다(꽂은 채 부팅 약 40초). 그때 동글이 떨어졌다 다시 붙고, AP가 꺼진 채 남을 수 있습니다(Android는 AP가 켜져 있다고 보고, HMG-API 지기는 이번 부팅에 띄웠다고 적어 둠. HMG-API #386). 서비스는 동글이 다시 붙을 때까지(장치 번호가 바뀜, 부팅 뒤 75초까지, 횟수 상한도 있음) 기다린 뒤 `wlan0`(20초)과 AP(30초)를 봅니다. AP가 없고 지기가 이번 부팅에 띄웠다고 적었으면 AP를 한 번 껐다 켭니다(`hooks.jar`의 `ApTool`, Android Wi-Fi 서비스로. HMG-API `WifiAp`과 같은 호출을 우리 것으로 둠. 차의 Wi-Fi 클라이언트가 켜져 있거나 되살릴 것이면 둠). 껐다 켜지 못하면 지기의 이번 부팅 기록(`ap.boot`·`ap.fail`)을 지워 지기가 다시 시도하게 합니다(PR #99 리뷰 4). 지기가 아직 다시 시도 중이면 맡깁니다. 프로젝션 AP를 요청한 모드가 없으면 5는 하지 않습니다.
+- **하지 않는 것:** 시스템 파일을 바꾸지 않습니다(`patches.json`·순정 md5 확인 없음, 재부팅하면 풀림). 드라이버를 직접 `insmod`하지 않습니다(순정 HAL이 같은 자리를 올림). `rmmod`는 4의 경우(먼저 올라 칩 없이 남은 순정, 또는 꽂힌 동글의 것이 아닌 우리 드라이버)에 한 번만 합니다. 상주하지 않습니다(#48 부하 점검의 설계 규칙).
+- **지우기:** `scripts/preun.sh`가 이 모드가 건 mount를 풀고 기록을 지웁니다. 업데이트 때는 둡니다(다음 부팅에 새 판이 다시 겁니다). 같은 부팅에 업데이트해 원본이 `stage/package-prev`로 옮겨져 지워진 것(mountinfo의 `//deleted`)도 이 모드 것으로 봅니다. USB 설치기(`UNINSTALL`)는 DSP OTA 프로세스에서 지우므로, 그 프로세스의 mount 이름공간에 따라 푼 것이 `system_server` 쪽에 미치지 않을 수 있습니다[추정, 차 확인]. 재부팅하면 풀립니다.
+- **기록:** hmgapid 서비스 기록 `logs/nx4-kor/dongle.log`(USB 진단 `logs/service/`).
+- **차에서 확인할 것:** 아래 "차에서 확인할 것"의 동글 항목.
 
 ### 한국 카플레이 길안내 (`hooks/`, #67)
 
@@ -364,6 +381,7 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
 - 모드와 USB 맨 위: `LICENSE`(AGPL-3.0), `NOTICE.md`(원저작권과 이 저장소의 변경)
 - busybox(BusyBox 1.36.1, Alpine 저장소에서 받아 `NOTICE.md`의 SHA-256과 맞을 때만. [`release.md`](release.md) "busybox")와 그 라이선스 안내(GPL-2.0, 대응 소스 위치): 모드의 `bin/busybox`·`bin/busybox-LICENSE.txt`, USB 맨 위 `BUSYBOX-LICENSE.txt`. 안내가 없으면 묶음을 만들지 않습니다.
 - HMG-API USB 묶음을 함께 넣으면 그 판과 소스 위치: USB 맨 위 `HMGAPI-SOURCE.txt`
+- USB Wi-Fi 동글 드라이버(GPL-2.0, `NX4_DRIVERS`로 줄 때): 모드의 `drivers/COPYING`(GPL-2.0 전문)과 `drivers/SOURCE.txt`(원본 드라이버 커밋, 이 저장소 `drivers/`의 커밋, 커널 소스 자산), 각 `.ko`의 빌드 정보 `bcmdhd.ko.txt`. 차에 넣을 `.ko`는 CI 빌드만 받습니다(빌드 정보에 에뮬레이션 표시가 있으면 묶음을 만들지 않음). 릴리스 워크플로가 같은 커밋에서 빌드해 넣습니다([`release.md`](release.md)).
 - USB `README.txt`에 이 묶음을 만든 소스 커밋을 적습니다(커밋하지 않은 수정이 있으면 그렇다고 적음).
 
 ## 다른 패키지·모드와 함께 쓸 때
@@ -415,6 +433,14 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
   - 2.1.1: 2.1.0을 쓰던 차(rc.8)가 rc.10으로 올라가는지. rc.10은 HMG-API도 차에서 아직 확인하지 않은 판입니다(HMG-API 1.1.0-rc.10 릴리스 노트). 올린 뒤 관리 앱의 HMG-API 칸이 `1.1.0-rc.10`이고 훅이 켜지는지 봅니다.
   - NEMESIS 1.17 차라면 올린 뒤 재부팅을 두 번 해도 Android가 뜨는지, `/data/hmgapi/install.log`에 `app_process.real`이 적히는지도 봅니다(HMG-API 1.1.0-rc.10 릴리스 노트 "What to test").
 - **USB 설치기가 HMG-API가 준비될 때까지 기다리는지**(PR #61). HMG-API를 올린 재부팅이 끝나자마자 바로 Update OTA를 누르면 "HMG-API가 준비되기를 기다리는 중" 토스트가 뜨고, 준비되면 이어서 설치하는지(최대 약 5분, USB `NX4/install.log`). 2026-11-25에는 재부팅 약 3분 뒤에 눌러 HMG-API가 이미 준비돼 있었고, 기다리는 갈래는 아직 보지 못했습니다([#23](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/23)). 결과는 [#64](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/64)에 적습니다.
+- **USB Wi-Fi 동글(2.2.0, [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)·[#80](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/80)).** 동글을 꽂은 채 시동을 켠 뒤 USB 진단 기록으로 봅니다. 결과는 #48에 적습니다.
+  - `logs/service/dongle.log`에 "…드라이버를 /system/wifi/bcmdhd.ko에 걺(부팅 뒤 N초)"가 동글이 보인 뒤(약 12초) 남는지, `nx4-kor-dongle.txt`가 그 부팅 id인지
+  - `system_server`가 그 파일을 보는지: dmesg에 우리 드라이버의 줄(`rtl88x2bu`·`rtl8851bu`·`nx4-hal`)과 `wlan0`이 생기고, `bcmdhd: unknown parameter 'clm_path' ignored` 말고 `Unknown symbol`이 없는지
+  - HAL이 우리 `.ko`를 받는지(`mac_address_read`가 없어도), HMG-API `wifi.log`에 `projection AP: up in mode 2`가 남는지, 5GHz 149번 채널인지
+  - 순정이 포트 전원을 껐다 켠 뒤(꽂은 채 부팅 약 40초): `dongle.log`의 "동글이 다시 붙음(… 장치 번호 a → b)"과 그 뒤 줄. AP가 스스로 다시 서면 "AP 떠 있음", 아니면 "AP를 껐다 켬"과 그 결과. 폰의 무선 카플레이가 다시 붙는지와 걸린 시간
+  - `dongle.log`에 "먼저 올라 있던 bcmdhd(stock)를 내림(부팅 뒤 N초)"이 순정이 포기한 뒤(약 18초) 남고, 그 뒤 HAL이 우리 드라이버를 올리는지(순정 HAL이 실패한 뒤 스스로 내렸으면 "이미 내려감")
+  - 동글을 뽑았다 꽂았을 때, 동글 없이 시동을 켰을 때(아무것도 걸지 않음), 칩이 있는 차에서 아무것도 하지 않는지
+  - USB `UNINSTALL`로 지운 뒤 재부팅 전에 `/system/wifi/bcmdhd.ko`가 순정으로 돌아왔는지(`system_server` 쪽 `/proc/<pid>/mountinfo`에 그 줄이 없는지)
 - **칩이 있는 차(또는 동글 뒤)에서 HMG-API 프로젝션 AP를 관리 앱이 바르게 읽는지.**
   - 부팅 뒤 `wifi.log`에 `projection AP: up in mode 2 (requested by wireless-carplay-aa)`(또는 `already up`)가 남고, 관리 앱 판정이 `ready`, 표의 "무선 연결용 Wi-Fi"가 "켜짐"인지. 이 판정은 netd가 띄운 `hostapd` 설정의 `ssid=`가 softap.conf의 카플레이 SSID(S2)인지로 합니다(`svc/lib.sh` `ap_ssid`). 순정 일반 핫스팟 SSID(S1)면 `aphotspot`입니다.
   - 폰을 무선으로 붙이면 `connected`와 "카플레이 N대 연결됨"이 나오는지(로컬 포트 7000, Wi-Fi 쪽 주소)
