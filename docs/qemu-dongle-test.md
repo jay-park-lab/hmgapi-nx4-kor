@@ -17,7 +17,7 @@ PC에 꽂은 동글을 QEMU 가상 머신(ARMv7)으로 넘겨, 우리 동글 드
   - 맞추지 못한 것: `CONFIG_WAKELOCK`(안드로이드 커널에만 있음). RTL8831BU의 wake lock 코드는 게스트에서 돌지 않습니다.
 - 툴체인도 차 빌드와 같은 모비스 `arm-eabi-4.7`입니다. vermagic은 `3.18.24 SMP preempt mod_unload ARMv7 p2v8`로, 차(`3.18.24-tcc …`)와 판 꼬리만 다릅니다.
 - USB는 차처럼 EHCI(PCI `usb-ehci`)에 고속(480 Mb/s)으로 붙습니다.
-- 드라이버는 차의 순정 HAL이 `bcmdhd`에 주는 인자 그대로 올립니다: `iface_name=wlan0 firmware_path=… nvram_path=… clm_path=…`(USB 진단 기록 `dongle/wifi-strings.txt`).
+- 드라이버는 차의 순정 HAL이 `bcmdhd`에 주는 인자 그대로 올립니다: `iface_name=wlan0 firmware_path=… nvram_path=… clm_path=…`(USB 진단 기록 `dongle/wifi-strings.txt`). 우리 HAL 패치가 기본 국가 코드를 KR로 두므로 이것만으로 KR입니다(`drivers/README.md` "드라이버를 순정 HAL 자리에 맞추기"). 국가 코드 없이 올릴 때는 `rtw_country_code=`(빈 값, 패치 전 원본과 같음)를 더합니다.
 
 ### 보는 것과 못 보는 것
 
@@ -50,14 +50,14 @@ sh scripts/qemu-dongle-test.sh interactive
 ```
 
 - `matrix`(기본, 사람 손 필요 없음, 약 6분):
-  - 차 HAL 인자로 올린 채널 표
-  - `rtw_country_code=KR`을 더해 올린 채널 표
+  - 국가 코드 없이(`rtw_country_code=`) 올린 채널 표
+  - HAL 인자만으로(기본 KR, 차에서 올라가는 모양) 올린 채널 표
   - 스캔
   - AP 다섯
-    - KR로 올린 드라이버: 2.4GHz 6번, 5GHz 149번(`hostapd` 국가 코드 없음), 5GHz 149번(`hostapd` `country_code=KR`)
-    - HAL 인자만으로 올린 드라이버(지금 차와 같음): 5GHz 149번(`hostapd` 국가 코드 없음), 5GHz 149번(`hostapd` `country_code=KR`)
+    - HAL 인자만으로 올린 드라이버: 2.4GHz 6번, 5GHz 149번(`hostapd` 국가 코드 없음), 5GHz 149번(`hostapd` `country_code=KR`)
+    - 국가 코드 없이 올린 드라이버: 5GHz 149번(`hostapd` 국가 코드 없음), 5GHz 149번(`hostapd` `country_code=KR`)
 - `interactive`:
-  - `rtw_country_code=KR`로 올려 5GHz 149번 AP(SSID `NX4-QEMU-TEST`, 비밀번호 `nx4-qemu-test`)를 3분 띄웁니다. 폰에서 붙어 봅니다.
+  - HAL 인자만으로(기본 KR) 올려 5GHz 149번 AP(SSID `NX4-QEMU-TEST`, 비밀번호 `nx4-qemu-test`)를 3분 띄웁니다. 폰에서 붙어 봅니다.
   - 그다음 "동글을 뽑아 주세요"가 나오면 PC에서 동글을 뽑습니다.
 - 두 번째 인자로 드라이버를 고릅니다(`rtl8831bu` 기본, `rtl88x2bu`).
 - 환경 변수:
@@ -75,9 +75,25 @@ sh scripts/qemu-dongle-test.sh interactive
 
 ## 결과
 
-### 2026-11-27, RTL8831BU(사용자 동글 `0bda:b831`), `matrix`
+### 2026-11-27, RTL8831BU(사용자 동글 `0bda:b831`), `matrix`, HAL 패치의 기본 국가 코드 KR
 
-PR #93 리뷰 반영 뒤 판(게스트 `HZ=100`, 스택 보호 REGULAR)으로 다시 돌린 결과입니다. 처음 판(HZ 200, 스택 보호 없음)과 같았습니다.
+아래 첫 결과로 HAL 패치의 기본 국가 코드를 KR로 둔 뒤 돌린 결과입니다(`drivers/*/0002-nx4-hal.diff`).
+
+| 단계 | 결과 |
+|---|---|
+| 채널 표(국가 코드 없이, `rtw_country_code=`) | 5GHz 149·153·157번이 모두 `no IR`(아래 첫 결과와 같음) |
+| 채널 표(HAL 인자만, 기본 KR) | `no IR` 없음 |
+| 스캔(HAL 인자만) | 2.4GHz AP 11개, 5GHz 0개 |
+| AP 2.4GHz 6번(HAL 인자만) | 섬 |
+| AP 5GHz 149번(HAL 인자만, `hostapd` 국가 코드 없음·`country_code=KR`) | **둘 다 섬** |
+| AP 5GHz 149번(국가 코드 없이, `hostapd` 국가 코드 없음·`country_code=KR`) | 둘 다 서지 않음(아래 첫 결과와 같음, "Configured channel (149) … not found") |
+| `rmmod` | 모두 종료 코드 0, 커널 멈춤 없음. AP를 쓴 뒤 내릴 때 드라이버 경고 하나(아래와 같음) |
+
+차에서 순정 HAL이 주는 인자만으로 올라가도 5GHz 149번 AP를 띄울 수 있게 되었습니다(게스트 기준. 차 확인은 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)).
+
+### 2026-11-27, RTL8831BU(사용자 동글 `0bda:b831`), `matrix`, HAL 패치에 국가 코드가 없을 때
+
+PR #93 리뷰 반영 뒤 판(게스트 `HZ=100`, 스택 보호 REGULAR)으로 다시 돌린 결과입니다. 처음 판(HZ 200, 스택 보호 없음)과 같았습니다. 이때는 "HAL 인자만"이 국가 코드 없음이었고, KR은 `rtw_country_code=KR`을 더해 올렸습니다.
 
 | 단계 | 결과 |
 |---|---|
@@ -97,7 +113,7 @@ PR #93 리뷰 반영 뒤 판(게스트 `HZ=100`, 스택 보호 REGULAR)으로 �
 - 차 커널도 내장 규제 DB가 없고(`CFG80211_INTERNAL_REGDB` 꺼짐), 안드로이드 4.4에는 보통 CRDA가 없습니다.
 - 순정 `bcmdhd`는 국가 코드를 `nvram_path`(`bcmdhd.cal`)의 `ccode` 같은 값으로 받을 수 있지만, 우리 패치는 `nvram_path`를 받아 두기만 합니다.
 
-그래서 4단계에서 HAL 패치의 기본 국가 코드를 KR로 두는 것을 권합니다. 차 확인(netd가 만드는 `hostapd.conf`의 `country_code` 줄, `bcmdhd.cal`의 `ccode` 줄. 비밀번호가 든 파일이라 그 줄만)은 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)에 적었습니다.
+그래서 HAL 패치의 기본 국가 코드를 KR로 두었습니다(위 결과). 차 확인(netd가 만드는 `hostapd.conf`의 `country_code` 줄(비밀번호가 든 파일이라 그 줄만), `bcmdhd.cal`의 `ccode` 줄)은 [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)과 `drivers/README.md` "차에서 확인할 것"에 있습니다.
 
 폰으로 붙기와 쓰는 중에 뽑기(`interactive`)는 아직 하지 않았습니다.
 

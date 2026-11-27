@@ -2,10 +2,13 @@
 # QEMU 동글 테스트(docs/qemu-dongle-test.md)의 게스트 init(PID 1). 루트 파일 시스템의 /sbin/nx4init로 들어간다
 # (tests/qemu/build-rootfs.sh). 커널 명령줄의 MODE로 고른다(커널이 key=value를 init 환경으로 넘김).
 # 드라이버는 차의 순정 HAL(libhardware_legacy.so)이 bcmdhd에 주는 인자 그대로 올린다(HAL_ARGS, USB 진단 기록 wifi-strings.txt).
-#   MODE=matrix       사람 손 없이: HAL 인자로 올린 채널 표, rtw_country_code=KR로 올린 채널 표, 스캔, AP 다섯(2.4GHz 6번,
-#                     KR로 올려 5GHz 149번을 hostapd 국가 코드 없이·KR로, HAL 인자만으로 올려 5GHz 149번을 hostapd 국가 코드 없이·KR로)
-#                     을 각 AP_SECS초
-#   MODE=interactive  KR로 올려 5GHz 149번 AP를 AP_SECS초 띄워 폰으로 붙어 보고, 그다음 쓰는 중에 뽑기를 UNPLUG_SECS초 기다림
+# 우리 HAL 패치(drivers/*/0002-nx4-hal.diff)가 기본 국가 코드를 KR로 두므로 HAL 인자만이면 KR이다. 국가 코드 없이 올리려면
+# rtw_country_code=(빈 값, 패치 전 원본과 같음)를 더한다.
+#   MODE=matrix       사람 손 없이: 국가 코드 없이 올린 채널 표, HAL 인자만으로(KR) 올린 채널 표, 스캔, AP 다섯(HAL 인자만으로
+#                     올려 2.4GHz 6번, 5GHz 149번을 hostapd 국가 코드 없이·KR로, 국가 코드 없이 올려 5GHz 149번을 hostapd
+#                     국가 코드 없이·KR로)을 각 AP_SECS초
+#   MODE=interactive  HAL 인자만으로(KR) 올려 5GHz 149번 AP를 AP_SECS초 띄워 폰으로 붙어 보고, 그다음 쓰는 중에 뽑기를
+#                     UNPLUG_SECS초 기다림
 # 결과는 직렬 콘솔에 "== "(단계)와 "-- "(결과) 줄로 남긴다. 호스트(scripts/qemu-dongle-test.sh)가 "-- " 줄을 모아 보이고,
 # 마지막 "== 끝"이 없으면 끝까지 돌지 못한 것으로 본다.
 
@@ -92,33 +95,33 @@ for u in /sys/bus/usb/devices/*; do
   [ -f $u/idVendor ] && echo "${u##*/} $(cat $u/idVendor):$(cat $u/idProduct) speed=$(cat $u/speed) $(cat $u/product 2>/dev/null)"
 done
 if [ "$MODE" = matrix ]; then
-  step "A. 차 HAL 인자 그대로(국가 코드 없음)"
-  load A
+  step "국가 코드 없이: 차 HAL 인자 + rtw_country_code=(빈 값, 패치 전 원본과 같음)"
+  load none rtw_country_code=
   dmesg | grep -iE 'unknown parameter|country|chplan|alpha2|regd' | tail -8
-  chans A
-  step "B. 차 HAL 인자 + rtw_country_code=KR"
-  load B rtw_country_code=KR
+  chans none
+  step "HAL 인자만: 차 HAL 인자 그대로(우리 패치의 기본 국가 코드 KR, 차에서 올라가는 모양)"
+  load hal
   dmesg | grep -iE 'country|chplan|alpha2|regd' | tail -8
-  chans B
-  step "스캔(KR)"
+  chans hal
+  step "스캔(HAL 인자만)"
   ip link set wlan0 up; sleep 3
   iw dev wlan0 scan > /tmp/scan.txt 2>&1
   echo "-- 스캔 결과: 종료 코드 $?, AP $(grep -c '^BSS ' /tmp/scan.txt)개, 5GHz $(grep -cE 'freq: 5[0-9]{3}' /tmp/scan.txt)개"
   ip link set wlan0 down
-  step "AP 1: 2.4GHz 6번, 국가 코드 없음(KR로 올린 드라이버)"
+  step "AP 1: 2.4GHz 6번, hostapd 국가 코드 없음(HAL 인자만으로 올린 드라이버)"
   ap g6 g 6 ""
-  step "AP 2: 5GHz 149번, hostapd 국가 코드 없음(KR로 올린 드라이버)"
+  step "AP 2: 5GHz 149번, hostapd 국가 코드 없음(HAL 인자만으로 올린 드라이버)"
   ap a149 a 149 ""
-  step "AP 3: 5GHz 149번, hostapd country_code=KR(KR로 올린 드라이버)"
+  step "AP 3: 5GHz 149번, hostapd country_code=KR(HAL 인자만으로 올린 드라이버)"
   ap a149kr a 149 KR
-  step "A로 다시 올려(HAL 인자만, 지금 차와 같은 드라이버) 5GHz 149번 AP, hostapd 국가 코드 없음"
-  load A2
-  ap a149hal a 149 ""
-  step "HAL 인자만으로 올린 드라이버에 5GHz 149번 AP, hostapd country_code=KR(게스트에는 CRDA가 없음)"
-  ap a149halkr a 149 KR
+  step "국가 코드 없이 다시 올려 5GHz 149번 AP, hostapd 국가 코드 없음"
+  load none2 rtw_country_code=
+  ap a149none a 149 ""
+  step "국가 코드 없이 올린 드라이버에 5GHz 149번 AP, hostapd country_code=KR(게스트에는 CRDA가 없음)"
+  ap a149nonekr a 149 KR
 else
-  step "KR로 올려 5GHz 149번 AP를 ${AP_SECS}초: 폰에서 NX4-QEMU-TEST(비밀번호 nx4-qemu-test)에 붙어 보세요"
-  load KR rtw_country_code=KR
+  step "HAL 인자만으로(KR) 올려 5GHz 149번 AP를 ${AP_SECS}초: 폰에서 NX4-QEMU-TEST(비밀번호 nx4-qemu-test)에 붙어 보세요"
+  load hal
   ap phone a 149 ""
   step "쓰는 중에 뽑기: AP를 다시 띄웠으니 지금 동글을 뽑아 주세요(${UNPLUG_SECS}초 기다림)"
   kcount; w0=$KW; o0=$KO
