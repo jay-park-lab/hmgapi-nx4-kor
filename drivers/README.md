@@ -1,6 +1,6 @@
 # USB Wi-Fi 동글 드라이버
 
-투싼 NX4 한국 내비(tcc803x, 커널 `3.18.24-tcc`)에서 쓸 USB Wi-Fi 동글 드라이버를 만드는 곳입니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48) 2·3단계). 아직 모드에 넣지 않았고, 차에서 확인하지 않았습니다.
+투싼 NX4 한국 내비(tcc803x, 커널 `3.18.24-tcc`)에서 쓸 USB Wi-Fi 동글 드라이버를 만드는 곳입니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48) 2·3단계). 2.2.0부터 릴리스 워크플로가 이 커밋에서 빌드해 모드에 싣고(`scripts/build.sh` `NX4_DRIVERS`), 부팅 서비스 `svc/dongle.sh`가 꽂힌 동글에 맞는 것을 순정 자리에 겁니다(아래 "두 드라이버와 자리 하나", `docs/design.md`). 차에서는 아직 확인하지 않았습니다.
 
 - 드라이버는 둘입니다. 같은 커널 트리(아래 "커널 준비")와 같은 툴체인으로 빌드합니다.
   - **RTL88x2BU**(ipTIME A3000MINI `0bda:b812`, TP-Link Archer T3U `2357:012d` 등): [cilynx/rtl88x2bu](https://github.com/cilynx/rtl88x2bu), 패치 `rtl88x2bu/`
@@ -78,6 +78,7 @@ kernel.org linux-3.18.24 (빌드 뼈대)
 - 부팅 서비스(`start: boot`)와 관리 앱 [동글 켜기]([#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60))가 꽂힌 동글의 USB ID를 sysfs에서 읽어, 맞는 `.ko`를 `/system/wifi/bcmdhd.ko` 위에 bind mount합니다.
 - 시동마다 다시 겁니다(시동을 끄고 켜면 새로 부팅함). 부팅 서비스는 HMG-API 데몬(부팅 약 2.6초)이 띄우므로 순정 HAL이 `bcmdhd`를 올리는 때(약 9.8초) 전에 걸 수 있습니다.
 - 순정이 포트 전원을 껐다 켠 뒤(꽂은 채 부팅 약 40초, 부팅 뒤 꽂으면 약 8초 뒤) `wlan0`·AP를 보고, 없으면 AP를 다시 켜게 합니다. 상주 루프는 두지 않습니다.
+- 부팅 서비스는 `svc/dongle.sh`(2.2.0)입니다. 모드에는 두 `.ko`와 빌드 정보, 받는 USB ID 목록 `drivers/usb-ids.txt`(빌드 정보의 alias에서), 이 폴더의 `COPYING`과 대응 소스 안내 `SOURCE.txt`가 들어갑니다. 관리 앱의 동글 켜기 버튼([#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60))은 다음 PR입니다.
 
 ## 커널 준비(빌드 방법)
 

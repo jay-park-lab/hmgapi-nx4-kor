@@ -19,6 +19,9 @@
 #                   <OUT>/busybox에 둠. 미러는 NX4_BUSYBOX_URL).
 #                   none이면 넣지 않는다(내비에 /system/bin/busybox가 없으면 무선 설정을 하지 않는 묶음이 된다)
 #   NX4_BUSYBOX_LICENSE  그 busybox의 라이선스 안내(GPL-2.0, 대응 소스 위치. 기본 <NX4_BUSYBOX>-LICENSE.txt)
+#   NX4_DRIVERS      USB Wi-Fi 동글 드라이버 폴더(CI drivers 워크플로의 drivers-tcc803x artifact를 푼 곳, 또는 리눅스 x86에서
+#                   scripts/build-driver.sh가 만든 out/drivers/tcc803x). 주면 두 드라이버를 모드의 drivers/에 넣는다. 맥의 에뮬레이션
+#                   빌드는 받지 않는다. 주지 않으면 동글 드라이버 없이 만든다(릴리스 워크플로는 늘 줌)
 #   HMGAPI_USB_ZIP  HMG-API USB 묶음(hmgapi-<버전>-usb.zip). 주면 같은 USB에 함께 넣는다(HMG-API가 없으면 그것부터 설치)
 #   NX4_WIRELESS_ZIP  USB에 함께 넣을 공식 무선 모드 zip(wireless-carplay-aa-<판>.zip, 고치지 않은 공식 릴리스 파일). 주지 않으면
 #                   공식 릴리스에서 받는다(scripts/fetch-wireless.sh: 고정한 판, NOTICE.md의 SHA-256과 같을 때만. <OUT>/wireless에 둠.
@@ -103,6 +106,60 @@ if [ -n "$BBX" ]; then
   fi
 else
   rm -f "$M/$BBNOTE"
+fi
+# USB Wi-Fi 동글 드라이버(#48·#80, drivers/README.md): NX4_DRIVERS 폴더(scripts/build-driver.sh의 결과 out/drivers/tcc803x 꼴:
+# <드라이버>/bcmdhd.ko와 그 빌드 정보 bcmdhd.ko.txt)의 두 드라이버를 모드의 drivers/<드라이버>/에 넣는다. 부팅 서비스(svc/dongle.sh)가
+# 꽂힌 동글에 맞는 것을 순정 자리에 bind mount한다. 받는 USB ID 목록 drivers/usb-ids.txt("<vid:pid> <드라이버>")는 빌드 정보의
+# modinfo alias 줄에서 만든다. 차에 넣을 .ko는 리눅스 x86(CI)에서 만든 것만 받는다: 빌드 정보에 에뮬레이션 표시가 있으면 멈춘다
+# (맥의 에뮬레이션 빌드는 조용히 다른 코드를 낸 적이 있음, drivers/README.md "차에 넣을 .ko는 CI에서 만든 것만").
+# 주지 않으면 넣지 않는다(그 묶음의 동글 서비스는 "드라이버 없음"으로 끝남). 릴리스 워크플로는 CI에서 빌드해 늘 준다.
+DRVS="rtl88x2bu rtl8831bu"
+rm -rf "$M/drivers"
+if [ -n "$NX4_DRIVERS" ]; then
+  [ -d "$NX4_DRIVERS" ] || { echo "동글 드라이버 폴더가 없습니다: $NX4_DRIVERS" >&2; exit 1; }
+  mkdir -p "$M/drivers"
+  : > "$W/usb-ids.txt"
+  : > "$W/drv-builds.txt"
+  for d in $DRVS; do
+    K=$NX4_DRIVERS/$d/bcmdhd.ko
+    [ -f "$K" ] && [ -f "$K.txt" ] || { echo "동글 드라이버가 없습니다: $K(와 $K.txt)" >&2; exit 1; }
+    grep -q "^driver $d [0-9a-f]\{40\}$" "$K.txt" && grep -qx 'module name bcmdhd' "$K.txt" && grep -q '^vermagic 3\.18\.24-tcc SMP preempt mod_unload ARMv7 p2v8' "$K.txt" \
+      || { echo "$K.txt가 이 차용 $d 빌드 정보가 아닙니다(driver·module name·vermagic 줄)" >&2; exit 1; }
+    if grep -q '^build host .*emulated' "$K.txt"; then
+      echo "$K는 에뮬레이션 빌드입니다(차에 넣지 않음). CI(.github/workflows/drivers.yml)의 drivers-tcc803x를 받아 NX4_DRIVERS로 주세요" >&2; exit 1
+    fi
+    KS=$( (sha256sum "$K" 2>/dev/null || shasum -a 256 "$K") | cut -d' ' -f1)
+    grep -qx "sha256 $KS" "$K.txt" || { echo "$K가 빌드 정보($K.txt)의 sha256과 다릅니다" >&2; exit 1; }
+    mkdir -p "$M/drivers/$d"
+    cp "$K" "$K.txt" "$M/drivers/$d/"
+    chmod 644 "$M/drivers/$d/bcmdhd.ko" "$M/drivers/$d/bcmdhd.ko.txt"
+    IDS=$(sed -n 's/^alias usb:v\([0-9A-Fa-f]\{4\}\)p\([0-9A-Fa-f]\{4\}\)d.*/\1:\2/p' "$K.txt" | tr 'A-F' 'a-f' | sort -u)
+    [ -n "$IDS" ] || { echo "$K.txt에 USB alias 줄이 없습니다" >&2; exit 1; }
+    for id in $IDS; do echo "$id $d"; done >> "$W/usb-ids.txt"
+    sed -n "s/^driver $d /$d /p" "$K.txt" >> "$W/drv-builds.txt"
+  done
+  DUP=$(cut -d' ' -f1 "$W/usb-ids.txt" | sort | uniq -d)
+  [ -z "$DUP" ] || { echo "두 드라이버가 같은 USB ID를 받습니다: $DUP" >&2; exit 1; }
+  cp "$W/usb-ids.txt" "$M/drivers/usb-ids.txt"
+  # GPL-2.0: 드라이버와 그 패치·빌드 스크립트의 라이선스 전문과 대응 소스 위치(drivers/README.md "출처와 라이선스")
+  cp "$B/drivers/COPYING" "$M/drivers/COPYING"
+  DREV=$(cd "$B" && git rev-parse HEAD 2>/dev/null) || DREV=
+  {
+    echo "USB Wi-Fi 동글 드라이버(이 폴더의 <드라이버>/bcmdhd.ko): GNU GPL-2.0. 전문은 같은 폴더의 COPYING."
+    echo "- 원본 드라이버와 커밋:"
+    while read -r dn dc; do
+      case $dn in
+        rtl88x2bu) echo "  - rtl88x2bu: https://github.com/cilynx/rtl88x2bu/tree/$dc" ;;
+        rtl8831bu) echo "  - rtl8831bu: https://github.com/hyeondg/rtl8831bu/tree/$dc" ;;
+      esac
+    done < "$W/drv-builds.txt"
+    echo "- 우리 패치·빌드 스크립트·커널 준비: https://github.com/jay-park-lab/hmgapi-nx4-kor/tree/${DREV:-main}/drivers"
+    echo "- 커널: kernel.org linux-3.18.24와 현대모비스 GPL 공개 내비 커널 소스(https://github.com/jay-park-lab/hmgapi-nx4-kor/releases/tag/src-mobis-avnt5w-r9)"
+    echo "- 각 .ko의 빌드 정보(원본 커밋, 패치·커널·툴체인 sha256, md5)는 <드라이버>/bcmdhd.ko.txt에 있습니다."
+  } > "$M/drivers/SOURCE.txt"
+  echo "동글 드라이버: $DRVS, USB ID $(wc -l < "$M/drivers/usb-ids.txt" | tr -d ' ')개"
+else
+  echo "참고: 동글 드라이버를 넣지 않습니다(NX4_DRIVERS 없음). 이 묶음은 USB Wi-Fi 동글을 켜지 않습니다"
 fi
 # AGPL-3.0 원문과 고지(원저작권, 이 포크의 변경)
 cp "$B/LICENSE" "$B/NOTICE.md" "$M/"

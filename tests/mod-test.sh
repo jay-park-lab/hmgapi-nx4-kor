@@ -46,8 +46,9 @@ assert m["id"] == "nx4-kor"
 assert m["hmgapi"] == ">=1.1.0-rc.10", m["hmgapi"]
 for s in m["services"]:
     assert os.path.isfile(os.path.join(d, s["script"])), s
-# launch: 관리 앱이 부름. nochip: 칩 없는 차에서 HMG-API 지기의 다시 시도를 멈춤(부팅 때 한 번, 상주는 inotifyd뿐)
-assert [(s["name"], s["start"], s["user"], s["restart"]) for s in m["services"]] == [("launch", "manual", "root", False), ("nochip", "boot", "root", False)], m["services"]
+# launch: 관리 앱이 부름. nochip: 칩 없는 차에서 HMG-API 지기의 다시 시도를 멈춤(부팅 때 한 번, 상주는 inotifyd뿐).
+# dongle: USB Wi-Fi 동글 드라이버를 순정 자리에 걺(부팅 때 한 번, 상주 없음, #80)
+assert [(s["name"], s["start"], s["user"], s["restart"]) for s in m["services"]] == [("launch", "manual", "root", False), ("nochip", "boot", "root", False), ("dongle", "boot", "root", False)], m["services"]
 # 차 이벤트(car_events)를 쓰면 HMG-API가 차량 서비스(상주 Dalvik)를 새로 띄우므로(ModRuntime) 두지 않는다
 assert "car_events" not in m and "vehicle" not in m, m.keys()
 assert m["apps"] == [{"apk": "app/NX4KOR.apk", "package": "io.github.jayparklab.nx4kor"}], m["apps"]
@@ -1658,6 +1659,102 @@ echo "100.00 50.00" > $RW/uptime; : > $RW/dmesg
 kill $RWP 2>/dev/null; wait $RWP 2>/dev/null
 check "  감시자가 끝 시각 파일(boot·until, 앱이 읽음)을 씀" 'grep -qx "boot=test-boot-id" $RW/watchf && grep -qx "until=200" $RW/watchf'
 
+# --- svc/dongle.sh: USB Wi-Fi 동글 드라이버를 순정 자리에 걺(#48, #80 결정). 부팅 때 한 번, 상주 없음 ---
+# 가짜 mount·umount: 받은 명령을 $T/mcalls에 적고, 가짜 mountinfo($MOUNTINFO)에 줄을 더하거나 뺀다. mountinfo의 4번째 칸은
+# 원본 파일 시스템 안의 경로처럼 앞의 $FAKEDATA를 뗀다(차: /data의 /hmgapi/mods/nx4-kor/drivers/<드라이버>/bcmdhd.ko)
+cat > $T/bin/mount <<E
+#!/bin/sh
+echo "mount \$*" >> $T/mcalls
+[ -n "\$MOUNT_FAIL" ] && exit 1
+[ "\$1" = -o ] && [ "\$2" = bind ] || exit 1
+echo "99 20 179:13 \${3#\$FAKEDATA} \$4 rw,relatime shared:20 - ext4 /dev/block/data rw" >> "\$MOUNTINFO"
+E
+cat > $T/bin/umount <<E
+#!/bin/sh
+echo "umount \$*" >> $T/mcalls
+[ -n "\$UMOUNT_FAIL" ] && exit 1
+awk -v p="\$1" '\$5 == p { last = NR } { l[NR] = \$0 } END { for (i = 1; i <= NR; i++) if (i != last) print l[i] }' "\$MOUNTINFO" > "\$MOUNTINFO.t"
+mv "\$MOUNTINFO.t" "\$MOUNTINFO"
+E
+# 가짜 AP 도구(hooks.jar ApTool 자리): 받은 인자를 적고 Android처럼 두 줄을 낸다
+printf '#!/bin/sh\necho "aptool $*" >> %s/mcalls\necho "projection AP on"\necho "(it was 13)"\n' $T > $T/bin/fakeaptool
+chmod +x $T/bin/mount $T/bin/umount $T/bin/fakeaptool
+DM=$T/dm; DA=$DM/data/hmgapi/mods/nx4-kor
+dgreset() {
+  rm -rf $DM $T/dusb $T/dnet $T/dh $T/dsysmod $T/dslot $T/ddongle $T/mcalls $T/ps.out
+  mkdir -p $DM/data/hmgapi/mods $T/dnet $T/dh/state $T/dh/wifi $T/dsysmod $T/dslot
+  cp -R $TP $DA
+  for d in rtl88x2bu rtl8831bu; do mkdir -p $DA/drivers/$d; echo "fake $d" > $DA/drivers/$d/bcmdhd.ko; chmod 600 $DA/drivers/$d/bcmdhd.ko; done
+  printf '0bda:b812 rtl88x2bu\n2357:012d rtl88x2bu\n0bda:b831 rtl8831bu\n0bda:b851 rtl8831bu\n' > $DA/drivers/usb-ids.txt
+  echo stock > $T/dslot/bcmdhd.ko
+  printf '%s\n' "20 1 179:12 / /system ro,relatime shared:20 - ext4 /dev/block/system ro" "21 1 179:13 / /data rw shared:21 - ext4 /dev/block/data rw" > $T/dmountinfo
+  usbdev $T/dusb 1-1 1d74 3104; usbdev $T/dusb 4-1 0bda b831; echo 2 > $T/dusb/4-1/devnum   # 순정 LG 모뎀, 사용자 동글
+  echo "projection wireless-carplay-aa" > $T/dh/state/wifi.txt
+  : > $T/dmodules; : > $T/mcalls; : > $T/ps.out
+  echo "3.00 1.00" > $T/duptime
+}
+dgrun() {
+  (env PATH=$P0 BB=$T/bin/bb NX4_APP=$DA NX4_ROOT=$T/droot W=$T/dw BOOT_ID=$T/bootid UPTIME=$T/duptime WIFI_SEEN=$T/dseen SDIO=$T/nosdio \
+     SYSNET=$T/dnet HMGDATA=$T/dh USBDEV=$T/dusb KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/dmountinfo FAKEDATA=$DM/data PROCMOD=$T/dmodules \
+     SYSMOD=$T/dsysmod DONGLE=$T/ddongle NX4_APTOOL=$T/bin/fakeaptool NX4_DONGLE_POLL=0.1 NX4_DONGLE_SPOLL=0.1 NX4_DONGLE_WLAN=1 NX4_DONGLE_AP=1 \
+     "$@" sh $DA/svc/dongle.sh) > $T/dg.out 2>&1; echo $? > $T/dg.rc
+}
+# dgcycle: 0.3초 뒤 포트 전원을 껐다 켠 것처럼 동글이 떨어졌다(0.3초) 장치 번호 3으로 다시 붙고, 그 뒤 wlan0이 생김($1: flags, 기본 0x1003 올라옴)
+dgcycle() { ( /bin/sleep 0.3; rm -rf $T/dusb/4-1; /bin/sleep 0.3; usbdev $T/dusb 4-1 0bda b831; echo 3 > $T/dusb/4-1/devnum; mkdir -p $T/dnet/wlan0; echo ${1:-0x1003} > $T/dnet/wlan0/flags ) & }
+mounted() { awk -v p=$T/dslot/bcmdhd.ko '$5 == p { r = $4 } END { print r }' $T/dmountinfo; }
+dgreset; echo "1234 root 0:00 hostapd -e /data/misc/wifi/entropy.bin /data/misc/wifi/hostapd.conf" > $T/ps.out; dgcycle; _dc=$!; dgrun; wait $_dc
+check "dongle.sh: 꽂힌 동글(0bda:b831)에 맞는 rtl8831bu를 순정 자리에 bind mount(644), 기록 한 줄(부팅 id·USB ID·드라이버·부팅 뒤 초, 644), 포트 끄고 켜기(장치 번호 2→3) 뒤 wlan0 올라옴·hostapd 돎이면 AP는 두고 끝남" \
+  '[ "$(cat $T/dg.rc)" = 0 ] && grep -qx "mount -o bind $DA/drivers/rtl8831bu/bcmdhd.ko $T/dslot/bcmdhd.ko" $T/mcalls && [ "$(mounted)" = /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko ] && [ "$(ls -l $DA/drivers/rtl8831bu/bcmdhd.ko | cut -c1-10)" = "-rw-r--r--" ] && [ "$(cat $T/ddongle)" = "test-boot-id 0bda:b831 rtl8831bu 3" ] && [ "$(ls -l $T/ddongle | cut -c1-10)" = "-rw-r--r--" ] && grep -q "동글 0bda:b831(4-1): rtl8831bu 드라이버를 $T/dslot/bcmdhd.ko에 걺(부팅 뒤 3초)" $T/dg.out && grep -q "동글이 다시 붙음(포트 전원 껐다 켬, 장치 번호 2 → 3" $T/dg.out && grep -q "AP 떠 있음" $T/dg.out && ! grep -q aptool $T/mcalls' || { cat $T/dg.out $T/mcalls; }
+dgreset; cat $T/bootid > $T/dh/wifi/ap.boot; dgcycle 0x1002; _dc=$!; dgrun; wait $_dc
+check "  다시 붙은 뒤 AP가 없고(wlan0 내려감, hostapd 없음) HMG-API가 이번 부팅에 띄웠다고 적었으면(ap.boot) AP를 한 번 껐다 켬(ApTool restart), 그 결과를 한 줄로" \
+  '[ "$(grep -c "^aptool restart$" $T/mcalls)" = 1 ] && grep -q "AP가 없음(HMG-API는 이번 부팅에 띄웠다고 적음, wlan0 내려감, hostapd 없음): AP를 껐다 켬" $T/dg.out && grep -q "AP 껐다 켜기: projection AP on (it was 13) (종료 코드 0)" $T/dg.out' || cat $T/dg.out $T/mcalls
+dgreset; echo other-boot > $T/dh/wifi/ap.boot; dgcycle 0x1002; _dc=$!; dgrun; wait $_dc
+check "  HMG-API 지기가 아직 띄우지 못했으면(ap.boot가 지난 부팅 것) AP를 건드리지 않고 지기에 맡김" '! grep -q aptool $T/mcalls && grep -q "HMG-API 지기가 다시 시도 중이라 맡김" $T/dg.out' || cat $T/dg.out
+dgreset; echo "80.00 1.00" > $T/duptime; mkdir -p $T/dnet/wlan0; echo 0x1003 > $T/dnet/wlan0/flags; echo "1 root 0:00 hostapd x.conf" > $T/ps.out; dgrun
+check "  부팅 뒤 NX4_DONGLE_SETTLE(75)초가 지나면 포트 끄고 켜기를 기다리지 않고 AP를 봄(늦게 시작해도 끝이 있음)" \
+  '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "부팅 뒤 80초까지 동글이 다시 붙지 않음" $T/dg.out && grep -q "AP 떠 있음" $T/dg.out' || cat $T/dg.out
+dgreset; echo "80.00 1.00" > $T/duptime; dgrun NX4_DONGLE_WLAN=0
+check "  wlan0이 생기지 않으면 순정 Wi-Fi 서비스에 맡기고 끝남(AP 도구 안 부름)" '! grep -q aptool $T/mcalls && grep -q "wlan0이 생기지 않음" $T/dg.out' || cat $T/dg.out
+dgreset; : > $T/dseen; dgrun
+check "  Wi-Fi 칩이 있는 내비(public/wifi-chip)면 아무것도 걸지 않음" '[ ! -s $T/mcalls ] && [ ! -e $T/ddongle ] && grep -q "Wi-Fi 칩이 있는 내비: 할 일 없음" $T/dg.out' || cat $T/dg.out
+rm -f $T/dseen
+dgreset; rm -f $DA/drivers/usb-ids.txt; dgrun
+check "  묶음에 동글 드라이버가 없으면(NX4_DRIVERS 없이 만든 묶음) 아무것도 하지 않음" '[ ! -s $T/mcalls ] && grep -q "이 묶음에 동글 드라이버가 없음" $T/dg.out' || cat $T/dg.out
+dgreset; rm -rf $T/dusb/4-1; echo "9.00 1.00" > $T/duptime; dgrun
+check "  우리 드라이버가 받는 동글이 없으면(LG 모뎀만) 부팅 뒤 NX4_DONGLE_FIND(9)초에 끝냄" '[ "$(cat $T/dg.rc)" = 0 ] && [ ! -s $T/mcalls ] && [ ! -e $T/ddongle ] && grep -q "우리 드라이버가 받는 동글이 없음(부팅 뒤 9초)" $T/dg.out' || cat $T/dg.out
+dgreset; rm -rf $T/dusb/4-1; ( /bin/sleep 0.4; usbdev $T/dusb 4-1 2357 012d; echo 2 > $T/dusb/4-1/devnum ) & _dc=$!; dgrun NX4_DONGLE_SETTLE=0; wait $_dc
+check "  부팅 뒤 FIND초 전이면 기다리다 늦게 보인 동글(TP-Link 2357:012d)에 rtl88x2bu를 걺" 'grep -qx "mount -o bind $DA/drivers/rtl88x2bu/bcmdhd.ko $T/dslot/bcmdhd.ko" $T/mcalls && grep -q "동글 2357:012d(4-1): rtl88x2bu" $T/dg.out' || cat $T/dg.out
+dgreset; echo "99 20 179:13 /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko $T/dslot/bcmdhd.ko rw shared:20 - ext4 /dev/block/data rw" >> $T/dmountinfo; dgrun NX4_DONGLE_SETTLE=0
+check "  이미 같은 드라이버가 걸려 있으면(서비스가 다시 돎) mount를 다시 하지 않음" '! grep -q "^mount" $T/mcalls && grep -q "rtl8831bu 드라이버를" $T/dg.out' || cat $T/dg.out $T/mcalls
+dgreset; echo "99 20 179:13 /hmgapi/mods/nx4-kor/drivers/rtl88x2bu/bcmdhd.ko $T/dslot/bcmdhd.ko rw shared:20 - ext4 /dev/block/data rw" >> $T/dmountinfo; dgrun NX4_DONGLE_SETTLE=0
+check "  이 모드의 다른 드라이버가 걸려 있으면 풀고 맞는 것을 걺" 'grep -qx "umount $T/dslot/bcmdhd.ko" $T/mcalls && grep -qx "mount -o bind $DA/drivers/rtl8831bu/bcmdhd.ko $T/dslot/bcmdhd.ko" $T/mcalls && [ "$(mounted)" = /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko ]' || cat $T/dg.out $T/mcalls
+dgreset; echo "99 20 179:13 /data/other-mod/bcmdhd.ko $T/dslot/bcmdhd.ko rw shared:20 - ext4 /dev/block/data rw" >> $T/dmountinfo; dgrun NX4_DONGLE_SETTLE=0
+check "  다른 것(다른 모드 등)이 걸려 있으면 건드리지 않음" '[ ! -s $T/mcalls ] && [ ! -e $T/ddongle ] && grep -q "다른 것이 걸려 있어 건드리지 않음" $T/dg.out' || cat $T/dg.out
+dgreset; dgrun MOUNT_FAIL=1 NX4_DONGLE_SETTLE=0
+check "  mount가 실패하면 알리고 끝냄(기록 없음)" '[ "$(cat $T/dg.rc)" = 0 ] && [ ! -e $T/ddongle ] && grep -q "rtl8831bu 드라이버를 $T/dslot/bcmdhd.ko에 걸지 못함" $T/dg.out' || cat $T/dg.out
+dgreset; : > $T/dh/state/wifi.txt; dgrun
+check "  프로젝션 AP를 요청한 모드가 없으면 걸기만 하고 끝냄(포트 끄고 켜기를 기다리지 않음)" '[ -s $T/ddongle ] && grep -q "프로젝션 AP를 요청한 모드가 없음: 걸기만 하고 끝냄" $T/dg.out && ! grep -q "다시 붙" $T/dg.out' || cat $T/dg.out
+dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; dgrun NX4_DONGLE_SETTLE=0
+check "  순정 bcmdhd가 이미 올라 있으면(늦게 걺, rtw_country_code 매개변수 없음) 그대로 두고 알림" 'grep -q "순정 bcmdhd가 이미 올라 있음(늦게 걺)" $T/dg.out && ! grep -q "rmmod" $T/mcalls' || cat $T/dg.out
+dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; : > $T/dsysmod/bcmdhd/parameters/rtw_country_code; dgrun NX4_DONGLE_SETTLE=0
+check "  올라 있는 bcmdhd가 우리 드라이버면 알리지 않음" '! grep -q "순정 bcmdhd가 이미 올라 있음" $T/dg.out' || cat $T/dg.out
+dgreset; ( /bin/sleep 0.3; rm -rf $T/dusb/4-1 ) & _dc=$!; echo "3.00 1.00" > $T/duptime; ( /bin/sleep 0.8; echo "80.00 1.00" > $T/duptime ) & _du=$!; dgrun; wait $_dc $_du
+check "  기다리는 동안 동글이 빠지면 끝냄(다시 꽂으면 관리 앱 [동글 켜기])" '! grep -q aptool $T/mcalls && grep -q "동글이 빠짐: 끝냄" $T/dg.out' || cat $T/dg.out
+rm -f $T/ps.out
+
+# preun.sh: 지울 때 이 모드가 순정 자리에 건 mount를 풀고 기록을 지운다. 업데이트 때는 둔다. 다른 것이 걸려 있으면 두고
+pumount() { printf '%s\n' "21 1 179:13 / /data rw shared:21 - ext4 /dev/block/data rw" "99 20 179:13 $1 $T/dslot/bcmdhd.ko rw shared:20 - ext4 /dev/block/data rw" > $T/umountinfo; echo x > $T/udongle; : > $T/mcalls; }
+pureset; pumount /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko; prun KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/umountinfo DONGLE=$T/udongle
+check "preun.sh: 지울 때 이 모드가 건 동글 드라이버 mount를 풀고 기록을 지움" \
+  'grep -qx "umount $T/dslot/bcmdhd.ko" $T/mcalls && [ ! -e $T/udongle ] && grep -q "USB Wi-Fi 동글 드라이버(rtl8831bu)를 순정 자리에서 풂" $T/pu.out && ! grep -q "bcmdhd.ko" $T/umountinfo' || cat $T/pu.out
+pureset; pumount /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko; prun NX4_UPDATE=1 KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/umountinfo DONGLE=$T/udongle
+check "  업데이트 때는 mount와 기록을 둠(다음 부팅에 새 판이 다시 걺)" '[ ! -s $T/mcalls ] && [ -e $T/udongle ]' || cat $T/pu.out
+pureset; pumount /data/other-mod/bcmdhd.ko; prun KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/umountinfo DONGLE=$T/udongle
+check "  다른 것이 걸려 있으면 풀지 않음" '[ ! -s $T/mcalls ] && ! grep -q "동글 드라이버" $T/pu.out' || cat $T/pu.out
+pureset; pumount /hmgapi/mods/nx4-kor/drivers/rtl88x2bu/bcmdhd.ko; prun UMOUNT_FAIL=1 KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/umountinfo DONGLE=$T/udongle
+check "  풀지 못하면 알리고(재부팅하면 풀림) 지우기는 이어 감" '[ "$(cat $T/pu.rc)" = 0 ] && grep -q "rtl88x2bu)를 순정 자리에서 풀지 못함(재부팅하면 풀림)" $T/pu.out && grep -qx "NX4 KOR를 지웠습니다." $T/pu.out' || cat $T/pu.out
+rm -f $T/umountinfo $T/udongle $T/mcalls
+
 # --- scripts/fetch-busybox.sh: Alpine 패키지에서 busybox만 꺼내, 패키지와 busybox가 NOTICE.md의 SHA-256과 맞을 때만 둔다 ---
 # 인터넷 없이: 가짜 apk(gzip tar, bin/busybox.static)를 file://로 주고, 그 SHA-256들을 적은 가짜 NOTICE.md 옆에 스크립트를 둔다
 FB=$T/fb; mkdir -p $FB/scripts; cp $B/scripts/fetch-busybox.sh $FB/scripts/
@@ -2044,8 +2141,8 @@ PY'
     DD=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -t/ -k1 -V | tail -n 1)dexdump
     if [ -x "$DD" ]; then
       "$DD" $T/hooks.jar 2>/dev/null | sed -n "s/^ *Class descriptor *: '\(.*\)'$/\1/p" > $T/hooks.classes
-      check "  hooks.jar 덱스에는 우리 클래스만(HMG-API 런타임·iAP2 스텁 없음), 진입 클래스와 DiPO 부분이 있음" \
-        '[ -s $T/hooks.classes ] && ! grep -v "^Lio/github/jayparklab/nx4kor/hook/" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/Nx4KorHooks;" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/dipo/KorTbt;" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/dipo/CpTurnsFit;" $T/hooks.classes' || cat $T/hooks.classes
+      check "  hooks.jar 덱스에는 우리 클래스만(HMG-API 런타임·iAP2 스텁 없음), 진입 클래스와 DiPO 부분, 동글 서비스의 AP 도구(ApTool)가 있음" \
+        '[ -s $T/hooks.classes ] && ! grep -v "^Lio/github/jayparklab/nx4kor/hook/" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/Nx4KorHooks;" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/dipo/KorTbt;" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/dipo/CpTurnsFit;" $T/hooks.classes && grep -qx "Lio/github/jayparklab/nx4kor/hook/ApTool;" $T/hooks.classes' || cat $T/hooks.classes
     fi
     # KP 2.4.10에서 더해진 곧 회전 그림 판단(회전교차로 32, 각도 없는 진입 램프, 지하차도·고가)과 CpIcons를 PC에서 돌린다(PR #74 리뷰 6).
     # hooks/src를 build-hooks.sh와 같은 클래스 경로(android.jar, HMG-API 런타임·스텁, iAP2 스텁)로 컴파일한다
@@ -2075,7 +2172,22 @@ PY'
   bld env NX4_BUSYBOX=$T/test-bb OUT=$T/out-nolic
   check "빌드: busybox를 넣는데 라이선스 안내가 없으면 만들지 않음" '[ "$(cat $T/build.rc)" != 0 ] && grep -q "라이선스 안내" $T/build.out && [ ! -f $T/out-nolic/hmgapi-nx4-kor-$V-usb.zip ]'
   echo "BusyBox GPL-2.0 test notice" > $T/test-bb-LICENSE.txt
-  bld env NX4_BUSYBOX=$T/test-bb OUT=$T/out
+  # 동글 드라이버(NX4_DRIVERS): CI 빌드(drivers-tcc803x) 꼴의 가짜 .ko와 빌드 정보. sha256은 그 파일의 값. $2를 주면 build host 줄 꼬리
+  mkdrv() {
+    rm -rf $1
+    for d in rtl88x2bu rtl8831bu; do
+      mkdir -p $1/$d; echo "fake $d ko" > $1/$d/bcmdhd.ko
+      { echo "driver $d 0123456789abcdef0123456789abcdef0123456$(printf %s $d | wc -c | tr -d ' ')"
+        echo "build host x86_64, Linux x86_64$2"; echo "module name bcmdhd"
+        case $d in
+          rtl88x2bu) echo "alias usb:v0BDApB812d*dc*dsc*dp*icFFiscFFipFFin*"; echo "alias usb:v2357p012Dd*dc*dsc*dp*icFFiscFFipFFin*" ;;
+          rtl8831bu) echo "alias usb:v0BDApB851d*dc*dsc*dp*icFFiscFFipFFin*"; echo "alias usb:v0BDApB831d*dc*dsc*dp*icFFiscFFipFFin*" ;;
+        esac
+        echo "sha256 $(sha256 $1/$d/bcmdhd.ko)"; echo "vermagic 3.18.24-tcc SMP preempt mod_unload ARMv7 p2v8 "; } > $1/$d/bcmdhd.ko.txt
+    done
+  }
+  mkdrv $T/drv
+  bld env NX4_BUSYBOX=$T/test-bb NX4_DRIVERS=$T/drv OUT=$T/out
   check "빌드: 모드 zip과 USB 묶음을 만듦, 받은 hooks.jar(NX4_HOOKS_JAR)를 넣었다고 찍음" '[ "$(cat $T/build.rc)" = 0 ] && [ -f $T/out/hmgapi-nx4-kor-$V.zip ] && [ -f $T/out/hmgapi-nx4-kor-$V-usb.zip ] && grep -q "hooks.jar는 NX4_HOOKS_JAR($T/hooks.jar)를 넣었습니다" $T/build.out' || cat $T/build.out
   rm -rf $T/ux; mkdir -p $T/ux; (cd $T/ux && unzip -q $T/out/hmgapi-nx4-kor-$V-usb.zip)
   check "USB 묶음: HMG-API 앱용 업데이트·공식 모드 묶음(HMGAPI/updates)은 넣지 않음, HMGAPI-SOURCE.txt에 뺀 것을 적음" \
@@ -2085,6 +2197,8 @@ PY'
   P=$T/ux/NX4/install/payload
   check "USB 묶음: payload = 서명된 모드를 푼 것(mod.json, settings.json, 스크립트, 앱, hooks.jar, busybox, 서명), 훅 소스·한국 포크 무선 부분(레시피·패치)·핫스팟 서비스 없음" \
     '[ -f $P/mod.json ] && cmp -s $P/settings.json $PKG/settings.json && [ -f $P/svc/launch.sh ] && [ -f $P/svc/lib.sh ] && [ -f $P/bin/status.sh ] && [ -f $P/bin/uninstall.sh ] && [ -f $P/scripts/preun.sh ] && [ -f $P/app/NX4KOR.apk ] && cmp -s $P/hooks.jar $T/hooks.jar && [ -f $P/bin/busybox ] && [ -d $P/META-HMGAPI ] && [ ! -e $P/src ] && [ ! -e $P/stubs ] && [ ! -e $P/recipes ] && [ ! -e $P/files ] && [ ! -e $P/patches.json ] && [ ! -e $P/svc/ap.sh ] && [ ! -e $P/svc/hotspot.sh ] && [ ! -d $P/hmgapi ] && [ ! -d $P/patches ]'
+  check "동글 드라이버(#48·#80): NX4_DRIVERS의 두 .ko·빌드 정보를 drivers/<드라이버>/에(644), 받는 USB ID 목록(alias에서, 소문자), GPL-2.0 전문(drivers/COPYING)과 대응 소스 안내(원본 커밋·우리 drivers/ 커밋·커널 소스)" \
+    'cmp -s $P/drivers/rtl88x2bu/bcmdhd.ko $T/drv/rtl88x2bu/bcmdhd.ko && cmp -s $P/drivers/rtl8831bu/bcmdhd.ko.txt $T/drv/rtl8831bu/bcmdhd.ko.txt && [ "$(ls -l $P/drivers/rtl8831bu/bcmdhd.ko | cut -c1-10)" = "-rw-r--r--" ] && [ "$(sort $P/drivers/usb-ids.txt | tr "\n" " ")" = "0bda:b812 rtl88x2bu 0bda:b831 rtl8831bu 0bda:b851 rtl8831bu 2357:012d rtl88x2bu " ] && cmp -s $P/drivers/COPYING $B/drivers/COPYING && grep -q "https://github.com/cilynx/rtl88x2bu/tree/0123456789abcdef0123456789abcdef01234569" $P/drivers/SOURCE.txt && grep -q "https://github.com/hyeondg/rtl8831bu/tree/0123456789abcdef0123456789abcdef01234569" $P/drivers/SOURCE.txt && grep -q "hmgapi-nx4-kor/tree/[0-9a-f]\{40\}/drivers" $P/drivers/SOURCE.txt && grep -q "src-mobis-avnt5w-r9" $P/drivers/SOURCE.txt && grep -q "GPL-2.0" $P/drivers/SOURCE.txt && grep -q "동글 드라이버: rtl88x2bu rtl8831bu, USB ID 4개" $T/build.out' || { ls -R $P/drivers; cat $P/drivers/usb-ids.txt $P/drivers/SOURCE.txt; }
   check "라이선스: 모드에 LICENSE·NOTICE.md·bin/busybox-LICENSE.txt, USB 맨 위에 LICENSE·NOTICE.md·BUSYBOX-LICENSE.txt(저장소와 같은 내용)" \
     'cmp -s $P/LICENSE $B/LICENSE && cmp -s $P/NOTICE.md $B/NOTICE.md && cmp -s $P/bin/busybox-LICENSE.txt $T/test-bb-LICENSE.txt && cmp -s $T/ux/LICENSE $B/LICENSE && cmp -s $T/ux/NOTICE.md $B/NOTICE.md && cmp -s $T/ux/BUSYBOX-LICENSE.txt $T/test-bb-LICENSE.txt'
   check "USB 묶음: 공식 무선 모드 zip 그대로(NX4/wireless/wireless-carplay-aa.zip)와 그 mod.json, WIRELESS-SOURCE.txt(판·SHA-256·대응 소스·AGPL-3.0)" \
@@ -2113,6 +2227,20 @@ PY'
   bld env -u NX4_WIRELESS_ZIP NX4_BUSYBOX=$T/test-bb NX4_WIRELESS_URL=file://$WZF OUT=$T/out-wfetch
   check "빌드: NX4_WIRELESS_ZIP이 없으면 공식 릴리스에서 받고, SHA-256이 NOTICE.md와 다르면 만들지 않음" \
     '[ "$(cat $T/build.rc)" != 0 ] && grep -q "공식 무선 모드 zip SHA-256.*다릅니다" $T/build.out && [ ! -f $T/out-wfetch/wireless/wireless-carplay-aa-$WV.zip ] && [ ! -f $T/out-wfetch/hmgapi-nx4-kor-$V-usb.zip ]' || cat $T/build.out
+  # 동글 드라이버: 맥의 에뮬레이션 빌드, 빌드 정보와 다른 .ko, 두 드라이버가 같은 USB ID를 받으면 만들지 않는다
+  mkdrv $T/drv-emu " (emulated: check against CI, do not ship)"
+  bld env NX4_BUSYBOX=$T/test-bb NX4_DRIVERS=$T/drv-emu OUT=$T/out-drvemu
+  check "빌드: 동글 드라이버가 에뮬레이션 빌드(빌드 정보의 build host에 emulated)면 만들지 않음(차에 넣을 .ko는 CI 것만)" \
+    '[ "$(cat $T/build.rc)" != 0 ] && grep -q "에뮬레이션 빌드입니다(차에 넣지 않음)" $T/build.out && [ ! -f $T/out-drvemu/hmgapi-nx4-kor-$V.zip ]' || cat $T/build.out
+  mkdrv $T/drv-bad; echo changed >> $T/drv-bad/rtl8831bu/bcmdhd.ko
+  bld env NX4_BUSYBOX=$T/test-bb NX4_DRIVERS=$T/drv-bad OUT=$T/out-drvbad
+  check "  .ko가 빌드 정보의 sha256과 다르면 만들지 않음" '[ "$(cat $T/build.rc)" != 0 ] && grep -q "빌드 정보.*의 sha256과 다릅니다" $T/build.out && [ ! -f $T/out-drvbad/hmgapi-nx4-kor-$V.zip ]' || cat $T/build.out
+  mkdrv $T/drv-dup; echo "alias usb:v0BDApB812d*dc*dsc*dp*icFFiscFFipFFin*" >> $T/drv-dup/rtl8831bu/bcmdhd.ko.txt
+  bld env NX4_BUSYBOX=$T/test-bb NX4_DRIVERS=$T/drv-dup OUT=$T/out-drvdup
+  check "  두 드라이버가 같은 USB ID를 받으면 만들지 않음" '[ "$(cat $T/build.rc)" != 0 ] && grep -q "두 드라이버가 같은 USB ID를 받습니다: 0bda:b812" $T/build.out' || cat $T/build.out
+  mkdrv $T/drv-mv; sed -i.bak "s/^vermagic .*/vermagic 3.18.24 SMP preempt mod_unload ARMv7 p2v8 /" $T/drv-mv/rtl88x2bu/bcmdhd.ko.txt
+  bld env NX4_BUSYBOX=$T/test-bb NX4_DRIVERS=$T/drv-mv OUT=$T/out-drvmv
+  check "  빌드 정보가 이 차용(vermagic 3.18.24-tcc)이 아니면 만들지 않음(QEMU 게스트 빌드 등)" '[ "$(cat $T/build.rc)" != 0 ] && grep -q "이 차용 rtl88x2bu 빌드 정보가 아닙니다" $T/build.out' || cat $T/build.out
   # NX4_BUSYBOX로 준 파일이 없으면 busybox 없이 만들지 않고 멈춘다
   bld env NX4_BUSYBOX=$T/nobb OUT=$T/out-missing
   check "빌드: NX4_BUSYBOX로 준 파일이 없으면 만들지 않음" '[ "$(cat $T/build.rc)" != 0 ] && grep -q "busybox가 없습니다" $T/build.out && [ ! -f $T/out-missing/hmgapi-nx4-kor-$V-usb.zip ]'
@@ -2126,6 +2254,8 @@ PY'
   # NX4_BUSYBOX=none이면 busybox 없이 만들고, 그 안내도 없다(HMG-API도 함께 넣지 않으면 HMGAPI-SOURCE.txt도 없다)
   (HMGAPI_SRC=$HS NX4_MOD_KEY=$T/test-mod.key NX4_APK=$T/test.apk NX4_HOOKS_JAR=$T/hooks.jar NX4_BUSYBOX=none NX4_WIRELESS_ZIP=$WZF OUT=$T/out-nobb sh $B/scripts/build.sh) > $T/build.out 2>&1; echo $? > $T/build.rc
   rm -rf $T/ux2; mkdir -p $T/ux2; (cd $T/ux2 && unzip -q $T/out-nobb/hmgapi-nx4-kor-$V-usb.zip 2>/dev/null)
+  check "빌드: NX4_DRIVERS를 주지 않으면 동글 드라이버 없이 만들고(drivers/ 없음) 그렇다고 알림" \
+    '[ "$(cat $T/build.rc)" = 0 ] && [ ! -e $T/ux2/NX4/install/payload/drivers ] && grep -q "동글 드라이버를 넣지 않습니다(NX4_DRIVERS 없음)" $T/build.out' || cat $T/build.out
   check "라이선스: NX4_BUSYBOX=none·HMG-API 없이 만들면 busybox·BUSYBOX-LICENSE.txt·HMGAPI-SOURCE.txt 없음, LICENSE·NOTICE.md는 있음" \
     '[ "$(cat $T/build.rc)" = 0 ] && grep -q "NX4_BUSYBOX=none" $T/build.out && [ ! -f $T/ux2/NX4/install/payload/bin/busybox ] && [ ! -f $T/ux2/BUSYBOX-LICENSE.txt ] && [ ! -f $T/ux2/NX4/install/payload/bin/busybox-LICENSE.txt ] && [ ! -f $T/ux2/HMGAPI-SOURCE.txt ] && [ -f $T/ux2/LICENSE ] && [ -f $T/ux2/NOTICE.md ]' || cat $T/build.out
   # HMG-API 엔진(PC JVM)으로 설치: 가짜 헤드유닛. 이 모드는 HMG-API 1.1.0-rc.10 이상을 요구한다(mod.json "hmgapi").
@@ -2144,8 +2274,8 @@ PY'
     bad "HMG-API 엔진 설치 시험: HMGAPI_SRC의 HMG-API($HSV)가 이 모드의 최소 판($MV)보다 낮아 설치·계획을 볼 수 없음. HMGAPI_SRC를 v$MV 이상으로 올려 주세요"
   else
   # hmgapid는 상대 경로를 /data/hmgapi/mods/<모드>/ 아래로 푼다(svc_start): sh /data/hmgapi/mods/nx4-kor/svc/launch.sh
-  check "HMG-API 엔진($HSV): NX4.KOR 260902에 설치됨(서명 확인), 서비스는 launch(root, manual)·nochip(root, boot), 앱이 등록됨, hooks.jar·settings.json이 있음, 무선 파일 없음" \
-    '[ "$(cat $T/eng.rc)" = 0 ] && grep -q "installed nx4-kor $V (author key" $T/eng.out && [ "$(grep -c "^nx4-kor " $ER/data/hmgapi/state/services.txt)" = 2 ] && grep -q "^nx4-kor launch root manual " $ER/data/hmgapi/state/services.txt && grep -q "^nx4-kor nochip root boot no " $ER/data/hmgapi/state/services.txt && ! grep -q "^hmgapi vehicle " $ER/data/hmgapi/state/services.txt && grep -qx "io.github.jayparklab.nx4kor nx4-kor" $ER/data/hmgapi/state/apps.txt && cmp -s $ER/data/hmgapi/mods/nx4-kor/hooks.jar $T/hooks.jar && [ -f $ER/data/hmgapi/mods/nx4-kor/settings.json ] && [ ! -e $ER/data/hmgapi/mods/nx4-kor/recipes ]' || { cat $T/eng.out; cat $ER/data/hmgapi/state/services.txt; }
+  check "HMG-API 엔진($HSV): NX4.KOR 260902에 설치됨(서명 확인), 서비스는 launch(root, manual)·nochip(root, boot)·dongle(root, boot), 앱이 등록됨, hooks.jar·settings.json이 있음, 무선 파일 없음" \
+    '[ "$(cat $T/eng.rc)" = 0 ] && grep -q "installed nx4-kor $V (author key" $T/eng.out && [ "$(grep -c "^nx4-kor " $ER/data/hmgapi/state/services.txt)" = 3 ] && grep -q "^nx4-kor launch root manual " $ER/data/hmgapi/state/services.txt && grep -q "^nx4-kor nochip root boot no " $ER/data/hmgapi/state/services.txt && grep -q "^nx4-kor dongle root boot no " $ER/data/hmgapi/state/services.txt && ! grep -q "^hmgapi vehicle " $ER/data/hmgapi/state/services.txt && grep -qx "io.github.jayparklab.nx4kor nx4-kor" $ER/data/hmgapi/state/apps.txt && cmp -s $ER/data/hmgapi/mods/nx4-kor/hooks.jar $T/hooks.jar && [ -f $ER/data/hmgapi/mods/nx4-kor/settings.json ] && [ ! -e $ER/data/hmgapi/mods/nx4-kor/recipes ]' || { cat $T/eng.out; cat $ER/data/hmgapi/state/services.txt; }
   engp() { (HMGAPI_ROOT=$ER HMGAPI_HOST=1 HMGAPI_PRODUCT=NX4.KOR.0000.V039.001.260902 java -cp $T/eh hmgapi.engine.Engine $1) > $T/engp.out 2>&1; echo $? > $T/engp.rc; }
   # 참고: $1은 따옴표 없이 넘겨 "remove nx4-kor"처럼 두 낱말도 받는다
   # 계획에는 지금 켜진 것의 설명 줄(app·service, HMG-API 기본 network  no cellular [nx4-kor] 등)만 나오고, 적용하면 할 것이 없다

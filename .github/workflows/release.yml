@@ -155,7 +155,8 @@ jobs:
     needs: check
     runs-on: ubuntu-24.04
     environment: production
-    timeout-minutes: 30
+    # 동글 드라이버 빌드(drivers 워크플로에서 3~9분)를 더해 늘림
+    timeout-minutes: 45
     permissions:
       contents: read
     defaults:
@@ -313,6 +314,15 @@ jobs:
           [ "$GOT" = "$EXP" ] || { echo "::error::앱 서명 인증서($GOT)가 .github/release/app-cert.sha256($EXP)과 다릅니다. 차가 앱 업데이트를 받지 않습니다"; exit 1; }
           echo "app_cert=$GOT" >> "$GITHUB_OUTPUT"
 
+      # USB Wi-Fi 동글 드라이버(#48·#80): drivers 워크플로와 같은 방법(scripts/build-driver.sh, Docker, 리눅스 x86)으로 이 커밋에서
+      # 빌드해 모드에 싣는다(scripts/build.sh NX4_DRIVERS). 빌드 날짜는 drivers/를 마지막으로 바꾼 커밋의 시각이라 같은 커밋이면
+      # drivers 워크플로·PC와 같은 md5가 나온다. 키·비밀값을 쓰지 않는다
+      - name: 동글 드라이버(bcmdhd.ko)
+        run: |
+          set -eu
+          sh scripts/build-driver.sh
+          echo "NX4_DRIVERS=$PWD/out/drivers/tcc803x" >> "$GITHUB_ENV"
+
       - name: 모드 zip과 USB 묶음
         env:
           HMGAPI_SRC: ${{ github.workspace }}/hmgapi
@@ -370,6 +380,16 @@ jobs:
           # busybox와 그 라이선스 안내가 모드와 USB 맨 위에 들어갔는지(build.sh는 NX4_BUSYBOX를 받으면 늘 넣는다)
           [ -f "$D/NX4/install/payload/bin/busybox" ] && [ -f "$D/NX4/install/payload/bin/busybox-LICENSE.txt" ] && [ -f "$D/BUSYBOX-LICENSE.txt" ] \
             || { echo "::error::USB 묶음에 busybox나 그 라이선스 안내가 없습니다"; exit 1; }
+          # USB Wi-Fi 동글 드라이버(#48): 위에서 빌드한 두 .ko 그대로, 받는 USB ID 목록, GPL-2.0 전문과 대응 소스 안내
+          DRVSUM=
+          for d in rtl88x2bu rtl8831bu; do
+            cmp -s "$D/NX4/install/payload/drivers/$d/bcmdhd.ko" "$NX4_DRIVERS/$d/bcmdhd.ko" \
+              || { echo "::error::USB 묶음의 nx4-kor에 동글 드라이버 $d가 없거나 빌드한 것과 다릅니다"; exit 1; }
+            grep -q " $d\$" "$D/NX4/install/payload/drivers/usb-ids.txt" || { echo "::error::drivers/usb-ids.txt에 $d가 없습니다"; exit 1; }
+            DRVSUM="$DRVSUM $d $(md5sum "$NX4_DRIVERS/$d/bcmdhd.ko" | cut -d' ' -f1)"
+          done
+          [ -s "$D/NX4/install/payload/drivers/COPYING" ] && [ -s "$D/NX4/install/payload/drivers/SOURCE.txt" ] \
+            || { echo "::error::USB 묶음의 nx4-kor에 동글 드라이버의 GPL-2.0 전문(drivers/COPYING)이나 대응 소스 안내(drivers/SOURCE.txt)가 없습니다"; exit 1; }
           rm -rf "$D"
           echo "uuid=$UUID" >> "$GITHUB_OUTPUT"
           BB="BusyBox 1.36.1(Alpine busybox-static-1.36.1-r31)을 넣음"
@@ -380,6 +400,7 @@ jobs:
             echo "- busybox: $BB"
             echo "- HMG-API: $HMGAPI_VER (USB 묶음에 함께)"
             echo "- 공식 무선 모드: wireless-carplay-aa $WIRELESS_VER (USB 묶음에 함께, 고치지 않음)"
+            echo "- 동글 드라이버(md5):$DRVSUM"
             echo '```'
             (cd out && sha256sum "hmgapi-nx4-kor-$V.zip" "hmgapi-nx4-kor-$V-usb.zip")
             echo '```'

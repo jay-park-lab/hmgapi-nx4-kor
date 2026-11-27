@@ -16,6 +16,7 @@
 4. `build` job(배포 키 있음, 저장소 읽기만)이 돕니다.
    - JDK 21, Android SDK(`build-tools;37.0.0`, `platforms;android-19`), HMG-API 소스를 준비합니다.
    - 키를 꺼내기 전에 공식 무선 모드(아래 "공식 무선 모드를 USB 묶음에 함께"), HMG-API USB 묶음(아래 "HMG-API를 USB 묶음에 함께")과 busybox(아래 "busybox")를 받아 확인합니다.
+   - USB Wi-Fi 동글 드라이버 둘을 `scripts/build-driver.sh`(Docker, 리눅스 x86)로 이 커밋에서 빌드하고, `build.sh`에 `NX4_DRIVERS`로 줍니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48), [`drivers/README.md`](../drivers/README.md)). drivers 워크플로와 같은 방법이라 같은 커밋이면 같은 md5가 나옵니다. 이 단계 때문에 `build` job의 시간 제한은 45분입니다.
    - 배포 키를 러너 임시 폴더의 파일로 꺼내고(umask 077), `scripts/build-app.sh`, `scripts/build.sh`를 돌립니다. `build.sh`는 같은 SDK(`ANDROID_HOME`)로 `scripts/build-hooks.sh`를 불러 `hooks.jar`(한국 카플레이 길안내, [#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67))를 만들어 넣습니다.
    - 다음을 봅니다. 하나라도 다르면 멈춥니다.
      - 앱 서명 인증서가 `.github/release/app-cert.sha256`과 같은지
@@ -26,6 +27,7 @@
      - 옛 2.0.x 되돌리기 스크립트(`NX4/legacy-2.0/`)가 들었는지. `build.sh`가 태그 `v2.0.4-beta.1`에서 꺼내므로 `build` job도 저장소를 태그까지 받습니다(`fetch-depth: 0`)
      - 묶음의 nx4-kor(`payload/mod.json`)가 공식 무선 모드와 충돌을 선언하지 않는지(옛 2.0.x 꼴이면 2.1.0 설치기가 멈춤). 그래서 nx4-kor 2.1.0(PR #50)이 합쳐지기 전의 커밋으로는 릴리스를 낼 수 없습니다
      - 묶음의 nx4-kor에 `mod.json`이 선언한 `hooks.jar`가 있고 비지 않았는지(없으면 HMG-API가 이 모드의 훅을 올리지 못함)
+     - 묶음의 nx4-kor에 동글 드라이버 둘(`drivers/<드라이버>/bcmdhd.ko`)이 빌드한 그대로 들었고, 받는 USB ID 목록(`drivers/usb-ids.txt`), GPL-2.0 전문(`drivers/COPYING`)과 대응 소스 안내(`drivers/SOURCE.txt`)가 있는지. 두 `.ko`의 md5는 실행 요약에 남깁니다
    - 키 파일을 지우고, 두 zip만 다음 job에 넘깁니다.
 5. `publish` job(배포 키 없음, 저장소 쓰기)이 릴리스를 만들어 두 파일을 올립니다. 릴리스 글에는 다음이 들어갑니다.
    - 파일 설명
