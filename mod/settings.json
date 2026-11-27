@@ -10,6 +10,14 @@
       "description": "Korea Projection's fit, beside the official Wireless CarPlay + Android Auto mod (keep its Turn-by-turn on): an arrow for every maneuver, the near-turn view and distance bar as the car's own navigation draws them, lanes, rerouting text, and a resend every second. While it has guidance, the official mod's cluster calls in DiPO get its values. Off: the official mod's turn-by-turn as it is."
     },
     {
+      "key": "kor_tbt_far_big",
+      "type": "toggle",
+      "default": true,
+      "apply": "restart",
+      "title": "Far turns as the road picture too",
+      "description": "With Korean turn-by-turn on: a turn farther than the near-turn distance (600 m, expressway exits 1050 m) shows the same road picture with the distance bar full, not the turn icon in a box (a long straight stretch too, as the straight-ahead picture, with the next road's name); the bar shrinks from there as before. At a turn change, the icon box no longer flashes between two pictures. Destinations, waypoints, the start and ferries keep their icon. Off: far turns as the icon box (Korea Projection's way)."
+    },
+    {
       "key": "kor_tbt_log",
       "type": "toggle",
       "default": false,

@@ -151,11 +151,12 @@
 
 ## HMG-API 앱의 설정
 
-NX4 KOR("NX4 KOR: Tucson NX4 (Korea)")의 설정은 둘입니다.
+NX4 KOR("NX4 KOR: Tucson NX4 (Korea)")의 설정은 셋입니다.
 
 | 설정 | 기본 | 하는 일 |
 |---|---|---|
 | `kor_tbt` "Korean CarPlay turn-by-turn on the cluster and HUD" | 켬 | 한국 카플레이 길안내(위 "무엇을 하나"). 끄면 공식 무선 모드의 길안내 그대로입니다 |
+| `kor_tbt_far_big` "Far turns as the road picture too" | 켬([#89](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/89)) | 곧 회전 거리(일반 600 m, 고속도로 출구 1,050 m)보다 먼 회전도 네모 칸 아이콘 대신 같은 큰 도로 그림으로 보냅니다(고속도로의 긴 직진 구간도 큰 직진 그림, 회전 뒤 도로 이름도 함께). 막대는 가득 찬 채 있다가 그 거리부터 줄어듭니다. 회전이 바뀔 때 아이콘 칸이 잠깐 끼는 깜빡임도 없앱니다. 목적지·경유지·출발·페리는 아이콘 그대로입니다. 끄면 Korea Projection처럼 먼 회전은 아이콘 칸입니다 |
 | `kor_tbt_log` "Log the CarPlay turn-by-turn diagnosis" | 끔(2.1.2-beta.2부터, [#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)) | Korea Projection의 진단 줄(곧 회전 판단, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)과 보낸 HUD 목록 줄(300줄까지)을 HMG-API 기록에 더 남깁니다. 꺼도 받은 안내의 숫자(종류·각도, 시작마다 300줄까지), 길안내 앱이 바뀐 줄(두 앱 이름), 지운 줄은 남습니다. 길·장소 이름은 어느 쪽이든 남기지 않습니다. 계기판이 이상하게 보였을 때 원인을 찾는 데 씁니다 |
 
 `kor_tbt_log`는 2.1.2-beta.2부터 기본으로 꺼져 있습니다([#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)). 길안내가 이상할 때 기록을 모으려면 HMG-API 앱의 NX4 KOR 설정에서 켜고 다시 시작합니다. HMG-API 앱은 설정 하나를 바꿀 때 그 모드의 모든 값을 함께 저장하므로, 2.1.2-beta.1까지 NX4 KOR 설정을 바꾼 적이 있으면 이 설정이 켜진 채 남습니다. 그런 차는 HMG-API 앱에서 꺼 주세요.

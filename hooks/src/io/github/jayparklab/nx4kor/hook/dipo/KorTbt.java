@@ -159,6 +159,7 @@ public final class KorTbt {
             }
         });
         turns.debug = m.settingBoolean("kor_tbt_log", false);   // off by default from 2.1.2-beta.2 (#77)
+        turns.farBig = m.settingBoolean("kor_tbt_far_big", true);   // #89: far turns as the picture too, on by default
         turns.onActive = new Runnable() {
             @Override
             public void run() {

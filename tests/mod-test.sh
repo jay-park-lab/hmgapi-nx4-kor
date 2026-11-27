@@ -77,14 +77,18 @@ check "빠진 것: 한국 포크 무선 모드(레시피·libleafiaaac.so·patch
   '[ ! -e $PKG/hooks.jar ] && [ ! -e $PKG/recipes ] && [ ! -e $PKG/files ] && [ ! -e $PKG/patches.json ] && [ ! -e $B/wireless ] && [ ! -e $PKG/svc/ap.sh ] && [ ! -e $PKG/svc/hotspot.sh ] && [ ! -e $PKG/scripts/post.sh ] && [ -f $PKG/svc/lib.sh ]'
 # kor_tbt_log(#77, 2026-11-26 사용자 결정): 켜고 끄는 설정으로 두고 기본은 끔(2.1.2-beta.2부터). KorTbt가 settingBoolean에
 # 주는 기본값도 settings.json과 같아야 한다(설정 파일이 없을 때 같은 뜻)
-check "settings.json: 한국 길안내(kor_tbt, 기본 켬)와 그 진단 줄(kor_tbt_log, 기본 끔)만, 다시 시작해 적용. KorTbt의 기본값도 끔" 'python3 - "$PKG" "$B/hooks/src/io/github/jayparklab/nx4kor/hook" <<PY
+# kor_tbt_far_big(#89, 2026-11-27 사용자 결정): 먼 회전도 큰 그림, 기본 켬. 끄면 KP처럼 먼 회전 칸
+check "settings.json: 한국 길안내(kor_tbt, 기본 켬), 먼 회전도 큰 그림(kor_tbt_far_big, 기본 켬), 진단 줄(kor_tbt_log, 기본 끔)만, 다시 시작해 적용. KorTbt의 기본값도 같음" 'python3 - "$PKG" "$B/hooks/src/io/github/jayparklab/nx4kor/hook" <<PY
 import json, os, sys
 s = json.load(open(os.path.join(sys.argv[1], "settings.json")))
 assert s["version"] == 1
 got = [(x["key"], x["type"], x["default"], x["apply"]) for x in s["settings"]]
-assert got == [("kor_tbt", "toggle", True, "restart"), ("kor_tbt_log", "toggle", False, "restart")], got
+assert got == [("kor_tbt", "toggle", True, "restart"), ("kor_tbt_far_big", "toggle", True, "restart"), ("kor_tbt_log", "toggle", False, "restart")], got
 part = open(os.path.join(sys.argv[2], "dipo", "KorTbt.java")).read()
 assert "settingBoolean(\"kor_tbt_log\", false)" in part
+assert "turns.farBig = m.settingBoolean(\"kor_tbt_far_big\", true);" in part
+fit = open(os.path.join(sys.argv[2], "dipo", "CpTurnsFit.java")).read()
+assert "    boolean farBig;\n" in fit   # false in the class (KP), the setting turns it on
 for x in s["settings"]:
     assert x["title"] and x["description"], x
 PY'
@@ -2027,7 +2031,7 @@ PY'
       $J -cp "$AJ" -d $F/stubs $(find "$B/hooks/stubs" -name '*.java')
       $J -cp "$AJ:$F/rt:$F/rtstubs:$F/stubs" -d $F/classes $(find "$B/hooks/src" -name '*.java') $B/tests/tools/NearFitTest.java
       java -cp "$AJ:$F/rt:$F/rtstubs:$F/stubs:$F/classes" io.github.jayparklab.nx4kor.hook.dipo.NearFitTest ) > $T/fit.out 2>&1
-    check "  곧 회전 그림(KP 2.4.10)과 곧 회전 거리 $(grep -c '^ok ' $T/fit.out)개: 회전교차로 32는 오른쪽 통행·출구 각도 있을 때만(들어가기 6은 그대로), 각도 없는 진입 램프는 오른쪽 진입 모양, 지하차도 46(좌·우)·고가 44(왼쪽만)는 시설 낱말이 있고 부정·옆길 낱말이 없을 때만, CpIcons, 곧 회전 거리(near() 직접: 일반 600m, 나갈 때 650m, 고속도로 출구 1050m, 막대 60m마다)" \
+    check "  곧 회전 그림(KP 2.4.10)과 곧 회전 거리 $(grep -c '^ok ' $T/fit.out)개: 회전교차로 32는 오른쪽 통행·출구 각도 있을 때만(들어가기 6은 그대로), 각도 없는 진입 램프는 오른쪽 진입 모양, 지하차도 46(좌·우)·고가 44(왼쪽만)는 시설 낱말이 있고 부정·옆길 낱말이 없을 때만, CpIcons, 곧 회전 거리(near() 직접: 일반 600m, 나갈 때 650m, 고속도로 출구 1050m, 막대 60m마다), 먼 회전도 큰 그림(#89: D 밖 막대 90, 미루기는 계기판 그대로, 묵은 거리는 새 회전 그림, 목적지·거리 없음은 아이콘, 끄면 KP)" \
       'tail -n 1 $T/fit.out | grep -qx ok && ! grep -q "^FAIL" $T/fit.out' || cat $T/fit.out
   else
     echo "skip hooks.jar 빌드·곧 회전 그림 테스트(NearFitTest)(ANDROID_HOME 없음): 빌드 시험은 자리만 채운 hooks.jar로 봄"

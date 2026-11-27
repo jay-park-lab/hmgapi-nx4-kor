@@ -6,7 +6,8 @@ import java.util.Arrays;
  * tests/mod-test.sh (#67, PR #74 review 6): runs the near-turn picture choices KP's mod 2.4.10 added
  * (CpTurnsFit.nearDisplay roundabout 32 and the on-ramp default, onRampDefault, facilityNear), CpIcons, and the
  * near-turn distance (PR #87: near() itself with ordinary roads at 600 m, out past 650 m, expressway exits at 1050 m;
- * dynamicD and bar) on the PC.
+ * dynamicD and bar) and far turns as the picture too (#89, farBig: bar 90 past D, the put-off hold, the stale-dist
+ * picture, a jump held whatever its distance, the icon for kinds with no picture and no distance; off is KP's way) on the PC.
  * Compiled with hooks/src against the same classpath as scripts/build-hooks.sh (HMG-API runtime, iAP2 stubs, android.jar).
  * Prints one line per case and "ok" at the end; exits 1 on the first failure.
  */
@@ -101,6 +102,78 @@ public class NearFitTest {
         is(nearAt(f, ue, exit, 2000) == null && nearAt(f, ue, exit, 1051) == null, "expressway exit 2000 m, 1051 m: far card");
         int[] ex = nearAt(f, ue, exit, 1050);
         is(ex != null && ex[0] == 17 && ex[4] == 1050, "expressway exit at 1050 m: near view 17, D 1050 (unchanged)");
+
+        // 먼 회전도 큰 그림(#89, 2026-11-27): farBig이면 D 밖도 같은 그림에 막대 90, D부터 줄어듦. 끄면 위처럼 먼 회전 칸(KP)
+        CpTurnsFit g = new CpTurnsFit(null, null, null);
+        g.farBig = true;
+        g.clock = 1000L;
+        CpTurnsFit.Update ub = new CpTurnsFit.Update(0, null);
+        int[] far = nearAt(g, ub, turn, 2400);
+        is(far != null && far[0] == 13 && far[3] == 90 && far[4] == 600 && "far-big".equals(g.nearWhy),
+                "farBig, left turn 2400 m: near view 13, bar 90, D 600 (far-big)");
+        int[] at = nearAt(g, ub, turn, 600), below = nearAt(g, ub, turn, 539);
+        is(at != null && at[3] == 90 && "in-d".equals(g.nearWhy) && below != null && below[3] == 80,
+                "farBig: in D from 600 m as before, bar 80 at 539 m");
+        is(Arrays.equals(Arrays.copyOf(far, 3), Arrays.copyOf(at, 3)), "farBig: the far picture is the same picture (display, side, slot) as the near one");
+        CpTurnsFit.Update ube = new CpTurnsFit.Update(0, null);
+        int[] fex = nearAt(g, ube, exit, 5000);
+        is(fex != null && fex[0] == 17 && fex[3] == 90 && fex[4] == 1050, "farBig, expressway exit 5000 m: near view 17, bar 90, D 1050");
+        CpTurnsFit.Maneuver dest = new CpTurnsFit.Maneuver(0, 0, null);
+        dest.type = 12;   // arrive at destination: no near-turn picture
+        is(nearAt(g, new CpTurnsFit.Update(0, null), dest, 900) == null && "type".equals(g.nearWhy),
+                "farBig, destination 900 m: the icon still (no picture for the kind)");
+        CpTurnsFit.Update un = new CpTurnsFit.Update(0, null);
+        g.clock += 1000L;
+        is(g.near(7, un, turn, 70) == null && "no-dist".equals(g.nearWhy), "farBig, no distance from the phone: the icon still");
+        // 회전이 바뀌는 갱신(네이버 지도 꼴): 새 회전의 첫 거리가 앞 회전의 마지막 값과 같으면 put-off. farBig이고 이미 그린 것이
+        // 있으면 계기판을 그대로 둔다(nearHeld). 그 뒤 refresh가 같은 묵은 거리로 다시 물으면(stale-dist) 새 회전의 그림, 막대 90
+        CpTurnsFit h = new CpTurnsFit(null, null, null);
+        h.farBig = true;
+        h.shown = true;
+        h.clock = 1000L;
+        CpTurnsFit.Update uc = new CpTurnsFit.Update(0, null);
+        uc.list = new int[] { 30 };
+        is(nearAt(h, uc, turn, 93) != null && "in-d".equals(h.nearWhy), "turn 30 at 93 m: near view");
+        uc.list = new int[] { 33 };
+        CpTurnsFit.Maneuver rturn = new CpTurnsFit.Maneuver(0, 0, null);
+        rturn.type = 2;   // right turn
+        int[] po = nearAt(h, uc, rturn, 93);
+        is(po == null && "put-off".equals(h.nearWhy) && h.nearHeld, "next turn 33 with the last value 93 m: put-off, the frame kept (nearHeld)");
+        h.clock += 1000L;
+        int[] st = h.near(7, uc, rturn, 67);
+        is(st != null && st[0] == 13 && st[3] == 90 && !h.nearHeld && "stale-dist".equals(h.nearWhy),
+                "refresh with the same old distance: stale-dist, turn 33's picture with bar 90 (no icon card)");
+        int[] real = nearAt(h, uc, rturn, 61);
+        is(real != null && real[3] == 90 && real[4] == 61 && "in-d".equals(h.nearWhy), "the real 61 m: in D, D 61, bar 90");
+        // PR #94 리뷰 4: 아직 그린 것이 없으면(shown false) farBig이어도 미루기는 붙잡지 않는다(KP처럼 아이콘)
+        CpTurnsFit s = new CpTurnsFit(null, null, null);
+        s.farBig = true;
+        s.clock = 1000L;
+        CpTurnsFit.Update us = new CpTurnsFit.Update(0, null);
+        us.list = new int[] { 30 };
+        nearAt(s, us, turn, 93);
+        us.list = new int[] { 33 };
+        is(nearAt(s, us, rturn, 93) == null && "put-off".equals(s.nearWhy) && !s.nearHeld,
+                "farBig, nothing shown yet: put-off is not held (the icon, as KP)");
+        CpTurnsFit k = new CpTurnsFit(null, null, null);
+        k.shown = true;
+        k.clock = 1000L;
+        CpTurnsFit.Update uk = new CpTurnsFit.Update(0, null);
+        uk.list = new int[] { 30 };
+        nearAt(k, uk, turn, 93);
+        uk.list = new int[] { 33 };
+        is(nearAt(k, uk, rturn, 93) == null && "put-off".equals(k.nearWhy) && !k.nearHeld, "farBig off: put-off is the far card, not held (KP)");
+        k.clock += 1000L;
+        is(k.near(7, uk, rturn, 67) == null && "stale-dist".equals(k.nearWhy), "farBig off: stale-dist is the far card (KP)");
+        // 같은 회전에서 거리가 뛸 때(카카오내비 꼴): farBig이면 D 밖으로 뛰어도 한 번 붙잡는다(앞 회전 그림을 새 거리로 그리지 않게)
+        CpTurnsFit j = new CpTurnsFit(null, null, null);
+        j.farBig = true;
+        j.clock = 1000L;
+        CpTurnsFit.Update uj = new CpTurnsFit.Update(0, null);
+        nearAt(j, uj, turn, 20);
+        is(nearAt(j, uj, turn, 900) == null && j.nearHeld && "jump-hold".equals(j.nearWhy), "farBig, 20 m then 900 m on the same turn: held once (jump-hold)");
+        int[] after = nearAt(j, uj, turn, 900);
+        is(after != null && after[3] == 90 && "far-big".equals(j.nearWhy), "the next 900 m: far-big, bar 90");
 
         System.out.println(n + " cases");
         System.out.println("ok");
