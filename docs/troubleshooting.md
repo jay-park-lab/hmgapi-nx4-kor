@@ -25,7 +25,7 @@ USB로 설치하다 멈추거나, 설치 뒤 관리 앱이 빨강·노랑일 때
 |---|---|---|
 | USB `NX4/install.log` | NX4 KOR 설치기가 한 일. 누를 때마다 아래에 이어 씁니다(앞의 시도도 남음). 이번 시도는 **맨 아래**, 마지막 "NX4 KOR USB 설치기 시작" 줄부터입니다 | 아니오 |
 | USB `HMGAPI/install.log` | HMG-API 설치기가 한 일 | 아니오 |
-| USB `NX4/diag/<시각>/` | 누를 때 뜨는 확인 창에서 [모으기]를 고르면, 설치기가 아무것도 바꾸기 전에 모은 진단 기록. 아래 adb 줄의 기록(`logs/`), HMG-API Car Report와 상태, `/system/lib` 파일의 이름·md5, 내비 판, 동글 준비 정보(커널 설정·USB 장치, `dongle/`) 등입니다. 담는 것은 [`design.md`](design.md) "진단 기록" | 아니오 |
+| USB `NX4/diag/<시각>/` | 누를 때 뜨는 확인 창에서 [모으기]를 고르면, 설치기가 아무것도 바꾸기 전에 모은 진단 기록. 아래 adb 줄의 기록(`logs/`), HMG-API Car Report와 상태, `/system/lib` 파일의 이름·md5, 내비 판, 동글 준비 정보(커널 설정·USB 장치, `dongle/`), 순정 iAP2 라이브러리·앱 사본과 관련 파일 목록(`iap2/`, 차선 안내 원인 [#90](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/90)) 등입니다. 담는 것은 [`design.md`](design.md) "진단 기록". 기록을 이슈에 올릴 때 `iap2/`는 순정 바이너리이므로 빼 주세요 | 아니오 |
 | 관리 앱 화면 | 오른쪽 칸의 판정·안내와 왼쪽 칸의 요약·상태표. 사진으로 남겨 두면 좋습니다. 앱 메뉴의 NX4 KOR 타일로 엽니다. 타일이 없으면(HMG-API 훅이 꺼졌거나, HMG-API가 이 모드의 훅을 거절함) 같은 USB로 Update OTA를 다시 누릅니다(다시 설치하지 않고 관리 앱만 엶) | 아니오 |
 | `/data/nx4-kor/logs/ap.log` | 관리 앱 감시자([지금 재부팅] 요청)의 기록 | 예 |
 | `/data/hmgapi/logs/hmgapi/wifi.log` | HMG-API가 무선 연결용 Wi-Fi(프로젝션 AP)를 띄운 기록(`projection AP: …` 줄). 2.1.2-beta.4부터 USB 진단 기록의 `logs/hmgapi-wifi.log` | 예 |
@@ -191,6 +191,7 @@ NEMESIS 1.17(LivePatch)이 깔린 차에서 다음 둘 중 하나가 일어나�
 - USB의 `NX4/install.log`, `HMGAPI/install.log`
 - USB의 `NX4/diag/` 폴더. 없거나 설정이 끝난 뒤의 기록이 필요하면, 재부팅하고 같은 USB로 Update OTA를 한 번 더 눌러 확인 창에서 [모으기]를 고른 뒤 가져옵니다(같은 판이면 기록을 모은 뒤 다시 설치하지 않고 관리 앱을 열어 map 확인·계획만 봅니다). 확인 창이 없는 예전 판에서 올리는 첫 설치 때는 묻지 않고 모으지도 않습니다.
   - 비밀번호가 든 Wi-Fi 설정 파일은 넣지 않고, Car Report는 HMG-API가 VIN·일련번호를 빼고 기록 줄을 가립니다. 그래도 공개 이슈에 올리기 전에 한 번 훑어봅니다.
+  - **`iap2/` 폴더는 빼고 올립니다.** 순정 내비 파일(iAP2 라이브러리·앱)의 사본이라 공개하면 안 됩니다(폴더 안 `README.txt`에도 적혀 있음). 차선 안내 원인([#90](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/90))을 보는 데만 쓰고, 필요하면 공개하지 않는 길로 따로 전합니다.
 - adb가 있으면 `/data/hmgapi/logs/hmgapi/wifi.log`, `/data/nx4-kor/logs/ap.log`, `/data/local/tmp/nx4-kor-status.txt`(USB 진단 기록의 `logs/`에도 일부 있음)
 - 몇 번째 Update OTA에서, 어떤 메시지가 떴는지
 - 내비 소프트웨어 판(`NX4.KOR.….260902`), 설치 전 HMG-API 판, 순정 무선 카플레이 트림인지
