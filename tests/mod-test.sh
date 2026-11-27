@@ -1857,15 +1857,23 @@ QARGS=matrix; qxrun PATH=$QX/bin:$P0 NX4_QEMU_NOBUILD=1 NX4_QEMU_USB=0BDA:B831; 
 QARGS=matrix; _t0=$(date +%s); qxrun PATH=$QX/hang:$QX/bin:$P0 NX4_QEMU_NOBUILD=1 NX4_QEMU_TIMEOUT=3; _t1=$(date +%s); cp $QX/run.out $QX/hang.out
 # 리뷰 93-9: 본 스크립트를 TERM으로 끝내면 지킴이·QEMU가 남지 않음(뒤로 돌린 sh는 SIGINT를 무시하므로 TERM으로 본다).
 # 파일 이름은 실행마다 달라(pid) 다른 실행의 QEMU를 건드리지 않는다
-# env가 sh를 exec하므로 $!가 본 스크립트의 pid다
-env -u DOCKER_CONTEXT -u NX4_DRV_DOCKER_CONTEXT -u DOCKER_HOST NX4_QEMU_OUT=$QX/out PATH=$QX/hang:$QX/bin:$P0 NX4_QEMU_NOBUILD=1 NX4_QEMU_TIMEOUT=100 sh $B/scripts/qemu-dongle-test.sh matrix > $QX/term.out 2>&1 &
+# env가 sh를 exec하므로 $!가 본 스크립트의 pid다. 결과 폴더는 따로 둔다(앞 실행의 기록과 섞이지 않게)
+mkdir -p $QX/tout; for f in zImage rootfs.img bcmdhd.ko; do echo x > $QX/tout/$f; done
+env -u DOCKER_CONTEXT -u NX4_DRV_DOCKER_CONTEXT -u DOCKER_HOST NX4_QEMU_OUT=$QX/tout PATH=$QX/hang:$QX/bin:$P0 NX4_QEMU_NOBUILD=1 NX4_QEMU_TIMEOUT=100 sh $B/scripts/qemu-dongle-test.sh matrix > $QX/term.out 2>&1 &
 _qs=$!
-_i=0; while [ $_i -lt 20 ] && ! ls $QX/out/qemu.$_qs.pid >/dev/null 2>&1; do sleep 1; _i=$((_i + 1)); done
-_qp=$(cat $QX/out/qemu.$_qs.pid 2>/dev/null)
+_i=0; while [ $_i -lt 20 ] && ! ls $QX/tout/qemu.$_qs.pid >/dev/null 2>&1; do sleep 1; _i=$((_i + 1)); done
+_qp=$(cat $QX/tout/qemu.$_qs.pid 2>/dev/null)
+# 리뷰 93-10: 가짜 qemu가 줄을 찍고 잠든 동안 그 줄이 벌써 기록에 있어야 한다(grep --line-buffered. 묶이면 QEMU가 끝날 때까지 빔)
+sleep 2
+_qlive=no; grep -aq "^1-1 0bda:b831" $QX/tout/console-matrix-*.log 2>/dev/null && _qlive=yes
+# 리뷰 93-11: 이 실행의 프로세스만 본다(같은 체크아웃에서 동시에 도는 다른 실행은 세지 않음). TERM 전에 자식(지킴이·QEMU 파이프라인)을 적어 둔다
+_qkids=$(pgrep -P $_qs | tr '\n' ' ')
 kill -TERM $_qs 2>/dev/null; sleep 4
+# 끝난 본 스크립트를 거둔다(거두지 않으면 좀비라 kill -0이 성공함)
+wait $_qs 2>/dev/null
 _qalive=no; [ -n "$_qp" ] && kill -0 "$_qp" 2>/dev/null && _qalive=yes
-_qleft=$(pgrep -f "$B/scripts/qemu-dongle-test.sh matrix" | tr '\n' ' ')
-_qfiles=$(ls $QX/out/qemu.* 2>/dev/null | tr '\n' ' ')
+_qleft=; for _p in $_qs $_qkids; do kill -0 $_p 2>/dev/null && _qleft="$_qleft $_p"; done
+_qfiles=$(ls $QX/tout/qemu.* 2>/dev/null | tr '\n' ' ')
 [ -n "$_qp" ] && kill "$_qp" 2>/dev/null
 printf 'NX4_DRV_DOCKER_CONTEXT=ctx-qemu\n' > $QX/env
 rm -f $QX/docker.calls
@@ -1883,7 +1891,9 @@ check "  QEMU: virt(ARMv7)에 EHCI로 동글(드라이버별 기본 VID:PID)을 
 check "  멈춘 게스트: NX4_QEMU_TIMEOUT초 뒤 QEMU를 끝내고 시간 제한과 \"== 끝\" 없음을 알림(리뷰 93-1)" \
   'grep -q "3초가 지나도 끝나지 않아 QEMU를 끝냈습니다" $QX/hang.out && grep -q "게스트가 끝까지 돌지 못했습니다" $QX/hang.out && [ $((_t1 - _t0)) -lt 30 ]' || cat $QX/hang.out
 check "  본 스크립트를 TERM으로 끝내면 QEMU·지킴이가 남지 않고 실행마다 다른 이름의 파일도 지움(리뷰 93-9)" \
-  '[ -n "$_qp" ] && [ "$_qalive" = no ] && [ -z "$_qleft" ] && [ -z "$_qfiles" ] && grep -q "PIDF=\$OUT/qemu.\$RUN.pid" $B/scripts/qemu-dongle-test.sh && grep -q "kill -0 \$RUN" $B/scripts/qemu-dongle-test.sh' || echo "  qemu=$_qp alive=$_qalive left=$_qleft files=$_qfiles"
+  '[ -n "$_qp" ] && [ -n "$_qkids" ] && [ "$_qalive" = no ] && [ -z "$_qleft" ] && [ -z "$_qfiles" ] && grep -q "PIDF=\$OUT/qemu.\$RUN.pid" $B/scripts/qemu-dongle-test.sh && grep -q "kill -0 \$RUN" $B/scripts/qemu-dongle-test.sh' || echo "  qemu=$_qp kids=$_qkids alive=$_qalive left=$_qleft files=$_qfiles"
+check "  QEMU 콘솔은 줄마다 바로 화면·기록에 나옴(grep --line-buffered, 리뷰 93-10): interactive의 뽑기 안내가 제때 보임" \
+  '[ "$_qlive" = yes ] && grep -q "grep --line-buffered -av" $B/scripts/qemu-dongle-test.sh' || cat $QX/tout/console-matrix-*.log
 check "  빌드: 드라이버 빌드와 같은 이미지·볼륨·context(.env.local NX4_DRV_DOCKER_CONTEXT)로 게스트 커널·드라이버(DRIVER, make 다시 돌리기 횟수), 루트 파일 시스템을 차례로. 게스트 쪽 파일은 drivers/ 밖(tests/qemu/)" \
   '[ "$(cat $QX/b.rc)" = 0 ] && grep -q "^ctx=ctx-qemu run .*-v nx4kor-drivers:/work .*/tests/qemu:/src/qemu:ro .*-e DRIVER=rtl88x2bu .*-e MAKE_TRIES=30 nx4kor-drvbuild bash /src/qemu/build-guest.sh" $QX/b.calls && grep -q "^ctx=ctx-qemu run .*/tests/qemu:/src/qemu:ro .*nx4kor-drvbuild sh /src/qemu/build-rootfs.sh" $QX/b.calls && [ "$(grep -n build-guest.sh$ $QX/b.calls | tail -1 | cut -d: -f1)" -lt "$(grep -n build-rootfs.sh $QX/b.calls | cut -d: -f1)" ] && [ ! -e $B/drivers/qemu ] && grep -q "^QEMU_APK_STATIC_SHA256=[0-9a-f]\{64\}$" $B/tests/qemu/inputs.sh && grep -q "^QEMU_ALPINE_KEYS_SHA256=[0-9a-f]\{64\}$" $B/tests/qemu/inputs.sh && grep -q "make_retry \$Q/zImage.log" $B/tests/qemu/build-guest.sh && grep -q "make_retry \$Q/\$DRIVER.log" $B/tests/qemu/build-guest.sh' || cat $QX/b.calls
 check "  Docker VM이 저장소나 결과 폴더를 못 보면 멈추고, 상대 경로 결과 폴더는 절대 경로로 넘김(리뷰 93-7)" \

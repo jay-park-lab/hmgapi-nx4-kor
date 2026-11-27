@@ -112,7 +112,8 @@ trap 'cleanup; rm -f "$TOF"; trap - EXIT; exit 143' TERM
 ) &
 WD=$!
 # QEMU의 libusb는 장치마다 macOS에서 "libusb_kernel_driver_active: -5"를 여러 번 찍는다(맥에는 이 동글의 커널 드라이버가 없음).
-# 뜻이 없는 줄이라 거른다.
+# 뜻이 없는 줄이라 거른다. grep은 출력이 파이프면 덩어리로 묶어 내보내므로(맥 16KB) --line-buffered로 줄마다 내보낸다:
+# 그렇지 않으면 interactive의 "동글을 뽑아 주세요" 같은 안내가 QEMU가 끝날 때까지 화면에 나오지 않는다(PR #93 리뷰 10).
 # 파이프라인을 뒤로 돌리고 wait로 기다린다: sh는 앞에서 도는 명령이 끝날 때까지 trap을 미루지만, wait는 신호가 오면 바로 풀려
 # trap(위)이 QEMU를 끝낸다
 qemu-system-arm -M virt,highmem=off -cpu cortex-a15 -smp 2 -m 1024 -display none -monitor none -serial stdio -no-reboot \
@@ -120,7 +121,7 @@ qemu-system-arm -M virt,highmem=off -cpu cortex-a15 -smp 2 -m 1024 -display none
   -append "console=ttyAMA0 root=/dev/vda rw rootfstype=ext4 panic=1 init=/sbin/nx4init MODE=$MODE AP_SECS=$AP UNPLUG_SECS=$UN" \
   -drive if=none,file="$OUT/rootfs.img",format=raw,id=hd0 -device virtio-blk-device,drive=hd0 \
   -device usb-ehci,id=ehci -device usb-host,bus=ehci.0,vendorid=0x"${USB%%:*}",productid=0x"${USB#*:}" </dev/null 2>&1 \
-  | grep -av 'libusb_kernel_driver_active' | tee "$LOG" &
+  | grep --line-buffered -av 'libusb_kernel_driver_active' | tee "$LOG" &
 wait $! || true
 : > "$DONE"
 # QEMU는 끝났다: 그 pid가 다른 프로세스에 다시 쓰여도 끝내지 않게 pid 파일을 먼저 지운다
