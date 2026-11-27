@@ -743,8 +743,12 @@ gfresh; ts $U; pset plan-same
 # 진단 기록: /system/lib(하위 폴더·링크), 내비의 busybox, 이 모드의 기록. 비밀번호가 든 파일(Wi-Fi 설정, 백업 폴더)은 넣지 않음
 mkdir -p $R/system/lib/hw $R/system/bin $R/data/nx4-kor/logs $R/data/nx4-kor/backup $R/data/local/tmp/nx4-kor $HD/logs/nx4-kor $R/data/misc/wifi
 echo core > $R/system/lib/libCarPlayCore.so; echo hw > $R/system/lib/hw/gralloc.so; ln -s libCarPlayCore.so $R/system/lib/liblink.so
-# 순정 iAP2 라이브러리(#90: 진단 기록이 iap2/에 그대로 복사함)
+# 순정 iAP2 라이브러리와 Java 쪽 앱(#90: 진단 기록이 iap2/에 그대로 복사함. 이름은 대소문자를 가리지 않음, PR #95 리뷰 3),
+# 복사하지 않고 이름만 files.txt에 남는 CarPlay 설정 파일, 이름이 맞지 않아 복사하지 않는 앱
+mkdir -p $R/system/app $R/system/etc
 printf 'iap2session\000lane\n' > $R/system/lib/libiap2session.so
+printf 'dex\000Iap2InitInformationMsg\n' > $R/system/app/Iap2ServerApp.odex; echo settings > $R/system/app/Settings.apk
+echo carplay > $R/system/etc/carplay_conf.xml
 cp $T/bin/bb $R/system/bin/busybox
 echo aplog > $R/data/nx4-kor/logs/ap.log; echo svclog > $HD/logs/nx4-kor/ap.log; echo hmgapi-install > $HD/install.log; mkdir -p $HD/logs/hmgapi; echo hmgapiwifi > $HD/logs/hmgapi/wifi.log
 echo mapcar > $R/data/local/tmp/nx4-kor/map-car.txt; echo status > $R/data/local/tmp/nx4-kor-status.txt
@@ -811,8 +815,8 @@ rm -f $T/features
 CORE5=$(md5sum < $R/system/lib/libCarPlayCore.so | cut -d" " -f1)
 check "USB 설치기 진단 기록: NX4/diag/<시각>/에 /system/lib 아래 모든 파일(하위 폴더·링크 포함)의 md5와 경로, ls -lR" \
   '[ "$(ls $K/diag | wc -l)" -eq 1 ] && grep -q "^$CORE5  .*/system/lib/libCarPlayCore.so$" $(dg)/system-lib-md5.txt && grep -q "^$CORE5  .*/system/lib/liblink.so$" $(dg)/system-lib-md5.txt && grep -q "  .*/system/lib/hw/gralloc.so$" $(dg)/system-lib-md5.txt && [ "$(wc -l < $(dg)/system-lib-md5.txt)" -eq 5 ] && grep -q "liblink.so -> libCarPlayCore.so" $(dg)/system-lib-ls.txt' || cat $(dg)/system-lib-md5.txt
-check "USB 설치기 진단 기록(#90): 순정 iAP2 라이브러리(/system/lib/libiap2*.so)를 iap2/에 그대로 복사함(다른 라이브러리는 복사하지 않음)" \
-  'cmp -s $R/system/lib/libiap2session.so $(dg)/iap2/libiap2session.so && [ "$(ls $(dg)/iap2)" = libiap2session.so ] && grep -q "iAP2 라이브러리 1개를 모음(iap2/)" $K/install.log' || ls -la $(dg)/iap2
+check "USB 설치기 진단 기록(#90): 이름에 iap2가 든 순정 라이브러리·앱(libiap2session.so, Iap2ServerApp.odex)만 iap2/에 그대로 복사, 공개하지 말라는 README.txt, iap2·carplay 파일 목록(files.txt)" \
+  'cmp -s $R/system/lib/libiap2session.so $(dg)/iap2/libiap2session.so && cmp -s $R/system/app/Iap2ServerApp.odex $(dg)/iap2/Iap2ServerApp.odex && [ "$(ls $(dg)/iap2 | wc -l)" -eq 4 ] && grep -q "공개 이슈나 저장소에 올리지 마세요" $(dg)/iap2/README.txt && grep -qx /system/lib/libiap2session.so $(dg)/iap2/files.txt && grep -qx /system/app/Iap2ServerApp.odex $(dg)/iap2/files.txt && grep -qx /system/lib/libCarPlayCore.so $(dg)/iap2/files.txt && grep -qx /system/etc/carplay_conf.xml $(dg)/iap2/files.txt && ! grep -q Settings.apk $(dg)/iap2/files.txt && [ ! -f $(dg)/iap2/none.txt ] && [ ! -f $(dg)/iap2/failed.txt ] && grep -q "iAP2 라이브러리·앱 2개를 모음(iap2/)" $K/install.log' || { ls -la $(dg)/iap2; cat $(dg)/iap2/files.txt; }
 check "USB 설치기 진단 기록: info.txt(판·공식 무선 모드 판·getprop·내비 busybox 유무·wifi_ap_on), HMG-API 상태·Car Report 복사, 이 모드와 HMG-API 기록" \
   'grep -qx "installed_mod: $V" $(dg)/info.txt && grep -qx "usb_mod: $V" $(dg)/info.txt && grep -qx "installed_wireless: $WV" $(dg)/info.txt && grep -qx "usb_wireless: $WV" $(dg)/info.txt && grep -q "^ro.build.product: NX4.KOR" $(dg)/info.txt && grep -qx "system_busybox: yes" $(dg)/info.txt && grep -qx "md5_busybox: $R/system/bin/busybox" $(dg)/info.txt && grep -qx "wifi_ap_on: 1" $(dg)/info.txt && grep -qx "hmgapid engine status" $T/calls && [ -f $(dg)/hmgapi-status.txt ] && grep -q "^saved: " $(dg)/car-report.txt && [ -f $(dg)/car-report-test.json ] && [ -f $(dg)/car-report-test.md ] && grep -qx aplog $(dg)/logs/ap.log && grep -qx svclog $(dg)/logs/service/ap.log && grep -qx hmgapi-install $(dg)/logs/hmgapi-install.log && grep -qx hmgapiwifi $(dg)/logs/hmgapi-wifi.log && grep -qx mapcar $(dg)/logs/map-car.txt && grep -qx status $(dg)/logs/nx4-kor-status.txt && grep -q "진단 기록을 모음: NX4/diag/" $K/install.log' || cat $(dg)/info.txt
 check "USB 설치기 진단 기록: 비밀번호가 든 파일(softap.conf, 백업 폴더)은 넣지 않음(이 회는 설치기가 아무것도 바꾸지 않음)" '! grep -rq SECRETPW $K/diag && ! engcalls'
@@ -863,16 +867,26 @@ ts $U
 check "USB 설치기 진단 기록: 설치된 모드에도 없으면 스틱의 busybox를 /data로 복사해 쓰고 지움" \
   'grep -qx "md5_busybox: $R/data/local/tmp/nx4-kor-diag-busybox" $(dg)/info.txt && grep -q "^$CORE5  " $(dg)/system-lib-md5.txt && [ ! -f $R/data/local/tmp/nx4-kor-diag-busybox ]'
 rm -rf $K/diag $K/install/payload/bin/busybox
+rm -f $R/system/lib/libiap2session.so $R/system/app/Iap2ServerApp.odex
 ts $U
 check "USB 설치기 진단 기록: md5를 셀 busybox가 없으면 그렇다고 적고(이름·크기는 ls -lR) 설치기는 그대로 끝남" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx "md5_busybox: none" $(dg)/info.txt && grep -q "busybox가 없음" $(dg)/system-lib-md5.txt && grep -q "libCarPlayCore.so" $(dg)/system-lib-ls.txt && grep -q "busybox가 없어" $K/install.log'
+check "USB 설치기 진단 기록(#90): 이름에 iap2가 든 라이브러리·앱이 없으면 iap2/none.txt에 적고(README.txt는 그대로) 설치기는 그대로 끝남" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "apk·odex가 없음" $(dg)/iap2/none.txt && [ -f $(dg)/iap2/README.txt ] && [ ! -f $(dg)/iap2/failed.txt ] && grep -q "이름에 iap2가 든 순정 라이브러리·앱이 없음(iap2/none.txt)" $K/install.log'
 check "USB 설치기 진단 기록(동글 준비): busybox가 없어도 커널 설정(config.gz)은 복사하고, md5·문자열이 빠졌다고 적음" \
   'cmp -s $R/proc/config.gz $(dg)/dongle/config.gz && [ ! -f $(dg)/dongle/config.txt ] && grep -q "busybox가 없음" $(dg)/dongle/config-sum.txt && grep -q "busybox가 없어" $(dg)/dongle/system-wifi-md5.txt && grep -q "0bda:b812" $(dg)/dongle/usb.txt'
-rm -f $R/proc/config.gz $R/system/lib/libiap2session.so; rm -rf $K/diag; ts $U
+# PR #95 리뷰 4: 읽을 수 없는 iAP2 라이브러리(복사 실패)는 덜 쓴 사본을 남기지 않고 failed.txt와 기록에 남김
+echo bad > $R/system/lib/libIAP2bad.so; chmod 000 $R/system/lib/libIAP2bad.so
+rm -f $R/proc/config.gz; rm -rf $K/diag; ts $U
 check "USB 설치기 진단 기록(동글 준비): /proc/config.gz가 없으면 그렇다고 적고 설치기는 그대로 끝남" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "config.gz 없음" $(dg)/dongle/config-sum.txt && grep -q "/proc/config.gz가 없음" $K/install.log'
-check "USB 설치기 진단 기록(#90): iAP2 라이브러리가 없으면 iap2/none.txt에 적고 설치기는 그대로 끝남" \
-  '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "libiap2\*.so 없음" $(dg)/iap2/none.txt && grep -q "iAP2 라이브러리(/system/lib/libiap2\*.so)를 모으지 못함" $K/install.log'
+if [ -r $R/system/lib/libIAP2bad.so ]; then
+  echo "skip 진단 기록(#90) 복사 실패 테스트: root라 권한 000 파일도 읽힘"
+else
+  check "USB 설치기 진단 기록(#90): 복사하지 못한 파일(대문자 이름 libIAP2bad.so)은 사본을 남기지 않고 failed.txt·기록에 적음(none.txt 없음)" \
+    '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx /system/lib/libIAP2bad.so $(dg)/iap2/failed.txt && [ ! -e $(dg)/iap2/libIAP2bad.so ] && [ ! -f $(dg)/iap2/none.txt ] && grep -q "iAP2 파일 1개를 복사하지 못함(iap2/failed.txt)" $K/install.log' || ls -la $(dg)/iap2
+fi
+chmod 644 $R/system/lib/libIAP2bad.so; rm -f $R/system/lib/libIAP2bad.so
 rm -rf $R/proc $R/sys
 # 확인 창에서 모으지 않는 경우: 진단 폴더를 만들지 않고 HMG-API 명령도 부르지 않으며, 설치기는 그대로 이어짐(같은 판: 관리 앱)
 dno() { rm -rf $K/diag; ts $U; [ "$(cat $T/ts.rc)" = 0 ] && [ ! -d $K/diag ] && ! grep -q "engine report" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && grep -q "이미 설치되어" $T/ts.out && grep -q "$1" $K/install.log; }

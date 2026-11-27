@@ -190,6 +190,7 @@ NEMESIS 1.17(LivePatch)이 깔린 차에서 다음 둘 중 하나가 일어나�
 - USB의 `NX4/install.log`, `HMGAPI/install.log`
 - USB의 `NX4/diag/` 폴더. 없거나 설정이 끝난 뒤의 기록이 필요하면, 재부팅하고 같은 USB로 Update OTA를 한 번 더 눌러 확인 창에서 [모으기]를 고른 뒤 가져옵니다(같은 판이면 기록을 모은 뒤 다시 설치하지 않고 관리 앱을 열어 map 확인·계획만 봅니다). 확인 창이 없는 예전 판에서 올리는 첫 설치 때는 묻지 않고 모으지도 않습니다.
   - 비밀번호가 든 Wi-Fi 설정 파일은 넣지 않고, Car Report는 HMG-API가 VIN·일련번호를 빼고 기록 줄을 가립니다. 그래도 공개 이슈에 올리기 전에 한 번 훑어봅니다.
+  - **`iap2/` 폴더는 빼고 올립니다.** 순정 내비 파일(iAP2 라이브러리·앱)의 사본이라 공개하면 안 됩니다(폴더 안 `README.txt`에도 적혀 있음). 차선 안내 원인([#90](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/90))을 보는 데만 쓰고, 필요하면 공개하지 않는 길로 따로 전합니다.
 - adb가 있으면 `/data/hmgapi/logs/hmgapi/wifi.log`, `/data/nx4-kor/logs/ap.log`, `/data/local/tmp/nx4-kor-status.txt`(USB 진단 기록의 `logs/`에도 일부 있음)
 - 몇 번째 Update OTA에서, 어떤 메시지가 떴는지
 - 내비 소프트웨어 판(`NX4.KOR.….260902`), 설치 전 HMG-API 판, 순정 무선 카플레이 트림인지

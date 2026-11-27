@@ -578,8 +578,9 @@ old_revert() {
 #   logs/               이 모드의 기록(ap.log, 서비스 기록, map 만들기·확인·계획·적용 결과, 상태 파일)과 HMG-API 설치 기록,
 #                       HMG-API Wi-Fi 지기 기록(hmgapi-wifi.log: 프로젝션 AP를 띄웠는지·다시 시도하는지·깨어났는지)
 #   dongle/             USB Wi-Fi 동글 드라이버를 이 차 커널에 맞춰 빌드하고 순정 HAL에 잇는 데 필요한 것(#48, 아래 diag_dongle)
-#   iap2/               순정 iAP2 라이브러리 사본(/system/lib/libiap2*.so). 카플레이 차선 안내가 오지 않는 원인(#90)을 PC에서 본다
-#                       (아래 diag_iap2). 순정 바이너리이므로 공개 이슈에 올리지 않는다
+#   iap2/               순정 iAP2 라이브러리·앱 사본(/system/lib·/system/app 중 이름에 iap2가 든 것)과 관련 파일 목록.
+#                       카플레이 차선 안내가 오지 않는 원인(#90)을 PC에서 본다(아래 diag_iap2). 순정 바이너리이므로 공개
+#                       이슈에 올리지 않는다(폴더 안 README.txt에도 적음)
 # HMG-API 명령은 HMG-API가 응답할 때만 돌린다. 비밀번호가 든 Wi-Fi 설정 파일(softap.conf·hostapd-nx4.conf·
 # wpa_supplicant.conf)과 이 모드의 백업 폴더($NX4_ROOT/backup)는 넣지 않는다. 못 모은 것은 기록만 하고 넘어간다.
 DIAGBB=$ROOT/data/local/tmp/nx4-kor-diag-busybox
@@ -854,22 +855,43 @@ diag_dongle() {
   done > $_o/dmesg-usb-wifi.txt
   log "진단 기록: 동글 준비 정보를 모음(dongle/)"
 }
-# 진단 기록의 iAP2 라이브러리(#90, 2026-11-27): 아이폰은 차가 CarPlay 연결 정보(iAP2 identification)에서 차선 안내를 받는다고
-# 알려야 차선 안내를 보내는 것으로 보인다. 그 정보를 만드는 순정 라이브러리(/system/lib/libiap2*.so, 공식 모드의
-# carplay-identification-fc7 패치가 고치려다 이 차에서 실패하는 libiap2session.so 포함)를 그대로 복사해 PC에서 읽는다.
-# 읽기만 한다. $1 폴더. 순정 바이너리이므로 이 폴더는 공개 이슈에 올리지 않는다(docs/troubleshooting.md)
+# 진단 기록의 iAP2 파일(#90, 2026-11-27): 아이폰은 차가 CarPlay 연결 정보(iAP2 identification)에서 차선 안내를 받는다고
+# 알려야 차선 안내를 보내는 것으로 보인다. 그 정보를 만드는 순정 파일을 그대로 복사해 PC에서 읽는다. 읽기만 한다. $1 폴더.
+#   lib…iap2….so, *iap2*.apk·.odex  /system/lib의 .so와 /system/app의 apk·odex 중 이름에 iap2가 든 것(대소문자 가리지 않음).
+#                       네이티브 직렬화기(libiap2session.so: 공식 모드의 carplay-identification-fc7 패치가 고치려다 이 차에서
+#                       실패함)와 Java 쪽 연결 정보 메시지(Iap2ServerApp.odex의 com.tcc.iap2server.Iap2InitInformationMsg,
+#                       HMG-API 훅 지점 iap2.init_info. PR #95 리뷰 3)
+#   files.txt           /system 아래 몇 폴더(두 단계까지)에서 이름에 iap2·carplay가 든 파일의 경로(이름만, 복사하지 않음)
+#   README.txt          순정 바이너리이므로 공개 이슈·저장소에 올리지 말라는 안내. 폴더와 함께 다니게 둔다(PR #95 리뷰 2)
+#   failed.txt          복사하지 못한 파일(덜 쓴 사본은 지움, PR #95 리뷰 4). 맞는 파일이 하나도 없으면 none.txt
+iap2_name() { case "${1##*/}" in *[Ii][Aa][Pp]2*) return 0 ;; esac; return 1; }
 diag_iap2() {
-  mkdir -p $1 || return 0
-  _n=0
-  for _f in $ROOT/system/lib/libiap2*.so; do
+  if ! mkdir -p $1; then log "진단 기록: iap2/ 폴더를 만들지 못해 iAP2 파일을 모으지 못함"; return 0; fi
+  echo "순정 내비 파일(iAP2 라이브러리·앱)의 사본입니다. 공개 이슈나 저장소에 올리지 마세요(#90). 진단 기록을 올릴 때는 이 iap2 폴더를 빼 주세요." > $1/README.txt
+  _n=0; _bad=0
+  for _f in $ROOT/system/lib/*.so $ROOT/system/app/*.apk $ROOT/system/app/*.odex; do
     [ -f "$_f" ] || continue
-    cp "$_f" $1/ 2>/dev/null && _n=$((_n+1))
+    iap2_name "$_f" || continue
+    if cp "$_f" $1/ 2>/dev/null; then
+      _n=$((_n+1))
+    else
+      rm -f "$1/${_f##*/}"
+      echo "${_f#$ROOT}" >> $1/failed.txt
+      _bad=$((_bad+1))
+    fi
   done
-  if [ $_n = 0 ]; then
-    echo "/system/lib/libiap2*.so 없음(또는 복사하지 못함)" > $1/none.txt
-    log "진단 기록: iAP2 라이브러리(/system/lib/libiap2*.so)를 모으지 못함"
-  else
-    log "진단 기록: iAP2 라이브러리 ${_n}개를 모음(iap2/)"
+  for _dir in app priv-app framework lib bin etc vendor; do
+    for _f in $ROOT/system/$_dir/* $ROOT/system/$_dir/*/*; do
+      [ -e "$_f" ] || continue
+      case "${_f##*/}" in *[Ii][Aa][Pp]2*|*[Cc][Aa][Rr][Pp][Ll][Aa][Yy]*) echo "${_f#$ROOT}" ;; esac
+    done
+  done > $1/files.txt 2>/dev/null
+  if [ $_bad -gt 0 ]; then log "진단 기록: iAP2 파일 ${_bad}개를 복사하지 못함(iap2/failed.txt)"; fi
+  if [ $_n -gt 0 ]; then
+    log "진단 기록: iAP2 라이브러리·앱 ${_n}개를 모음(iap2/)"
+  elif [ $_bad = 0 ]; then
+    echo "이름에 iap2가 든 /system/lib의 .so와 /system/app의 apk·odex가 없음" > $1/none.txt
+    log "진단 기록: 이름에 iap2가 든 순정 라이브러리·앱이 없음(iap2/none.txt)"
   fi
 }
 # busybox $2(md5sum·sha256sum)로 센 값만(파일 이름 없이). 못 세면 빈 값
