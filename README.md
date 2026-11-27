@@ -234,16 +234,17 @@ NX4 KOR("NX4 KOR: Tucson NX4 (Korea)")의 설정은 둘입니다.
 | `art/` | 앱 메뉴 타일 모양의 원본(`tile.svg`). `mod/icons/`의 그림 넷은 이것을 HMG-API `tools/mkicon.sh`로 만든 것입니다 |
 | `app/` | 관리 앱 소스 |
 | `usb/` | USB 설치기(`troubleShooter`)와 USB 안내(`README.txt`) |
-| `scripts/` | `build-app.sh`(관리 앱), `build-hooks.sh`(`hooks.jar`), `build.sh`(서명한 모드 zip과 USB 묶음), `build-driver.sh`(USB Wi-Fi 동글 드라이버, Docker) |
+| `scripts/` | `build-app.sh`(관리 앱), `build-hooks.sh`(`hooks.jar`), `build.sh`(서명한 모드 zip과 USB 묶음), `build-driver.sh`(USB Wi-Fi 동글 드라이버, Docker), `qemu-dongle-test.sh`(QEMU에서 동글 테스트) |
 | `drivers/` | USB Wi-Fi 동글 드라이버의 패치·빌드 방법(GPL-2.0, [#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)). 안내는 [`drivers/README.md`](drivers/README.md) |
 | `docs/design.md` | 설계와 차에서 확인할 것 |
 | `docs/flow.md` | 설치부터 무선 연결·관리 앱·지우기까지의 처리 흐름 그림(mermaid) |
 | `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때 |
 | `docs/emulator-test.md` | 에뮬레이터에서 관리 앱 테스트 |
+| `docs/qemu-dongle-test.md` | QEMU에서 USB Wi-Fi 동글 테스트(PC에 꽂은 동글로 우리 드라이버·패치) |
 | `docs/git-flow.md` | 브랜치 전략(Git Flow) |
 | [GitHub 이슈](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues) | 정하지 않은 것(라벨 `결정 필요`), 차에서 확인할 일(`차 확인`), 릴리스 일(`릴리스`) |
 | `docs/release.md` | 태그로 도는 배포(GitHub Actions)와 배포 키 |
-| `tests/` | PC 시험(`mod-test.sh`), 에뮬레이터 시험 스크립트(`emu/`) |
+| `tests/` | PC 시험(`mod-test.sh`), 에뮬레이터 시험 스크립트(`emu/`), QEMU 동글 테스트의 게스트 쪽(`qemu/`) |
 
 **만들기**
 
@@ -283,6 +284,7 @@ cp mod/icons/icon_night.png app/res/drawable-night-hdpi/ic_launcher.png
 **PC 시험**
 - `sh tests/mod-test.sh`: `mod.json`(뺀 것 포함), 앱 메뉴 타일 그림과 앱 아이콘, 서비스 래퍼, 삭제 전 정리, 상태 판정(공식 무선 모드·훅·프로젝션 AP·Wi-Fi 부품), [지금 재부팅] 요청, USB 설치기(공식 무선 모드 설치, 옛 2.0.x 되돌리기, map 만들기·확인, 계획 읽기와 적용, 진행 기록), 지우기(HMG-API를 먼저 지운 경우, `UNINSTALL-ALL` 포함), 공식 무선 모드 받기(`fetch-wireless.sh`), 관리 앱의 `ReportTest`, 한국 카플레이 길안내의 판단(`TbtGateTest`), 정적 검사. `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치·계획·지우기, 차종 제한(NX4.KOR 260902만)까지 봅니다. `ANDROID_HOME`도 있으면 `hooks.jar`를 진짜로 만들고 곧 회전 그림 판단과 곧 회전 거리(`NearFitTest`)도 돌립니다. 이 모드는 HMG-API 1.1.0-rc.10 이상을 요구하므로 `HMGAPI_SRC`도 v1.1.0-rc.10 이상이어야 합니다(낮으면 엔진이 설치를 거절하고 테스트가 실패로 알림).
 - 에뮬레이터: 관리 앱을 1920x720 에뮬레이터에 띄워 상태별 화면과 [지금 재부팅] 흐름을 봅니다. 준비와 순서는 [`docs/emulator-test.md`](docs/emulator-test.md).
+- QEMU 동글 테스트: PC에 꽂은 USB Wi-Fi 동글을 QEMU 가상 머신(같은 판 3.18.24 커널)으로 넘겨, 우리 드라이버·패치로 드라이버 올리기, 채널 표, 2.4GHz·5GHz AP, 뽑기를 봅니다(`sh scripts/qemu-dongle-test.sh`). 준비와 결과는 [`docs/qemu-dongle-test.md`](docs/qemu-dongle-test.md).
 
 ## 라이선스
 

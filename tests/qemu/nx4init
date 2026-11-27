@@ -1,0 +1,112 @@
+#!/bin/busybox sh
+# QEMU 동글 테스트(docs/qemu-dongle-test.md)의 게스트 init(PID 1). 루트 파일 시스템의 /sbin/nx4init로 들어간다
+# (tests/qemu/build-rootfs.sh). 커널 명령줄의 MODE로 고른다(커널이 key=value를 init 환경으로 넘김).
+# 드라이버는 차의 순정 HAL(libhardware_legacy.so)이 bcmdhd에 주는 인자 그대로 올린다(HAL_ARGS, USB 진단 기록 wifi-strings.txt).
+#   MODE=matrix       사람 손 없이: HAL 인자로 올린 채널 표, rtw_country_code=KR로 올린 채널 표, 스캔, AP 셋(2.4GHz 6번,
+#                     5GHz 149번 국가 코드 없이, 5GHz 149번 country_code=KR)을 각 AP_SECS초
+#   MODE=interactive  KR로 올려 5GHz 149번 AP를 AP_SECS초 띄워 폰으로 붙어 보고, 그다음 쓰는 중에 뽑기를 UNPLUG_SECS초 기다림
+/bin/busybox --install -s
+export PATH=/sbin:/usr/sbin:/bin:/usr/bin
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t devtmpfs dev /dev 2>/dev/null
+mkdir -p /dev/pts /run /tmp /var/run /var/log
+mount -t tmpfs tmpfs /run
+mount -t tmpfs tmpfs /tmp
+hostname nx4-qemu
+MODE=${MODE:-matrix}
+AP_SECS=${AP_SECS:-30}
+UNPLUG_SECS=${UNPLUG_SECS:-90}
+HAL_ARGS="iface_name=wlan0 firmware_path=/data/misc/wifi/fw_bcmdhd.bin nvram_path=/data/misc/wifi/bcmdhd.cal clm_path=/system/wifi/89359.clm_blob"
+step() { echo; echo "== $*"; }
+load() {
+  rmmod bcmdhd 2>/dev/null; sleep 2
+  insmod /lib/modules/bcmdhd.ko $HAL_ARGS "$@"
+  echo "insmod $* 종료 코드 $?"
+  i=0; while [ ! -d /sys/class/net/wlan0 ] && [ $i -lt 20 ]; do sleep 1; i=$((i + 1)); done
+  ls /sys/class/net | tr '\n' ' '; echo
+}
+chans() {
+  iw phy | grep -E '^\s+\* (2437|5180|5745|5765|5785|5805|5825) MHz' | sed 's/^[[:space:]]*//'
+  iw reg get 2>/dev/null | head -3
+}
+ap() {  # $1 이름, $2 hw_mode, $3 channel, $4 country_code(빈 값이면 넣지 않음)
+  pkill hostapd 2>/dev/null; sleep 1
+  ip link set wlan0 down 2>/dev/null
+  {
+    echo interface=wlan0; echo driver=nl80211; echo ssid=NX4-QEMU-TEST; echo hw_mode=$2; echo channel=$3
+    [ -n "$4" ] && { echo country_code=$4; echo ieee80211d=1; }
+    echo ieee80211n=1; echo wmm_enabled=1; echo auth_algs=1; echo wpa=2; echo wpa_key_mgmt=WPA-PSK; echo rsn_pairwise=CCMP
+    echo wpa_passphrase=nx4-qemu-test; echo ctrl_interface=/var/run/hostapd
+  } > /tmp/h.conf
+  hostapd /tmp/h.conf > /tmp/h-$1.log 2>&1 &
+  i=0; t=; maxst=0
+  while [ $i -lt $AP_SECS ]; do
+    sleep 5; i=$((i + 5))
+    t=$(iw dev wlan0 info 2>/dev/null | grep -E 'type|channel' | tr '\n' ' ' | tr -s '\t ' ' ')
+    st=$(iw dev wlan0 station dump 2>/dev/null | grep -c '^Station')
+    [ $st -gt $maxst ] && maxst=$st
+    pidof hostapd >/dev/null && h=돎 || h=없음
+    echo "[$1 $i초] hostapd $h, 연결 ${st}개,$t"
+  done
+  # 끝까지 hostapd가 살아 있고 AP였을 때만 "섬"(잠깐 AP였다가 hostapd가 끝나는 경우가 있음)
+  ok=no
+  pidof hostapd >/dev/null && case "$t" in *"type AP"*) ok=yes ;; esac
+  echo "-- $1 결과: AP로 섬=$ok, 가장 많이 붙은 기기 ${maxst}개, 채널:$(echo "$t" | sed 's/.*channel//')"
+  grep -vE '^$' /tmp/h-$1.log | tail -12
+  pkill hostapd 2>/dev/null; sleep 1
+}
+step "커널 $(uname -r), MODE=$MODE AP_SECS=$AP_SECS"
+# PC의 동글이 VM에 붙기까지 몇 초 걸린다(QEMU usb-host). 루트 허브 말고 장치가 하나 보일 때까지 기다린다
+i=0; while [ ! -e /sys/bus/usb/devices/1-1/idVendor ] && [ $i -lt 30 ]; do sleep 1; i=$((i + 1)); done
+for u in /sys/bus/usb/devices/*; do
+  [ -f $u/idVendor ] && echo "${u##*/} $(cat $u/idVendor):$(cat $u/idProduct) speed=$(cat $u/speed) $(cat $u/product 2>/dev/null)"
+done
+if [ "$MODE" = matrix ]; then
+  step "A. 차 HAL 인자 그대로(국가 코드 없음)"
+  load
+  dmesg | grep -iE 'unknown parameter|country|chplan|alpha2|regd' | tail -8
+  chans
+  step "B. 차 HAL 인자 + rtw_country_code=KR"
+  load rtw_country_code=KR
+  dmesg | grep -iE 'country|chplan|alpha2|regd' | tail -8
+  chans
+  step "스캔(KR)"
+  ip link set wlan0 up; sleep 3
+  iw dev wlan0 scan > /tmp/scan.txt 2>&1
+  echo "스캔 종료 코드 $? / AP $(grep -c '^BSS ' /tmp/scan.txt)개, 5GHz $(grep -cE 'freq: 5[0-9]{3}' /tmp/scan.txt)개"
+  ip link set wlan0 down
+  step "AP 1: 2.4GHz 6번, 국가 코드 없음(KR로 올린 드라이버)"
+  ap g6 g 6 ""
+  step "AP 2: 5GHz 149번, hostapd 국가 코드 없음(KR로 올린 드라이버)"
+  ap a149 a 149 ""
+  step "AP 3: 5GHz 149번, hostapd country_code=KR(KR로 올린 드라이버)"
+  ap a149kr a 149 KR
+  step "A로 다시 올려 5GHz 149번 AP(국가 코드 없음): 지금 차와 같은 상태"
+  load
+  ap a149hal a 149 ""
+else
+  step "KR로 올려 5GHz 149번 AP를 ${AP_SECS}초: 폰에서 NX4-QEMU-TEST(비밀번호 nx4-qemu-test)에 붙어 보세요"
+  load rtw_country_code=KR
+  ap phone a 149 ""
+  step "쓰는 중에 뽑기: AP를 다시 띄웠으니 지금 동글을 뽑아 주세요(${UNPLUG_SECS}초 기다림)"
+  ap_bg() { hostapd /tmp/h.conf > /tmp/h-unplug.log 2>&1 & }
+  ip link set wlan0 down 2>/dev/null; ap_bg; sleep 5
+  i=0
+  while [ $i -lt $UNPLUG_SECS ]; do
+    sleep 5; i=$((i + 5))
+    [ -d /sys/class/net/wlan0 ] || { echo "[$i초] wlan0이 사라짐(뽑힘)"; break; }
+  done
+  sleep 5
+  dmesg | grep -iE 'nx4-protect|disconnect|rtw_dev|bcmdhd|Oops|BUG|Unable to handle|panic|Call trace|Internal error' | tail -30
+  echo "hostapd $(pidof hostapd >/dev/null && echo 돎 || echo 없음)"
+  tail -8 /tmp/h-unplug.log
+fi
+step "rmmod"
+pkill hostapd 2>/dev/null; sleep 1
+rmmod bcmdhd
+echo "rmmod 종료 코드 $?"
+dmesg | grep -iE 'Oops|BUG|Unable to handle|panic|Internal error' | tail -5
+step "끝"
+sync
+poweroff -f

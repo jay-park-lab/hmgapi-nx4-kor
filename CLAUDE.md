@@ -21,6 +21,7 @@
 | `docs/flow.md` | 2.1.0 처리 흐름 그림(mermaid): 누가 무엇을 하나, USB 설치·업데이트, 재부팅 뒤 무선 연결, 관리 앱, 지우기. `design.md`의 요약 |
 | `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때(설치기·관리 앱 문구별 할 일, 부팅 보호, 되돌리기, 남길 기록) |
 | `docs/emulator-test.md` | 에뮬레이터에서 관리 앱 테스트(SDK·AVD 준비, 시나리오, [지금 재부팅] 흐름, 이 테스트가 보지 않는 것) |
+| `docs/qemu-dongle-test.md` | QEMU에서 USB Wi-Fi 동글 테스트: 같은 판(3.18.24) 커널을 QEMU virt용으로 빌드해 우리 드라이버·패치를 올리고 PC에 꽂은 동글을 넘김. 보는 것·못 보는 것, 돌리기(`scripts/qemu-dongle-test.sh`, `tests/qemu/`), 결과(국가 코드 없이는 5GHz AP가 서지 않음) |
 | `docs/git-flow.md` | 브랜치 전략(Git Flow) 규칙, 흐름(작업마다 워크트리), 강제 장치 |
 | `drivers/README.md` | USB Wi-Fi 동글 드라이버(#48, RTL88x2BU·RTL8831BU): 순정 HAL 자리(`bcmdhd`)에 맞추는 방법, 보호 패치, RTL8831BU 빌드 맞춤, 두 드라이버와 자리 하나, 커널 준비(kernel.org 3.18.24 뼈대 + 현대모비스 GPL 공개 내비 커널 소스 + 차 설정에 맞춘 defconfig), 커널 소스 자산(릴리스 `src-mobis-avnt5w-r9`, `--src-asset`), Docker 빌드(`scripts/build-driver.sh`, CI `.github/workflows/drivers.yml`), 바깥 자료와 출처·라이선스(GPL-2.0). 차에 넣을 `.ko`는 CI(리눅스 x86) 것만(맥 에뮬레이션 빌드는 확인용) |
 | GitHub 이슈(`gh issue list`) | 정하지 않은 것(라벨 `결정 필요`), 차에서 확인할 일(`차 확인`), 릴리스 일(`릴리스`). 결정을 기다리는 일과 이후 할 일은 모두 여기 |
