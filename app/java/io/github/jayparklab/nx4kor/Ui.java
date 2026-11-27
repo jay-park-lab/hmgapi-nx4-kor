@@ -5,10 +5,8 @@ import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Shader;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
@@ -72,8 +70,8 @@ final class Ui {
     static final int WARN = 0xFFF9A825, BAD = 0xFFC62828, NOTICE = 0xFFFFE082;
 
     // ---- 크기(1920x720 px) ----
-    /** 제목 줄 높이, 제목 글자, 왼쪽 위 [닫기](뒤로) 누르는 칸 폭 */
-    static final int HEAD_H = 96, HEAD_TEXT = 34, BACK_W = 120;
+    /** 제목 줄 높이, 제목 글자 */
+    static final int HEAD_H = 96, HEAD_TEXT = 34;
     /** 왼쪽 목록 칸과 오른쪽 칸의 폭(1920 = 1280 + 640) */
     static final int LIST_W = 1280, PANEL_W = 640;
     /** 목록 왼쪽·오른쪽 여백 */
@@ -182,18 +180,16 @@ final class Ui {
         return v;
     }
 
-    /** 제목 줄: 가운데 제목, 왼쪽 위 뒤로(닫기) 버튼. back은 그 버튼을 누를 때 받는 쪽 */
-    FrameLayout header(String title, View.OnClickListener back) {
+    /**
+     * 제목 줄: 가운데 제목만 둔다. 닫기는 차 화면 맨 위 시스템 줄의 `<`(뒤로)로 한다. 앱 안 왼쪽 위의 `<`는 바로 위
+     * 시스템 줄의 `<`와 겹쳐 뺐다(2026-11-27 사용자 결정)
+     */
+    FrameLayout header(String title) {
         FrameLayout f = new FrameLayout(c);
         TextView t = text(title, HEAD_TEXT, TEXT);
         t.setGravity(Gravity.CENTER);
         t.setSingleLine(true);
         f.addView(t, new FrameLayout.LayoutParams(-1, -1));
-        Back b = new Back(c, k);
-        b.setContentDescription("닫기");
-        b.setBackground(pressable(new ColorDrawable(0), new ColorDrawable(BTN_PRESSED)));
-        b.setOnClickListener(back);
-        f.addView(b, new FrameLayout.LayoutParams(px(BACK_W), -1, Gravity.LEFT));
         return f;
     }
 
@@ -279,35 +275,6 @@ final class Ui {
     void addRow(LinearLayout list, View row) {
         list.addView(row);
         list.addView(fadeLine(), new LinearLayout.LayoutParams(-1, thin()));
-    }
-
-    /** 순정 뒤로 버튼의 "<" 모양. 익명 클래스 대신 이름 있는 클래스로 둔다(StatusActivity의 [닫기] 주석) */
-    static final class Back extends View {
-        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        final Path path = new Path();
-        final float k;
-
-        Back(Context c, float k) {
-            super(c);
-            this.k = k;
-            p.setColor(TEXT);
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(4 * k);
-            p.setStrokeCap(Paint.Cap.ROUND);
-            p.setStrokeJoin(Paint.Join.ROUND);
-            setClickable(true);
-            setFocusable(true);
-        }
-
-        @Override
-        protected void onDraw(Canvas cv) {
-            float cx = PAD_X * k + 6 * k, cy = getHeight() / 2f, half = 17 * k, w = 9 * k;
-            path.reset();
-            path.moveTo(cx + w, cy - half);
-            path.lineTo(cx - w, cy);
-            path.lineTo(cx + w, cy + half);
-            cv.drawPath(path, p);
-        }
     }
 
     /** 진행 막대: 어두운 바닥 위에 시안 그러데이션으로 채운다(Holo 막대 대신) */
