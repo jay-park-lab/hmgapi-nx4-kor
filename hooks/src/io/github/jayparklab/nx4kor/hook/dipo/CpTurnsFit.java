@@ -18,6 +18,12 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 //   exits stay at 1050 m and D still shrinks to a shorter first distance (dynamicD). Stock windows seen on a NEEV KOR
 //   were 150-600 m (HMG-Seogaemo .agents/cluster-ar-view.md); the official mod's GUIDE_WINDOW is 457 m,
 //   HMG_Phone_Projection_TBT's default 400 m.
+// Modified by NX4 KOR, 2026-11-27 (#89, owner's decision: no far-turn icon card): with farBig (the setting
+//   kor_tbt_far_big, on by default) a turn past D gets the near-turn picture with the bar full (BAR_FULL 90), shrinking
+//   from D as before ("far-big"); a new turn still carrying the last turn's distance gets its picture the same way
+//   (stale-dist, farPicture) and the one put-off update keeps the frame on the cluster (nearHeld, as jump-hold), so no
+//   icon card flashes between two pictures at a turn change; staysNear holds a jump whatever its distance. near()'s
+//   picture part moved to picture(). Kinds with no picture and no distance at all keep the icon. farBig off: KP's way.
 // Modified by Korea Projection (StopDragon/HMG-API, branch korea-build), 2026-11-07:
 //   - an icon for every maneuver (angle bands, then the type alone, then the blank icon 8);
 //     turn() no longer stops before the distance, HUD and trip when the exact table has none
@@ -213,8 +219,18 @@ final class CpTurnsFit implements CpTbt {
      */
     // NX4 KOR: 300 here, not KP's 1200 (with kor_tbt_log on, HMG-API's Logs tab shows only the last 64 KB, PR #74)
     static final int DIAG_LOGS_MAX = 300;
-    /** 마지막 near() 판정의 이유(진단 줄용): in-d(D 안, 곧 회전), hold(D와 D + NEAR_EXIT_MARGIN 사이에서 곧 회전 유지, 1.7.3), no-dist, stale-dist(새 회전인데 이번 갱신에 거리 없음), put-off(새 회전의 거리를 앞 회전의 값으로 보고 미룸, 2.4.4 후보), jump-hold(같은 회전에서 거리가 뛰어 한 번 붙잡음, 2.4.4 후보), type(큰 그림 없는 종류), far */
+    /** 마지막 near() 판정의 이유(진단 줄용): in-d(D 안, 곧 회전), hold(D와 D + NEAR_EXIT_MARGIN 사이에서 곧 회전 유지, 1.7.3), no-dist, stale-dist(새 회전인데 이번 갱신에 거리 없음), put-off(새 회전의 거리를 앞 회전의 값으로 보고 미룸, 2.4.4 후보), jump-hold(같은 회전에서 거리가 뛰어 한 번 붙잡음, 2.4.4 후보), type(큰 그림 없는 종류), far, far-big(farBig: D 밖도 큰 그림, NX4 KOR #89) */
     String nearWhy = "";
+    /**
+     * NX4 KOR (#89, owner's decision 2026-11-27): no far-turn icon card. A turn past D gets the near-turn picture with the bar
+     * full (BAR_FULL) and the bar shrinks from D as before; a new turn whose distance is still the last turn's gets its picture
+     * the same way (stale-dist) or, at the one put-off update, the frame on the cluster is kept (as jump-hold). Kinds with no
+     * picture (destination, waypoint, start, ferry) and no distance at all keep the icon. KorTbt sets it from the setting
+     * kor_tbt_far_big (on by default); false here is KP's way (far card), which the tests use unless they say otherwise.
+     */
+    boolean farBig;
+    /** NX4 KOR (#89): the bar of a far turn's picture (the stock maximum, bar() of a distance at or past D) */
+    static final int BAR_FULL = 90;
     /** 마지막 near() 판정에 쓴 D(m, 진단 줄용). D를 정하기 전에 판정이 끝났으면 -1 */
     int nearD = -1;
     /** the time (ms since boot: the wall clock jumps when GPS or the network sets it); tests set clock */
@@ -961,9 +977,10 @@ final class CpTurnsFit implements CpTbt {
         if (nearHeld) {
             // 2.4.4 후보 재설계: 뛴 거리를 한 번 붙잡는다. 계기판·HUD·막대는 앞 프레임 그대로 두고 아무것도 보내지 않는다
             // (lastSendAt은 위에서 지금으로 했으므로 refresh()도 REFRESH_MS 동안은 다시 부르지 않는다)
+            // NX4 KOR (#89): farBig의 미루기(put-off)도 같은 길로 붙잡는다. 줄에는 이유(jump-hold·put-off)를 적는다
             if (debug) {
                 try {
-                    diag("CarPlay diag: maneuver " + list[0] + " type " + x.type + " remain " + u.distNext + "m -> held (jump-hold)");
+                    diag("CarPlay diag: maneuver " + list[0] + " type " + x.type + " remain " + u.distNext + "m -> held (" + nearWhy + ")");
                 } catch (Throwable e) {
                     // 남기지 않는다
                 }
@@ -1049,6 +1066,8 @@ final class CpTurnsFit implements CpTbt {
     /** 4차 리뷰 중간 1: 같은 회전에서 뛴 값 remain을 지금 받아들이면 곧 회전이 되는지(아래 near()와 같은 판단, 상태는 바꾸지 않음) */
     boolean staysNear(Maneuver x, int icon, Update u, int remain) {
         if (nearDisplay(x.type, x.side, x.junction, x.exit, icon) == null) return false;
+        // NX4 KOR (#89): with farBig a far value is a picture too, so a jump is held once whatever its distance
+        if (farBig) return true;
         int d = dynamicD(expressway(x.type) ? D_EXPRESSWAY : D_GENERAL, Math.max(u.nearFirst, remain));
         return remain <= (u.nearOn ? d + NEAR_EXIT_MARGIN : d);
     }
@@ -1087,7 +1106,9 @@ final class CpTurnsFit implements CpTbt {
         boolean putOffOver = key.equals(u.nearPutOff) && now() - u.nearPutOffAt >= PUT_OFF_MAX_MS;
         if (newKey && !u.distNextFresh && !jumpPending && !putOffOver) {
             nearWhy = "stale-dist";
-            return null;
+            // NX4 KOR (#89): with farBig, this new turn's picture with the bar full instead of the icon card (the distance is
+            // still the last turn's until the phone's next update). The near-turn state stays as it is, as before
+            return farBig ? farPicture(x, icon) : null;
         }
         // 2.4.4 후보(베타 3, 공개 이슈 76번 2026-11-15 쏘렌토 MQ4 하이브리드·네이버 지도): 회전이 바뀌는 갱신에 item 10이
         // 새로 왔어도 값이 앞 회전의 마지막 남은 거리 이하이면 앞 회전의 값으로 보고 이번 갱신은 판단하지 않는다(멀리 있음).
@@ -1112,6 +1133,9 @@ final class CpTurnsFit implements CpTbt {
             // 폰이 다음 갱신을 보내면 read()가 다시 정한다
             u.distNextFresh = false;
             nearWhy = "put-off";
+            // NX4 KOR (#89): with farBig there's no far card to put between two pictures (the flash seen on 2.1.2-beta.5):
+            // keep the frame on the cluster for this one update, as jump-hold does. Nothing shown yet: the icon, as before
+            if (farBig && shown) nearHeld = true;
             return null;
         }
         // 2.4.4 후보 재설계(니로 카카오내비 2026-11-15 14:01:36): 카카오내비는 회전이 바뀔 때 새 회전의 거리를 옛 회전 번호로 먼저
@@ -1159,13 +1183,30 @@ final class CpTurnsFit implements CpTbt {
         // 1.7.3(N-3): 들어갈 때는 D, 이미 곧 회전이면 D + NEAR_EXIT_MARGIN을 넘어야 나간다(#67 경계에서 그림이 왔다갔다함)
         if (remain > (u.nearOn ? d + NEAR_EXIT_MARGIN : d)) {
             u.nearOn = false;
-            return null;
+            if (!farBig) return null;
+            // NX4 KOR (#89): past D, the same picture with the bar full; it shrinks from D (nearOn stays the hysteresis)
+            nearWhy = "far-big";
+            return picture(x, disp, BAR_FULL, d);
         }
         nearWhy = remain > d ? "hold" : "in-d";
         u.nearOn = true;
+        return picture(x, disp, bar(remain, d), d);
+    }
+
+    /** NX4 KOR (#89): a far turn's picture with the bar full and the kind's own D (stale-dist with farBig), or null with none */
+    int[] farPicture(Maneuver x, int icon) {
+        int[] disp = nearDisplay(x.type, x.side, x.junction, x.exit, icon);
+        if (disp == null) return null;
+        int d = expressway(x.type) ? D_EXPRESSWAY : D_GENERAL;
+        nearD = d;
+        return picture(x, disp, BAR_FULL, d);
+    }
+
+    /** the near-turn values {display, side bits, direction slot, bar, D} for disp (split out of near() for farBig, #89) */
+    int[] picture(Maneuver x, int[] disp, int bar, int d) {
         // 2.4.10(1.8.1 T1-1): 고가·지하차도 낱말이 있으면 순정 번호(44·46), 옆길 0, 방향 90/270도. 다른 길 비트는 넣지 않는다(순정 옆길 0)
         int[] f = facilityNear(x.type, x.description, x.afterRoad, disp);
-        if (f != null) return new int[] { f[0], 0, f[1], bar(remain, d), d };
+        if (f != null) return new int[] { f[0], 0, f[1], bar, d };
         int bits = disp[1] < 0 ? 0 : sideBits(x.angles, disp[1]);
         // 1.8.0(2.4.7): 갈림의 다른 길 비트는 순정과 같게 넣는다. 폰이 다른 길 각도를 주지 않아도 넣는다.
         // 오른쪽 갈림(14)은 직진 비트 0(순정 side 3 = 비트 0·1), 왼쪽 갈림(13)은 오른쪽 22.5도 비트 1(순정 side 16386 = 비트 1·14,
@@ -1173,7 +1214,7 @@ final class CpTurnsFit implements CpTbt {
         if (fork(x.type)) bits |= forkOtherBit(x.type == 13);
         // 2.4.10(1.8.1 L-2): 각도 없는 진입 램프는 오른쪽 갈림 모양(순정 side 3 = 직진 비트 0 + 22.5도 비트 1). 왼쪽 통행의 거울(0 + 14)도 직진 비트
         if (onRampDefault(x.type, x.exit)) bits |= 1;
-        return new int[] { disp[0], bits, disp[2], bar(remain, d), d };
+        return new int[] { disp[0], bits, disp[2], bar, d };
     }
 
     /**

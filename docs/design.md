@@ -35,7 +35,7 @@
 | `services` | `launch`(`svc/launch.sh`, root, 앱이 부를 때만), `nochip`(`svc/nochip.sh`, root, 부팅 때 한 번, 2.1.2-beta.4부터. 아래 "[Wi-Fi 칩이 없는 차](#wi-fi-칩이-없는-차의-hmg-api-다시-시도-멈추기-svcnochipsh)"). `car_events`는 쓰지 않습니다(쓰면 HMG-API 차량 서비스가 새로 뜸) |
 | `apps`, `provides.launcher` | 관리 앱(`app/NX4KOR.apk`)과 앱 메뉴 타일. 타일 그림은 `icons/`의 순정 꼴 넷(낮·밤, 모드를 껐을 때의 회색 낮·밤)이고, 저장소의 `art/tile.svg`를 HMG-API `tools/mkicon.sh`로 만든 것입니다([#47](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/47)) |
 | `hooks` | 한국 카플레이 길안내(#67): `hooks.jar`(저장소의 `hooks/src`를 `scripts/build-hooks.sh`로 만듦), 진입 클래스 `io.github.jayparklab.nx4kor.hook.Nx4KorHooks`, 훅 지점 9곳. DiPO 안 계기판 호출 `framework.navigation_cluster.*` 8곳은 `change`, DiPO의 길안내 멈춤 `dipo.iap2_proxy.stop_route_guidance`는 `observe`. `replace`는 쓰지 않습니다 |
-| `settings.json` | `kor_tbt`(한국 카플레이 길안내, 기본 켬), `kor_tbt_log`(그 진단 줄, 2.1.2-beta.2부터 기본 끔, [#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)). 둘 다 HMG-API 앱에서 바꾸고 다시 시작하면 적용됩니다 |
+| `settings.json` | `kor_tbt`(한국 카플레이 길안내, 기본 켬), `kor_tbt_far_big`(먼 회전도 큰 그림, 기본 켬, [#89](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/89)), `kor_tbt_log`(그 진단 줄, 2.1.2-beta.2부터 기본 끔, [#77](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/77)). 모두 HMG-API 앱에서 바꾸고 다시 시작하면 적용됩니다 |
 
 - **빠진 것:** 한국 포크 무선 모드 2.4.5(`parts`·`feature_flags`, 그 `hooks.jar`·`settings.json`, 레시피 5개, `files/libleafiaaac.so`, `patches.json`, 저장소의 `wireless/`), `"wifi": {"hotspot": true}`, `conflicts: ["wireless-carplay-aa"]`, 서비스 `ap`(`svc/ap.sh` → `svc/hotspot.sh`의 순정 `hostapd`·`dnsmasq` 핫스팟, Wi-Fi 설정 잠금, 칩 깨우기, 자동 설정 `setup_hmgapi`)와 `scripts/post.sh`. 공식 모드와 `replace`로 겹치는 훅이 없습니다([#17](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/17)).
 - **`requires`로 공식 모드를 걸지 않습니다.** HMG-API는 요구한 모드가 없거나 꺼지면 이 모드의 앱·서비스까지 멈춥니다(rc.8 `docs/mod-reference.md` "Other mods", `engine/Engine.java` `visit`). 그러면 관리 앱이 그 사실을 알릴 수 없습니다. 대신 관리 앱이 공식 모드가 있는지·켜졌는지·판을 봅니다(아래 "관리 앱").
@@ -100,7 +100,7 @@
   5. HMG-API 앱에서 NX4 KOR를 재시작 없이 끄면 HMG-API가 이 모드의 훅을 통과시키고, 이 모드도 받기·다시 보내기를 멈추고 상태와 "그렸다" 표시를 비웁니다(지우지는 않음: 공식 모드가 이어 그림). 다시 켜면 처음 받을 때 폰에 길안내 전체를 다시 요청합니다(폰은 갱신을 항목마다 보내, 상태 항목이 없는 갱신만으로는 "안내 끝"으로 읽히기 때문, PR #68 리뷰 2·11). 그 다시 요청의 멈춤에 공식 모드가 HUD(거리·차선·목록)를 비우므로, 다시 켠 직후 HUD가 1초 안팎 빌 수 있습니다. 계기판 화살표는 그대로입니다(리뷰 14, 재시작 없이 다시 켤 때만).
   - 3·4·5의 판단, 중복 호출 줄이기, 공식 호출 잠깐 붙잡기는 `TbtGate.java`에 따로 두고 `tests/mod-test.sh`가 PC에서 돌립니다(`tests/tools/TbtGateTest.java`. 붙잡기는 가짜 시계·대기로, 깨우기는 실제 스레드 둘로 테스트).
   - KP 2.4.10에서 더해진 곧 회전 그림 판단(아래 "가져온 것과 바꾼 것"), `CpIcons`, 곧 회전 거리(`near()`를 직접 불러 일반 600 m·나갈 때 650 m·고속도로 출구 1,050 m, `dynamicD`·`bar`)는 `tests/tools/NearFitTest.java`로 돌립니다. `hooks/src` 전체를 `scripts/build-hooks.sh`와 같은 클래스 경로로 컴파일해야 해서, `HMGAPI_SRC`와 `ANDROID_HOME`이 있을 때만 돕니다(없으면 skip 줄에 나옴).
-- **설정:** `kor_tbt`를 끄면 위 일을 하나도 하지 않아 공식 모드 그대로입니다. `kor_tbt_log`는 KP의 진단 줄(곧 회전 판단의 차로 수·거리·D, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)과 보낸 HUD 목록 줄(`CarPlay: hud list …`, 시작마다 300줄까지, #77. 공식 모드도 자기 것을 남김), 붙잡은 공식 호출 줄(`… from the official mod held N ms, …`, 길안내·연결마다 100줄, 한 지점 20줄까지, 위 "공식 호출 잠깐 붙잡기")을 HMG-API 기록에 더 남깁니다. 2.1.2-beta.2부터 기본으로 끕니다(2026-11-26 사용자 결정, #77: 켜고 끄는 설정으로 두고 기본은 끔). 기록이 필요하면 HMG-API 앱의 NX4 KOR 설정에서 켜고 다시 시작합니다. HMG-API 앱은 설정 하나를 바꿀 때 그 모드의 모든 값을 함께 저장하므로, 2.1.2-beta.1까지 설정을 바꾼 적이 있는 차는 켜진 채 남습니다(그때의 기본이 켬). 꺼도 받은 안내의 숫자 줄(`CarPlay: maneuver type … side … junction … exit …`, 시작마다 300줄까지), 길안내 앱이 바뀐 줄(`route guidance source changed from <앱> to <앱>`), 지운 줄(`turn-by-turn cleared`)은 남습니다. 길 이름·장소 이름은 어느 쪽이든 남기지 않습니다. 줄 머리는 공식 모드처럼 `CarPlay:`이고, HMG-API 앱 기록에서 출처가 `nx4-kor`로 나옵니다.
+- **설정:** `kor_tbt`를 끄면 위 일을 하나도 하지 않아 공식 모드 그대로입니다. `kor_tbt_far_big`(기본 켬)을 끄면 먼 회전을 KP처럼 네모 칸 아이콘으로 보냅니다(아래 "먼 회전도 큰 그림"). `kor_tbt_log`는 KP의 진단 줄(곧 회전 판단의 차로 수·거리·D, 계기판에 보낸 값, 차선, 처음 본 길안내 앱 이름)과 보낸 HUD 목록 줄(`CarPlay: hud list …`, 시작마다 300줄까지, #77. 공식 모드도 자기 것을 남김), 붙잡은 공식 호출 줄(`… from the official mod held N ms, …`, 길안내·연결마다 100줄, 한 지점 20줄까지, 위 "공식 호출 잠깐 붙잡기")을 HMG-API 기록에 더 남깁니다. 2.1.2-beta.2부터 기본으로 끕니다(2026-11-26 사용자 결정, #77: 켜고 끄는 설정으로 두고 기본은 끔). 기록이 필요하면 HMG-API 앱의 NX4 KOR 설정에서 켜고 다시 시작합니다. HMG-API 앱은 설정 하나를 바꿀 때 그 모드의 모든 값을 함께 저장하므로, 2.1.2-beta.1까지 설정을 바꾼 적이 있는 차는 켜진 채 남습니다(그때의 기본이 켬). 꺼도 받은 안내의 숫자 줄(`CarPlay: maneuver type … side … junction … exit …`, 시작마다 300줄까지), 길안내 앱이 바뀐 줄(`route guidance source changed from <앱> to <앱>`), 지운 줄(`turn-by-turn cleared`)은 남습니다. 길 이름·장소 이름은 어느 쪽이든 남기지 않습니다. 줄 머리는 공식 모드처럼 `CarPlay:`이고, HMG-API 앱 기록에서 출처가 `nx4-kor`로 나옵니다.
 - **가져온 것과 바꾼 것**(`NOTICE.md`):
   - KP `StopDragon/HMG-API` `korea-build` `ebca56f`(무선 모드 2.4.10, Korea Projection 1.8.1): `CpTurnsFit.java`·`CpTbt.java`(그대로, 패키지·로그만 바꿈), `CpTurns.java`의 `exactIcon`·`distStrState`(`CpIcons.java`). `CpTurnsFit`의 seogaemo 출처 줄은 그대로 둡니다. 처음(2026-11-25)에는 `6258357`(2.4.9)에서 가져왔고, 2026-11-26에 2.4.10에서 다시 가져왔습니다.
   - 2.4.10에서 더해진 카플레이 곧 회전 그림(KP도 차에서 아직 확인하지 않음):
@@ -109,6 +109,14 @@
     - 각도를 주지 않는 진입 램프(종류 9)는 직진 대신 순정 오른쪽 진입 모양(13, 22.5도). iAP2가 램프가 어느 쪽인지 주지 않아 왼쪽 램프도 이 모양입니다.
     - 기록 줄에 표시 거리 문자열의 유무·단위(`dist str N units U`, 문자열 자체는 남기지 않음).
   - **곧 회전 거리(2026-11-26 사용자 결정, 2.1.2-beta.4):** 일반 도로에서 큰 도로 그림·거리 막대("곧 회전" 화면)를 여는 거리 `D_GENERAL`을 KP의 350 m에서 600 m로 늘렸습니다. 그 밖에서는 계기판에 네모 칸 아이콘(먼 회전, 프로젝션 아이콘 번호)이 나와 투박하다는 사용자 의견 때문입니다. 고속도로 출구 1,050 m와, 처음 받은 거리가 더 짧으면 D를 그만큼 줄이는 규칙(`dynamicD`)은 그대로입니다. 근거는 다른 프로젝트의 값입니다: 서개모가 기아 NEEV KOR에서 본 순정 창 150~600 m(시내 150~375 m, 고속도로 580~600 m, 서개모 `.agents/cluster-ar-view.md`), 공식 모드 457 m(`GUIDE_WINDOW`), `HMG_Phone_Projection_TBT` 기본 400 m. 일반 회전에서 본 순정 최대 375 m보다는 깁니다. 막대(10~90)는 600 m에 걸쳐 더 천천히 줄어듭니다. KP·서개모·JMK 모두 먼 회전은 아이콘이고, 먼 회전까지 큰 그림으로 보낸 프로젝트는 없습니다.
+  - **먼 회전도 큰 그림(2026-11-27 사용자 결정, [#89](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/89), 설정 `kor_tbt_far_big` 기본 켬):** 2.1.2-beta.5 주행 뒤 사용자 의견은 두 가지였습니다. 먼 회전 칸(네모 아이콘)은 큰 의미가 없고, 회전이 바뀔 때 그 칸이 잠깐 끼는 깜빡임이 보인다는 것입니다. 그래서 KP와 다르게 바꿨습니다.
+    - **D 밖의 회전:** 곧 회전과 같은 큰 그림에 막대를 가득 찬 채(90, `BAR_FULL`)로 보냅니다. D(일반 600 m, 고속도로 출구 1,050 m)부터 막대가 지금처럼 줄어듭니다. 진단 줄은 `-> near (far-big)`입니다. 들어가고 나가는 히스테리시스(`nearOn`)는 그대로입니다. 그림이 같고 막대만 90이라 경계에서 모양이 바뀌지 않습니다.
+    - **회전이 바뀌는 순간(네이버 지도 꼴):** 새 회전의 첫 거리가 앞 회전 값과 같아 미루는 그 한 번(`put-off`)은 먼 회전 칸 대신 계기판을 그대로 둡니다. 이미 그린 것이 있을 때만이고, 뛴 거리 붙잡기(`jump-hold`)와 같은 길(`nearHeld`)입니다. 진단 줄은 `-> held (put-off)`입니다. 그 뒤 폰의 다음 갱신 전에 1초 다시 보내기가 묵은 거리로 다시 물으면(`stale-dist`), 새 회전의 큰 그림을 막대 90으로 보냅니다(거리 숫자는 다음 갱신까지 앞 회전 값).
+    - **같은 회전에서 거리가 뛸 때(카카오내비 꼴):** 뛴 값이 D 밖이어도 한 번 붙잡습니다(`staysNear`). 앞 회전 그림을 새 거리로 다시 그리지 않으려는 것입니다.
+    - **아이콘 그대로:** 큰 그림이 없는 종류(목적지·경유지·출발·페리, `type`)와 폰이 거리를 한 번도 주지 않은 때(`no-dist`)입니다.
+    - **남는 것:** 묵은 짧은 거리를 받아들인 큰 그림(`d 30`, 막대 20~40)이 한 번 나갔다가 진짜 거리로 다시 그려지는 일은 그대로입니다(같은 큰 그림 안에서 막대가 뜀).
+    - **끄면:** KP 그대로(D 밖은 먼 회전 칸, 미루기·묵은 거리도 먼 회전 칸)입니다. 클래스의 기본값은 KP 쪽(`farBig` false)이고, `KorTbt`가 설정에서 켭니다.
+    - **근거·테스트:** 2.1.2-beta.5 로그(#64). `NearFitTest`의 farBig 경우를 봅니다(2,400 m·5,000 m의 막대 90, 600 m부터 그대로, 목적지·거리 없음은 아이콘, 미루기 붙잡기, 묵은 거리의 그림, 뛴 거리 붙잡기, 끄면 KP).
   - KP 2.4.10은 진단 줄 한도를 300에서 1200으로 올렸지만 이 모드는 300으로 둡니다(PR #74). `kor_tbt_log`를 켜면 그 줄이 쌓이고, HMG-API 앱 Logs 탭은 공식 모드와 함께 쓰는 `log.log`의 마지막 64KB만 보여 주기 때문입니다.
   - `PhoneBarOut`은 아무것도 보내지 않습니다. KP는 곧 회전 막대를 순정 내비 쪽 `TrapBar` 훅으로 방송했지만, 그 훅은 선언하지 않은 원시 훅이라 가져오지 않았습니다.
   - KP의 순정 층 `CpTurns`(설정 `tbt_fit` 끔)와 무선 전환 뒤 다시 요청 `RgAsk`는 가져오지 않았습니다(무선 전환 뒤 다시 요청은 공식 모드가 함).
@@ -403,6 +411,13 @@ adb shell "hmgapid sh 'sh /data/hmgapi/mods/nx4-kor/bin/uninstall.sh'"
     - **새로 생기는 동작:** 앞 회전을 지나자마자 다음 회전이 350~600 m 앞이면, 이제 바로 큰 그림(막대 90)으로 시작합니다(그 전에는 350 m까지 먼 회전 칸). 자연스러운지 봅니다
     - **전부터 있던 동작이 600 m까지 넓어짐:** 네이버 지도에서 두 곧 회전 사이에 미루기(`put-off`, 새 회전의 첫 거리를 앞 회전 값으로 보고 한 번 미룸)로 먼 회전 칸이 약 1초 끼는 일이, 전에는 다음 회전이 350 m 안일 때만이었고 이제 600 m 안이면 생깁니다. 자주 보이면 `CarPlay diag: … -> far (put-off)` 줄을 #67에 적습니다
     - 가까운 두 회전이 이어질 때 그림이 번갈아 바뀌지 않는지(위 네이버 지도의 약 1초 먼 회전 칸 말고)
+    - 600 m 확인 결과(2.1.2-beta.5, 2026-11-27, #64): 600 m에서 바로 큰 그림, 앞 회전 직후에도 바로 큰 그림, 막대 60 m마다 한 칸. 회전이 바뀔 때 잠깐 깜빡임이 보여 아래 "먼 회전도 큰 그림"으로 이어졌습니다
+  - **먼 회전도 큰 그림**(`kor_tbt_far_big` 켬, [#89](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/89)). 결과는 #89에 적습니다. 위 600 m 항목의 "먼 회전"·"먼 회전 칸"은 이 설정을 끈 때의 일입니다.
+    - 600 m(고속도로 출구 1,050 m)보다 먼 회전에 네모 칸 아이콘 대신 큰 도로 그림이 나오는지. 그 그림에서 거리가 km 단위("2.4 km")로 맞게 보이는지. 진단 줄은 `-> near (far-big)`입니다
+    - 막대가 가득 찬 채로 있다가 600 m부터 한 칸씩 줄어드는지
+    - 회전이 바뀔 때 네모 칸 아이콘이 잠깐 끼던 깜빡임이 없어졌는지(`-> held (put-off)`, `-> near (stale-dist)` 줄)
+    - 목적지·경유지에서는 아이콘 그대로인지
+    - 설정을 끄고 다시 시작하면 예전처럼 먼 회전 칸이 나오는지
   - KP 2.4.10에서 더해진 곧 회전 그림(2.1.2-beta.2부터): 회전교차로 앞에서 순정 회전교차로 큰 그림(32)이, 지하차도로 들어가는 회전에서 지하차도 그림(46)이, 왼쪽으로 올라가는 고가에서 고가 그림(44)이 나오는지. 각도를 주지 않는 앱(애플 지도·네이버 지도)에서 고속도로 진입로가 직진 대신 오른쪽 갈림 모양으로 나오는지. 다르게 나오면 그때의 `CarPlay: maneuver type …`·`CarPlay: near layout display …` 줄을 #67에 적습니다. 아래는 바뀌지 않는 것이 맞습니다:
     - 회전교차로에 들어갈 때(종류 6)나 폰이 출구 각도를 주지 않을 때: 출구 아이콘 그대로
     - 왼쪽 진입 램프: 오른쪽 갈림 모양(폰이 램프 쪽을 주지 않음)
