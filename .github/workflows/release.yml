@@ -286,7 +286,9 @@ jobs:
         run: |
           set -eu
           sh scripts/driver-source.sh "out/hmgapi-nx4-kor-$V-driver-source.tar.gz"
-          tar -tzf "out/hmgapi-nx4-kor-$V-driver-source.tar.gz" | grep -q '^hmgapi-nx4-kor-driver-source/SOURCE.txt$' \
+          # 목록을 파일로 받은 뒤 찾는다(파이프로 grep -q에 물리면 grep이 먼저 끝나 tar가 SIGPIPE로 죽고 pipefail에 걸림, PR #101 리뷰 1)
+          tar -tzf "out/hmgapi-nx4-kor-$V-driver-source.tar.gz" > "$RUNNER_TEMP/driver-source.list"
+          grep -qx 'hmgapi-nx4-kor-driver-source/SOURCE.txt' "$RUNNER_TEMP/driver-source.list" \
             || { echo "::error::대응 소스 묶음에 SOURCE.txt가 없습니다"; exit 1; }
 
       # secret은 화면에 내지 않는다(set -x 금지). 파일은 umask 077, 러너 임시 폴더, 마지막 step에서 지운다
@@ -410,7 +412,7 @@ jobs:
             echo "- 공식 무선 모드: wireless-carplay-aa $WIRELESS_VER (USB 묶음에 함께, 고치지 않음)"
             echo "- 동글 드라이버(md5):$DRVSUM"
             echo '```'
-            (cd out && sha256sum "hmgapi-nx4-kor-$V.zip" "hmgapi-nx4-kor-$V-usb.zip")
+            (cd out && sha256sum "hmgapi-nx4-kor-$V.zip" "hmgapi-nx4-kor-$V-usb.zip" "hmgapi-nx4-kor-$V-driver-source.tar.gz")
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

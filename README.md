@@ -298,6 +298,7 @@ cp mod/icons/icon_night.png app/res/drawable-night-hdpi/ic_launcher.png
 
 - 다른 프로젝트에서 가져온 부분과 원저작권, 이 저장소에서 바꾼 것은 [`NOTICE.md`](NOTICE.md)에 있습니다.
 - 모드에 함께 넣는 `bin/busybox`는 별개 프로그램이며 **GPL-2.0**입니다. 출처와 대응 소스는 [`NOTICE.md`](NOTICE.md#busybox-gpl-20)에 있습니다.
+- 모드에 함께 넣는 USB Wi-Fi 동글 드라이버(`drivers/<드라이버>/bcmdhd.ko`)와 그 패치·빌드 스크립트(`drivers/`)는 **GPL-2.0**입니다. 출처는 [`NOTICE.md`](NOTICE.md#usb-wi-fi-동글-드라이버-drivers-gpl-20)에, 대응 소스 묶음은 판마다 릴리스 자산 `hmgapi-nx4-kor-<판>-driver-source.tar.gz`로 냅니다.
 
 ## 바탕이 된 프로젝트
 

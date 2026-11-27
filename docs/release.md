@@ -40,7 +40,7 @@
    - 세 파일의 SHA-256
    - 자동 변경 목록
 
-PC에서 `.env.local`의 키로 `sh scripts/build.sh`를 돌려 만드는 길도 그대로 있습니다(`git-flow.md` 규칙 7).
+PC에서 `.env.local`의 키로 `sh scripts/build.sh`를 돌려 만드는 길도 그대로 있습니다(`git-flow.md` 규칙 7). 동글 드라이버를 넣은 PC 묶음을 남에게 줄 때는 릴리스 자산이 없으므로, 같은 커밋에서 `sh scripts/driver-source.sh <파일>`로 대응 소스 묶음(GPL-2.0)을 만들어 함께 줍니다.
 
 ### 모드가 아닌 릴리스(`src-*`)
 

@@ -109,3 +109,4 @@ NEMESIS가 깔린 차
   NX4/legacy-2.0은 이 저장소의 태그 v2.0.4-beta.1에 있는 파일 그대로입니다(같은 대응 소스, 그 폴더의 SOURCE).
   공식 무선 모드(VysseCodes, AGPL-3.0)는 고치지 않고 넣었습니다. 판과 대응 소스는 WIRELESS-SOURCE.txt를 보세요.
   busybox(GPL-2.0)를 함께 넣었으면 BUSYBOX-LICENSE.txt, HMG-API를 함께 넣었으면 HMGAPI-SOURCE.txt를 보세요.
+  USB Wi-Fi 동글 드라이버(NX4/install의 모드 zip 안 drivers/, GPL-2.0)를 넣었으면 전문과 대응 소스는 그 폴더의 COPYING·SOURCE.txt를 보세요.

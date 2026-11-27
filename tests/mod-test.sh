@@ -2025,11 +2025,22 @@ for r in a b; do
 done
 dsrun() { (env NX4_DRVSRC_RTL88X2BU_GIT=$DS/a NX4_DRVSRC_RTL88X2BU_COMMIT=$(cat $DS/a.c1) NX4_DRVSRC_RTL8831BU_GIT=$DS/b NX4_DRVSRC_RTL8831BU_COMMIT=$(cat $DS/b.c1) "$@" sh $B/scripts/driver-source.sh $DS/out/src.tar.gz) > $DS/run.out 2>&1; echo $? > $DS/run.rc; }
 dsrun
-if [ -z "$(cd $B && git status --porcelain -- drivers scripts/build-driver.sh)" ]; then
+if [ -z "$(cd $B && git status --porcelain -- drivers scripts/build-driver.sh scripts/local-env.sh)" ]; then
   rm -rf $DS/x; mkdir -p $DS/x; tar -xzf $DS/out/src.tar.gz -C $DS/x 2>/dev/null
   DR=$DS/x/hmgapi-nx4-kor-driver-source
   check "driver-source.sh: 원본 드라이버 둘을 고정 커밋 그대로(그 뒤 커밋이 아님), 이 저장소의 drivers/·build-driver.sh(지금 커밋), SOURCE.txt(원본 주소·커밋, 저장소 커밋, 커널 소스 자산·kernel.org·툴체인의 sha256, 빌드 방법)" \
     '[ "$(cat $DS/run.rc)" = 0 ] && grep -qx "/\* src a \*/" $DR/rtl88x2bu-$(cat $DS/a.c1)/x.c && grep -qx "/\* src b \*/" $DR/rtl8831bu-$(cat $DS/b.c1)/x.c && cmp -s $DR/nx4-kor/drivers/rtl88x2bu/0002-nx4-hal.diff $B/drivers/rtl88x2bu/0002-nx4-hal.diff && cmp -s $DR/nx4-kor/drivers/COPYING $B/drivers/COPYING && cmp -s $DR/nx4-kor/scripts/build-driver.sh $B/scripts/build-driver.sh && grep -q "커밋 $(cat $DS/a.c1) 그대로" $DR/SOURCE.txt && grep -q "hmgapi-nx4-kor 커밋 $(cd $B && git rev-parse HEAD) 의 drivers/" $DR/SOURCE.txt && grep -q "$(. $B/drivers/inputs.sh; echo $MOBIS_SRC_SHA256)" $DR/SOURCE.txt && grep -q "$(. $B/drivers/inputs.sh; echo $KERNEL_SHA256)" $DR/SOURCE.txt && grep -q "$(. $B/drivers/inputs.sh; echo $TOOLCHAIN_SHA256)" $DR/SOURCE.txt && grep -q "sh scripts/build-driver.sh" $DR/SOURCE.txt' || { cat $DS/run.out; ls -R $DS/x | head -30; }
+  # 묶음만으로 빌드할 수 있게: build-driver.sh가 읽는 local-env.sh, .ko에 들어가는 빌드 날짜·시각(build-driver.sh와 같은 값, PR #101 리뷰 2)
+  DST=$(cd $B && git log -1 --format=%ct -- drivers scripts/build-driver.sh)
+  DSD=$(LC_ALL=C TZ=UTC date -r "$DST" '+%b %e %Y' 2>/dev/null || LC_ALL=C TZ=UTC date -d "@$DST" '+%b %e %Y')
+  DSH=$(LC_ALL=C TZ=UTC date -r "$DST" '+%H:%M:%S' 2>/dev/null || LC_ALL=C TZ=UTC date -d "@$DST" '+%H:%M:%S')
+  check "  묶음에 build-driver.sh가 읽는 local-env.sh와 .ko의 빌드 날짜·시각(BUILD_DATE·BUILD_TIME, drivers/를 마지막으로 바꾼 커밋 시각 UTC)" \
+    'cmp -s $DR/nx4-kor/scripts/local-env.sh $B/scripts/local-env.sh && grep -qF "BUILD_DATE=\"$DSD\" BUILD_TIME=\"$DSH\"" $DR/SOURCE.txt' || grep -n BUILD_ $DR/SOURCE.txt
+  # 릴리스 워크플로의 SOURCE.txt 확인 줄을 그대로 꺼내 만든 묶음에 bash -eo pipefail로 돌린다(build job과 같은 셸, PR #101 리뷰 1)
+  sed -n '/tar -tzf "out\/hmgapi-nx4-kor-\$V-driver-source.tar.gz"/,/::error::대응 소스 묶음에 SOURCE.txt가 없습니다/p' $B/.github/workflows/release.yml > $DS/wfcheck.sh
+  rm -rf $DS/wf; mkdir -p $DS/wf/out $DS/wf/tmp; cp $DS/out/src.tar.gz $DS/wf/out/hmgapi-nx4-kor-9.9.9-driver-source.tar.gz
+  (cd $DS/wf && V=9.9.9 RUNNER_TEMP=$DS/wf/tmp bash -eo pipefail $DS/wfcheck.sh) > $DS/wf.out 2>&1; echo $? > $DS/wf.rc
+  check "  릴리스 워크플로의 SOURCE.txt 확인 줄이 pipefail 셸에서 만든 묶음을 통과시킴" '[ -s $DS/wfcheck.sh ] && [ "$(cat $DS/wf.rc)" = 0 ]' || { cat $DS/wfcheck.sh; cat $DS/wf.out; }
 else
   check "driver-source.sh: drivers/에 커밋하지 않은 수정이 있으면 만들지 않음(묶음이 커밋과 달라짐)" '[ "$(cat $DS/run.rc)" != 0 ] && grep -q "커밋하지 않은 수정이 있습니다" $DS/run.out && [ ! -f $DS/out/src.tar.gz ]' || cat $DS/run.out
 fi
@@ -2037,6 +2048,8 @@ dsrun NX4_DRVSRC_RTL8831BU_COMMIT=0123456789abcdef0123456789abcdef01234567
 check "  원본 저장소에 고정 커밋이 없으면 만들지 않음" '[ "$(cat $DS/run.rc)" != 0 ] && grep -q "커밋 0123456789abcdef0123456789abcdef01234567이 없습니다\|커밋하지 않은 수정이 있습니다" $DS/run.out' || cat $DS/run.out
 check "  릴리스 워크플로가 이 묶음을 만들어(SOURCE.txt 확인) 넘기고 릴리스 자산으로 올림, 모드의 drivers/SOURCE.txt가 그 자산을 가리킴" \
   'grep -q "sh scripts/driver-source.sh \"out/hmgapi-nx4-kor-\$V-driver-source.tar.gz\"" $B/.github/workflows/release.yml && grep -q "nx4/out/hmgapi-nx4-kor-\${{ needs.check.outputs.version }}-driver-source.tar.gz" $B/.github/workflows/release.yml && grep -q "gh release create \"\$TAG\" \"\$F1\" \"\$F2\" \"\$F3\"" $B/.github/workflows/release.yml && grep -q "hmgapi-nx4-kor-\$V-driver-source.tar.gz" $B/scripts/build.sh'
+check "  SOURCE.txt 확인은 목록을 파일로 받은 뒤 찾음(tar | grep -q는 pipefail에서 SIGPIPE로 멈춤, PR #101 리뷰 1), PC 빌드의 SOURCE.txt는 driver-source.sh로 만들어 함께 주라고 적음" \
+  '! grep -q "tar -tzf .*| *grep" $B/.github/workflows/release.yml && grep -q "tar -tzf \"out/hmgapi-nx4-kor-\$V-driver-source.tar.gz\" > " $B/.github/workflows/release.yml && grep -q "릴리스가 아닌 PC 빌드면" $B/scripts/build.sh'
 # --- scripts/qemu-dongle-test.sh(docs/qemu-dongle-test.md): QEMU에서 동글 테스트. 진짜 빌드·QEMU는 동글과 Docker가 있는 PC에서만
 # 돌린다. 여기서는 인자·멈춤, 가짜 docker로 빌드 두 단계(같은 볼륨·이미지, 이 테스트 폴더, 드라이버), 가짜 qemu로 넘기는 인자와 기록을 본다
 QX=$T/qx; mkdir -p $QX/bin $QX/noqemu $QX/out
