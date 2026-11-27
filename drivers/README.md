@@ -231,7 +231,9 @@ docker context use colima
 - HAL이 올릴 때 dmesg에 `Unknown symbol`이 없는지(두 드라이버, 빌드의 커널 심볼 확인이 못 잡는 설정 차이)
 - 순정 HAL이 주는 insmod 인자와 `bcmdhd` 매개변수 이름(`dongle/wifi-strings.txt`)
 - HAL이 우리 `.ko`를 받는지: `mac_address_read`가 없어도 HAL이 Wi-Fi를 켜는지(`wifi_check_module_info`, WifiHW logcat)
-- 국가 코드: 기본 KR로 올린 드라이버의 5GHz 채널(`iw phy`의 `no IR`), netd가 만드는 `hostapd.conf`의 `country_code` 줄(비밀번호가 든 파일이라 그 줄만), 순정 `bcmdhd.cal`의 `ccode` 줄. RTL88x2BU 동글은 QEMU로도 보지 못했으므로 차에서 5GHz 149번 AP가 서는지와 dmesg의 채널 계획 줄(`hal_com_config_channel_plan`, 디버그 빌드가 아니면 안 찍힐 수 있음)
+- 국가 코드: 기본 KR로 올린 드라이버의 5GHz 채널(`iw phy`의 `no IR`), netd가 만드는 `hostapd.conf`의 `country_code` 줄(비밀번호가 든 파일이라 그 줄만), 순정 `bcmdhd.cal`의 `ccode` 줄
+  - 드라이버가 쓰는 국가 코드와 채널 계획: `/proc/net/<드라이버 이름>/wlan0/country_code`, `chan_plan`. 폴더 이름은 모듈 이름(`bcmdhd`)이 아니라 드라이버의 `DRV_NAME`입니다(RTL88x2BU `rtl88x2bu`, RTL8831BU `rtl8851bu`, 두 드라이버 모두 `CONFIG_PROC_DEBUG = y`). dmesg의 채널 계획 줄(`RTW_PRINT`)은 디버그 로그를 끈 우리 빌드에서는 찍히지 않습니다(PR #97 리뷰 3).
+  - RTL88x2BU 동글은 QEMU로도 보지 못했으므로 차에서 5GHz 149번 AP가 서는지
 - HAL이 바꿔 둔 `bcmdhd.ko`를 올렸을 때 `wlan0`이 생기고 HMG-API가 AP를 띄우는지(149번 채널 포함)
 - RTL8831BU 동글을 꽂았을 때 USB ID(`0bda:b831`)와 이 드라이버가 붙는지, `wlan0`과 AP(149번 채널 포함). 동글이 실제로 RTL8831BU인지는 `lsusb` ID로 확인합니다(RTL8851BU `0bda:b851`도 이 드라이버가 받음)
 - 보호 패치(두 드라이버): 쓰는 중에 동글을 뽑아도 내비가 멈추지 않는지, Wi-Fi를 끄고 켜도 되는지, 수신 오류로 멈춘(`nx4-protect: … rx stopped`) 뒤 Wi-Fi를 끄고 켜면 AP가 돌아오는지, dmesg의 `nx4-protect:` 줄
