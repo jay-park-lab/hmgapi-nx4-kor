@@ -25,7 +25,7 @@ USB로 설치하다 멈추거나, 설치 뒤 관리 앱이 빨강·노랑일 때
 |---|---|---|
 | USB `NX4/install.log` | NX4 KOR 설치기가 한 일. 누를 때마다 아래에 이어 씁니다(앞의 시도도 남음). 이번 시도는 **맨 아래**, 마지막 "NX4 KOR USB 설치기 시작" 줄부터입니다 | 아니오 |
 | USB `HMGAPI/install.log` | HMG-API 설치기가 한 일 | 아니오 |
-| USB `NX4/diag/<시각>/` | 누를 때 뜨는 확인 창에서 [모으기]를 고르면, 설치기가 아무것도 바꾸기 전에 모은 진단 기록. 아래 adb 줄의 기록(`logs/`), HMG-API Car Report와 상태, `/system/lib` 파일의 이름·md5, 내비 판, 동글 준비 정보(커널 설정·USB 장치, `dongle/`), 순정 iAP2 라이브러리 사본(`iap2/`, 차선 안내 원인 [#90](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/90)) 등입니다. 담는 것은 [`design.md`](design.md) "진단 기록". 기록을 이슈에 올릴 때 `iap2/`는 순정 바이너리이므로 빼 주세요 | 아니오 |
+| USB `NX4/diag/<시각>/` | 누를 때 뜨는 확인 창에서 [모으기]를 고르면, 설치기가 아무것도 바꾸기 전에 모은 진단 기록. 아래 adb 줄의 기록(`logs/`), HMG-API Car Report와 상태, `/system/lib` 파일의 이름·md5, 내비 판, 동글 준비 정보(커널 설정·USB 장치, `dongle/`), 순정 iAP2 라이브러리·앱 사본과 관련 파일 목록(`iap2/`, 차선 안내 원인 [#90](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/90)) 등입니다. 담는 것은 [`design.md`](design.md) "진단 기록". 기록을 이슈에 올릴 때 `iap2/`는 순정 바이너리이므로 빼 주세요 | 아니오 |
 | 관리 앱 화면 | 오른쪽 칸의 판정·안내와 왼쪽 칸의 요약·상태표. 사진으로 남겨 두면 좋습니다. 앱 메뉴의 NX4 KOR 타일로 엽니다. 타일이 없으면(HMG-API 훅이 꺼졌거나, HMG-API가 이 모드의 훅을 거절함) 같은 USB로 Update OTA를 다시 누릅니다(다시 설치하지 않고 관리 앱만 엶) | 아니오 |
 | `/data/nx4-kor/logs/ap.log` | 관리 앱 감시자([지금 재부팅] 요청)의 기록 | 예 |
 | `/data/hmgapi/logs/hmgapi/wifi.log` | HMG-API가 무선 연결용 Wi-Fi(프로젝션 AP)를 띄운 기록(`projection AP: …` 줄). 2.1.2-beta.4부터 USB 진단 기록의 `logs/hmgapi-wifi.log` | 예 |

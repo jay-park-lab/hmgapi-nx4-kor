@@ -875,18 +875,24 @@ check "USB 설치기 진단 기록(#90): 이름에 iap2가 든 라이브러리·
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "apk·odex가 없음" $(dg)/iap2/none.txt && [ -f $(dg)/iap2/README.txt ] && [ ! -f $(dg)/iap2/failed.txt ] && grep -q "이름에 iap2가 든 순정 라이브러리·앱이 없음(iap2/none.txt)" $K/install.log'
 check "USB 설치기 진단 기록(동글 준비): busybox가 없어도 커널 설정(config.gz)은 복사하고, md5·문자열이 빠졌다고 적음" \
   'cmp -s $R/proc/config.gz $(dg)/dongle/config.gz && [ ! -f $(dg)/dongle/config.txt ] && grep -q "busybox가 없음" $(dg)/dongle/config-sum.txt && grep -q "busybox가 없어" $(dg)/dongle/system-wifi-md5.txt && grep -q "0bda:b812" $(dg)/dongle/usb.txt'
-# PR #95 리뷰 4: 읽을 수 없는 iAP2 라이브러리(복사 실패)는 덜 쓴 사본을 남기지 않고 failed.txt와 기록에 남김
-echo bad > $R/system/lib/libIAP2bad.so; chmod 000 $R/system/lib/libIAP2bad.so
+# PR #95 리뷰 4·6: 도중에 실패한 iAP2 라이브러리 복사(USB가 꽉 찬 때 등)는 덜 쓴 사본을 지우고 failed.txt와 기록에 남김.
+# 이 회만 가짜 cp가 libIAP2bad.so(대문자 이름) 복사에서 사본을 반쯤 쓰고 실패한다. 다른 복사는 진짜 cp로 넘긴다
+echo bad > $R/system/lib/libIAP2bad.so
+cat > $T/bin/cp <<'CPEOF'
+#!/bin/sh
+case "$1" in
+  */libIAP2bad.so) _d=$2; [ -d "$_d" ] && _d=$_d/libIAP2bad.so; echo partial > "$_d"; exit 1 ;;
+esac
+exec /bin/cp "$@"
+CPEOF
+chmod 755 $T/bin/cp
 rm -f $R/proc/config.gz; rm -rf $K/diag; ts $U
+rm -f $T/bin/cp
 check "USB 설치기 진단 기록(동글 준비): /proc/config.gz가 없으면 그렇다고 적고 설치기는 그대로 끝남" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "config.gz 없음" $(dg)/dongle/config-sum.txt && grep -q "/proc/config.gz가 없음" $K/install.log'
-if [ -r $R/system/lib/libIAP2bad.so ]; then
-  echo "skip 진단 기록(#90) 복사 실패 테스트: root라 권한 000 파일도 읽힘"
-else
-  check "USB 설치기 진단 기록(#90): 복사하지 못한 파일(대문자 이름 libIAP2bad.so)은 사본을 남기지 않고 failed.txt·기록에 적음(none.txt 없음)" \
-    '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx /system/lib/libIAP2bad.so $(dg)/iap2/failed.txt && [ ! -e $(dg)/iap2/libIAP2bad.so ] && [ ! -f $(dg)/iap2/none.txt ] && grep -q "iAP2 파일 1개를 복사하지 못함(iap2/failed.txt)" $K/install.log' || ls -la $(dg)/iap2
-fi
-chmod 644 $R/system/lib/libIAP2bad.so; rm -f $R/system/lib/libIAP2bad.so
+check "USB 설치기 진단 기록(#90): 도중에 실패한 복사(대문자 이름 libIAP2bad.so)는 덜 쓴 사본을 지우고 failed.txt·기록에 적음(none.txt 없음)" \
+  '[ "$(cat $T/ts.rc)" = 0 ] && grep -qx /system/lib/libIAP2bad.so $(dg)/iap2/failed.txt && [ ! -e $(dg)/iap2/libIAP2bad.so ] && [ ! -f $(dg)/iap2/none.txt ] && grep -q "iAP2 파일 1개를 복사하지 못함(iap2/failed.txt)" $K/install.log' || ls -la $(dg)/iap2
+rm -f $R/system/lib/libIAP2bad.so
 rm -rf $R/proc $R/sys
 # 확인 창에서 모으지 않는 경우: 진단 폴더를 만들지 않고 HMG-API 명령도 부르지 않으며, 설치기는 그대로 이어짐(같은 판: 관리 앱)
 dno() { rm -rf $K/diag; ts $U; [ "$(cat $T/ts.rc)" = 0 ] && [ ! -d $K/diag ] && ! grep -q "engine report" $T/calls && grep -q "^am start -n io.github.jayparklab.nx4kor/.StatusActivity" $T/calls && grep -q "이미 설치되어" $T/ts.out && grep -q "$1" $K/install.log; }
