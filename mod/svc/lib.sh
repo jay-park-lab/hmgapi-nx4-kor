@@ -416,10 +416,19 @@ dongle_snap() {
   echo "boot=$(boot_id)"
   for _ud in $USBDEV/*; do
     [ -r "$_ud/idVendor" ] || continue
-    echo "usb ${_ud##*/} $(cat "$_ud/idVendor" 2>/dev/null):$(cat "$_ud/idProduct" 2>/dev/null) devnum=$(cat "$_ud/devnum" 2>/dev/null) speed=$(cat "$_ud/speed" 2>/dev/null)"
+    # 붙은 드라이버: 인터페이스(<장치>:1.0 등)의 driver 링크 이름(ls로 읽음, readlink가 없는 툴박스도 됨)
+    _udr=
+    for _ui in "$_ud"/*:*; do
+      [ -e "$_ui/driver" ] || continue
+      _ul=$(ls -ld "$_ui/driver" 2>/dev/null); _ul=${_ul##*/}; _udr="$_udr${_udr:+,}${_ul:-?}"
+    done
+    echo "usb ${_ud##*/} $(cat "$_ud/idVendor" 2>/dev/null):$(cat "$_ud/idProduct" 2>/dev/null) devnum=$(cat "$_ud/devnum" 2>/dev/null) speed=$(cat "$_ud/speed" 2>/dev/null) driver=${_udr:-none}"
   done
   ko_on; echo "slot=${_KO:-none}"
   echo "bcmdhd=$(bcmdhd_drv) initstate=$(cat $SYSMOD/bcmdhd/initstate 2>/dev/null || echo -)"
+  echo "wlan.driver.status=$(getprop wlan.driver.status 2>/dev/null)"
+  echo "-- /proc/modules"
+  cat "$PROCMOD" 2>/dev/null
   if [ -d $SYSNET/$WIF ]; then echo "wlan0=yes flags=$(cat $SYSNET/$WIF/flags 2>/dev/null) operstate=$(cat $SYSNET/$WIF/operstate 2>/dev/null)"
   else echo "wlan0=no"; fi
   ap_on && echo "hostapd=yes" || echo "hostapd=no"
@@ -427,9 +436,16 @@ dongle_snap() {
   this_boot $HMGWIFI/ap.fail && echo "ap_fail=yes" || echo "ap_fail=no"
   this_boot $NOCHIP && echo "nochip_mark=yes" || echo "nochip_mark=no"
   dhd_gave_up && echo "dhd_gave_up=yes" || echo "dhd_gave_up=no"
-  echo "-- 커널 줄(usb·Wi-Fi, 마지막 80줄)"
-  klog 2>/dev/null | $BB grep -E 'usb|bcmdhd|rtl|RTW|nx4-|vbus|wlan|dwc_otg|DHD' | $BB tail -n 80 \
-    | $BB sed -E 's/([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}/xx:xx:xx:xx:xx:xx/g'
+  # 일련번호 줄(SerialNumber: Realtek 동글은 MAC에서 나온 값일 때가 많음)은 빼고, MAC 꼴 값은 가린다(2026-11-26 결정). 내비의
+  # busybox(1.8.1)에도 되게 grep -E·sed -E 대신 awk 정규식으로 한다(PR #100 리뷰 3)
+  echo "-- 커널 줄(usb·Wi-Fi, 마지막 80줄. 일련번호 줄 뺌, MAC 꼴 가림)"
+  klog 2>/dev/null | $BB awk '
+    /[Ss]erial[Nn]umber/ { next }
+    /usb|bcmdhd|rtl|RTW|nx4-|vbus|wlan|dwc_otg|DHD/ {
+      gsub(/[0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f]/, "xx:xx:xx:xx:xx:xx")
+      l[n++ % 80] = $0
+    }
+    END { s = n > 80 ? n - 80 : 0; for (i = s; i < n; i++) print l[i % 80] }'
 }
 
 # mod.json 꼴 파일($1, 없으면 이 모드의 mod.json)의 "version" 값. 못 읽으면 빈 값

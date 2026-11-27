@@ -45,6 +45,11 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
     static final String WATCHF = "/data/local/tmp/nx4-kor-watch.txt";
     /** [동글 켜기] 요청 파일 이름(앱 개인 폴더, #60). root 쪽(svc/lib.sh DGREQ)과 같아야 한다. 꼴은 reboot.req와 같다 */
     static final String DG_NAME = "dongle.req";
+    /**
+     * [동글 켜기] 기다림 기록(앱 개인 폴더, dongle.req와 같은 꼴). root는 요청을 받자마자 dongle.req를 지우므로, 화면을 다시 그리거나
+     * 다시 열어도 기다림을 이어 가도록 앱이 따로 남긴다. 결과가 오거나 DG_WAIT초가 지나면 지운다(PR #100 리뷰 1)
+     */
+    static final String DG_WAIT_NAME = "dongle.wait";
     /** root(svc/dongle.sh --now, 받지 않으면 status.sh --watch)가 남기는 [동글 켜기] 결과(id·boot·code·usb·drv, 644) */
     static final String DGRES = "/data/local/tmp/nx4-kor-dongle-result.txt";
 
@@ -176,7 +181,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
     @Override
     protected void onResume() {
         super.onResume();
-        if (watching || rbEl > 0) {
+        if (watching || rbEl > 0 || dgEl > 0) {
             handler.removeCallbacks(this);
             handler.postDelayed(this, 1000);
         }
@@ -418,17 +423,18 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         } else if (rbf.exists()) {
             try { rbf.delete(); } catch (Exception ignored) { }
         }
-        // 남은 [동글 켜기] 요청: 이번 부팅·DG_WAIT초 안이면 기다림을 이어 보이고(재부팅 기다림이 없을 때), 아니면 지운다
-        File dgf = new File(getFilesDir(), DG_NAME);
-        long[] dgq = Report.rbParse(read(dgf.getPath()), boot);
-        if (dgq != null && dongleBtn != null && rbEl == 0 && el >= dgq[1] && (el - dgq[1]) / 1000 < Report.DG_WAIT) {
+        // 남은 [동글 켜기] 기다림(dongle.wait): 이번 부팅·DG_WAIT초 안이면 이어 보이고, 아니면 지운다. dongle.req는 root가 받자마자
+        // 지우므로 기다림은 앱의 dongle.wait로 되살린다(PR #100 리뷰 1). 재부팅 기다림 안내가 있으면 그 안내를 덮지 않는다
+        File dgw = new File(getFilesDir(), DG_WAIT_NAME);
+        long[] dgq = Report.rbParse(read(dgw.getPath()), boot);
+        if (dgq != null && dongleBtn != null && el >= dgq[1] && (el - dgq[1]) / 1000 < Report.DG_WAIT) {
             dgEl = dgq[1]; dgId = dgq[0];
             dongleBtn.setEnabled(false);
-            showMsg(Report.DG_SENT, Ui.MSG_BG, Color.WHITE);
+            if (rbEl == 0) showMsg(Report.DG_SENT, Ui.MSG_BG, Color.WHITE);
             handler.removeCallbacks(this);
             handler.postDelayed(this, 1000);
-        } else if (dgf.exists()) {
-            try { dgf.delete(); } catch (Exception ignored) { }
+        } else if (dgw.exists()) {
+            try { dgw.delete(); } catch (Exception ignored) { }
         }
         setContentView(root);
     }
@@ -483,7 +489,10 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
      */
     void requestDongle() {
         long el = android.os.SystemClock.elapsedRealtime();
-        if (!writeText(new File(getFilesDir(), DG_NAME), Report.rbLine(el, boot))) {
+        String line = Report.rbLine(el, boot);
+        // 기다림 기록을 먼저 쓴다(root가 요청을 받아 지운 뒤에도 화면이 기다림을 이어 가게, PR #100 리뷰 1)
+        if (!writeText(new File(getFilesDir(), DG_WAIT_NAME), line) || !writeText(new File(getFilesDir(), DG_NAME), line)) {
+            try { new File(getFilesDir(), DG_WAIT_NAME).delete(); } catch (Exception ignored) { }
             showMsg(Report.DG_WRITE_FAILED, Ui.WARN, Color.BLACK);
             return;
         }
@@ -503,6 +512,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         if (ans == null && (el - dgEl) / 1000 < Report.DG_WAIT) return true;
         dgEl = 0;
         try { new File(getFilesDir(), DG_NAME).delete(); } catch (Exception ignored) { }
+        try { new File(getFilesDir(), DG_WAIT_NAME).delete(); } catch (Exception ignored) { }
         if (dongleBtn != null) dongleBtn.setEnabled(true);
         // 재부팅 기다림 중이면 그 안내를 덮지 않는다
         if (rbEl > 0) return false;

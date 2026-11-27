@@ -190,11 +190,12 @@ Wi-Fi 칩이 없는 차(NX4HEV 260902)의 무선은 USB Wi-Fi 동글로 합니�
   | 14 | `aphotspot` | AP가 일반 핫스팟 SSID(softap.conf의 S1)로 떠 있음 |
   | 15 | `ready` | AP가 떠 있음(프로젝션 AP는 카플레이 SSID S2) |
   | 16 | `wificlient` | AP 없이 Wi-Fi 클라이언트(`wpa_supplicant`, HMG-API 집 Wi-Fi 포함)가 돎. HMG-API는 이때 라디오를 건드리지 않음 |
-  | 17 | `nowifipart` | **이번 부팅에 칩이 없음**(`nochip`): `nochip` 서비스의 기록이 이번 부팅 것이거나 지금 커널 기록으로 그렇게 보이고(위 "Wi-Fi 칩이 없는 차"), 순정 핫스팟 기능이 켜짐. 그 부팅에는 칩이 올라오지 않으므로 부팅 뒤 5분(`apwait`)을 기다리지 않습니다(2.1.2-beta.4) |
-  | 18 | `apoff` | 이번 부팅에 떴다가 지금 꺼짐(`wifi/ap.boot`). `nochip` 서비스가 쓴 `ap.boot`(`nochip_mark`)는 뜬 것이 아니므로 빼고 봅니다 |
-  | 19 | `apwait` | 부팅 뒤 5분 전이고 AP가 아직 없음(`wifi/ap.fail`이 있어도). HMG-API 지기는 첫 시도가 실패하면 바로 `ap.fail`을 쓰고 다시 시도하며, 칩이 SDIO에 늦게 올라오는 첫 부팅도 있어 이 사이에는 "부품 없음"·"못 켬"으로 굳히지 않습니다. 문구는 켜는 것이 HMG-API임을 밝힙니다 |
-  | 20 | `nowifipart` | **Wi-Fi 부품이 없는 차**(17을 못 본 경우: 커널 줄이 밀려남 등): 부팅 뒤 5분이 지났고, 순정 핫스팟 기능(칩 전원)은 켜졌는데 칩이 SDIO에 한 번도 안 보였고(HMG-API `public/wifi-chip`도 없음), `wlan0`이 없고, HMG-API가 이번 부팅에 AP를 띄우지 못함(`wifi/ap.fail`만). 2026-11-23 NX4HEV 260902가 이랬습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로라 "안 됨"으로 끝내지 않고(노랑), 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다 |
-  | 21 | `apfail` | 부팅 뒤 5분이 지나도 AP를 띄우지 못함(`wifi/ap.fail`, 또는 기록 없음). USB 동글처럼 `wlan0`이 있는 차도 여기로 옵니다 |
+  | 17 | `dongleoff` | **USB Wi-Fi 동글이 꽂혔지만 켜지 않음**(2.2.0, #60): 묶음에 동글 드라이버가 있고 칩이 없는 내비(`dongle_btn=yes`)에 우리 드라이버가 받는 동글이 꽂혔는데, 그 드라이버가 순정 자리에 걸리지 않았음(부팅 뒤에 꽂음). [동글 켜기]를 안내합니다(PR #100 리뷰 4) |
+  | 18 | `nowifipart` | **이번 부팅에 칩이 없음**(`nochip`): `nochip` 서비스의 기록이 이번 부팅 것이거나 지금 커널 기록으로 그렇게 보이고(위 "Wi-Fi 칩이 없는 차"), 순정 핫스팟 기능이 켜짐. 그 부팅에는 칩이 올라오지 않으므로 부팅 뒤 5분(`apwait`)을 기다리지 않습니다(2.1.2-beta.4) |
+  | 19 | `apoff` | 이번 부팅에 떴다가 지금 꺼짐(`wifi/ap.boot`). `nochip` 서비스가 쓴 `ap.boot`(`nochip_mark`)는 뜬 것이 아니므로 빼고 봅니다 |
+  | 20 | `apwait` | 부팅 뒤 5분 전이고 AP가 아직 없음(`wifi/ap.fail`이 있어도). HMG-API 지기는 첫 시도가 실패하면 바로 `ap.fail`을 쓰고 다시 시도하며, 칩이 SDIO에 늦게 올라오는 첫 부팅도 있어 이 사이에는 "부품 없음"·"못 켬"으로 굳히지 않습니다. 문구는 켜는 것이 HMG-API임을 밝힙니다 |
+  | 21 | `nowifipart` | **Wi-Fi 부품이 없는 차**(18을 못 본 경우: 커널 줄이 밀려남 등): 부팅 뒤 5분이 지났고, 순정 핫스팟 기능(칩 전원)은 켜졌는데 칩이 SDIO에 한 번도 안 보였고(HMG-API `public/wifi-chip`도 없음), `wlan0`이 없고, HMG-API가 이번 부팅에 AP를 띄우지 못함(`wifi/ap.fail`만). 2026-11-23 NX4HEV 260902가 이랬습니다. 유선 카플레이·안드로이드 오토와 계기판 길안내는 그대로라 "안 됨"으로 끝내지 않고(노랑), 무선은 USB Wi-Fi 동글([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48))을 기다립니다 |
+  | 22 | `apfail` | 부팅 뒤 5분이 지나도 AP를 띄우지 못함(`wifi/ap.fail`, 또는 기록 없음). USB 동글처럼 `wlan0`이 있는 차도 여기로 옵니다 |
 
   - 부팅 보호의 근거는 HMG-API rc.6 이후 `core/zygote/zygote.c`입니다([#18](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/18)). 2.1.0은 HMG-API 1.1.0-rc.8 이상만 받으므로 rc.4의 규칙(`starts` 3에서 끔)은 두지 않습니다.
     - zygote가 시작할 때마다 `hook/starts`(120초를 버티지 못한 시작이 재부팅을 넘어 이어진 횟수)와 `hook/boot`(`<boot_id> <이번 커널 부팅 안의 횟수>`)를 1씩 올립니다. 올리기 전 값으로 이번 부팅 횟수가 3 이상이거나 `starts`가 6 이상이면 그 시작의 훅을 끕니다. 훅이 켜진 시작이 120초를 버티면 두 값을 지웁니다(HMG-API 설치도 지움). boot_id가 없으면 모든 시작을 한 부팅으로 셉니다.
@@ -212,10 +213,11 @@ Wi-Fi 칩이 없는 차(NX4HEV 260902)의 무선은 USB Wi-Fi 동글로 합니�
   - 2.0.x 서비스가 쓰던 상태 안내 `/data/local/tmp/nx4-kor-hint.txt`(아이폰·AA 안내)는 2.1.0에 쓰는 곳이 없습니다. 앱은 그대로 읽지만 보통 아무것도 보이지 않습니다.
 - [지금 재부팅]은 앱 개인 폴더의 `reboot.req`를 `status.sh --watch`(화면을 연 뒤 10분)가 받습니다. 설치 중(진행 기록 `run`), `/system`을 바꾸는 작업 중(HMG-API 적용·remount 등), HMG-API 부팅 보호에 걸릴 때는 거절합니다.
   - 부팅 보호 거절은 `hook/starts`가 5·6이고, 이번 시작의 watcher가 돌기 전("hooks on" 줄 시각 + 135초, 그 줄이 없으면 부팅 뒤 300초)일 때입니다. 재부팅은 새 커널 부팅이라 다음 시작의 이번 부팅 횟수는 0부터이고, `starts`가 6이면 다음 시작에, 5면 그다음 시작에 훅이 꺼지기 때문입니다. 이번 시작이 이미 꺼졌으면(커널 줄 guard, 또는 파일로 보아 꺼짐) 막지 않습니다. 앱은 "HMG-API는 내비가 켜지고 2분 안의 재부팅이 6번 이어지면 무선 기능을 끕니다."와 그 아래 줄 "3~5분 뒤에 다시 눌러 주세요."를 보입니다.
-- **[동글 켜기]**([#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60), 2.2.0): 부팅 뒤 꽂은 USB Wi-Fi 동글을 재부팅 없이 켭니다. 상태 파일의 `dongle_btn=yes`(묶음에 동글 드라이버가 있고 칩이 없는 내비)일 때만 [지금 재부팅] 위에 보조 버튼으로 보입니다. 확인 창("USB Wi-Fi 동글을 꽂은 뒤 누르세요…") 뒤 앱 개인 폴더에 `dongle.req`(꼴은 `reboot.req`와 같음)를 쓰고, `status.sh --watch`가 받아 `svc/dongle.sh --now <요청 id>`를 그 자리에서 돌립니다(위 "[USB Wi-Fi 동글](#usb-wi-fi-동글-드라이버-걸기-svcdonglesh-4880)"의 2~5를 한 번).
+- **[동글 켜기]**([#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60), 2.2.0): 부팅 뒤 꽂은 USB Wi-Fi 동글을 재부팅 없이 켭니다. 상태 파일의 `dongle_btn=yes`(묶음에 동글 드라이버가 있고 칩이 없는 내비)일 때만 [지금 재부팅] 위에 보조 버튼으로 보입니다. 확인 창("USB Wi-Fi 동글을 꽂은 뒤 누르세요…") 뒤 앱 개인 폴더에 `dongle.req`(꼴은 `reboot.req`와 같음)를 쓰고, `status.sh --watch`가 받아 `svc/dongle.sh --now <요청 id>`를 뒤에서 띄웁니다(위 "[USB Wi-Fi 동글](#usb-wi-fi-동글-드라이버-걸기-svcdonglesh-4880)"의 2~5를 한 번). 1~2분 걸리는 동안에도 감시자는 [지금 재부팅]을 받고, 두 번째 누름은 `dongle.pid`로 `busy`가 됩니다(PR #100 리뷰 2).
+  - 상태 파일 판정: 칩이 없는 내비에 동글이 꽂혔는데 그 드라이버가 순정 자리에 걸리지 않았으면 `dongleoff`("USB Wi-Fi 동글이 꽂혀 있지만 아직 켜지 않았습니다. 오른쪽 아래 [동글 켜기]를 눌러 주세요.")입니다(리뷰 4).
   - 부팅 서비스와 다른 점: 찾기는 지금부터 15초입니다. 포트 끄고 켜기는 그 장치가 붙은 지(커널 줄 시각) 20초가 안 됐을 때만 기다립니다(부팅 뒤 꽂으면 약 8초 뒤 순정이 껐다 켬). AP가 떠 있지 않으면 HMG-API 지기의 기록과 상관없이 `ApTool`로 한 번 껐다 켭니다(그때 HAL이 우리 드라이버를 올림). 순정 `bcmdhd`는 포기한 커널 줄이 링 버퍼에서 밀려났어도 nochip의 이번 부팅 칩 없음 기록이 있으면 내립니다.
-  - 결과는 `/data/local/tmp/nx4-kor-dongle-result.txt`(644: id·boot·code·usb·drv)입니다. 앱은 최대 180초 기다리며 code에 맞는 안내를 버튼 위에 보입니다. 좋은 소식(ok)은 표시만, 그 밖(아직 AP 없음, 동글 없음, 다른 것이 자리에 걸림, 실패, 오래된 요청 등)은 노란 띠입니다. 부팅 서비스가 도는 중이면(같은 부팅의 `dongle.pid`) `busy`로 답합니다.
-  - 누르기 전·뒤를 `/data/local/tmp/nx4-kor/dongle-before.txt`·`dongle-after.txt`에 남깁니다(2026-11-26 결정). USB 장치·순정 자리·`bcmdhd`·`wlan0`·`hostapd`·지기와 nochip 기록·커널 줄 일부이고, MAC 꼴 값은 가립니다. USB 진단 [모으기]가 `logs/`로 모읍니다. 줄은 `ap.log`에 남습니다.
+  - 결과는 `/data/local/tmp/nx4-kor-dongle-result.txt`(644: id·boot·code·usb·drv)입니다. 앱은 최대 180초 기다리며 code에 맞는 안내를 버튼 위에 보입니다. 기다림은 앱 개인 폴더의 `dongle.wait`(root가 지우지 않음)로 이어 가므로, 기다리는 동안 화면이 가려졌다 돌아오거나 다시 열어도 끊기지 않습니다(리뷰 1). 좋은 소식(ok)은 표시만, 그 밖(아직 AP 없음, 동글 없음, 다른 것이 자리에 걸림, 실패, 오래된 요청 등)은 노란 띠입니다. 부팅 서비스가 도는 중이면(같은 부팅의 `dongle.pid`) `busy`로 답합니다.
+  - 누르기 전·뒤를 `/data/local/tmp/nx4-kor/dongle-before.txt`·`dongle-after.txt`에 남깁니다(2026-11-26 결정). USB 장치와 붙은 드라이버·순정 자리·`bcmdhd`·`wlan.driver.status`·`/proc/modules`·`wlan0`·`hostapd`·지기와 nochip 기록·커널 줄 일부입니다. 커널 줄은 일련번호 줄을 빼고 MAC 꼴 값을 가립니다(busybox 1.8.1에도 되게 awk로, 리뷰 3). USB 진단 [모으기]가 `logs/`로 모읍니다. 줄은 `ap.log`에 남습니다.
   - "자세히" 표에는 묶음에 드라이버가 있을 때 "USB Wi-Fi 동글" 줄이 생깁니다("RTL8831BU (0bda:b831), 드라이버 걸림"·"… 안 걸림"·"안 꽂힘").
   - 하지 않는 것: AOA 가드(#60 계획 1)와 USB 다시 연결(계획 3)은 차 확인(가드 없이 꽂았을 때 동글이 먹통이 되는지) 뒤에 정합니다.
 - 진단 기록 확인 창(`DiagActivity`)은 USB 설치기가 엽니다(아래 "진단 기록"). 투명 화면 위에 확인 창만 보이고, 답을 앱 개인 폴더의 `diag.ans`에 씁니다.

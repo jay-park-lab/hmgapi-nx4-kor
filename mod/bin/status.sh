@@ -159,7 +159,7 @@ NOWIFI_MSG="이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 무�
 # 관리 앱은 상태 파일의 verdict·verdict_lv·verdict_msg를 그대로 보인다.
 # 판정 순서: HMG-API 부팅 보호 → 설치 중 → 이 모드의 차가 아님 → HMG-API 판 → 설치기가 남긴 재부팅 필요·실패 →
 # 공식 무선 모드(설치·켜짐·판) → HMG-API 훅(map) → 공식 모드의 훅 → 무선 카플레이 설정 → 무선 기능 → 프로젝션 AP 요청 →
-# 연결됨 → 다른 Wi-Fi 패키지 → AP 켜짐(준비됨·일반 핫스팟) → Wi-Fi 클라이언트 → 이번 부팅 칩 없음(Wi-Fi 부품 없음) →
+# 연결됨 → 다른 Wi-Fi 패키지 → AP 켜짐(준비됨·일반 핫스팟) → Wi-Fi 클라이언트 → USB Wi-Fi 동글 꽂힘(켜기 전) → 이번 부팅 칩 없음(Wi-Fi 부품 없음) →
 # AP 꺼짐 → 켜는 중(부팅 뒤 5분 전) → Wi-Fi 부품 없음(5분 뒤) → 못 켬.
 st_collect() {
   [ "$SC_DONE" = 1 ] && return 0
@@ -278,6 +278,10 @@ st_verdict() {
   elif [ "$K_WPA" = yes ]; then
     # 내비의 Wi-Fi 클라이언트(HMG-API 집 Wi-Fi 포함)가 켜져 있으면 HMG-API 지기는 라디오를 건드리지 않는다(Wi-Fi 칩은 하나)
     _vs wificlient 1 "내비가 일반 Wi-Fi에 접속하는 중이라 무선 연결용 Wi-Fi가 꺼져 있습니다. HMG-API 앱의 Home Wi-Fi를 쓰면 주차를 풀 때 돌아옵니다."
+  elif [ "$K_DGBTN" = yes ] && [ "$K_DG" != none ] && [ "$K_DGON" != "${K_DG#* }" ]; then
+    # USB Wi-Fi 동글(#60): 칩이 없는 내비에 우리 드라이버가 받는 동글이 꽂혔는데 그 드라이버가 순정 자리에 걸리지 않았다(부팅 뒤에 꽂음).
+    # 그대로면 nochip의 ap.boot로 HMG-API 지기가 다시 시도하지 않거나 "켜는 중"·"못 켬"에 머문다. [동글 켜기]로 안내한다(PR #100 리뷰 4)
+    _vs dongleoff 1 "USB Wi-Fi 동글이 꽂혀 있지만 아직 켜지 않았습니다. 오른쪽 아래 [동글 켜기]를 눌러 주세요."
   elif [ "$K_NOCHIP" = yes ] && k_feat com.hkmc.software.wifihotspot; then
     # 이번 부팅에 칩이 없음(nochip.sh 기록 또는 lib.sh nochip_now: 이 내비에서 칩을 본 적 없음, wlan0 없음, 순정 드라이버가 이번 부팅에 칩 켜기를
     # 포기함). 그 부팅에는 칩이 올라오지 않으므로 아래 "켜는 중"(부팅 뒤 5분)을 기다리지 않는다. 핫스팟 기능은 아래와 같이 본다
@@ -307,7 +311,7 @@ st_verdict() {
     installing) V_S1="설치: 진행 중" ;;
     reboot) V_S1="설치: 재부팅 필요" ;;
     bootguard) V_S1="설치: HMG-API 훅 꺼짐(부팅 보호)" ;;
-    ready|connected|aphotspot|wificlient|nowifipart|apoff|apfail|apwait|hooksoff) V_S1="설치: 끝남" ;;
+    ready|connected|aphotspot|wificlient|nowifipart|apoff|apfail|apwait|hooksoff|dongleoff) V_S1="설치: 끝남" ;;
     *) V_S1="설치: 안 됨(오른쪽 안내를 보세요)" ;;
   esac
   if [ "$V_CODE" = otherwifi ]; then V_S2="무선 Wi-Fi: 다른 패키지가 씀"
@@ -316,6 +320,7 @@ st_verdict() {
   elif [ "$V_CODE" = nowifipart ]; then V_S2="무선 Wi-Fi: 부품 없음(USB 동글 필요)"
   elif [ "$V_CODE" = wificlient ]; then V_S2="무선 Wi-Fi: 일반 Wi-Fi 접속 중"
   elif [ "$V_CODE" = apwait ]; then V_S2="무선 Wi-Fi: 켜는 중"
+  elif [ "$V_CODE" = dongleoff ]; then V_S2="무선 Wi-Fi: 동글 꽂힘(켜기 전)"
   else V_S2="무선 Wi-Fi: 꺼짐"; fi
   if [ "${K_CP:-0}" != 0 ]; then V_S3="폰 연결: 카플레이 ${K_CP}대 연결됨"
   else V_S3="폰 연결: 지금 연결된 폰 없음"; fi
@@ -611,10 +616,11 @@ if [ "$1" = --watch ]; then
       rb_result cmd
       fi
     fi
-    # [동글 켜기](#60): 받으면 svc/dongle.sh --now를 이 자리에서 돌린다(1~2분. 그동안 재부팅 요청은 다음 차례). 줄은 ap.log에
+    # [동글 켜기](#60): 받으면 svc/dongle.sh --now를 뒤에서 띄운다(1~2분 걸림. 그동안에도 감시자는 재부팅 요청을 받는다, PR #100 리뷰 2).
+    # 둘이 겹치지 않게 하는 것은 dongle.sh의 dongle.pid(두 번째는 busy로 답함). 감시자가 먼저 끝나도 계속 돈다. 줄은 ap.log에
     if [ -f $DGREQ ] && take_dgreq; then
       aplog "관리 앱에서 동글 켜기 요청: 동글 드라이버를 걸고 무선 연결용 Wi-Fi를 다시 켬"
-      NX4_APP=$APP sh $APP/svc/dongle.sh --now $RQ_ID >> $APLOG 2>&1
+      ( NX4_APP=$APP sh $APP/svc/dongle.sh --now $RQ_ID </dev/null >> $APLOG 2>&1 ) &
     fi
     sleep 1
   done

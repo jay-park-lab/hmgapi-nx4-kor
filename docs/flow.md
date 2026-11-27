@@ -189,6 +189,13 @@ sequenceDiagram
       S->>U: 재부팅
     end
   end
+  opt [동글 켜기](칩 없는 내비, 동글 드라이버가 든 묶음, #60)
+    U->>App: 동글을 꽂고 누름 → 확인
+    App->>App: 앱 개인 폴더에 dongle.req(기다림은 dongle.wait)
+    S->>S: 감시자가 받아 svc/dongle.sh --now를 뒤에서 띄움
+    Note over S: 드라이버를 순정 자리에 걺 → 순정 bcmdhd 내림 →<br/>(막 꽂았으면) 포트 끄고 켜기 기다림 → AP 껐다 켬
+    S-->>App: 결과 파일(code) → 버튼 위에 안내
+  end
 ```
 
 판정은 `bin/status.sh`의 `st_verdict` 한 곳에서 정하고, 앞에서부터 처음 맞는 것이 판정입니다. 읽기만 하고 아무것도 바꾸지 않습니다(전체 표는 `design.md` "관리 앱").
@@ -204,8 +211,8 @@ flowchart TD
   G --> H["8 wmhooksoff<br/>공식 모드 훅 꺼짐"]
   H --> I["9 bridgeoff · 10 nofeat ·<br/>11 noproj"]
   I --> J["12 connected<br/>무선 연결됨"]
-  J --> K["13 otherwifi · 14 aphotspot ·<br/>15 ready · 16 wificlient"]
-  K --> L["17 apoff · 18 apwait ·<br/>19 nowifipart · 20 apfail"]
+  J --> K["13 otherwifi · 14 aphotspot ·<br/>15 ready · 16 wificlient · 17 dongleoff"]
+  K --> L["18 nowifipart · 19 apoff · 20 apwait ·<br/>21 nowifipart · 22 apfail"]
 ```
 
 ## 5. 지우기

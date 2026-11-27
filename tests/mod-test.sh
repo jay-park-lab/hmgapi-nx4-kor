@@ -1487,6 +1487,15 @@ check "status.sh 동글: 묶음에 드라이버가 있고 칩이 없으면 dongl
 _dgchip=$(sv dongle_btn); rm -rf $T/susb; stsh DONGLE_IDS=$T/sids.txt KO_SLOT=$T/sslot MOUNTINFO=$T/nomountinfo
 check "  칩이 있는 내비면 dongle_btn=no, 동글이 없고 건 것도 없으면 dongle=none·dongle_on=none, 묶음에 드라이버가 없으면 dongle_drivers=no" \
   '[ "$_dgchip" = no ] && [ "$(sv dongle)" = none ] && [ "$(sv dongle_on)" = none ] && [ "$(sv dongle_btn)" = yes ] && { stsh; [ "$(sv dongle_drivers)" = no ] && [ "$(sv dongle_btn)" = no ]; }' || cat $T/status.txt
+# 칩 없는 차(포기한 줄)에 부팅 뒤 꽂은 동글, 순정 자리에 아직 걸지 않음 → dongleoff([동글 켜기] 안내, PR #100 리뷰 4)
+streset; noap; rm -f $T/wifiseen; echo "$DHDL" > $T/sdmesg; usbdev $T/susb 4-1 0bda b831; cat $T/bootid > $T/snochip; stsh DONGLE_IDS=$T/sids.txt KO_SLOT=$T/sslot MOUNTINFO=$T/nomountinfo
+_dgv1=$(sv verdict); _dgs2=$(sv s2); _dgm=$(sv verdict_msg)
+stsh DONGLE_IDS=$T/sids.txt KO_SLOT=$T/sslot MOUNTINFO=$T/smountinfo
+check "status.sh 동글: 칩 없는 내비에 꽂힌 동글의 드라이버가 걸리지 않았으면 dongleoff(노랑, [동글 켜기] 안내, 무선 Wi-Fi '동글 꽂힘(켜기 전)'), 다른 드라이버가 걸려 있어도 같음, 묶음에 드라이버가 없으면 예전 판정" \
+  '[ "$_dgv1" = dongleoff ] && [ "$_dgs2" = "무선 Wi-Fi: 동글 꽂힘(켜기 전)" ] && [ "$_dgm" = "USB Wi-Fi 동글이 꽂혀 있지만 아직 켜지 않았습니다. 오른쪽 아래 [동글 켜기]를 눌러 주세요." ] && [ "$(sv verdict)" = dongleoff ] && [ "$(sv verdict_lv)" = 1 ] && { stsh; [ "$(sv verdict)" != dongleoff ]; }' || cat $T/status.txt
+printf '%s\n' "99 20 179:13 /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko $T/sslot rw shared:20 - ext4 /dev/block/data rw" > $T/smountinfo2
+stsh DONGLE_IDS=$T/sids.txt KO_SLOT=$T/sslot MOUNTINFO=$T/smountinfo2
+check "  꽂힌 동글의 드라이버가 걸려 있으면 dongleoff가 아님" '[ "$(sv verdict)" != dongleoff ] && [ "$(sv dongle_on)" = rtl8831bu ]' || cat $T/status.txt
 check "재부팅을 안내하는 문구에 '3분 후'가 없음(설치기는 부팅 보호 확인 뒤 안내하고 [지금 재부팅]이 보호를 막음). 부팅 보호 문구의 '3분 넘게 켜 두세요'만 남김" \
   '! grep -q "3분 후" $PKG/bin/status.sh $B/usb/troubleShooter $B/app/java/io/github/jayparklab/nx4kor/*.java && [ "$(grep -c "3분 넘게 켜 두세요" $PKG/bin/status.sh)" = 2 ]'
 
@@ -1827,7 +1836,9 @@ check "  AP를 껐다 켜지 못하면 HMG-API 지기의 이번 부팅 기록(ap
 dgv() { awk -F= -v k="$1" '$1 == k { print substr($0, length(k) + 2) }' $T/ddgres; }
 # 부팅 뒤 오래(500초) 지나 꽂은 동글, 순정 bcmdhd가 부팅 때 포기한 채 남음, AP 없음 → 걸고, 순정을 내리고, AP를 껐다 켜 뜸
 dgreset; echo "500.00 1.00" > $T/duptime; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo live > $T/dsysmod/bcmdhd/initstate
-printf '%s\n' "$DHDL" "<6>[  400.100000] usb 4-1: new high-speed USB device number 2 using ehci-platform" "<6>[  401.000000] wlan0: authenticated with 12:34:56:ab:cd:ef" > $T/ddmesg
+printf '%s\n' "$DHDL" "<6>[  400.100000] usb 4-1: new high-speed USB device number 2 using ehci-platform" "<6>[  400.200000] usb 4-1: SerialNumber: 00e04c000001" "<6>[  401.000000] wlan0: authenticated with 12:34:56:ab:cd:ef" > $T/ddmesg
+# 동글 인터페이스에 붙은 드라이버(sysfs의 driver 링크)
+mkdir -p $T/dusbdrv/rtl8851bu; mkdir -p $T/dusb/4-1/4-1:1.0; ln -s $T/dusbdrv/rtl8851bu $T/dusb/4-1/4-1:1.0/driver
 dgnow() { _dn=$1; shift; (env PATH=$P0 BB=$T/bin/bb NX4_APP=$DA NX4_ROOT=$T/droot W=$T/dw BOOT_ID=$T/bootid UPTIME=$T/duptime WIFI_SEEN=$T/dseen SDIO=$T/dsdio NX4_DMESG=$T/ddmesg \
      SYSNET=$T/dnet HMGDATA=$T/dh USBDEV=$T/dusb KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/dmountinfo FAKEDATA=$DM/data PROCMOD=$T/dmodules \
      SYSMOD=$T/dsysmod PROCNET=$T/dprocnet DONGLE=$T/ddongle DGRES=$T/ddgres NX4_APTOOL=$T/bin/fakeaptool NX4_DONGLE_POLL=0.1 NX4_DONGLE_SPOLL=0.1 \
@@ -1836,8 +1847,8 @@ dgnow() { _dn=$1; shift; (env PATH=$P0 BB=$T/bin/bb NX4_APP=$DA NX4_ROOT=$T/droo
 dgnow 777001 APTOOL_UP=1
 check "dongle.sh --now: 오래전에 꽂은 동글에 드라이버를 걸고, 포기한 순정 bcmdhd를 내리고, AP가 없으니 껐다 켬(뜸), 결과 id·boot·code=ok·usb·drv(644)" \
   '[ "$(cat $T/dg.rc)" = 0 ] && grep -qx "mount -o bind $DA/drivers/rtl8831bu/bcmdhd.ko $T/dslot/bcmdhd.ko" $T/mcalls && grep -qx "rmmod bcmdhd live" $T/mcalls && grep -qx "aptool restart" $T/mcalls && [ "$(dgv id)" = 777001 ] && [ "$(dgv boot)" = test-boot-id ] && [ "$(dgv code)" = ok ] && [ "$(dgv usb)" = 0bda:b831 ] && [ "$(dgv drv)" = rtl8831bu ] && [ "$(ls -l $T/ddgres | cut -c1-10)" = "-rw-r--r--" ] && grep -q "동글이 붙은 지 오래됨(부팅 뒤 400초)" $T/dg.out && ! grep -q "다시 붙지 않음" $T/dg.out' || { cat $T/dg.out $T/mcalls; }
-check "  누르기 전·뒤 기록($W/dongle-before.txt·after.txt): USB 장치·자리·bcmdhd·wlan0·hostapd·커널 줄, MAC 꼴 값은 가림, 다 끝나면 dongle.pid를 지움" \
-  'grep -q "^usb 4-1 0bda:b831 devnum=2" $T/dw/dongle-before.txt && grep -qx "slot=none" $T/dw/dongle-before.txt && grep -q "^bcmdhd=stock initstate=live" $T/dw/dongle-before.txt && grep -qx "hostapd=no" $T/dw/dongle-before.txt && grep -qx "slot=rtl8831bu" $T/dw/dongle-after.txt && grep -q "^wlan0=yes flags=0x1003" $T/dw/dongle-after.txt && grep -qx "hostapd=yes" $T/dw/dongle-after.txt && grep -q "authenticated with xx:xx:xx:xx:xx:xx" $T/dw/dongle-after.txt && ! grep -q "12:34:56" $T/dw/dongle-after.txt && [ ! -e $T/dw/dongle.pid ]' || { cat $T/dw/dongle-before.txt $T/dw/dongle-after.txt; }
+check "  누르기 전·뒤 기록($W/dongle-before.txt·after.txt): USB 장치와 붙은 드라이버·자리·bcmdhd·/proc/modules·wlan0·hostapd·커널 줄, 일련번호 줄은 빼고 MAC 꼴 값은 가림(PR #100 리뷰 3), 다 끝나면 dongle.pid를 지움" \
+  'grep -q "^usb 4-1 0bda:b831 devnum=2 speed= driver=rtl8851bu$" $T/dw/dongle-before.txt && grep -qx "bcmdhd 1234567 0 - Live 0xbf000000" $T/dw/dongle-before.txt && grep -qx -- "-- /proc/modules" $T/dw/dongle-before.txt && ! grep -qi "serialnumber" $T/dw/dongle-before.txt $T/dw/dongle-after.txt && ! grep -q "00e04c000001" $T/dw/dongle-after.txt && grep -q "usb 4-1: new high-speed USB device number 2" $T/dw/dongle-after.txt &&grep -qx "slot=none" $T/dw/dongle-before.txt && grep -q "^bcmdhd=stock initstate=live" $T/dw/dongle-before.txt && grep -qx "hostapd=no" $T/dw/dongle-before.txt && grep -qx "slot=rtl8831bu" $T/dw/dongle-after.txt && grep -q "^wlan0=yes flags=0x1003" $T/dw/dongle-after.txt && grep -qx "hostapd=yes" $T/dw/dongle-after.txt && grep -q "authenticated with xx:xx:xx:xx:xx:xx" $T/dw/dongle-after.txt && ! grep -q "12:34:56" $T/dw/dongle-after.txt && [ ! -e $T/dw/dongle.pid ]' || { cat $T/dw/dongle-before.txt $T/dw/dongle-after.txt; }
 # 막 꽂은 동글(부팅 뒤 497초에 붙음, 지금 500초): 순정이 약 8초 뒤 포트 전원을 껐다 켬 → 다시 붙을 때까지 기다림
 dgreset; echo "500.00 1.00" > $T/duptime; printf '%s\n' "$DHDL" "<6>[  497.100000] usb 4-1: new high-speed USB device number 2 using ehci-platform" > $T/ddmesg
 dgcycle; _dc=$!; dgnow 777002 APTOOL_UP=1; wait $_dc
