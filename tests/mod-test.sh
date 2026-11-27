@@ -1765,6 +1765,9 @@ dgreset; : > $T/ddmesg; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules;
 ( /bin/sleep 0.8; mkdir -p $T/dsdio/mmc1:0001:1; echo live > $T/dsysmod/bcmdhd/initstate ) & _dc=$!; dgrun NX4_DONGLE_SETTLE=0; wait $_dc
 check "  칩 찾기가 끝날 때 Wi-Fi 칩(SDIO)이 보이면 순정 bcmdhd를 내리지 않고 건 것을 풀고 기록을 지움(표시 파일이 아직 없는 칩 차, PR #99 리뷰 8)" \
   '! grep -q "^rmmod" $T/mcalls && grep -qx "umount $T/dslot/bcmdhd.ko" $T/mcalls && [ -z "$(mounted)" ] && [ ! -e $T/ddongle ] && grep -q "Wi-Fi 칩이 보임" $T/dg.out' || cat $T/dg.out $T/mcalls
+dgreset; : > $T/ddmesg; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo coming > $T/dsysmod/bcmdhd/initstate
+( /bin/sleep 0.8; mkdir -p $T/dsdio/mmc1:0001:1; echo live > $T/dsysmod/bcmdhd/initstate ) & _dc=$!; dgrun UMOUNT_FAIL=1 NX4_DONGLE_SETTLE=0; wait $_dc
+check "  그때 건 것을 풀지 못하면 그렇다고 남김(재부팅하면 풀림, PR #99 리뷰 12)" '! grep -q "^rmmod" $T/mcalls && grep -q "두었지만 건 것을 풀지 못함(재부팅하면 풀림)" $T/dg.out && [ ! -e $T/ddongle ]' || cat $T/dg.out
 dgreset; : > $T/ddmesg; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo live > $T/dsysmod/bcmdhd/initstate; dgrun NX4_DONGLE_SETTLE=0
 check "  순정 bcmdhd가 이번 부팅에 칩 켜기를 포기한 줄이 없으면 내리지 않음(동작 중일 수 있음)" '! grep -q "^rmmod" $T/mcalls && grep -q "칩 켜기를 포기한 줄이 없음: 내리지 않음" $T/dg.out' || cat $T/dg.out
 dgreset; ( /bin/sleep 0.3; rm -rf $T/dusb/4-1 ) & _dc=$!; echo "3.00 1.00" > $T/duptime; ( /bin/sleep 0.8; echo "80.00 1.00" > $T/duptime ) & _du=$!; dgrun; wait $_dc $_du

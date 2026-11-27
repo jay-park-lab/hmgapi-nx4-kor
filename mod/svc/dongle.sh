@@ -78,9 +78,9 @@ case $_lm in
     # 켠 뒤(약 10초)에야 보인다. 그래서 내리기 전에 다시 보고, 칩이 보이면 내리지 않고 건 것도 푼다. 순정은 이번 부팅에 칩 켜기를
     # 포기한 줄이 있을 때만 내린다(PR #99 리뷰 8)
     if wifi_chip_seen; then
-      ko_umount
       rm -f $DONGLE
-      say "Wi-Fi 칩이 보임(부팅 뒤 ${_U:-?}초): bcmdhd($_lm)를 두고 건 것을 풂"
+      if ko_umount; then say "Wi-Fi 칩이 보임(부팅 뒤 ${_U:-?}초): bcmdhd($_lm)를 두고 건 것을 풂"
+      else say "Wi-Fi 칩이 보임(부팅 뒤 ${_U:-?}초): bcmdhd($_lm)를 두었지만 건 것을 풀지 못함(재부팅하면 풀림)"; fi
       exit 0
     fi
     if [ "$_lm" = stock ] && ! dhd_gave_up; then
