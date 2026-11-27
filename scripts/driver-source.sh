@@ -88,6 +88,7 @@ NX4 KOR USB Wi-Fi 동글 드라이버의 대응 소스 (GNU GPL-2.0, 전문은 n
 자세한 것은 nx4-kor/drivers/README.md.
 EOF
 mkdir -p "$(dirname "$OUTF")"
-(cd "$W" && tar -cf - hmgapi-nx4-kor-driver-source | gzip -9n) > "$OUTF.tmp"
+# 맥(bsdtar)은 기본으로 확장 속성(com.apple.provenance 등)과 ._ 파일을 넣어, 리눅스 GNU tar가 항목마다 경고한다. 둘 다 뺀다(PR #101 리뷰 9)
+(cd "$W" && COPYFILE_DISABLE=1 tar --no-xattrs -cf - hmgapi-nx4-kor-driver-source | gzip -9n) > "$OUTF.tmp"
 mv -f "$OUTF.tmp" "$OUTF"
 echo "만듦: $OUTF ($(wc -c < "$OUTF" | tr -d ' ') 바이트, 커밋 $REV)"

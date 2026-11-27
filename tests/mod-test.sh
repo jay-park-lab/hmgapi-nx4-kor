@@ -2046,6 +2046,9 @@ if [ -z "$(cd $B && git status --porcelain -- drivers scripts/build-driver.sh sc
   (cd $DS/wf && V=9.9.9 RUNNER_TEMP=$DS/wf/tmp NX4_DRIVERS=$DS/wf/drv bash -eo pipefail $DS/wfcheck.sh) > $DS/wf2.out 2>&1; echo $? > $DS/wf2.rc
   check "  릴리스 워크플로의 SOURCE.txt 확인 줄(pipefail 셸)이 만든 묶음을 통과시키고, .ko의 build date가 SOURCE.txt와 다르면 멈춤(PR #101 리뷰 8)" \
     'grep -q "bcmdhd.ko.txt" $DS/wfcheck.sh && [ "$(cat $DS/wf.rc)" = 0 ] && [ "$(cat $DS/wf2.rc)" != 0 ] && grep -q "빌드 날짜가 .*rtl8831bu/bcmdhd.ko.txt의 build date(Jan  1 2000 00:00:00)와 다릅니다" $DS/wf2.out' || { cat $DS/wfcheck.sh; cat $DS/wf.out $DS/wf2.out; }
+  # 맥에서 만들어도 확장 속성(pax 머리의 LIBARCHIVE.xattr·SCHILY.xattr)과 ._ 파일이 들어가지 않음(리눅스 GNU tar 경고, PR #101 리뷰 9)
+  check "  묶음에 확장 속성 머리와 ._ 파일이 없음" \
+    '! gzip -dc $DS/out/src.tar.gz | grep -aq "LIBARCHIVE\.xattr\|SCHILY\.xattr" && ! tar -tzf $DS/out/src.tar.gz | grep -q "/\._" && grep -q "COPYFILE_DISABLE=1 tar --no-xattrs" $B/scripts/driver-source.sh'
   # 같은 .ko(md5)를 얻을 경로·커널 판: build-in-container.sh의 값 그대로(PR #101 리뷰 7)
   check "  SOURCE.txt의 손 빌드에 build-in-container.sh의 커널 트리·KVER·드라이버 폴더(-g라 .ko에 경로가 들어감)" \
     'grep -qF "KSRC=/work/k/linux-3.18.24 KVER=3.18.24-tcc" $DR/SOURCE.txt && grep -qF "/work/nx4/<드라이버>" $DR/SOURCE.txt && grep -q "^K=/work/k/linux-3.18.24$" $B/drivers/build-in-container.sh && grep -q "^KREL=3.18.24-tcc$" $B/drivers/build-in-container.sh' || grep -n "KSRC\|/work" $DR/SOURCE.txt
