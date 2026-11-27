@@ -41,7 +41,7 @@ argument-hint: "[PR 번호 | PR URL]"
 - 리뷰·답글·댓글·보고는 존댓말 한국어로 쓴다.
 - 자동 리뷰는 PR 작성자와 같은 계정으로 달린다. 리뷰어의 글은 첫 줄 머리말 `(자동 리뷰 — ` 로, 내 반영
   답글은 커밋 SHA 로 구분한다. `user.login` 으로 가르지 않는다.
-- 이 저장소에는 PR 때 도는 CI 가 없다(release 워크플로는 `v*` 태그에서만 돈다). `gh pr checks` 는 필요한 때 한 번만 보고, 검사가 없거나 진행
+- PR 때 도는 CI 는 `drivers` 워크플로뿐이다(`drivers/`·`scripts/build-driver.sh` 가 바뀐 PR 에서 동글 드라이버를 빌드, `drivers/README.md`). release 워크플로는 `v*` 태그에서만 돈다. `gh pr checks` 는 필요한 때 한 번만 보고, 검사가 없거나 진행
   중이면 로컬 검증 결과를 근거로 삼는다. 주기적으로 조회하지 않는다.
 - 비밀값을 지킨다. `.env.local`, 서명 키(`NX4_APP_KEYS` 폴더, `NX4_MOD_KEY`)는 커밋하지 않고, 그 내용과
   비밀번호를 화면·PR·로그에 남기지 않는다. `git add -f` 를 쓰지 않는다.
@@ -270,6 +270,10 @@ PR 에 첫 줄이 `(자동 리뷰 — ` 로 시작하는 리뷰가 이미 있으
      2 에서 되돌려 합치기까지 고른 경우에만 `--admin` 을 붙인다.
    - `hotfix/` 는 진행 중인 `release/` 에 합치지 않는다(`docs/git-flow.md` 규칙 12). 그 `release/` 에 고침이 필요하면
      `develop` 에 합친 뒤 `release/<판>` 에 `origin/develop` 을 합치고 판을 다음 베타(`<판>-beta.<n+1>`)로 올린다(규칙 4).
+     `develop` 에 다음 판의 작업이 이미 있으면 `develop` 을 합치지 않는다. hotfix 의 고침 커밋만 골라
+     `git cherry-pick -x <고침 커밋>` 으로 하나씩 옮긴다(판 올리기·merge 커밋은 빼고, 충돌하면 `release/` 쪽을 남기고 고침만 얹으며
+     판 세 곳은 `release/` 쪽). `feature/` PR 은 그 PR 을 합친 merge commit `M` 으로 `git cherry-pick -x --no-merges $M^1..$M^2`
+     한다(`docs/git-flow.md` 규칙 12).
    - 태그를 올리면 release 워크플로가 `production` 승인을 기다린 뒤 배포 묶음을 만들어 GitHub 릴리스에 올린다
      ([`docs/release.md`](../../../docs/release.md)). 승인은 사용자가 Actions 화면에서 한다. 대신 승인하거나
      승인 여부를 짐작해 말하지 않는다.

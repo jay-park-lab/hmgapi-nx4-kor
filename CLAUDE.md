@@ -22,6 +22,7 @@
 | `docs/troubleshooting.md` | 차에서 설치하다 문제가 생길 때(설치기·관리 앱 문구별 할 일, 부팅 보호, 되돌리기, 남길 기록) |
 | `docs/emulator-test.md` | 에뮬레이터에서 관리 앱 테스트(SDK·AVD 준비, 시나리오, [지금 재부팅] 흐름, 이 테스트가 보지 않는 것) |
 | `docs/git-flow.md` | 브랜치 전략(Git Flow) 규칙, 흐름(작업마다 워크트리), 강제 장치 |
+| `drivers/README.md` | USB Wi-Fi 동글 드라이버(#48, RTL88x2BU·RTL8831BU): 순정 HAL 자리(`bcmdhd`)에 맞추는 방법, 보호 패치, RTL8831BU 빌드 맞춤, 두 드라이버와 자리 하나, 커널 준비(kernel.org 3.18.24 뼈대 + 현대모비스 GPL 공개 내비 커널 소스 + 차 설정에 맞춘 defconfig), 커널 소스 자산(릴리스 `src-mobis-avnt5w-r9`, `--src-asset`), Docker 빌드(`scripts/build-driver.sh`, CI `.github/workflows/drivers.yml`), 바깥 자료와 출처·라이선스(GPL-2.0). 차에 넣을 `.ko`는 CI(리눅스 x86) 것만(맥 에뮬레이션 빌드는 확인용) |
 | GitHub 이슈(`gh issue list`) | 정하지 않은 것(라벨 `결정 필요`), 차에서 확인할 일(`차 확인`), 릴리스 일(`릴리스`). 결정을 기다리는 일과 이후 할 일은 모두 여기 |
 | `docs/release.md` | 태그로 도는 배포 워크플로(`.github/workflows/release.yml`), 배포 키 secret, `production` 환경, 키 백업, 유출 위험 |
 | `usb/README.txt` | USB 설치기 안내 |
@@ -48,7 +49,7 @@
   - **새 작업 브랜치(와 그 워크트리)는 늘 `origin/develop`에서 시작합니다**(`feature/`·`release/` 모두, [`docs/git-flow.md`](docs/git-flow.md) 규칙 12).
     - 새 작업의 예외는 배포한 `main`을 고치는 `hotfix/`(`origin/main`)뿐입니다. `main`의 README 안내만 넣는 `hotfix/main-readme`도 `origin/main`에서 시작합니다(판 번호·태그 없이 `main`에만 합침, 규칙 13).
     - 이미 있는 브랜치를 이어서 고칠 때(열린 PR의 리뷰 반영 등)는 새 작업이 아니므로 그 브랜치에서 워크트리를 엽니다(아래 줄).
-    - `release/<판>`에서 시작하는 `feature/`는 만들지 않습니다. 고침은 develop에 합치고, 그 고침이 든 묶음이 필요하면 `release/<판>`에 `origin/develop`을 합친 뒤 판을 다음 베타(`<판>-beta.<n+1>`)로 올립니다([`docs/git-flow.md`](docs/git-flow.md) 규칙 4·12).
+    - `release/<판>`에서 시작하는 `feature/`는 만들지 않습니다. 고침은 develop에 합치고, 그 고침이 든 묶음이 필요하면 `release/<판>`에 `origin/develop`을 합친 뒤 판을 다음 베타(`<판>-beta.<n+1>`)로 올립니다. `develop`에 다음 판의 작업이 이미 있으면 `develop`을 합치지 않고, `develop`에 합친 그 PR의 커밋만 `release/<판>`에 체리픽합니다(그 PR을 합친 merge commit `M`으로 `git cherry-pick -x --no-merges $M^1..$M^2`. hotfix의 고침은 고침 커밋만 하나씩. 2026-11-26 사용자 결정, [`docs/git-flow.md`](docs/git-flow.md) 규칙 4·12).
   - 메인 체크아웃은 `develop`에 두고 고치지 않습니다. 읽기만 하는 일은 메인 체크아웃에서 해도 됩니다.
   - 메인 체크아웃에 내가 하지 않은 커밋하지 않은 변경이 있으면 다른 작업의 것이니 건드리지 않습니다.
   - 이미 있는 브랜치(열린 PR의 리뷰 반영 등)를 고칠 때도 메인 체크아웃에서 `git switch` 하지 않고 그 브랜치의 워크트리에서 고칩니다. 없으면 만듭니다. 그 워크트리가 내가 만들었거나 지금 쓰던 것이 아니면 다른 세션이 쓰고 있을 수 있으니 들어가기 전에 사용자에게 묻습니다(`docs/git-flow.md` "워크트리").

@@ -1,0 +1,78 @@
+nx4-build: 이 차 커널(3.18.24-tcc)과 GCC 4.7에 맞추는 빌드 고침(이 저장소, GPL-2.0).
+대상: hyeondg/rtl8831bu fed914c8에 0001·0002를 넣은 것(os_intfs.c를 0001도 고쳐, 이 차례로 만든 diff).
+  1. Makefile: 디버그 로그를 끈다(CONFIG_RTW_DEBUG = n)
+  2. osdep_service_linux.c: rtw_warn_on_cnt(u16)를 ATOMIC_T로 바꿔 ATOMIC_INC에 넘기던 것을 보통 더하기로(GCC 4.7 컴파일 오류)
+  3. drv_conf.h: strlcpy를 strscpy로 바꾸던 정의를 뺀다(3.18에는 strscpy가 없어 insmod가 실패함, PR #81 리뷰 1)
+  4. os_intfs.c rtw_ethtool_get_drvinfo: strscpy 다섯 곳을 strlcpy로(같은 까닭)
+
+--- a/Makefile
++++ b/Makefile
+@@ -151,7 +151,8 @@
+ endif
+ 
+ ########################## Debug ###########################
+-CONFIG_RTW_DEBUG = y
++# nx4-build: 디버그 로그를 끈다(순정 시스템의 dmesg·CPU 부하를 줄임. RTL88x2BU도 끈 채로 빌드됨)
++CONFIG_RTW_DEBUG = n
+ # default log level is _DRV_INFO_ = 4,
+ # please refer to "How_to_set_driver_debug_log_level.doc" to set the available level.
+ CONFIG_RTW_LOG_LEVEL = 4
+--- a/include/drv_conf.h
++++ b/include/drv_conf.h
+@@ -711,8 +711,8 @@
+ */
+ #define RTW_WKARD_TRIGGER_FRAME_PARSER
+ 
+-#if !defined(strlcpy)
+-#define strlcpy(a, b, c) strscpy(a, b, c)
+-#endif
++/* nx4-build: 새 커널(strlcpy가 없어진 6.8 뒤)용으로 strlcpy를 strscpy로 바꾸던 정의를 뺀다. 3.18에는 strscpy가 없고(4.3에
++ * 생김) strlcpy는 매크로가 아닌 함수라 이 정의가 늘 켜져, 모든 strlcpy가 이 커널이 내보내지 않는 strscpy가 된다
++ * (insmod: Unknown symbol strscpy, PR #81 리뷰 1) */
+ 
+ #endif /* __DRV_CONF_H__ */
+--- a/os_dep/osdep_service_linux.c
++++ b/os_dep/osdep_service_linux.c
+@@ -883,7 +883,9 @@
+ void rtw_warn_on(bool condition){
+ 	if(condition){
+ 		WARN_ON(condition);
+-		ATOMIC_INC((ATOMIC_T *)&rtw_warn_on_cnt);
++		/* nx4-build: u16 변수를 ATOMIC_T(4바이트)로 바꿔 ATOMIC_INC에 넘기면 GCC 4.7이 ARM 인라인 어셈블리를 받지 않는다
++		 * ("output number 2 not directly addressable"). 남의 2바이트까지 쓰는 것이기도 하다. 세기만 하는 카운터라 보통 더하기로 */
++		rtw_warn_on_cnt++;
+ 	}
+ }
+ 
+--- a/os_dep/linux/os_intfs.c
++++ b/os_dep/linux/os_intfs.c
+@@ -515,13 +515,13 @@
+ 
+ 	wdev = dev->ieee80211_ptr;
+ 	if (wdev) {
+-		strscpy(info->driver, wiphy_dev(wdev->wiphy)->driver->name,
++		strlcpy(info->driver, wiphy_dev(wdev->wiphy)->driver->name,
+ 			sizeof(info->driver));
+ 	} else {
+-		strscpy(info->driver, "N/A", sizeof(info->driver));
++		strlcpy(info->driver, "N/A", sizeof(info->driver));
+ 	}
+ 
+-	strscpy(info->version, DRIVERVERSION, sizeof(info->version));
++	strlcpy(info->version, DRIVERVERSION, sizeof(info->version));
+ 
+ 	padapter = (_adapter *)rtw_netdev_priv(dev);
+ 
+@@ -538,10 +538,10 @@
+ 	} else
+ 	#endif
+ 	{
+-		strscpy(info->fw_version, "N/A", sizeof(info->fw_version));
++		strlcpy(info->fw_version, "N/A", sizeof(info->fw_version));
+ 	}
+ 
+-	strscpy(info->bus_info, dev_name(wiphy_dev(wdev->wiphy)),
++	strlcpy(info->bus_info, dev_name(wiphy_dev(wdev->wiphy)),
+ 		sizeof(info->bus_info));
+ }
+ 

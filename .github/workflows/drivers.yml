@@ -1,0 +1,70 @@
+# USB Wi-Fi 동글 드라이버(#48, drivers/README.md): drivers/나 빌드 스크립트가 바뀌면 PC와 같은 방법(scripts/build-driver.sh,
+# Docker)으로 빌드한다. 키·비밀값을 쓰지 않고 저장소에 쓰지 않는다.
+#   우리 드라이버 둘(RTL88x2BU, RTL8831BU, 모두 bcmdhd.ko). 빌드 날짜·시각을 drivers/를 마지막으로 바꾼 커밋의 시각으로 고정하므로 같은 커밋이면 PC와 같은 md5가
+#   나와야 한다(다르면 PC의 에뮬레이션 쪽을 의심하고, 컴파일 옵션 지문 cflags도 견준다).
+#   결과의 md5는 실행 요약에, .ko와 정보 파일은 artifact(drivers-tcc803x)에 둔다.
+# 차에 넣을 .ko는 이처럼 리눅스 x86에서 만든 것만 쓴다(맥의 qemu 에뮬레이션 빌드는 조용히 다른 코드를 낸 적이 있음, drivers/README.md)
+name: drivers
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'drivers/**'
+      - 'scripts/build-driver.sh'
+      - '.github/workflows/drivers.yml'
+  pull_request:
+    paths:
+      - 'drivers/**'
+      - 'scripts/build-driver.sh'
+      - '.github/workflows/drivers.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: drivers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 동글 드라이버 빌드
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash # 명시해야 -o pipefail이 켜진다
+    steps:
+      - name: 저장소
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # PR이면 합친 커밋이 아니라 브랜치 끝 커밋으로(커밋 시각이 빌드 날짜가 되므로 PC와 같은 커밋이어야 md5가 같다)
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # 빌드 날짜는 drivers/를 마지막으로 바꾼 커밋의 시각이라 기록 전체가 필요하다(얕은 클론이면 build-driver.sh가 멈춤)
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 우리 드라이버(bcmdhd.ko)
+        run: |
+          sh scripts/build-driver.sh
+          {
+            echo '### 동글 드라이버'
+            echo '```'
+            echo 'RTL88x2BU'
+            cat out/drivers/tcc803x/rtl88x2bu/bcmdhd.ko.txt
+            echo '---'
+            echo 'RTL8831BU'
+            cat out/drivers/tcc803x/rtl8831bu/bcmdhd.ko.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 결과 올리기
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: drivers-tcc803x
+          path: out/drivers/tcc803x/
+          if-no-files-found: error
+          retention-days: 30

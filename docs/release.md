@@ -39,11 +39,17 @@
 
 PC에서 `.env.local`의 키로 `sh scripts/build.sh`를 돌려 만드는 길도 그대로 있습니다(`git-flow.md` 규칙 7).
 
+### 모드가 아닌 릴리스(`src-*`)
+
+동글 드라이버 빌드가 받는 커널 소스 자산은 `v*`가 아닌 태그의 릴리스로 올립니다(지금은 `src-mobis-avnt5w-r9`, [`drivers/README.md`](../drivers/README.md) "커널 소스 자산"). 이 워크플로는 돌지 않고, 시험판·최신 아님으로 두어 "Latest" 릴리스를 가리지 않습니다.
+
+- 모드 릴리스의 자동 변경 목록(`--generate-notes`)은 바로 앞 릴리스부터 셉니다. `src-*` 릴리스 뒤 첫 모드 릴리스(특히 베타)는 그 범위가 `src-*` 태그부터일 수 있으니, 올린 뒤 변경 목록을 보고 모자라면 릴리스 글을 고칩니다.
+
 ### 같은 태그로 다시 만들지 않습니다
 
 묶음은 같은 커밋·같은 키로 만들어도 매번 다릅니다. HMG-API의 서명(ECDSA)이 만들 때마다 달라 모드 zip이 바뀌고, 그것을 담은 USB 묶음도 바뀝니다. 그래서 같은 태그로 다시 만들면, 이미 받은 사람의 파일이나 릴리스 글의 SHA-256과 맞지 않게 됩니다.
 
-- 릴리스가 이미 있으면 `check`와 `publish`가 멈춥니다. 고쳐야 하면 `develop`에서 고친 뒤 `release/<판>`에 `develop`을 합치고 판을 다음 베타로 올려 `v<판>-beta.<n+1>`을 답니다(`git-flow.md` 규칙 4·12. 예: `v2.0.4-beta.1` 다음이 `v2.0.4-beta.2`). 정식이면 `hotfix/`의 다음 판입니다.
+- 릴리스가 이미 있으면 `check`와 `publish`가 멈춥니다. 고쳐야 하면 `develop`에서 고친 뒤 `release/<판>`에 `develop`을 합치고(`develop`에 다음 판의 작업이 있으면 그 PR만 체리픽, `git-flow.md` 규칙 12) 판을 다음 베타로 올려 `v<판>-beta.<n+1>`을 답니다(`git-flow.md` 규칙 4·12. 예: `v2.0.4-beta.1` 다음이 `v2.0.4-beta.2`). 정식이면 `hotfix/`의 다음 판입니다.
 - 올리다 실패해 파일이 빠진 릴리스가 남았으면, 그 릴리스를 GitHub에서 지운 뒤(태그는 두고) 실패한 실행을 다시 돌립니다.
 
 ## 키와 값
@@ -141,7 +147,7 @@ gh secret list --env production
   - 그래서 1.1.0 전에 쓰던 시험판이 지워지면 아래 "HMG-API가 릴리스를 지우면"대로 그때 가장 새 시험판으로 옮깁니다. 지금까지 HMG-API가 지운 것은 시험판(rc.4, rc.5)뿐이고, 정식판 1.0.2는 남아 있습니다.
 - **HMG-API가 릴리스를 지우면:** HMG-API는 새 시험판을 내면서 예전 시험판 릴리스를 지웁니다. 2026-11-20에 rc.4 릴리스가 지워져, `v2.0.0-beta.2` 실행이 "HMG-API USB 묶음" step의 다운로드(404)에서 멈췄습니다. 키를 꺼내기 전이라 키는 쓰이지 않았고, 릴리스도 만들지 않았습니다.
   - 고치려면 그때 있는 판으로 `HMGAPI_COMMIT`, `HMGAPI_USB_URL`, `HMGAPI_USB_SHA256`을 함께 옮깁니다. 바꿀 곳 목록은 [#14](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/14)에 있습니다.
-  - 이 고침도 `develop`에서 시작한 `feature/`로 `develop`에 합칩니다(`git-flow.md` 규칙 12). 그 소스로 `tests/mod-test.sh`를 통과시킨 뒤, `release/<판>`에 `develop`을 합치고 판을 다음 베타로 올려 `v<판>-beta.<n+1>`을 답니다. `release/`에서 직접 고치지는 않습니다.
+  - 이 고침도 `develop`에서 시작한 `feature/`로 `develop`에 합칩니다(`git-flow.md` 규칙 12). 그 소스로 `tests/mod-test.sh`를 통과시킨 뒤, `release/<판>`에 `develop`을 합치고(다음 판의 작업이 있으면 그 PR만 체리픽, 규칙 12) 판을 다음 베타로 올려 `v<판>-beta.<n+1>`을 답니다. `release/`에서 직접 고치지는 않습니다.
   - 같은 태그는 다시 쓸 수 없습니다. 태그 push로 도는 워크플로는 그 태그 커밋의 `release.yml`을 쓰기 때문입니다.
   - 받을 수 있는지는 태그를 달기 전에 `curl -sSI -o /dev/null -w '%{http_code}\n' <HMGAPI_USB_URL>`로 봅니다. 200이나 302면 됩니다.
   - 정식판 직전에 지워지면 차에서 확인하지 않은 판으로 옮겨야 합니다. 그래도 사본은 두지 않기로 했습니다(위 "어느 HMG-API 판을 쓰나").
