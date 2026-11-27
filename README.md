@@ -1,5 +1,10 @@
 > 🧪 **실험 중인 프로젝트입니다.** 일반 차주가 쓰기를 권하지 않습니다.
-> - **2.1.1을 정식으로 냈습니다**(2026-11-26, [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases/tag/v2.1.1)). 2.1.0에 HMG-API 1.1.0-rc.10과 NEMESIS 1.17 경고를 더한 판입니다. 구조는 아래 "[2.1.0 구조](#210-구조)"를 보세요([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38)).
+> - **2.1.2를 정식으로 냈습니다**(2026-11-27, [릴리스](https://github.com/jay-park-lab/hmgapi-nx4-kor/releases/tag/v2.1.2)). 2.1.1에 다음을 더한 판입니다. 구조는 아래 "[2.1.0 구조](#210-구조)"를 보세요([#38](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/38)).
+>   - 한국 카플레이 계기판·HUD 길안내([#67](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/67)): 모든 회전에 화살표, 회전 600 m 전부터 큰 그림과 거리 막대. 길안내를 시작할 때 공식 모드 그림이 끼지 않게 했습니다.
+>   - Wi-Fi 칩이 없는 내비에서 HMG-API가 무선 연결용 Wi-Fi를 부팅 내내 다시 켜려는 것을 멈춤
+>   - NEMESIS가 깔린 차에서는 USB 설치기가 아무것도 하지 않음([#75](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/75))
+>   - 관리 앱: 한국 길안내 훅이 도는지 보임, 재부팅 안내에서 "3분 후"를 뺌, 앱 안 왼쪽 위 `<`를 뺌(차 화면 시스템 줄의 `<`로 닫음)
+> - 2.1.1(2026-11-26)은 2.1.0에 HMG-API 1.1.0-rc.10과 NEMESIS 1.17 경고를 더한 판입니다.
 > - 2.1.0은 2026-11-25에 태그(`v2.1.0`)만 달렸고 릴리스 묶음은 없습니다. 묶음을 만들기 전에 HMG-API가 rc.8 릴리스를 지워, 빌드가 HMG-API USB 묶음을 받지 못하고 멈췄습니다(배포 키는 쓰이지 않음).
 > - 2.0.x는 정식으로 내지 않고 끝냈습니다. 베타 묶음(`v2.0.0-beta.*`~`v2.0.4-beta.1`)은 릴리스에 그대로 둡니다.
 > - **무선 카플레이·안드로이드 오토는 차에서 아직 확인하지 못했습니다.** 테스트한 차(NX4HEV 260902)는 내비에 Wi-Fi 칩이 없습니다. USB Wi-Fi 동글 지원은 2.2.0에서 합니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48), [#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60)).
