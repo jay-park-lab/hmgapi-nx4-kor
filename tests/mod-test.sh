@@ -1496,6 +1496,9 @@ check "status.sh 동글: 칩 없는 내비에 꽂힌 동글의 드라이버가 �
 printf '%s\n' "99 20 179:13 /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko $T/sslot rw shared:20 - ext4 /dev/block/data rw" > $T/smountinfo2
 stsh DONGLE_IDS=$T/sids.txt KO_SLOT=$T/sslot MOUNTINFO=$T/smountinfo2
 check "  꽂힌 동글의 드라이버가 걸려 있으면 dongleoff가 아님" '[ "$(sv verdict)" != dongleoff ] && [ "$(sv dongle_on)" = rtl8831bu ]' || cat $T/status.txt
+printf '%s\n' "99 20 179:13 /data/other/bcmdhd.ko $T/sslot rw shared:20 - ext4 /dev/block/data rw" > $T/smountinfo3
+stsh DONGLE_IDS=$T/sids.txt KO_SLOT=$T/sslot MOUNTINFO=$T/smountinfo3
+check "  다른 모드가 순정 자리에 건 것(dongle_on=other)이면 dongleoff가 아님([동글 켜기]도 other로 끝남, PR #100 리뷰 7)" '[ "$(sv dongle_on)" = other ] && [ "$(sv verdict)" != dongleoff ]' || cat $T/status.txt
 check "재부팅을 안내하는 문구에 '3분 후'가 없음(설치기는 부팅 보호 확인 뒤 안내하고 [지금 재부팅]이 보호를 막음). 부팅 보호 문구의 '3분 넘게 켜 두세요'만 남김" \
   '! grep -q "3분 후" $PKG/bin/status.sh $B/usb/troubleShooter $B/app/java/io/github/jayparklab/nx4kor/*.java && [ "$(grep -c "3분 넘게 켜 두세요" $PKG/bin/status.sh)" = 2 ]'
 

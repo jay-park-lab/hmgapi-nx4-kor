@@ -66,6 +66,9 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
     /** [동글 켜기] 버튼(상태 파일이 dongle_btn=yes일 때만), 요청을 보낸 때(부팅 뒤 밀리초, 0이면 없음)와 그 id */
     TextView dongleBtn;
     long dgEl, dgId;
+    /** [동글 켜기] 결과 안내: 상태 파일을 새로 써 화면을 다시 그린 뒤 다시 올린다(PR #100 리뷰 6) */
+    String dgShow;
+    int dgShowBg, dgShowFg;
     /** 띄운 확인 창이 무엇인가(확인 창의 버튼을 이 화면이 받으므로): 1 재부팅, 2 동글 켜기 */
     int dialogFor;
     /** 기다리는 재부팅 요청의 id(요청 파일 첫 칸). 결과 파일과 맞춰 본다 */
@@ -436,6 +439,11 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         } else if (dgw.exists()) {
             try { dgw.delete(); } catch (Exception ignored) { }
         }
+        // 방금 받은 [동글 켜기] 결과 안내(dongleTick): 상태를 새로 읽어 다시 그린 화면에 한 번 다시 올린다(PR #100 리뷰 6)
+        if (dgShow != null) {
+            if (rbEl == 0 && dgEl == 0) showMsg(dgShow, dgShowBg, dgShowFg);
+            dgShow = null;
+        }
         setContentView(root);
     }
 
@@ -516,10 +524,14 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         if (dongleBtn != null) dongleBtn.setEnabled(true);
         // 재부팅 기다림 중이면 그 안내를 덮지 않는다
         if (rbEl > 0) return false;
-        if (ans == null) showMsg(Report.DG_TIMEOUT, Ui.WARN, Color.BLACK);
-        else if (Report.dgGood(res)) showMsg(ans, Ui.MSG_BG, Color.WHITE);
-        else showMsg(ans, Ui.WARN, Color.BLACK);
-        // 표는 다시 그리지 않는다(다시 그리면 이 안내가 사라짐). 표의 동글·Wi-Fi 칸은 화면을 다시 열면 새로 보인다
+        if (ans == null) { dgShow = Report.DG_TIMEOUT; dgShowBg = Ui.WARN; dgShowFg = Color.BLACK; }
+        else if (Report.dgGood(res)) { dgShow = ans; dgShowBg = Ui.MSG_BG; dgShowFg = Color.WHITE; }
+        else { dgShow = ans; dgShowBg = Ui.WARN; dgShowFg = Color.BLACK; }
+        showMsg(dgShow, dgShowBg, dgShowFg);
+        // 판정 띠와 표(동글·Wi-Fi 칸)가 결과와 어긋나지 않게 상태 파일을 새로 쓰게 한다. 새로 써지면 kickWatch가 다시 그리고,
+        // showStatus가 이 안내를 다시 올린다(PR #100 리뷰 6). 화면을 열 때의 새로 쓰기(10초 안 한 번)와 겹치지 않으므로 그 막음은 푼다
+        kickEl = 0;
+        kickStatus();
         return false;
     }
 

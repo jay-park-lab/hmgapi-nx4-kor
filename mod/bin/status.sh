@@ -278,7 +278,8 @@ st_verdict() {
   elif [ "$K_WPA" = yes ]; then
     # 내비의 Wi-Fi 클라이언트(HMG-API 집 Wi-Fi 포함)가 켜져 있으면 HMG-API 지기는 라디오를 건드리지 않는다(Wi-Fi 칩은 하나)
     _vs wificlient 1 "내비가 일반 Wi-Fi에 접속하는 중이라 무선 연결용 Wi-Fi가 꺼져 있습니다. HMG-API 앱의 Home Wi-Fi를 쓰면 주차를 풀 때 돌아옵니다."
-  elif [ "$K_DGBTN" = yes ] && [ "$K_DG" != none ] && [ "$K_DGON" != "${K_DG#* }" ]; then
+  elif [ "$K_DGBTN" = yes ] && [ "$K_DG" != none ] && [ "$K_DGON" != "${K_DG#* }" ] && [ "$K_DGON" != other ]; then
+    # 다른 모드가 순정 자리에 건 것(other)이면 [동글 켜기]도 건드리지 않고 other로 끝나므로 안내하지 않는다(PR #100 리뷰 7)
     # USB Wi-Fi 동글(#60): 칩이 없는 내비에 우리 드라이버가 받는 동글이 꽂혔는데 그 드라이버가 순정 자리에 걸리지 않았다(부팅 뒤에 꽂음).
     # 그대로면 nochip의 ap.boot로 HMG-API 지기가 다시 시도하지 않거나 "켜는 중"·"못 켬"에 머문다. [동글 켜기]로 안내한다(PR #100 리뷰 4)
     _vs dongleoff 1 "USB Wi-Fi 동글이 꽂혀 있지만 아직 켜지 않았습니다. 오른쪽 아래 [동글 켜기]를 눌러 주세요."
