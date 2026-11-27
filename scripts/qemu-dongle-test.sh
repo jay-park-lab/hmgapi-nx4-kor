@@ -10,7 +10,8 @@
 # PC에 꽂은 동글. 동글은 QEMU가 도는 동안 VM으로 넘어가 PC에서는 쓰지 못한다.
 # 환경 변수: NX4_QEMU_USB(VID:PID, 기본 rtl8831bu 0bda:b831, rtl88x2bu 0bda:b812), NX4_QEMU_AP_SECS(AP 하나를 띄워 둘 초,
 #            기본 matrix 30·interactive 180), NX4_QEMU_UNPLUG_SECS(뽑기를 기다릴 초, 기본 90), NX4_QEMU_NOBUILD=1(지난 빌드를 다시 씀),
-#            NX4_QEMU_OUT(결과 폴더), NX4_DRV_DOCKER_CONTEXT·NX4_DRV_VOLUME·NX4_DRV_IMAGE·NX4_DRV_JOBS(scripts/build-driver.sh와 같음)
+#            NX4_QEMU_OUT(결과 폴더), NX4_QEMU_TIMEOUT(이 초가 지나면 QEMU를 끝냄, 기본은 모드와 AP 초로 셈),
+#            NX4_DRV_DOCKER_CONTEXT·NX4_DRV_VOLUME·NX4_DRV_IMAGE·NX4_DRV_JOBS·NX4_DRV_TRIES(scripts/build-driver.sh와 같음)
 # 결과는 out/qemu-test/<드라이버>/에 남는다(zImage, bcmdhd.ko, rootfs.img, console-<모드>-<시각>.log).
 set -eu
 B=$(cd "$(dirname "$0")/.." && pwd)
@@ -30,6 +31,12 @@ for n in "$AP" "$UN"; do case "$n" in ''|*[!0-9]*) echo "초는 숫자로 주세
 command -v qemu-system-arm >/dev/null 2>&1 || { echo "qemu-system-arm이 없습니다(맥: brew install qemu)"; exit 1; }
 OUT=${NX4_QEMU_OUT:-$B/out/qemu-test/$DRIVER}
 mkdir -p "$OUT"
+# docker -v는 상대 경로를 볼륨 이름으로 읽으므로 절대 경로로 바꾼다(PR #93 리뷰 7)
+OUT=$(cd "$OUT" && pwd)
+# 게스트가 멈추거나 끝나지 않을 때 QEMU를 끝낼 시간(초): 부팅·드라이버 올리기 여유 + AP 시간들(matrix는 AP 다섯, interactive는 AP와 뽑기)
+case "$MODE" in matrix) DLIM=$((420 + 5 * (AP + 15))) ;; *) DLIM=$((420 + AP + UN + 60)) ;; esac
+LIMIT=${NX4_QEMU_TIMEOUT:-$DLIM}
+case "$LIMIT" in ''|*[!0-9]*) echo "NX4_QEMU_TIMEOUT은 숫자(초)로 주세요: $LIMIT"; exit 1 ;; esac
 
 if [ "${NX4_QEMU_NOBUILD:-0}" != 1 ]; then
   command -v docker >/dev/null 2>&1 || { echo "docker가 없습니다"; exit 1; }
@@ -48,9 +55,17 @@ if [ "${NX4_QEMU_NOBUILD:-0}" != 1 ]; then
   IMG=${NX4_DRV_IMAGE:-nx4kor-drvbuild}
   VOL=${NX4_DRV_VOLUME:-nx4kor-drivers}
   docker build -q --platform linux/amd64 -t "$IMG" "$B/drivers" >/dev/null
+  # Docker VM이 이 저장소와 결과 폴더를 보는지(colima 등은 홈 폴더 같은 정해진 곳만 VM에 붙인다. scripts/build-driver.sh와 같음,
+  # PR #93 리뷰 7). 결과 폴더는 VM에서 쓴 파일이 이 PC에 보이는지까지 본다
+  docker run --rm --platform linux/amd64 -v "$B/tests/qemu":/src/qemu:ro "$IMG" test -f /src/qemu/build-guest.sh \
+    || { echo "Docker가 이 저장소 폴더를 보지 못합니다($B). Docker VM에 공유된 곳(예: 홈 폴더 아래)으로 옮겨 돌려 주세요"; exit 1; }
+  rm -f "$OUT/.nx4-visible"
+  docker run --rm --platform linux/amd64 -v "$OUT":/out "$IMG" touch /out/.nx4-visible >/dev/null 2>&1 || true
+  [ -f "$OUT/.nx4-visible" ] || { echo "Docker가 결과 폴더($OUT)에 쓴 파일이 이 PC에 보이지 않습니다. 홈 폴더 아래로 NX4_QEMU_OUT을 주세요"; exit 1; }
+  rm -f "$OUT/.nx4-visible"
   echo "1. 게스트 커널·드라이버 빌드($DRIVER)"
   docker run --rm --platform linux/amd64 -v "$VOL":/work -v "$B/drivers":/src/drivers:ro -v "$B/tests/qemu":/src/qemu:ro \
-    -v "$OUT":/out -e DRIVER="$DRIVER" -e JOBS="${NX4_DRV_JOBS:-}" "$IMG" bash /src/qemu/build-guest.sh
+    -v "$OUT":/out -e DRIVER="$DRIVER" -e JOBS="${NX4_DRV_JOBS:-}" -e MAKE_TRIES="${NX4_DRV_TRIES:-30}" "$IMG" bash /src/qemu/build-guest.sh
   echo "2. 게스트 루트 파일 시스템"
   docker run --rm --platform linux/amd64 -v "$B/tests/qemu":/src/qemu:ro -v "$OUT":/out "$IMG" sh /src/qemu/build-rootfs.sh
 fi
@@ -65,15 +80,33 @@ if [ "$MODE" = interactive ]; then
 else
   echo "3. QEMU($MODE, 동글 $USB를 VM으로 넘김, AP 하나에 ${AP}초)"
 fi
+# 게스트가 멈춰도 끝나게(PR #93 리뷰 1): 게스트는 panic=1(패닉 1초 뒤 재부팅 → -no-reboot라 QEMU가 끝남), 호스트는 LIMIT초가
+# 지나면 QEMU를 끝낸다(지킴이는 2초마다 끝났는지 보고, QEMU가 끝나면 함께 끝남)
+PIDF=$OUT/qemu.pid; DONE=$OUT/qemu.done; TOF=$OUT/qemu.timeout
+rm -f "$PIDF" "$DONE" "$TOF"
+(
+  i=0
+  while [ $i -lt $LIMIT ] && [ ! -f "$DONE" ]; do sleep 2; i=$((i + 2)); done
+  if [ ! -f "$DONE" ] && [ -f "$PIDF" ]; then
+    : > "$TOF"
+    kill "$(cat "$PIDF")" 2>/dev/null || true
+  fi
+) &
+WD=$!
 # QEMU의 libusb는 장치마다 macOS에서 "libusb_kernel_driver_active: -5"를 여러 번 찍는다(맥에는 이 동글의 커널 드라이버가 없음).
 # 뜻이 없는 줄이라 거른다
 qemu-system-arm -M virt,highmem=off -cpu cortex-a15 -smp 2 -m 1024 -display none -monitor none -serial stdio -no-reboot \
-  -kernel "$OUT/zImage" \
-  -append "console=ttyAMA0 root=/dev/vda rw rootfstype=ext4 init=/sbin/nx4init MODE=$MODE AP_SECS=$AP UNPLUG_SECS=$UN" \
+  -pidfile "$PIDF" -kernel "$OUT/zImage" \
+  -append "console=ttyAMA0 root=/dev/vda rw rootfstype=ext4 panic=1 init=/sbin/nx4init MODE=$MODE AP_SECS=$AP UNPLUG_SECS=$UN" \
   -drive if=none,file="$OUT/rootfs.img",format=raw,id=hd0 -device virtio-blk-device,drive=hd0 \
   -device usb-ehci,id=ehci -device usb-host,bus=ehci.0,vendorid=0x"${USB%%:*}",productid=0x"${USB#*:}" </dev/null 2>&1 \
   | grep -av 'libusb_kernel_driver_active' | tee "$LOG"
+: > "$DONE"
+wait $WD 2>/dev/null || true
 echo
 echo "기록: $LOG"
+[ -f "$TOF" ] && echo "알림: ${LIMIT}초가 지나도 끝나지 않아 QEMU를 끝냈습니다(게스트가 멈췄을 수 있음, NX4_QEMU_TIMEOUT)"
+grep -aq "^== 끝" "$LOG" || echo "알림: 게스트가 끝까지 돌지 못했습니다(기록에 \"== 끝\"이 없음. 패닉·멈춤·시간 제한)"
 grep -aq "^1-1 $USB " "$LOG" || echo "알림: VM에 동글($USB)이 보이지 않았습니다. PC에 꽂혀 있는지, 다른 프로그램(가상 머신 등)이 잡고 있지 않은지 봐 주세요"
 grep -aE '^(== |-- )' "$LOG" | grep -av '^== 끝' || true
+rm -f "$PIDF" "$DONE" "$TOF"

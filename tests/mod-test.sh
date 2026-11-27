@@ -1830,25 +1830,60 @@ QX=$T/qx; mkdir -p $QX/bin $QX/noqemu $QX/out
 qxrun() { (env -u DOCKER_CONTEXT -u NX4_DRV_DOCKER_CONTEXT -u DOCKER_HOST NX4_QEMU_OUT=$QX/out "$@" sh $B/scripts/qemu-dongle-test.sh $QARGS) > $QX/run.out 2>&1; echo $? > $QX/run.rc; }
 QARGS=bogus; qxrun PATH=$QX/noqemu:$P0; cp $QX/run.out $QX/usage.out; cp $QX/run.rc $QX/usage.rc
 QARGS=matrix; qxrun PATH=$QX/noqemu:$P0; cp $QX/run.out $QX/noq.out; cp $QX/run.rc $QX/noq.rc
-# 가짜 qemu: 받은 인자를 적고, 게스트처럼 libusb 잡음·USB 목록·단계 줄을 찍는다. 가짜 docker: 인자와 context를 적고 docker info는 됨
+# 가짜 qemu: 받은 인자를 적고, 게스트처럼 libusb 잡음·USB 목록·단계 줄을 찍는다. 가짜 docker: 인자와 context를 적고, 폴더 공유
+# 확인(test -f, touch /out/.nx4-visible)은 QX_NOVIS·QX_NOOUT이 없으면 된 것처럼 한다
 printf '#!/bin/sh\necho "$*" > %s/qemu.args\necho "qemu-system-arm: libusb_kernel_driver_active: -5 [NOT_FOUND]"\necho "1-1 0bda:b831 speed=480 802.11ax WLAN Adapter"\necho "== A. 차 HAL 인자 그대로(국가 코드 없음)"\necho "-- a149 결과: AP로 섬=yes, 가장 많이 붙은 기기 0개, 채널: 149 (5745 MHz)"\necho "== 끝"\n' $QX > $QX/bin/qemu-system-arm
-printf '#!/bin/sh\necho "ctx=${DOCKER_CONTEXT:-none} $*" >> %s/docker.calls\nexit 0\n' $QX > $QX/bin/docker
-chmod +x $QX/bin/qemu-system-arm $QX/bin/docker
+cat > $QX/bin/docker <<'E'
+#!/bin/sh
+echo "ctx=${DOCKER_CONTEXT:-none} $*" >> @QX@/docker.calls
+case "$*" in
+  *"test -f /src/qemu/build-guest.sh"*) [ -z "${QX_NOVIS:-}" ]; exit $? ;;
+  *"touch /out/.nx4-visible"*)
+    if [ -z "${QX_NOOUT:-}" ]; then for a in "$@"; do case "$a" in *:/out) touch "${a%:/out}/.nx4-visible" ;; esac; done; fi ;;
+esac
+exit 0
+E
+sed -i.bak "s#@QX@#$QX#" $QX/bin/docker
+# 멈춘 게스트 흉내: pidfile에 자기 pid를 쓰고 끝나지 않음(exec라 그 pid를 끝내면 출력도 끝남)
+mkdir -p $QX/hang
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = -pidfile ] && echo $$ > "$2"; shift; done\necho "1-1 0bda:b831 speed=480 802.11ax WLAN Adapter"\necho "== A. 차 HAL 인자 그대로(국가 코드 없음)"\nexec sleep 60\n' > $QX/hang/qemu-system-arm
+chmod +x $QX/bin/qemu-system-arm $QX/bin/docker $QX/hang/qemu-system-arm
 QARGS=matrix; qxrun PATH=$QX/bin:$P0 NX4_QEMU_NOBUILD=1; cp $QX/run.out $QX/nofile.out; cp $QX/run.rc $QX/nofile.rc
 : > $QX/out/zImage; for f in zImage rootfs.img bcmdhd.ko; do echo x > $QX/out/$f; done
 QARGS=matrix; qxrun PATH=$QX/bin:$P0 NX4_QEMU_NOBUILD=1; cp $QX/run.out $QX/m.out; cp $QX/run.rc $QX/m.rc; cp $QX/qemu.args $QX/m.args
 QARGS="interactive rtl88x2bu"; qxrun PATH=$QX/bin:$P0 NX4_QEMU_NOBUILD=1 NX4_QEMU_AP_SECS=45; cp $QX/run.out $QX/i.out; cp $QX/qemu.args $QX/i.args
 QARGS=matrix; qxrun PATH=$QX/bin:$P0 NX4_QEMU_NOBUILD=1 NX4_QEMU_USB=0BDA:B831; cp $QX/run.out $QX/badusb.out; cp $QX/run.rc $QX/badusb.rc
+# 리뷰 93-1: 게스트가 멈추면 NX4_QEMU_TIMEOUT초 뒤 QEMU를 끝내고 알림, 게스트는 panic=1
+QARGS=matrix; _t0=$(date +%s); qxrun PATH=$QX/hang:$QX/bin:$P0 NX4_QEMU_NOBUILD=1 NX4_QEMU_TIMEOUT=3; _t1=$(date +%s); cp $QX/run.out $QX/hang.out
 printf 'NX4_DRV_DOCKER_CONTEXT=ctx-qemu\n' > $QX/env
-QARGS="matrix rtl88x2bu"; qxrun PATH=$QX/bin:$P0 NX4_ENV_FILE=$QX/env; cp $QX/run.rc $QX/b.rc
+rm -f $QX/docker.calls
+QARGS="matrix rtl88x2bu"; qxrun PATH=$QX/bin:$P0 NX4_ENV_FILE=$QX/env; cp $QX/run.rc $QX/b.rc; cp $QX/docker.calls $QX/b.calls
+# 리뷰 93-7: Docker VM이 저장소·결과 폴더를 못 보면 멈춤, 결과 폴더는 절대 경로로
+QARGS=matrix; qxrun PATH=$QX/bin:$P0 NX4_ENV_FILE=$QX/env QX_NOVIS=1; cp $QX/run.out $QX/novis.out; cp $QX/run.rc $QX/novis.rc
+QARGS=matrix; qxrun PATH=$QX/bin:$P0 NX4_ENV_FILE=$QX/env QX_NOOUT=1; cp $QX/run.out $QX/noout.out; cp $QX/run.rc $QX/noout.rc
+mkdir -p $QX/rel/out; for f in zImage rootfs.img bcmdhd.ko; do echo x > $QX/rel/out/$f; done
+rm -f $QX/docker.calls
+QARGS=matrix; (cd $QX/rel && env -u DOCKER_CONTEXT -u NX4_DRV_DOCKER_CONTEXT -u DOCKER_HOST PATH=$QX/bin:$P0 NX4_ENV_FILE=$QX/env NX4_QEMU_OUT=out sh $B/scripts/qemu-dongle-test.sh matrix) > $QX/rel.out 2>&1
 check "scripts/qemu-dongle-test.sh: 모르는 모드는 쓰는 법, qemu-system-arm이 없으면 설치 안내, VID:PID 꼴 확인, 빌드 결과가 없으면 멈춤" \
   '[ "$(cat $QX/usage.rc)" = 1 ] && grep -q "쓰는 법: sh scripts/qemu-dongle-test.sh" $QX/usage.out && [ "$(cat $QX/noq.rc)" = 1 ] && grep -q "qemu-system-arm이 없습니다(맥: brew install qemu)" $QX/noq.out && [ "$(cat $QX/badusb.rc)" = 1 ] && grep -q "NX4_QEMU_USB는 VID:PID" $QX/badusb.out && [ "$(cat $QX/nofile.rc)" = 1 ] && grep -q "zImage가 없습니다" $QX/nofile.out' || cat $QX/usage.out $QX/noq.out $QX/nofile.out
-check "  QEMU: virt(ARMv7)에 EHCI로 동글(드라이버별 기본 VID:PID)을 넘기고, MODE·AP·뽑기 초를 게스트에 줌. 기록에서 libusb 잡음은 거르고 단계 줄을 모아 보임" \
-  '[ "$(cat $QX/m.rc)" = 0 ] && grep -q -- "-M virt,highmem=off -cpu cortex-a15" $QX/m.args && grep -q "device usb-ehci,id=ehci -device usb-host,bus=ehci.0,vendorid=0x0bda,productid=0xb831" $QX/m.args && grep -q "init=/sbin/nx4init MODE=matrix AP_SECS=30 UNPLUG_SECS=90" $QX/m.args && grep -q "vendorid=0x0bda,productid=0xb812" $QX/i.args && grep -q "MODE=interactive AP_SECS=45" $QX/i.args && grep -q "폰에서 NX4-QEMU-TEST" $QX/i.out && ! grep -q libusb_kernel_driver_active $QX/out/console-matrix-*.log && grep -q "^-- a149 결과: AP로 섬=yes" $QX/m.out && ! grep -q "VM에 동글(0bda:b831)이 보이지 않았습니다" $QX/m.out && grep -q "VM에 동글(0bda:b812)이 보이지 않았습니다" $QX/i.out' || cat $QX/m.out $QX/m.args
-check "  빌드: 드라이버 빌드와 같은 이미지·볼륨·context(.env.local NX4_DRV_DOCKER_CONTEXT)로 게스트 커널·드라이버(DRIVER), 루트 파일 시스템을 차례로. 게스트 쪽 파일은 drivers/ 밖(tests/qemu/)" \
-  '[ "$(cat $QX/b.rc)" = 0 ] && grep -q "^ctx=ctx-qemu run .*-v nx4kor-drivers:/work .*/tests/qemu:/src/qemu:ro .*-e DRIVER=rtl88x2bu .*nx4kor-drvbuild bash /src/qemu/build-guest.sh" $QX/docker.calls && grep -q "^ctx=ctx-qemu run .*/tests/qemu:/src/qemu:ro .*nx4kor-drvbuild sh /src/qemu/build-rootfs.sh" $QX/docker.calls && [ "$(grep -n build-guest.sh $QX/docker.calls | cut -d: -f1)" -lt "$(grep -n build-rootfs.sh $QX/docker.calls | cut -d: -f1)" ] && [ ! -e $B/drivers/qemu ] && grep -q "^QEMU_APK_STATIC_SHA256=[0-9a-f]\{64\}$" $B/tests/qemu/inputs.sh && grep -q "^QEMU_ALPINE_KEYS_SHA256=[0-9a-f]\{64\}$" $B/tests/qemu/inputs.sh' || cat $QX/docker.calls
-check "  게스트 init: 차 HAL 인자 그대로 insmod, matrix는 국가 코드 없음·KR 채널 표와 5GHz 149번 AP, AP는 끝까지 hostapd가 살아 있어야 섬" \
-  'grep -q "^HAL_ARGS=\"iface_name=wlan0 firmware_path=/data/misc/wifi/fw_bcmdhd.bin nvram_path=/data/misc/wifi/bcmdhd.cal clm_path=/system/wifi/89359.clm_blob\"" $B/tests/qemu/nx4init && grep -q "load rtw_country_code=KR" $B/tests/qemu/nx4init && grep -q "ap a149hal a 149" $B/tests/qemu/nx4init && grep -q "pidof hostapd >/dev/null && case" $B/tests/qemu/nx4init'
+check "  QEMU: virt(ARMv7)에 EHCI로 동글(드라이버별 기본 VID:PID)을 넘기고, MODE·AP·뽑기 초와 panic=1을 게스트에 줌. 기록에서 libusb 잡음은 거르고 단계 줄을 모아 보임" \
+  '[ "$(cat $QX/m.rc)" = 0 ] && grep -q -- "-M virt,highmem=off -cpu cortex-a15" $QX/m.args && grep -q "device usb-ehci,id=ehci -device usb-host,bus=ehci.0,vendorid=0x0bda,productid=0xb831" $QX/m.args && grep -q "panic=1 init=/sbin/nx4init MODE=matrix AP_SECS=30 UNPLUG_SECS=90" $QX/m.args && grep -q -- "-pidfile $QX/out/qemu.pid" $QX/m.args && grep -q "vendorid=0x0bda,productid=0xb812" $QX/i.args && grep -q "MODE=interactive AP_SECS=45" $QX/i.args && grep -q "폰에서 NX4-QEMU-TEST" $QX/i.out && ! grep -q libusb_kernel_driver_active $QX/out/console-matrix-*.log && grep -q "^-- a149 결과: AP로 섬=yes" $QX/m.out && ! grep -q "VM에 동글(0bda:b831)이 보이지 않았습니다" $QX/m.out && grep -q "VM에 동글(0bda:b812)이 보이지 않았습니다" $QX/i.out && ! grep -q "끝까지 돌지 못했습니다" $QX/m.out' || cat $QX/m.out $QX/m.args
+check "  멈춘 게스트: NX4_QEMU_TIMEOUT초 뒤 QEMU를 끝내고 시간 제한과 \"== 끝\" 없음을 알림(리뷰 93-1)" \
+  'grep -q "3초가 지나도 끝나지 않아 QEMU를 끝냈습니다" $QX/hang.out && grep -q "게스트가 끝까지 돌지 못했습니다" $QX/hang.out && [ $((_t1 - _t0)) -lt 30 ] && [ ! -e $QX/out/qemu.pid ]' || cat $QX/hang.out
+check "  빌드: 드라이버 빌드와 같은 이미지·볼륨·context(.env.local NX4_DRV_DOCKER_CONTEXT)로 게스트 커널·드라이버(DRIVER, make 다시 돌리기 횟수), 루트 파일 시스템을 차례로. 게스트 쪽 파일은 drivers/ 밖(tests/qemu/)" \
+  '[ "$(cat $QX/b.rc)" = 0 ] && grep -q "^ctx=ctx-qemu run .*-v nx4kor-drivers:/work .*/tests/qemu:/src/qemu:ro .*-e DRIVER=rtl88x2bu .*-e MAKE_TRIES=30 nx4kor-drvbuild bash /src/qemu/build-guest.sh" $QX/b.calls && grep -q "^ctx=ctx-qemu run .*/tests/qemu:/src/qemu:ro .*nx4kor-drvbuild sh /src/qemu/build-rootfs.sh" $QX/b.calls && [ "$(grep -n build-guest.sh$ $QX/b.calls | tail -1 | cut -d: -f1)" -lt "$(grep -n build-rootfs.sh $QX/b.calls | cut -d: -f1)" ] && [ ! -e $B/drivers/qemu ] && grep -q "^QEMU_APK_STATIC_SHA256=[0-9a-f]\{64\}$" $B/tests/qemu/inputs.sh && grep -q "^QEMU_ALPINE_KEYS_SHA256=[0-9a-f]\{64\}$" $B/tests/qemu/inputs.sh && grep -q "make_retry \$Q/zImage.log" $B/tests/qemu/build-guest.sh && grep -q "make_retry \$Q/\$DRIVER.log" $B/tests/qemu/build-guest.sh' || cat $QX/b.calls
+check "  Docker VM이 저장소나 결과 폴더를 못 보면 멈추고, 상대 경로 결과 폴더는 절대 경로로 넘김(리뷰 93-7)" \
+  '[ "$(cat $QX/novis.rc)" = 1 ] && grep -q "Docker가 이 저장소 폴더를 보지 못합니다" $QX/novis.out && [ "$(cat $QX/noout.rc)" = 1 ] && grep -q "결과 폴더(.*)에 쓴 파일이 이 PC에 보이지 않습니다" $QX/noout.out && grep -q -- "-v $QX/rel/out:/out" $QX/docker.calls && ! grep -q -- "-v out:/out" $QX/docker.calls' || cat $QX/novis.out $QX/noout.out $QX/rel.out
+# 리뷰 93-4: 게스트의 AP 판정(ap_ok)을 가짜 pidof로 직접 본다: hostapd가 끝났으면 마지막이 AP여도 섬이 아님
+sed -n '/^ap_ok() {/,/^}/p' $B/tests/qemu/nx4init > $QX/apok.sh
+mkdir -p $QX/pyes $QX/pno
+printf '#!/bin/sh\nexit 0\n' > $QX/pyes/pidof; printf '#!/bin/sh\nexit 1\n' > $QX/pno/pidof; chmod +x $QX/pyes/pidof $QX/pno/pidof
+apok() { PATH=$1:$P0 sh -c '. "$1"; ap_ok "$2" && echo yes || echo no' x $QX/apok.sh "$2"; }
+_ap="$(apok $QX/pyes ' type AP channel 149 (5745 MHz)')$(apok $QX/pno ' type AP channel 149 (5745 MHz)')$(apok $QX/pyes ' type managed channel 36 (5180 MHz)')$(apok $QX/pno '')"
+check "  게스트 init: AP 판정은 끝까지 hostapd가 살아 있고 마지막 정보가 AP일 때만 섬(가짜 pidof로 넷: 살아 있음·AP=섬, 끝남·AP, 살아 있음·managed, 끝남·없음=아님)" \
+  '[ "$_ap" = yesnonono ] && grep -q "if ap_ok \"\$t\"; then ok=yes; else ok=no; fi" $B/tests/qemu/nx4init' || echo "  $_ap"
+check "  게스트 init: 차 HAL 인자 그대로 insmod, matrix는 국가 코드 없음·KR 채널 표와 5GHz 149번 AP 넷(HAL 인자만 + hostapd KR 포함), 결과 줄에 insmod·채널·rmmod(경고·멈춤 수)" \
+  'grep -q "^HAL_ARGS=\"iface_name=wlan0 firmware_path=/data/misc/wifi/fw_bcmdhd.bin nvram_path=/data/misc/wifi/bcmdhd.cal clm_path=/system/wifi/89359.clm_blob\"" $B/tests/qemu/nx4init && grep -q "load B rtw_country_code=KR" $B/tests/qemu/nx4init && grep -q "ap a149hal a 149 \"\"" $B/tests/qemu/nx4init && grep -q "ap a149halkr a 149 KR" $B/tests/qemu/nx4init && grep -q "echo \"-- rmmod 결과(\$1): 종료 코드 \$rc, 경고" $B/tests/qemu/nx4init && grep -q "echo \"-- 채널 결과(\$1)" $B/tests/qemu/nx4init && grep -q "echo \"-- insmod 결과(" $B/tests/qemu/nx4init'
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
 # 절대 경로 .ko), err(다른 오류), ok. 부른 횟수는 $MR/calls
 MR=$T/mr; mkdir -p $MR/bin $MR/k/scripts/dtc

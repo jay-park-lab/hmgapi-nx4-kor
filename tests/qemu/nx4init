@@ -2,9 +2,34 @@
 # QEMU 동글 테스트(docs/qemu-dongle-test.md)의 게스트 init(PID 1). 루트 파일 시스템의 /sbin/nx4init로 들어간다
 # (tests/qemu/build-rootfs.sh). 커널 명령줄의 MODE로 고른다(커널이 key=value를 init 환경으로 넘김).
 # 드라이버는 차의 순정 HAL(libhardware_legacy.so)이 bcmdhd에 주는 인자 그대로 올린다(HAL_ARGS, USB 진단 기록 wifi-strings.txt).
-#   MODE=matrix       사람 손 없이: HAL 인자로 올린 채널 표, rtw_country_code=KR로 올린 채널 표, 스캔, AP 셋(2.4GHz 6번,
-#                     5GHz 149번 국가 코드 없이, 5GHz 149번 country_code=KR)을 각 AP_SECS초
+#   MODE=matrix       사람 손 없이: HAL 인자로 올린 채널 표, rtw_country_code=KR로 올린 채널 표, 스캔, AP 다섯(2.4GHz 6번,
+#                     KR로 올려 5GHz 149번을 hostapd 국가 코드 없이·KR로, HAL 인자만으로 올려 5GHz 149번을 hostapd 국가 코드 없이·KR로)
+#                     을 각 AP_SECS초
 #   MODE=interactive  KR로 올려 5GHz 149번 AP를 AP_SECS초 띄워 폰으로 붙어 보고, 그다음 쓰는 중에 뽑기를 UNPLUG_SECS초 기다림
+# 결과는 직렬 콘솔에 "== "(단계)와 "-- "(결과) 줄로 남긴다. 호스트(scripts/qemu-dongle-test.sh)가 "-- " 줄을 모아 보이고,
+# 마지막 "== 끝"이 없으면 끝까지 돌지 못한 것으로 본다.
+
+# AP 판정: 끝까지 hostapd가 살아 있고 마지막 iw 정보($1)가 AP일 때만 섬(잠깐 AP였다가 hostapd가 끝나는 경우가 있음)
+ap_ok() {
+  pidof hostapd >/dev/null 2>&1 || return 1
+  case "$1" in *"type AP"*) return 0 ;; esac
+  return 1
+}
+# 커널 기록에서 센 경고(WARNING)와 멈춤(Oops·BUG·Unable to handle·Internal error·panic) 줄 수를 KW·KO에 둔다
+kcount() {
+  KW=$(dmesg | grep -c 'WARNING:')
+  KO=$(dmesg | grep -cE 'Oops|BUG:|Unable to handle|Internal error|Kernel panic')
+}
+# 드라이버 내리기: 올라 있을 때만. 결과 줄(-- rmmod 결과)에 종료 코드와 그 사이 늘어난 경고·멈춤 줄 수를 남긴다
+unload() {
+  grep -q '^bcmdhd ' /proc/modules || return 0
+  pkill hostapd 2>/dev/null; sleep 1
+  kcount; w0=$KW; o0=$KO
+  rmmod bcmdhd; rc=$?
+  sleep 2; kcount
+  echo "-- rmmod 결과($1): 종료 코드 $rc, 경고 $((KW - w0))개, 멈춤 $((KO - o0))개"
+}
+
 /bin/busybox --install -s
 export PATH=/sbin:/usr/sbin:/bin:/usr/bin
 mount -t proc proc /proc
@@ -19,15 +44,21 @@ AP_SECS=${AP_SECS:-30}
 UNPLUG_SECS=${UNPLUG_SECS:-90}
 HAL_ARGS="iface_name=wlan0 firmware_path=/data/misc/wifi/fw_bcmdhd.bin nvram_path=/data/misc/wifi/bcmdhd.cal clm_path=/system/wifi/89359.clm_blob"
 step() { echo; echo "== $*"; }
-load() {
-  rmmod bcmdhd 2>/dev/null; sleep 2
+load() {  # $1 이름(결과 줄용), 그 뒤 HAL_ARGS에 더할 인자
+  n=$1; shift
+  extra="$*"
+  unload "$n 앞"
+  sleep 1
   insmod /lib/modules/bcmdhd.ko $HAL_ARGS "$@"
-  echo "insmod $* 종료 코드 $?"
+  rc=$?
   i=0; while [ ! -d /sys/class/net/wlan0 ] && [ $i -lt 20 ]; do sleep 1; i=$((i + 1)); done
-  ls /sys/class/net | tr '\n' ' '; echo
+  [ -d /sys/class/net/wlan0 ] && w=yes || w=no
+  echo "-- insmod 결과($n${extra:+, $extra}): 종료 코드 $rc, wlan0 $w"
 }
 chans() {
   iw phy | grep -E '^\s+\* (2437|5180|5745|5765|5785|5805|5825) MHz' | sed 's/^[[:space:]]*//'
+  ir=$(iw phy | grep -E '^\s+\* 57(45|65|85) MHz' | grep -c 'no IR')
+  echo "-- 채널 결과($1): 5GHz 149·153·157번 중 no IR $ir개"
   iw reg get 2>/dev/null | head -3
 }
 ap() {  # $1 이름, $2 hw_mode, $3 channel, $4 country_code(빈 값이면 넣지 않음)
@@ -49,9 +80,7 @@ ap() {  # $1 이름, $2 hw_mode, $3 channel, $4 country_code(빈 값이면 넣�
     pidof hostapd >/dev/null && h=돎 || h=없음
     echo "[$1 $i초] hostapd $h, 연결 ${st}개,$t"
   done
-  # 끝까지 hostapd가 살아 있고 AP였을 때만 "섬"(잠깐 AP였다가 hostapd가 끝나는 경우가 있음)
-  ok=no
-  pidof hostapd >/dev/null && case "$t" in *"type AP"*) ok=yes ;; esac
+  if ap_ok "$t"; then ok=yes; else ok=no; fi
   echo "-- $1 결과: AP로 섬=$ok, 가장 많이 붙은 기기 ${maxst}개, 채널:$(echo "$t" | sed 's/.*channel//')"
   grep -vE '^$' /tmp/h-$1.log | tail -12
   pkill hostapd 2>/dev/null; sleep 1
@@ -64,17 +93,17 @@ for u in /sys/bus/usb/devices/*; do
 done
 if [ "$MODE" = matrix ]; then
   step "A. 차 HAL 인자 그대로(국가 코드 없음)"
-  load
+  load A
   dmesg | grep -iE 'unknown parameter|country|chplan|alpha2|regd' | tail -8
-  chans
+  chans A
   step "B. 차 HAL 인자 + rtw_country_code=KR"
-  load rtw_country_code=KR
+  load B rtw_country_code=KR
   dmesg | grep -iE 'country|chplan|alpha2|regd' | tail -8
-  chans
+  chans B
   step "스캔(KR)"
   ip link set wlan0 up; sleep 3
   iw dev wlan0 scan > /tmp/scan.txt 2>&1
-  echo "스캔 종료 코드 $? / AP $(grep -c '^BSS ' /tmp/scan.txt)개, 5GHz $(grep -cE 'freq: 5[0-9]{3}' /tmp/scan.txt)개"
+  echo "-- 스캔 결과: 종료 코드 $?, AP $(grep -c '^BSS ' /tmp/scan.txt)개, 5GHz $(grep -cE 'freq: 5[0-9]{3}' /tmp/scan.txt)개"
   ip link set wlan0 down
   step "AP 1: 2.4GHz 6번, 국가 코드 없음(KR로 올린 드라이버)"
   ap g6 g 6 ""
@@ -82,31 +111,33 @@ if [ "$MODE" = matrix ]; then
   ap a149 a 149 ""
   step "AP 3: 5GHz 149번, hostapd country_code=KR(KR로 올린 드라이버)"
   ap a149kr a 149 KR
-  step "A로 다시 올려 5GHz 149번 AP(국가 코드 없음): 지금 차와 같은 상태"
-  load
+  step "A로 다시 올려(HAL 인자만, 지금 차와 같은 드라이버) 5GHz 149번 AP, hostapd 국가 코드 없음"
+  load A2
   ap a149hal a 149 ""
+  step "HAL 인자만으로 올린 드라이버에 5GHz 149번 AP, hostapd country_code=KR(게스트에는 CRDA가 없음)"
+  ap a149halkr a 149 KR
 else
   step "KR로 올려 5GHz 149번 AP를 ${AP_SECS}초: 폰에서 NX4-QEMU-TEST(비밀번호 nx4-qemu-test)에 붙어 보세요"
-  load rtw_country_code=KR
+  load KR rtw_country_code=KR
   ap phone a 149 ""
   step "쓰는 중에 뽑기: AP를 다시 띄웠으니 지금 동글을 뽑아 주세요(${UNPLUG_SECS}초 기다림)"
-  ap_bg() { hostapd /tmp/h.conf > /tmp/h-unplug.log 2>&1 & }
-  ip link set wlan0 down 2>/dev/null; ap_bg; sleep 5
-  i=0
+  kcount; w0=$KW; o0=$KO
+  ip link set wlan0 down 2>/dev/null
+  hostapd /tmp/h.conf > /tmp/h-unplug.log 2>&1 &
+  sleep 5
+  i=0; gone=no
   while [ $i -lt $UNPLUG_SECS ]; do
     sleep 5; i=$((i + 5))
-    [ -d /sys/class/net/wlan0 ] || { echo "[$i초] wlan0이 사라짐(뽑힘)"; break; }
+    [ -d /sys/class/net/wlan0 ] || { echo "[$i초] wlan0이 사라짐(뽑힘)"; gone=yes; break; }
   done
   sleep 5
   dmesg | grep -iE 'nx4-protect|disconnect|rtw_dev|bcmdhd|Oops|BUG|Unable to handle|panic|Call trace|Internal error' | tail -30
-  echo "hostapd $(pidof hostapd >/dev/null && echo 돎 || echo 없음)"
+  kcount
+  echo "-- 뽑기 결과: wlan0 사라짐 $gone, nx4-protect 줄 $(dmesg | grep -c 'nx4-protect'), 경고 $((KW - w0))개, 멈춤 $((KO - o0))개, hostapd $(pidof hostapd >/dev/null && echo 돎 || echo 없음)"
   tail -8 /tmp/h-unplug.log
 fi
 step "rmmod"
-pkill hostapd 2>/dev/null; sleep 1
-rmmod bcmdhd
-echo "rmmod 종료 코드 $?"
-dmesg | grep -iE 'Oops|BUG|Unable to handle|panic|Internal error' | tail -5
+unload 끝
 step "끝"
 sync
 poweroff -f
