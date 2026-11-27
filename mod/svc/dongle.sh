@@ -10,7 +10,9 @@
 #   4. 순정 HAL은 동글이 보이기 전(약 9.8초)에 순정 bcmdhd를 올리고, 그 모듈은 18초까지 칩을 찾다 포기한 채 남는다. HAL은 그 모듈이
 #      올라 있다고 보고 다시 올리지 않으므로(11-26 진단: 그 줄은 부팅 때 한 번뿐), 순정(또는 이 모드의 다른 드라이버)이 올라 있으면
 #      칩 찾기가 끝난 뒤(initstate live, NX4_DONGLE_LIVE초까지) rmmod한다. 그러면 다음 Wi-Fi 요청(HMG-API 지기는 처음 1분 동안
-#      2초마다)에 HAL이 이 자리의 우리 것을 올린다. 칩이 있는 내비는 1에서 빠지므로 내리는 순정 모듈에는 칩이 없다.
+#      2초마다)에 HAL이 이 자리의 우리 것을 올린다. 내리기 전에 칩을 다시 본다: 칩이 있는 내비라도 HMG-API 표시 파일이 아직 없으면
+#      1에서 빠지지 않고 SDIO 칩은 약 10초에야 보이므로, 그때 칩이 보이면 내리지 않고 건 것도 푼다. 순정은 이번 부팅에 칩 켜기를
+#      포기한 줄(lib.sh dhd_gave_up)이 있을 때만 내린다(PR #99 리뷰 8).
 #   5. 순정은 호스트 세션마다 USB 포트 전원을 한 번 껐다 켠다(꽂은 채 부팅 약 40초, 다시 붙기까지 3.4~3.8초, #48 차 기록).
 #      그때 동글이 떨어졌다 다시 붙어 wlan0이 새로 생기는데, AP는 꺼진 채로 남을 수 있다(Android는 AP가 켜져 있다고 보고
 #      HMG-API 지기는 이번 부팅에 띄웠다고 적어 둠, HMG-API #386). 동글의 장치 번호가 바뀔 때까지(부팅 뒤 NX4_DONGLE_SETTLE초까지)
@@ -72,9 +74,20 @@ case $_lm in
     _i=0
     while [ "$(cat $SYSMOD/bcmdhd/initstate 2>/dev/null)" = coming ] && [ $_i -lt "$LIVE" ]; do sleep 1; _i=$((_i+1)); done
     boot_secs
-    if bbx rmmod bcmdhd 2>/dev/null; then say "먼저 올라 있던 bcmdhd($_lm)를 내림(부팅 뒤 ${_U:-?}초): 다음 Wi-Fi 요청에 HAL이 $N0을 올림"
+    # 칩이 있는 내비인데 HMG-API 표시 파일(public/wifi-chip)이 아직 없으면 1에서 걸러지지 않는다: SDIO 칩은 순정 HAL이 칩 전원을
+    # 켠 뒤(약 10초)에야 보인다. 그래서 내리기 전에 다시 보고, 칩이 보이면 내리지 않고 건 것도 푼다. 순정은 이번 부팅에 칩 켜기를
+    # 포기한 줄이 있을 때만 내린다(PR #99 리뷰 8)
+    if wifi_chip_seen; then
+      ko_umount
+      rm -f $DONGLE
+      say "Wi-Fi 칩이 보임(부팅 뒤 ${_U:-?}초): bcmdhd($_lm)를 두고 건 것을 풂"
+      exit 0
+    fi
+    if [ "$_lm" = stock ] && ! dhd_gave_up; then
+      say "순정 bcmdhd가 이번 부팅에 칩 켜기를 포기한 줄이 없음: 내리지 않음(이번 부팅에는 우리 드라이버가 올라가지 않을 수 있음, 재부팅하면 다시 봄)"
+    elif bbx rmmod bcmdhd 2>/dev/null; then say "먼저 올라 있던 bcmdhd($_lm)를 내림(부팅 뒤 ${_U:-?}초): 다음 Wi-Fi 요청에 HAL이 $N0을 올림"
     elif ! bcmdhd_loaded; then say "먼저 올라 있던 bcmdhd($_lm)는 이미 내려감(HAL이 내렸음)"
-    else say "먼저 올라 있던 bcmdhd($_lm)를 내리지 못함($(cat $SYSMOD/bcmdhd/initstate 2>/dev/null || echo ?)): AP를 껐다 켤 때 다시 봄"; fi
+    else say "먼저 올라 있던 bcmdhd($_lm)를 내리지 못함($(cat $SYSMOD/bcmdhd/initstate 2>/dev/null || echo ?)): HAL이 그것을 둔 채라 이번 부팅에는 우리 드라이버가 올라가지 않을 수 있음(재부팅하면 다시 봄)"; fi
     ;;
 esac
 

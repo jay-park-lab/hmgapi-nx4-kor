@@ -272,16 +272,16 @@ jobs:
           sh scripts/fetch-busybox.sh "$RUNNER_TEMP/busybox"
           echo "NX4_BUSYBOX=$RUNNER_TEMP/busybox/busybox" >> "$GITHUB_ENV"
 
-      # secret은 화면에 내지 않는다(set -x 금지). 파일은 umask 077, 러너 임시 폴더, 마지막 step에서 지운다
       # USB Wi-Fi 동글 드라이버(#48·#80): drivers 워크플로와 같은 방법(scripts/build-driver.sh, Docker, 리눅스 x86)으로 이 커밋에서
-      # 빌드해 모드에 싣는다(scripts/build.sh NX4_DRIVERS). 배포 키를 꺼내기 전에 한다(PR #99 리뷰 3). 빌드 날짜는 drivers/를 마지막으로 바꾼 커밋의 시각이라 같은 커밋이면
-      # drivers 워크플로·PC와 같은 md5가 나온다. 키·비밀값을 쓰지 않는다
+      # 빌드해 모드에 싣는다(scripts/build.sh NX4_DRIVERS). 배포 키를 꺼내기 전에 한다(PR #99 리뷰 3).
+      # 빌드 날짜는 drivers/를 마지막으로 바꾼 커밋의 시각이라 같은 커밋이면 drivers 워크플로·PC와 같은 md5가 나온다. 키·비밀값을 쓰지 않는다
       - name: 동글 드라이버(bcmdhd.ko)
         run: |
           set -eu
           sh scripts/build-driver.sh
           echo "NX4_DRIVERS=$PWD/out/drivers/tcc803x" >> "$GITHUB_ENV"
 
+      # secret은 화면에 내지 않는다(set -x 금지). 파일은 umask 077, 러너 임시 폴더, 마지막 step에서 지운다
       - name: 배포 키를 파일로
         env:
           NX4_APP_KEYSTORE_B64: ${{ secrets.NX4_APP_KEYSTORE_B64 }}

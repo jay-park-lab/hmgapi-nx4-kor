@@ -1688,8 +1688,9 @@ E
 chmod +x $T/bin/mount $T/bin/umount $T/bin/fakeaptool $T/bin/rmmod
 DM=$T/dm; DA=$DM/data/hmgapi/mods/nx4-kor
 dgreset() {
-  rm -rf $DM $T/dusb $T/dnet $T/dh $T/dsysmod $T/dslot $T/ddongle $T/mcalls $T/ps.out $T/dprocnet
-  mkdir -p $DM/data/hmgapi/mods $T/dnet $T/dh/state $T/dh/wifi $T/dsysmod $T/dslot $T/dprocnet
+  rm -rf $DM $T/dusb $T/dnet $T/dh $T/dsysmod $T/dslot $T/ddongle $T/mcalls $T/ps.out $T/dprocnet $T/dsdio
+  mkdir -p $DM/data/hmgapi/mods $T/dnet $T/dh/state $T/dh/wifi $T/dsysmod $T/dslot $T/dprocnet $T/dsdio
+  echo "$DHDL" > $T/ddmesg   # 칩 없는 차: 순정 bcmdhd가 이번 부팅에 칩 켜기를 포기함
   cp -R $TP $DA
   for d in rtl88x2bu rtl8831bu; do mkdir -p $DA/drivers/$d; echo "fake $d" > $DA/drivers/$d/bcmdhd.ko; chmod 600 $DA/drivers/$d/bcmdhd.ko; done
   printf '0bda:b812 rtl88x2bu\n2357:012d rtl88x2bu\n0bda:b831 rtl8831bu\n0bda:b851 rtl8831bu\n' > $DA/drivers/usb-ids.txt
@@ -1701,7 +1702,7 @@ dgreset() {
   echo "3.00 1.00" > $T/duptime
 }
 dgrun() {
-  (env PATH=$P0 BB=$T/bin/bb NX4_APP=$DA NX4_ROOT=$T/droot W=$T/dw BOOT_ID=$T/bootid UPTIME=$T/duptime WIFI_SEEN=$T/dseen SDIO=$T/nosdio \
+  (env PATH=$P0 BB=$T/bin/bb NX4_APP=$DA NX4_ROOT=$T/droot W=$T/dw BOOT_ID=$T/bootid UPTIME=$T/duptime WIFI_SEEN=$T/dseen SDIO=$T/dsdio NX4_DMESG=$T/ddmesg \
      SYSNET=$T/dnet HMGDATA=$T/dh USBDEV=$T/dusb KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/dmountinfo FAKEDATA=$DM/data PROCMOD=$T/dmodules \
      SYSMOD=$T/dsysmod PROCNET=$T/dprocnet DONGLE=$T/ddongle NX4_APTOOL=$T/bin/fakeaptool NX4_DONGLE_POLL=0.1 NX4_DONGLE_SPOLL=0.1 \
      NX4_DONGLE_FTRIES=100 NX4_DONGLE_STRIES=200 NX4_DONGLE_LIVE=3 NX4_DONGLE_WLAN=1 NX4_DONGLE_AP=1 \
@@ -1758,7 +1759,14 @@ check "  이 모드의 다른 드라이버(rtl88x2bu, /proc/net/rtl88x2bu)가 �
 dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters $T/dprocnet/rtl8851bu; : > $T/dsysmod/bcmdhd/parameters/rtw_country_code; dgrun NX4_DONGLE_SETTLE=0
 check "  올라 있는 것이 꽂힌 동글의 드라이버(rtl8831bu, /proc/net/rtl8851bu)면 내리지 않음" '! grep -q "^rmmod" $T/mcalls && ! grep -q "먼저 올라 있던" $T/dg.out' || cat $T/dg.out
 dgreset; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo live > $T/dsysmod/bcmdhd/initstate; dgrun RMMOD_FAIL=1 NX4_DONGLE_SETTLE=0
-check "  내리지 못하면 알리고 이어 감" '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "먼저 올라 있던 bcmdhd(stock)를 내리지 못함(live)" $T/dg.out' || cat $T/dg.out
+check "  내리지 못하면 이번 부팅에는 우리 것이 올라가지 않을 수 있다고 알리고 이어 감" '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "먼저 올라 있던 bcmdhd(stock)를 내리지 못함(live): HAL이 그것을 둔 채라" $T/dg.out' || cat $T/dg.out
+# 칩이 있는 내비인데 HMG-API 표시 파일이 아직 없음: 서비스가 볼 때는 SDIO가 비었다가, 순정이 칩 찾기를 하는 동안(coming) 칩이 보임(PR #99 리뷰 8)
+dgreset; : > $T/ddmesg; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo coming > $T/dsysmod/bcmdhd/initstate
+( /bin/sleep 0.8; mkdir -p $T/dsdio/mmc1:0001:1; echo live > $T/dsysmod/bcmdhd/initstate ) & _dc=$!; dgrun NX4_DONGLE_SETTLE=0; wait $_dc
+check "  칩 찾기가 끝날 때 Wi-Fi 칩(SDIO)이 보이면 순정 bcmdhd를 내리지 않고 건 것을 풀고 기록을 지움(표시 파일이 아직 없는 칩 차, PR #99 리뷰 8)" \
+  '! grep -q "^rmmod" $T/mcalls && grep -qx "umount $T/dslot/bcmdhd.ko" $T/mcalls && [ -z "$(mounted)" ] && [ ! -e $T/ddongle ] && grep -q "Wi-Fi 칩이 보임" $T/dg.out' || cat $T/dg.out $T/mcalls
+dgreset; : > $T/ddmesg; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo live > $T/dsysmod/bcmdhd/initstate; dgrun NX4_DONGLE_SETTLE=0
+check "  순정 bcmdhd가 이번 부팅에 칩 켜기를 포기한 줄이 없으면 내리지 않음(동작 중일 수 있음)" '! grep -q "^rmmod" $T/mcalls && grep -q "칩 켜기를 포기한 줄이 없음: 내리지 않음" $T/dg.out' || cat $T/dg.out
 dgreset; ( /bin/sleep 0.3; rm -rf $T/dusb/4-1 ) & _dc=$!; echo "3.00 1.00" > $T/duptime; ( /bin/sleep 0.8; echo "80.00 1.00" > $T/duptime ) & _du=$!; dgrun; wait $_dc $_du
 check "  기다리는 동안 동글이 빠지면 끝냄(다시 꽂으면 관리 앱 [동글 켜기])" '! grep -q aptool $T/mcalls && grep -q "동글이 빠짐: 끝냄" $T/dg.out' || cat $T/dg.out
 dgreset; cat $T/bootid > $T/dh/wifi/ap.boot; cat $T/bootid > $T/dh/wifi/ap.fail; dgcycle 0x1002; _dc=$!; dgrun APTOOL_FAIL=1; wait $_dc
