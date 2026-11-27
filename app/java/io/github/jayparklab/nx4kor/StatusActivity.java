@@ -43,6 +43,10 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
     static final String RBRES = "/data/local/tmp/nx4-kor-reboot-result.txt";
     /** root 감시자가 끝나는 시각(boot=…, until=부팅 뒤 초, 644) */
     static final String WATCHF = "/data/local/tmp/nx4-kor-watch.txt";
+    /** [동글 켜기] 요청 파일 이름(앱 개인 폴더, #60). root 쪽(svc/lib.sh DGREQ)과 같아야 한다. 꼴은 reboot.req와 같다 */
+    static final String DG_NAME = "dongle.req";
+    /** root(svc/dongle.sh --now, 받지 않으면 status.sh --watch)가 남기는 [동글 켜기] 결과(id·boot·code·usb·drv, 644) */
+    static final String DGRES = "/data/local/tmp/nx4-kor-dongle-result.txt";
 
     final Handler handler = new Handler();
     /** 화면 부품(그릴 때마다 지금 화면 크기로 새로 만든다) */
@@ -54,6 +58,11 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
     /** [지금 재부팅] 버튼과 요청을 보낸 때(부팅 뒤 밀리초, 0이면 없음) */
     TextView rebootBtn;
     long rbEl;
+    /** [동글 켜기] 버튼(상태 파일이 dongle_btn=yes일 때만), 요청을 보낸 때(부팅 뒤 밀리초, 0이면 없음)와 그 id */
+    TextView dongleBtn;
+    long dgEl, dgId;
+    /** 띄운 확인 창이 무엇인가(확인 창의 버튼을 이 화면이 받으므로): 1 재부팅, 2 동글 켜기 */
+    int dialogFor;
     /** 기다리는 재부팅 요청의 id(요청 파일 첫 칸). 결과 파일과 맞춰 본다 */
     long rbId;
     /**
@@ -185,7 +194,10 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
     @Override
     public void run() {
         if (!watching) {
-            if (rbEl > 0 && rebootTick()) {
+            boolean more = false;
+            if (rbEl > 0 && rebootTick()) more = true;
+            if (dgEl > 0 && dongleTick()) more = true;
+            if (more) {
                 handler.removeCallbacks(this);
                 handler.postDelayed(this, 1000);
             }
@@ -306,7 +318,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
      */
     void showStatus() {
         bar = null; pctText = null; stageText = null; timeText = null; noticeText = null; hintText = null; rebootBtn = null; rbEl = 0;
-        msgText = null;
+        msgText = null; dongleBtn = null; dgEl = 0;
         Report r = Report.parse(read(STATUS));
         Report p = Report.parse(read(PROG));
         ui = new Ui(this);
@@ -379,6 +391,12 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         mp.setMargins(ui.px(Ui.PANEL_PAD), ui.px(Ui.GAP), ui.px(Ui.PANEL_PAD), ui.px(Ui.GAP));
         right.addView(msgText, mp);
 
+        // [동글 켜기](#60)는 묶음에 동글 드라이버가 있고 칩이 없는 내비에서만 [지금 재부팅] 위에 둔다(보조 버튼)
+        if (r.dongleButton()) {
+            dongleBtn = ui.button("동글 켜기", false, this);
+            right.addView(dongleBtn, new LinearLayout.LayoutParams(-1, ui.px(Ui.BTN_H)));
+        }
+
         // [지금 재부팅]은 늘 둔다(오른쪽 칸 아래 주 버튼 블록). 누르면 확인 창을 띄우고(운행 중에도 막지 않음), root가 설치 중·마무리 중이면 거절한다.
         // busybox를 실행하지 못한 내비(nobb)는 status.sh가 감시자를 띄우지 않으므로 버튼이 없다.
         if (!r.nobb()) {
@@ -400,6 +418,18 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         } else if (rbf.exists()) {
             try { rbf.delete(); } catch (Exception ignored) { }
         }
+        // 남은 [동글 켜기] 요청: 이번 부팅·DG_WAIT초 안이면 기다림을 이어 보이고(재부팅 기다림이 없을 때), 아니면 지운다
+        File dgf = new File(getFilesDir(), DG_NAME);
+        long[] dgq = Report.rbParse(read(dgf.getPath()), boot);
+        if (dgq != null && dongleBtn != null && rbEl == 0 && el >= dgq[1] && (el - dgq[1]) / 1000 < Report.DG_WAIT) {
+            dgEl = dgq[1]; dgId = dgq[0];
+            dongleBtn.setEnabled(false);
+            showMsg(Report.DG_SENT, Ui.MSG_BG, Color.WHITE);
+            handler.removeCallbacks(this);
+            handler.postDelayed(this, 1000);
+        } else if (dgf.exists()) {
+            try { dgf.delete(); } catch (Exception ignored) { }
+        }
         setContentView(root);
     }
 
@@ -412,6 +442,7 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
                 return;
             }
             // 확인 창. 익명 클래스 대신 이 화면이 직접 받는다(JDK 21 + d8 8.2가 익명 클래스에서 멈춤)
+            dialogFor = 1;
             new android.app.AlertDialog.Builder(this)
                 .setTitle("지금 재부팅")
                 .setMessage(Report.RB_CONFIRM)
@@ -420,14 +451,66 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
                 .show();
             return;
         }
+        if (v == dongleBtn) {
+            if (Report.watchGone(read(WATCHF), boot, android.os.SystemClock.elapsedRealtime() / 1000)) {
+                showMsg(Report.RB_NOWATCH, Ui.WARN, Color.BLACK);
+                return;
+            }
+            dialogFor = 2;
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("동글 켜기")
+                .setMessage(Report.DG_CONFIRM)
+                .setPositiveButton("켜기", this)
+                .setNegativeButton("취소", this)
+                .show();
+            return;
+        }
         finish();
     }
 
-    /** 확인 창의 버튼: 재부팅만 요청한다(취소는 닫기만) */
+    /** 확인 창의 버튼: 띄운 창에 따라 재부팅이나 동글 켜기를 요청한다(취소는 닫기만) */
     @Override
     public void onClick(android.content.DialogInterface d, int which) {
         d.dismiss();
-        if (which == android.content.DialogInterface.BUTTON_POSITIVE) requestReboot();
+        if (which != android.content.DialogInterface.BUTTON_POSITIVE) return;
+        if (dialogFor == 2) requestDongle();
+        else requestReboot();
+    }
+
+    /**
+     * [동글 켜기](#60): 앱은 dongle.req만 쓴다. root 감시자(status.sh --watch)가 받아 svc/dongle.sh --now를 돌리고(동글 드라이버를
+     * 순정 자리에 걸고, 먼저 올라 있는 순정 bcmdhd를 내리고, 무선 연결용 Wi-Fi를 다시 켬) 결과를 DGRES에 남긴다
+     */
+    void requestDongle() {
+        long el = android.os.SystemClock.elapsedRealtime();
+        if (!writeText(new File(getFilesDir(), DG_NAME), Report.rbLine(el, boot))) {
+            showMsg(Report.DG_WRITE_FAILED, Ui.WARN, Color.BLACK);
+            return;
+        }
+        dgEl = el; dgId = el;
+        if (dongleBtn != null) dongleBtn.setEnabled(false);
+        showMsg(Report.DG_SENT, Ui.MSG_BG, Color.WHITE);
+        handler.removeCallbacks(this);
+        handler.postDelayed(this, 1000);
+    }
+
+    /** [동글 켜기] 결과 기다림. 더 기다려야 하면 true. 결과가 오거나 DG_WAIT초가 지나면 안내를 보이고 상태를 다시 읽는다 */
+    boolean dongleTick() {
+        long el = android.os.SystemClock.elapsedRealtime();
+        if (el < dgEl) dgEl = el;
+        Report res = Report.parse(read(DGRES));
+        String ans = Report.dgAnswer(res, boot, dgId);
+        if (ans == null && (el - dgEl) / 1000 < Report.DG_WAIT) return true;
+        dgEl = 0;
+        try { new File(getFilesDir(), DG_NAME).delete(); } catch (Exception ignored) { }
+        if (dongleBtn != null) dongleBtn.setEnabled(true);
+        // 재부팅 기다림 중이면 그 안내를 덮지 않는다
+        if (rbEl > 0) return false;
+        if (ans == null) showMsg(Report.DG_TIMEOUT, Ui.WARN, Color.BLACK);
+        else if (Report.dgGood(res)) showMsg(ans, Ui.MSG_BG, Color.WHITE);
+        else showMsg(ans, Ui.WARN, Color.BLACK);
+        // 표는 다시 그리지 않는다(다시 그리면 이 안내가 사라짐). 표의 동글·Wi-Fi 칸은 화면을 다시 열면 새로 보인다
+        return false;
     }
 
     /**

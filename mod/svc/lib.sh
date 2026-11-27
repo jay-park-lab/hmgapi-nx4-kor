@@ -394,6 +394,43 @@ wlan_up() {
   case "$(cat $SYSNET/$WIF/flags 2>/dev/null)" in *[13579bdfBDF]) return 0 ;; esac
   return 1
 }
+# 순정 bcmdhd가 이번 부팅에 칩 켜기를 포기했는가: 커널 줄(dhd_gave_up). 오래 켜 두어 그 줄이 밀려났으면 svc/nochip.sh의
+# 이번 부팅 칩 없음 기록으로 본다([동글 켜기]는 부팅 뒤 오래 지나 누를 수 있음)
+stock_gave_up() { dhd_gave_up || this_boot $NOCHIP; }
+# 장치($1 sysfs 이름, $2 장치 번호)가 붙은 때(부팅 뒤 정수 초): 커널 줄 "usb <이름>: new … device number <번호> using …"의 시각.
+# 못 찾으면(링 버퍼에서 밀려남) 빈 값
+dongle_since() {
+  klog 2>/dev/null | $BB awk -v d="usb $1: new " -v n="device number $2 using" \
+    'index($0, d) && index($0, n) { s = $0 } END { if (s != "") { sub(/^[^[]*\[ */, "", s); sub(/\].*$/, "", s); print int(s) } }'
+}
+
+# [동글 켜기](#60): 관리 앱이 앱 개인 폴더에 쓰는 요청(꼴은 reboot.req와 같음: "<요청 id> <boot_id> <부팅 뒤 초>", 감시자
+# status.sh --watch만 받음)과 그 결과(644: id·boot·code, 그리고 svc/dongle.sh --now가 쓰면 usb·drv). 다른 앱은 그 폴더에 쓸 수 없다
+DGREQ=${NX4_DGREQ:-/data/data/io.github.jayparklab.nx4kor/files/dongle.req}
+DGRES=${DGRES:-/data/local/tmp/nx4-kor-dongle-result.txt}
+# [동글 켜기]를 누르기 전·뒤의 기록(svc/dongle.sh --now가 $W/dongle-before.txt·dongle-after.txt로 씀. USB 진단 [모으기]가 logs/로 모음,
+# #60 2026-11-26 결정). USB 장치, 순정 자리, bcmdhd, wlan0, hostapd, HMG-API 지기·nochip 기록, 커널 줄 일부. MAC 꼴 값은 가린다
+dongle_snap() {
+  boot_secs
+  echo "uptime=${_U:-?}"
+  echo "boot=$(boot_id)"
+  for _ud in $USBDEV/*; do
+    [ -r "$_ud/idVendor" ] || continue
+    echo "usb ${_ud##*/} $(cat "$_ud/idVendor" 2>/dev/null):$(cat "$_ud/idProduct" 2>/dev/null) devnum=$(cat "$_ud/devnum" 2>/dev/null) speed=$(cat "$_ud/speed" 2>/dev/null)"
+  done
+  ko_on; echo "slot=${_KO:-none}"
+  echo "bcmdhd=$(bcmdhd_drv) initstate=$(cat $SYSMOD/bcmdhd/initstate 2>/dev/null || echo -)"
+  if [ -d $SYSNET/$WIF ]; then echo "wlan0=yes flags=$(cat $SYSNET/$WIF/flags 2>/dev/null) operstate=$(cat $SYSNET/$WIF/operstate 2>/dev/null)"
+  else echo "wlan0=no"; fi
+  ap_on && echo "hostapd=yes" || echo "hostapd=no"
+  this_boot $HMGWIFI/ap.boot && echo "ap_boot=yes" || echo "ap_boot=no"
+  this_boot $HMGWIFI/ap.fail && echo "ap_fail=yes" || echo "ap_fail=no"
+  this_boot $NOCHIP && echo "nochip_mark=yes" || echo "nochip_mark=no"
+  dhd_gave_up && echo "dhd_gave_up=yes" || echo "dhd_gave_up=no"
+  echo "-- 커널 줄(usb·Wi-Fi, 마지막 80줄)"
+  klog 2>/dev/null | $BB grep -E 'usb|bcmdhd|rtl|RTW|nx4-|vbus|wlan|dwc_otg|DHD' | $BB tail -n 80 \
+    | $BB sed -E 's/([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}/xx:xx:xx:xx:xx:xx/g'
+}
 
 # mod.json 꼴 파일($1, 없으면 이 모드의 mod.json)의 "version" 값. 못 읽으면 빈 값
 mod_ver() {

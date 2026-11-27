@@ -145,6 +145,7 @@
 - 오른쪽 칸의 판정: 준비됨·연결됨이면 시안 글자(띠 없음), 확인이 필요하면 노란 띠, 문제면 빨간 띠입니다. 판정은 HMG-API 판, 공식 무선 모드(설치·켜짐·판·훅), HMG-API 훅(map), 프로젝션 AP, Wi-Fi 부품을 차례로 봅니다. 판정 코드별 뜻은 [`docs/design.md`](docs/design.md) "관리 앱".
 - 왼쪽 칸: 요약 3줄(설치 / 무선 Wi-Fi / 폰 연결)과 그 아래 자세한 상태표.
 - 오른쪽 칸 판정 아래의 노란 띠: 설치 중 안내와 알림.
+- **[동글 켜기]**(2.2.0, [지금 재부팅] 위, Wi-Fi 칩이 없는 내비에서 묶음에 동글 드라이버가 있을 때만): 부팅 뒤 USB Wi-Fi 동글(RTL8831BU·RTL88x2BU)을 꽂았을 때 재부팅 없이 켭니다. 동글을 꽂은 뒤 누르면 1~2분 동안 드라이버를 걸고 무선 연결용 Wi-Fi를 다시 켭니다(그동안 무선 카플레이가 끊길 수 있음). 동글을 꽂은 채 시동을 켜면 누르지 않아도 됩니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48), [#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60)).
 - **[지금 재부팅]**(오른쪽 칸 맨 아래): 차를 세운 상태에서만 누르세요. 켜진 지 2분이 안 돼 재부팅되거나 꺼지는 일이 6번 이어지면 HMG-API가 훅을 끄므로, 그 횟수에 가까우면 켜진 지 3~5분이 될 때까지 막힙니다. 그래서 재부팅하라는 안내가 나오면 바로 눌러도 됩니다.
 
 더 자세한 기록은 HMG-API 쪽에 있습니다: 프로젝션 AP는 `/data/hmgapi/logs/hmgapi/wifi.log`, 모드·훅은 HMG-API 앱의 Logs 탭. adb가 없으면 설치 USB로 Update OTA를 누르고 확인 창에서 [모으기]를 고르면 USB의 `NX4/diag/<시각>/logs/`에 함께 모입니다.
@@ -288,7 +289,7 @@ cp mod/icons/icon_night.png app/res/drawable-night-hdpi/ic_launcher.png
 ```
 
 **PC 시험**
-- `sh tests/mod-test.sh`: `mod.json`(뺀 것 포함), 앱 메뉴 타일 그림과 앱 아이콘, 서비스 래퍼, 삭제 전 정리, 상태 판정(공식 무선 모드·훅·프로젝션 AP·Wi-Fi 부품), [지금 재부팅] 요청, USB 설치기(공식 무선 모드 설치, 옛 2.0.x 되돌리기, map 만들기·확인, 계획 읽기와 적용, 진행 기록), 지우기(HMG-API를 먼저 지운 경우, `UNINSTALL-ALL` 포함), 공식 무선 모드 받기(`fetch-wireless.sh`), 관리 앱의 `ReportTest`, 한국 카플레이 길안내의 판단(`TbtGateTest`), 정적 검사. `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치·계획·지우기, 차종 제한(NX4.KOR 260902만)까지 봅니다. `ANDROID_HOME`도 있으면 `hooks.jar`를 진짜로 만들고 곧 회전 그림 판단과 곧 회전 거리(`NearFitTest`)도 돌립니다. 이 모드는 HMG-API 1.1.0-rc.10 이상을 요구하므로 `HMGAPI_SRC`도 v1.1.0-rc.10 이상이어야 합니다(낮으면 엔진이 설치를 거절하고 테스트가 실패로 알림).
+- `sh tests/mod-test.sh`: `mod.json`(뺀 것 포함), 앱 메뉴 타일 그림과 앱 아이콘, 서비스 래퍼, 삭제 전 정리, 상태 판정(공식 무선 모드·훅·프로젝션 AP·Wi-Fi 부품·USB Wi-Fi 동글), [지금 재부팅]·[동글 켜기] 요청, 동글 부팅 서비스, USB 설치기(공식 무선 모드 설치, 옛 2.0.x 되돌리기, map 만들기·확인, 계획 읽기와 적용, 진행 기록), 지우기(HMG-API를 먼저 지운 경우, `UNINSTALL-ALL` 포함), 공식 무선 모드 받기(`fetch-wireless.sh`), 관리 앱의 `ReportTest`, 한국 카플레이 길안내의 판단(`TbtGateTest`), 정적 검사. `HMGAPI_SRC`에 HMG-API 소스를 주면 빌드와 HMG-API 엔진(PC) 설치·계획·지우기, 차종 제한(NX4.KOR 260902만)까지 봅니다. `ANDROID_HOME`도 있으면 `hooks.jar`를 진짜로 만들고 곧 회전 그림 판단과 곧 회전 거리(`NearFitTest`)도 돌립니다. 이 모드는 HMG-API 1.1.0-rc.10 이상을 요구하므로 `HMGAPI_SRC`도 v1.1.0-rc.10 이상이어야 합니다(낮으면 엔진이 설치를 거절하고 테스트가 실패로 알림).
 - 에뮬레이터: 관리 앱을 1920x720 에뮬레이터에 띄워 상태별 화면과 [지금 재부팅] 흐름을 봅니다. 준비와 순서는 [`docs/emulator-test.md`](docs/emulator-test.md).
 - QEMU 동글 테스트: PC에 꽂은 USB Wi-Fi 동글을 QEMU 가상 머신(같은 판 3.18.24 커널)으로 넘겨, 우리 드라이버·패치로 드라이버 올리기, 채널 표, 2.4GHz·5GHz AP, 뽑기를 봅니다(`sh scripts/qemu-dongle-test.sh`). 준비와 결과는 [`docs/qemu-dongle-test.md`](docs/qemu-dongle-test.md).
 

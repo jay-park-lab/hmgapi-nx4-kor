@@ -239,6 +239,65 @@ final class Report {
         return untilSec > 0 && nowSec > untilSec;
     }
 
+    // --- [동글 켜기] (#60, 2.2.0) ---
+    // [지금 재부팅]과 같은 길: 앱 폴더에 dongle.req를 쓰면 root 감시자(status.sh --watch)가 받아 svc/dongle.sh --now를 돌리고,
+    // 결과(id·boot·code·usb·drv)를 DGRES 파일에 남긴다. 상태 파일의 dongle_btn=yes(묶음에 동글 드라이버가 있고 칩이 없는 내비)일 때만 보인다
+    static final String DG_CONFIRM = "USB Wi-Fi 동글을 꽂은 뒤 누르세요. 동글 드라이버를 걸고 무선 연결용 Wi-Fi를 다시 켭니다. 1~2분 걸리고, 그동안 무선 카플레이가 끊길 수 있습니다.";
+    static final String DG_SENT = "동글을 켜는 중입니다…(1~2분)";
+    static final String DG_WRITE_FAILED = "동글 켜기 요청을 저장하지 못했습니다. 다시 눌러 주세요.";
+    static final String DG_TIMEOUT = "동글 켜기 결과를 받지 못했습니다. 관리 앱을 다시 열어 표를 확인하고, 안 되면 재부팅해 주세요.";
+    /** 결과를 기다리는 최대 시간(초). root 쪽은 찾기 15 + 포트 끄고 켜기 20 + 순정 내리기 30 + AP 껐다 켜기·기다림 약 45로 2분 남짓 */
+    static final long DG_WAIT = 180;
+
+    /** [동글 켜기]를 보일지: busybox가 도는 내비이고 상태 파일이 dongle_btn=yes */
+    boolean dongleButton() { return !nobb() && yes("dongle_btn"); }
+
+    /**
+     * root가 남긴 [동글 켜기] 결과(res)에서 내 요청(reqId)에 대한 안내. 이번 부팅의 내 요청이 아니거나 아직 답이 없으면 null.
+     * code: ok·restarted(AP 뜸) · noap·nowlan(드라이버는 걸었지만 AP가 아직) · noproj(AP 요청 없음) · nodongle · nodrivers · chip ·
+     * other(다른 것이 자리에 걸림) · fail(걸지 못함) · gone(빠짐) · busy(부팅 서비스가 도는 중) · old·bad(요청을 받지 못함)
+     */
+    static String dgAnswer(Report res, String boot, long reqId) {
+        if (boot == null || boot.trim().isEmpty() || reqId <= 0) return null;
+        if (!boot.trim().equals(res.get("boot").trim()) || !String.valueOf(reqId).equals(res.get("id").trim())) return null;
+        String c = res.get("code").trim();
+        if (c.isEmpty()) return null;
+        String n = drvName(res.get("drv").trim());
+        if ("ok".equals(c) || "restarted".equals(c)) return "동글(" + n + ")을 켰습니다. 무선 연결용 Wi-Fi가 떴습니다. 폰에서 무선 카플레이를 다시 연결해 보세요.";
+        if ("noap".equals(c) || "nowlan".equals(c)) return "동글 드라이버(" + n + ")는 걸었지만 무선 연결용 Wi-Fi가 아직 뜨지 않았습니다. 1~2분 뒤 표를 확인하고, 안 되면 재부팅해 주세요.";
+        if ("noproj".equals(c)) return "동글 드라이버(" + n + ")를 걸었습니다. 공식 무선 모드가 무선 연결용 Wi-Fi를 요청하지 않아 켜지 않았습니다.";
+        if ("nodongle".equals(c)) return "꽂힌 동글을 찾지 못했습니다. 지원하는 동글(RTL8831BU·RTL88x2BU)인지, 포트에 끝까지 꽂혔는지 확인해 주세요.";
+        if ("nodrivers".equals(c)) return "이 NX4 KOR 묶음에는 동글 드라이버가 없습니다.";
+        if ("chip".equals(c)) return "이 내비에는 Wi-Fi 칩이 있어 동글을 쓰지 않습니다.";
+        if ("other".equals(c)) return "다른 모드가 순정 Wi-Fi 드라이버 자리를 쓰고 있어 동글 드라이버를 걸지 않았습니다.";
+        if ("gone".equals(c)) return "동글이 빠졌습니다. 다시 꽂은 뒤 눌러 주세요.";
+        if ("busy".equals(c)) return "동글을 켜는 작업이 이미 도는 중입니다. 1~2분 뒤 다시 눌러 주세요.";
+        if ("old".equals(c) || "bad".equals(c)) return "동글 켜기 요청을 받지 못했습니다. 다시 눌러 주세요.";
+        return "동글을 켜지 못했습니다(" + c + "). 재부팅한 뒤 다시 눌러 주세요.";
+    }
+
+    /** 결과가 좋은 소식인가(AP가 뜸). 아니면 노란 띠로 보인다 */
+    static boolean dgGood(Report res) {
+        String c = res.get("code").trim();
+        return "ok".equals(c) || "restarted".equals(c);
+    }
+
+    /** 드라이버 이름(dongle.sh·usb-ids.txt의 rtl8831bu 등)을 화면 이름으로 */
+    static String drvName(String d) {
+        if ("rtl8831bu".equals(d)) return "RTL8831BU";
+        if ("rtl88x2bu".equals(d)) return "RTL88x2BU";
+        return d == null || d.isEmpty() || "none".equals(d) ? "?" : d;
+    }
+
+    /** 표의 "USB Wi-Fi 동글" 칸: 안 꽂힘, 또는 "<드라이버> (<vid:pid>), 드라이버 걸림·안 걸림" */
+    String dongleCell() {
+        String d = get("dongle").trim();
+        if (d.isEmpty() || "none".equals(d)) return "안 꽂힘";
+        String[] f = d.split("\\s+");
+        String drv = f.length > 1 ? f[1] : "";
+        return drvName(drv) + " (" + f[0] + "), " + (!drv.isEmpty() && drv.equals(get("dongle_on").trim()) ? "드라이버 걸림" : "드라이버 안 걸림");
+    }
+
     // --- [지금 재부팅] ---
     // 앱은 일반 앱 권한이라 직접 재부팅하지 못한다. 앱 폴더에 reboot.req만 쓰고, root 감시자(status.sh --watch, 화면을 연 뒤
     // 10분 동안 돎)가 받아 재부팅한다. 받지 않으면 이유(code)를 RBRES 파일에 남긴다.
@@ -593,6 +652,7 @@ final class Report {
         out.add(new String[] { "순정 핫스팟 기능 (Wi-Fi 칩 전원)", yn("feat_hotspot") });
         out.add(new String[] { "Wi-Fi 칩", yes("chip") ? "보임" : "no".equals(get("chip")) ? "안 보임" : "-" });
         out.add(new String[] { "Wi-Fi 장치", yn("wlan0") });
+        if (yes("dongle_drivers")) out.add(new String[] { "USB Wi-Fi 동글", dongleCell() });
         out.add(new String[] { "무선 연결용 Wi-Fi (HMG-API)", apCell() });
         if (yes("other_ap")) out.add(new String[] { "다른 패키지의 Wi-Fi", "있음 (지워야 함)" });
         out.add(new String[] { "카플레이 연결", get("cp_conn").isEmpty() ? "-" : get("cp_conn") + "개" });
