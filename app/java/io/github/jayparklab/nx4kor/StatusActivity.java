@@ -535,13 +535,15 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         else if (Report.dgGood(res)) { reShow = ans; reShowBg = Ui.MSG_BG; reShowFg = Color.WHITE; }
         else { reShow = ans; reShowBg = Ui.WARN; reShowFg = Color.BLACK; }
         showMsg(reShow, reShowBg, reShowFg);
-        if (ans != null) {
+        // busy(다른 동글 작업이 돎)·old·bad(감시자가 받지 않음)는 상태 파일을 새로 쓰지 않고 답한다(PR #113 리뷰 4)
+        String dc = res.get("code").trim();
+        if (ans != null && !"busy".equals(dc) && !"old".equals(dc) && !"bad".equals(dc)) {
             // 판정 띠와 표(동글·Wi-Fi 칸)를 결과에 맞춘다. root(svc/dongle.sh --now)가 결과를 쓰기 바로 앞에 상태 파일을 새로 썼으므로
             // 그것을 다시 읽어 그리고, showStatus가 이 안내를 다시 올린다(#111. 예전에는 hmgapid로 새로 쓰게 하고 바뀌기를 기다렸는데,
             // 띠가 "꺼져 있습니다"로 남은 일이 있었음, PR #100 리뷰 6)
             showStatus();
         } else {
-            // 답이 없으면(시간 초과) root가 상태를 새로 쓰지 않았으므로 hmgapid로 새로 쓰게 하고 바뀌면 다시 그린다
+            // 답이 없거나(시간 초과) 상태를 새로 쓰지 않는 답이면 hmgapid로 새로 쓰게 하고 바뀌면 다시 그린다
             kickEl = 0;
             kickStatus();
         }

@@ -24,8 +24,8 @@
 #        껐다 켜지 못했거나 NX4_DONGLE_AP초 뒤에도 AP가 없으면 ap.boot·ap.fail을 지워 지기가 다시 시도하게 한다(PR #99 리뷰 4).
 #      프로젝션 AP를 요청한 모드가 없으면 5는 하지 않는다.
 #      동글로 AP를 띄웠으면 이번 부팅의 칩 없음 기록(nochip.sh)을 지운다: 관리 앱이 "Wi-Fi 부품 없음"이 아니라 실제 AP를 보게.
-#   6. 다시 붙는 동글 지켜보기(#107): NX4_DONGLE_WATCH초(기본 5)마다 USB 장치 목록(이름과 장치 번호)만 셸 안에서 읽는다(외부 명령을
-#      띄우지 않음). 목록이 바뀌고 우리 드라이버가 받는 동글이 새로 보이거나 장치 번호가 바뀌었으면(뺐다 꽂음, 포트 전원 껐다 켬,
+#   6. 다시 붙는 동글 지켜보기(#107): NX4_DONGLE_WATCH초(기본 5)마다 USB 장치 목록(이름과 장치 번호)만 셸 안에서 읽는다(목록 읽기에 외부 명령을
+#      띄우지 않음. 5초 기다림의 sleep은 셸에 따라 외부 명령일 수 있음). 목록이 바뀌고 우리 드라이버가 받는 동글이 새로 보이거나 장치 번호가 바뀌었으면(뺐다 꽂음, 포트 전원 껐다 켬,
 #      QuickBoot에서 깨어남) 아래 --auto로 [동글 켜기]와 같은 일을 한다. 순정 포트가 유선 카플레이로 장치 모드가 되면 버스가
 #      사라지는데, 그때는 동글이 보이지 않으니 하지 않는다. Wi-Fi 칩이 있는 내비, 동글 드라이버가 없는 묶음, 다른 것이 자리에 걸린
 #      경우에는 지켜보지 않는다. 지켜보는 동안에는 dongle.pid를 쥐지 않아 [동글 켜기]를 막지 않는다.
@@ -67,7 +67,7 @@ elif [ "$1" = --auto ]; then
   AUTO=1; QUICK=1
 fi
 V0= N0=
-# 6. 다시 붙는 동글 지켜보기. 목록은 셸 안에서만 읽는다(글롭·read): 5초마다 외부 명령을 띄우지 않게. 바뀌었을 때만 dongle_find
+# 6. 다시 붙는 동글 지켜보기. 목록은 셸 안에서만 읽는다(글롭·read): 목록 읽기에 외부 명령을 띄우지 않게(sleep은 셸에 따라 외부 명령, 5초에 하나). 바뀌었을 때만 dongle_find
 usb_sig() {
   _US=
   for _ud in $USBDEV/*; do
@@ -78,6 +78,9 @@ usb_sig() {
 }
 replug_watch() {
   [ "$WATCH" = 0 ] && exit 0
+  # 1의 칩 확인은 서비스가 시작한 때(부팅 약 2.6초) 한 번이라, HMG-API 표시 파일이 아직 없는 칩 차의 첫 부팅에는 SDIO 칩(약 10초)을
+  # 못 봤을 수 있다. 지켜보기 전에 다시 보고 칩이 있으면 남지 않는다(PR #113 리뷰 1)
+  if wifi_chip_seen; then say "Wi-Fi 칩이 보임: 다시 붙는 동글을 지켜보지 않음"; exit 0; fi
   say "다시 붙는 동글을 지켜봄(${WATCH}초마다 USB 장치 목록만 봄)"
   usb_sig; _wl=$_US
   if dongle_find; then _wd="$_DD:$_DNUM"; else _wd=; fi
@@ -108,6 +111,11 @@ nochip_clear() {
   this_boot $NOCHIP || return 0
   rm -f $NOCHIP && say "동글로 AP를 띄워 이번 부팅의 칩 없음 기록을 지움"
 }
+# 상태 파일만 새로 쓴다(bin/status.sh --once: 감시자를 늘리거나 새로 띄우지 않음, PR #113 리뷰 3). PC 테스트는 NX4_STATUS_CMD로 바꾼다
+st_once() {
+  if [ -n "$NX4_STATUS_CMD" ]; then $NX4_STATUS_CMD
+  else APP=$NX4_APP sh $NX4_APP/bin/status.sh --once; fi
+}
 # 끝내기: 부팅 서비스는 6으로 가고, [동글 켜기]는 누른 뒤 기록과 결과(code, 관리 앱이 읽음)를 남긴다
 dg_done() {
   case $1 in ok|restarted) nochip_clear ;; esac
@@ -115,7 +123,7 @@ dg_done() {
     dongle_snap 2>/dev/null > $W/dongle-after.txt
     # 결과를 쓰기 바로 앞에 상태 파일을 새로 쓴다: 관리 앱은 결과를 받으면 상태 파일을 다시 읽어 판정 띠·표를 그리므로, 결과와
     # 같은 때의 AP를 보게 한다(#111). PC 테스트는 NX4_STATUS_CMD로 바꾼다
-    ${NX4_STATUS_CMD:-sh $NX4_APP/bin/status.sh} </dev/null >/dev/null 2>&1
+    st_once </dev/null >/dev/null 2>&1
     ( umask 022; { echo "id=$RQ"; echo "boot=$(boot_id)"; echo "code=$1"; echo "usb=${V0:-none}"; echo "drv=${N0:-none}"; } > $DGRES.tmp \
         && $BB chmod 644 $DGRES.tmp && $BB mv -f $DGRES.tmp $DGRES ) 2>/dev/null
   fi

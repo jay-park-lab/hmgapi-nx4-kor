@@ -1860,6 +1860,15 @@ dgreset; : > $T/dseen; dgrun NX4_DONGLE_WATCH=0.2 NX4_DONGLE_WATCHN=3
 check "  Wi-Fi 칩이 있는 내비, 동글 드라이버가 없는 묶음, 다른 것이 자리에 걸린 경우에는 지켜보지 않음" \
   '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "Wi-Fi 칩이 있는 내비: 할 일 없음" $T/dg.out && ! grep -q "지켜봄" $T/dg.out && grep -q "chip|nodrivers|other|fail) ;; \*) replug_watch" $DA/svc/dongle.sh' || cat $T/dg.out
 rm -f $T/dseen
+# 칩 있는 내비인데 HMG-API 표시 파일이 아직 없는 첫 부팅: 1의 확인 때는 SDIO 칩이 안 보였다가(약 10초에 보임) 동글을 찾는 동안
+# 보이면, 지켜보기 전에 다시 보고 남지 않음(PR #113 리뷰 1)
+dgreset; rm -rf $T/dusb/4-1; ( /bin/sleep 0.2; mkdir -p $T/dsdio/mmc1:0001:1 ) & _dc=$!
+dgrun NX4_DONGLE_FTRIES=6 NX4_DONGLE_WATCH=0.2 NX4_DONGLE_WATCHN=3; wait $_dc
+check "  1에서 못 본 SDIO 칩이 동글을 찾는 동안 보이면(표시 파일이 아직 없는 칩 차의 첫 부팅) 지켜보지 않고 끝남(PR #113 리뷰 1)" \
+  '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "우리 드라이버가 받는 동글이 없음" $T/dg.out && grep -q "Wi-Fi 칩이 보임: 다시 붙는 동글을 지켜보지 않음" $T/dg.out && ! grep -q "지켜봄(" $T/dg.out' || cat $T/dg.out
+# [동글 켜기] 결과 앞의 상태 쓰기는 status.sh --once: 상태 파일만 쓰고 감시자를 늘리거나 띄우지 않음, 설치 대기도 남기지 않음(PR #113 리뷰 3)
+check "  결과 앞의 상태 쓰기는 status.sh --once(감시자·설치 대기를 건드리지 않음, PR #113 리뷰 3)" \
+  'grep -q "APP=\$NX4_APP sh \$NX4_APP/bin/status.sh --once" $DA/svc/dongle.sh && grep -q "^ONCE=; \[ \"\$1\" = --once \] && ONCE=1$" $TP/bin/status.sh && grep -q "RPT_SYNC:-0}\" != 1 \] && \[ -z \"\$ONCE\" \]" $TP/bin/status.sh && grep -q "WAITED = 0 \] && \[ -z \"\$ONCE\" \]" $TP/bin/status.sh'
 # 지켜보기는 셸 안에서만 USB 목록을 읽는다(글롭·read, 외부 명령 없음): 5초마다 프로세스를 띄우지 않게
 _usg=$(sed -n '/^usb_sig() {/,/^}/p' $DA/svc/dongle.sh)
 check "  지켜보기의 USB 목록 읽기(usb_sig)는 외부 명령 없이 셸 안에서만(글롭과 read), 기본 5초마다" \
