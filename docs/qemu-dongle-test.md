@@ -90,7 +90,7 @@ PR #103(DHCP)의 첫 판으로 돌린 결과입니다. 폰 하나로 붙었습�
 | AP 5GHz 149번(20MHz) | 섬, 180초 내내 hostapd 돎 |
 | 폰으로 붙기 | **붙음**(AP를 띄운 지 약 90초에 폰에서 붙음), WPA2 4-way 끝남 |
 | DHCP | **IP 받음**(붙은 지 5초 안에 `192.168.43.x`), 붙은 채로 AP 시간이 끝날 때까지 남음 |
-| 쓰는 중에 뽑기 | `wlan0` 사라짐, `nx4-protect: device already gone, skip hw access while removing` 한 줄, 커널 경고 하나(`rtw_warn_on` ← `rtw_phl_wifi_role_free`, 위 `rmmod` 때와 같은 것), **커널 멈춤 없음** |
+| 쓰는 중에 뽑기 | `wlan0` 사라짐, `nx4-protect: device already gone, skip hw access while removing` 한 줄, 커널 경고 하나(`rtw_warn_on` ← `rtw_phl_wifi_role_free`, 아래 2026-11-27 결과의 `rmmod` 때와 같은 것), **커널 멈춤 없음** |
 | `rmmod` | 종료 코드 0, 경고 0, 멈춤 0 |
 
 동글 드라이버로 띄운 5GHz 149번 AP에 폰이 붙어 IP까지 받는 것을 PC에서 확인했습니다. 무선 카플레이·안드로이드 오토로 이어지는지는 차에서만 볼 수 있습니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48)).
@@ -98,7 +98,7 @@ PR #103(DHCP)의 첫 판으로 돌린 결과입니다. 폰 하나로 붙었습�
 이 실행에서 고친 것(PR #103):
 
 - `$USB를`처럼 변수 바로 뒤에 한글이 붙은 줄에서, 맥 `/bin/sh`가 UTF-8 로캘에서 `USB�: unbound variable`로 멈췄습니다. `${USB}`로 고쳤습니다.
-- 게스트가 `== 끝`까지 돌았는데도 호스트가 "끝까지 돌지 못했습니다"라고 알렸습니다. 기록을 바이트로 찾고(`LC_ALL=C`), 끝 줄을 몇 초 기다린 뒤 판정하게 했습니다.
+- 게스트가 `== 끝`까지 돌았는데도 호스트가 "끝까지 돌지 못했습니다"라고 알렸습니다. 맥 grep이 UTF-8 로캘에서 기록 원본의 한글 패턴을 못 찾기 때문이었습니다. 기록을 바이트로 찾게(`LC_ALL=C`) 했습니다.
 - 이 판의 기록에는 hostapd 줄의 폰 MAC이 그대로 남았습니다. 그 뒤 판은 `<MAC>`으로 가립니다.
 
 ### 2026-11-27, RTL8831BU(사용자 동글 `0bda:b831`), `matrix`, HAL 패치의 기본 국가 코드 KR

@@ -2267,12 +2267,14 @@ PATH=$QX/fk:$P0 AP_SECS=10 sh -c '. "$1"; ap phone a 149 "" dhcp; ap g6 g 6 ""' 
 check "  게스트 init: interactive AP는 wlan0에 192.168.43.1/24를 주고 dnsmasq(게이트웨이·DNS 없음)로 IP를 빌려줌, 결과 줄에 IP 받은 기기 수, 기록은 종류와 IP만(MAC·폰 이름 없음), matrix AP에는 DHCP 없음" \
   'grep -q "^-- phone 결과: AP로 섬=yes, 가장 많이 붙은 기기 1개, IP 받은 기기 1개(DHCP 돎), 채널:" $QX/apdhcp.out && grep -qx "DHCPACK 192.168.43.23" $QX/apdhcp.out && grep -qx "DHCPDISCOVER" $QX/apdhcp.out && ! grep -q "DHCPDISCOVER [0-9]" $QX/apdhcp.out && ! grep -q "Jay-iPhone\|aa:bb:cc\|02:1a" $QX/apdhcp.out && grep -q "wlan0: AP-STA-CONNECTED <MAC>" $QX/apdhcp.out && grep -qx "dnsmasq: started, version 2.90 DNS disabled" $QX/apdhcp.out && grep -q "^-- g6 결과: AP로 섬=yes, 가장 많이 붙은 기기 1개, 채널:" $QX/apdhcp.out && grep -q -- "--log-facility=- .*--interface=wlan0 --bind-interfaces .*--dhcp-range=192.168.43.10,192.168.43.50,255.255.255.0,1h --dhcp-option=3 --dhcp-option=6" $QX/dnsmasq.args && grep -q "ip addr add 192.168.43.1/24 dev wlan0" $B/tests/qemu/nx4init && grep -q "^  ap phone a 149 \"\" dhcp$" $B/tests/qemu/nx4init && grep -q "usr/sbin/dnsmasq" $B/tests/qemu/build-rootfs.sh && grep -q "^QEMU_ALPINE_PKGS=\".* dnsmasq\"$" $B/tests/qemu/inputs.sh' || cat $QX/apdhcp.out
 # 맥의 /bin/sh(bash 3.2)는 UTF-8 로캘에서 $VAR 바로 뒤의 한글 바이트를 이름으로 읽어 set -u로 멈춘다("USB�: unbound variable",
-# PR #103 테스트 중). 이 테스트는 C 로캘에서 돌아 그 실패를 못 보므로, QEMU 테스트 파일에 그 꼴(${VAR}로 써야 함)이 없는지 본다
+# PR #103 테스트 중). 이 테스트는 부른 쪽 로캘을 물려받아 C 로캘인 PC에서는 그 실패를 못 보므로, QEMU 테스트 파일에 그 꼴
+# (${VAR}로 써야 함)이 없는지 글자로 본다
 _ub=$(LC_ALL=C grep -n '\$[A-Za-z_][A-Za-z0-9_]*[^ -~]' $B/scripts/qemu-dongle-test.sh $B/tests/qemu/nx4init $B/tests/qemu/*.sh)
 check "  QEMU 테스트 파일에 \$VAR 바로 뒤 한글이 없음(맥 sh가 UTF-8 로캘에서 이름으로 읽어 멈춤)" '[ -z "$_ub" ]' || echo "$_ub"
-# 호스트가 기록에서 "== 끝"을 찾는 줄은 바이트로(LC_ALL=C) 찾고, 끝 줄을 몇 초 기다린 뒤 판정한다(PR #103 테스트에서 끝까지 돈 게스트를 못 봄)
-check "  호스트의 기록 판정은 LC_ALL=C로 찾고 \"== 끝\"을 몇 초 기다림" \
-  '[ "$(grep -c "LC_ALL=C grep -aq \"^== 끝\" \"\$LOG\"" $B/scripts/qemu-dongle-test.sh)" = 2 ] && grep -q "LC_ALL=C grep -av .\^== 끝." $B/scripts/qemu-dongle-test.sh && ! grep -q "^grep -a" $B/scripts/qemu-dongle-test.sh'
+# 호스트가 기록을 찾는 줄은 바이트로(LC_ALL=C) 찾는다: 맥 grep은 UTF-8 로캘에서 기록 원본의 한글 패턴을 못 찾아, 끝까지 돈 게스트를
+# "끝까지 돌지 못했습니다"로 알렸다(PR #103 첫 실행, 리뷰 4)
+check "  호스트의 기록 판정은 LC_ALL=C로 찾음(맥 grep이 UTF-8 로캘에서 기록의 한글 줄을 못 찾음)" \
+  '[ "$(grep -c "LC_ALL=C grep -aq \"^== 끝\" \"\$LOG\"" $B/scripts/qemu-dongle-test.sh)" = 1 ] && grep -q "LC_ALL=C grep -av .\^== 끝." $B/scripts/qemu-dongle-test.sh && ! grep -q "^grep -a" $B/scripts/qemu-dongle-test.sh'
 check "  게스트 init: 차 HAL 인자 그대로 insmod(우리 패치의 기본 KR), matrix는 국가 코드 없음(rtw_country_code= 빈 값)·HAL 인자만 채널 표와 5GHz 149번 AP 넷(국가 코드 없음 + hostapd KR 포함), interactive는 HAL 인자만, 결과 줄에 insmod·채널·rmmod(경고·멈춤 수)" \
   'grep -q "^HAL_ARGS=\"iface_name=wlan0 firmware_path=/data/misc/wifi/fw_bcmdhd.bin nvram_path=/data/misc/wifi/bcmdhd.cal clm_path=/system/wifi/89359.clm_blob\"" $B/tests/qemu/nx4init && grep -q "^  load none rtw_country_code=$" $B/tests/qemu/nx4init && grep -q "^  load none2 rtw_country_code=$" $B/tests/qemu/nx4init && [ "$(grep -c "^  load hal$" $B/tests/qemu/nx4init)" = 2 ] && ! grep -q "rtw_country_code=KR" $B/tests/qemu/nx4init && grep -q "ap a149 a 149 \"\"" $B/tests/qemu/nx4init && grep -q "ap a149kr a 149 KR" $B/tests/qemu/nx4init && grep -q "ap a149none a 149 \"\"" $B/tests/qemu/nx4init && grep -q "ap a149nonekr a 149 KR" $B/tests/qemu/nx4init && grep -q "echo \"-- rmmod 결과(\$1): 종료 코드 \$rc, 경고" $B/tests/qemu/nx4init && grep -q "echo \"-- 채널 결과(\$1)" $B/tests/qemu/nx4init && grep -q "echo \"-- insmod 결과(" $B/tests/qemu/nx4init'
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와
