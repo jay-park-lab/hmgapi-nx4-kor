@@ -1862,13 +1862,35 @@ check "  Wi-Fi 칩이 있는 내비, 동글 드라이버가 없는 묶음, 다�
 rm -f $T/dseen
 # 칩 있는 내비인데 HMG-API 표시 파일이 아직 없는 첫 부팅: 1의 확인 때는 SDIO 칩이 안 보였다가(약 10초에 보임) 동글을 찾는 동안
 # 보이면, 지켜보기 전에 다시 보고 남지 않음(PR #113 리뷰 1)
-dgreset; rm -rf $T/dusb/4-1; ( /bin/sleep 0.2; mkdir -p $T/dsdio/mmc1:0001:1 ) & _dc=$!
-dgrun NX4_DONGLE_FTRIES=6 NX4_DONGLE_WATCH=0.2 NX4_DONGLE_WATCHN=3; wait $_dc
+# 차례를 시각 하나에 기대지 않게(PR #113 리뷰 7): 찾기는 부팅 뒤 초가 3에 멈춰 있어 끝나지 않고 돈다. 서비스가 dongle.pid를 쓴 뒤
+# (1의 칩 확인은 바로 그 뒤) 칩을 만들고, 칩을 만든 뒤에야 부팅 뒤 초를 30으로 바꿔 찾기를 끝낸다. 그래서 지켜보기 전에는 늘 칩이 있다
+dgreset; rm -rf $T/dusb/4-1
+( _w=0; until [ -s $T/dw/dongle.pid ] || [ $_w -ge 200 ]; do /bin/sleep 0.05; _w=$((_w+1)); done
+  /bin/sleep 0.5; mkdir -p $T/dsdio/mmc1:0001:1; echo "30.00 1.00" > $T/duptime ) & _dc=$!
+dgrun NX4_DONGLE_FTRIES=1000000 NX4_DONGLE_WATCH=0.2 NX4_DONGLE_WATCHN=3; wait $_dc
 check "  1에서 못 본 SDIO 칩이 동글을 찾는 동안 보이면(표시 파일이 아직 없는 칩 차의 첫 부팅) 지켜보지 않고 끝남(PR #113 리뷰 1)" \
-  '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "우리 드라이버가 받는 동글이 없음" $T/dg.out && grep -q "Wi-Fi 칩이 보임: 다시 붙는 동글을 지켜보지 않음" $T/dg.out && ! grep -q "지켜봄(" $T/dg.out' || cat $T/dg.out
+  '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "우리 드라이버가 받는 동글이 없음(부팅 뒤 30초)" $T/dg.out && grep -q "Wi-Fi 칩이 보임: 다시 붙는 동글을 지켜보지 않음" $T/dg.out && ! grep -q "지켜봄(" $T/dg.out' || cat $T/dg.out
 # [동글 켜기] 결과 앞의 상태 쓰기는 status.sh --once: 상태 파일만 쓰고 감시자를 늘리거나 띄우지 않음, 설치 대기도 남기지 않음(PR #113 리뷰 3)
-check "  결과 앞의 상태 쓰기는 status.sh --once(감시자·설치 대기를 건드리지 않음, PR #113 리뷰 3)" \
-  'grep -q "APP=\$NX4_APP sh \$NX4_APP/bin/status.sh --once" $DA/svc/dongle.sh && grep -q "^ONCE=; \[ \"\$1\" = --once \] && ONCE=1$" $TP/bin/status.sh && grep -q "RPT_SYNC:-0}\" != 1 \] && \[ -z \"\$ONCE\" \]" $TP/bin/status.sh && grep -q "WAITED = 0 \] && \[ -z \"\$ONCE\" \]" $TP/bin/status.sh'
+# status.sh --once를 실제로 돌린다(RPT_SYNC 없이, 설치 진행 중 기록도 둠): 상태 파일은 쓰고, 감시자 끝 시각·설치 대기 pid는
+# 남기지 않음(PR #113 리뷰 8). 틀려서 감시자가 떴으면 테스트가 끝내 둔다
+rm -rf $T/ow $T/once.txt $T/oprog; mkdir -p $T/ow; echo "state=run" > $T/oprog
+(env PATH=$P0 BB=$T/bin/bb APP=$TP W=$T/ow HMGDATA=$SH PROG=$T/oprog BOOT_ID=$T/bootid UPTIME=$T/suptime \
+   WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio SYSNET=$T/sysnet PROCNET=$T/procnet PROC=$T/sproc STATUS=$T/once.txt SRC=$T/softap.conf \
+   HMGINST=$T/sinst HMGLOG=$T/shlog HOOKSTARTS=$T/shook/starts NX4_DMESG=$T/sdmesg NOCHIP=$T/snochip USBDEV=$T/susb \
+   NX4_APLOG=$T/ow/ap.log sh $TP/bin/status.sh --once) > $T/once.out 2>&1
+/bin/sleep 0.3
+for _f in $T/ow/watch.pid $T/ow/wait.pid; do [ -s $_f ] && kill $(cut -d' ' -f1 $_f) 2>/dev/null; done
+_once=$(ls $T/ow | tr '\n' ' ')
+# 같은 환경에서 인자 없이 돌리면 감시자 끝 시각을 쓴다(이 테스트가 늘 통과하는 것이 아님을 보임). 띄운 감시자·설치 대기는 끝낸다
+rm -rf $T/ow2; mkdir -p $T/ow2
+(env PATH=$P0 BB=$T/bin/bb APP=$TP W=$T/ow2 HMGDATA=$SH PROG=$T/oprog BOOT_ID=$T/bootid UPTIME=$T/suptime \
+   WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio SYSNET=$T/sysnet PROCNET=$T/procnet PROC=$T/sproc STATUS=$T/once2.txt SRC=$T/softap.conf \
+   HMGINST=$T/sinst HMGLOG=$T/shlog HOOKSTARTS=$T/shook/starts NX4_DMESG=$T/sdmesg NOCHIP=$T/snochip USBDEV=$T/susb \
+   NX4_APLOG=$T/ow2/ap.log sh $TP/bin/status.sh) > $T/once2.out 2>&1
+/bin/sleep 0.5
+for _f in $T/ow2/watch.pid $T/ow2/wait.pid; do [ -s $_f ] && kill $(cut -d' ' -f1 $_f) 2>/dev/null; done
+check "  결과 앞의 상태 쓰기는 status.sh --once: 실제로 돌리면 상태 파일만 쓰고 감시자 끝 시각·감시자·설치 대기를 남기지 않음(인자 없이 돌리면 남김), dongle.sh가 그것을 부름(PR #113 리뷰 3·8)" \
+  'grep -q "^verdict=" $T/once.txt && [ ! -e $T/ow/watch.until ] && [ ! -e $T/ow/watch.pid ] && [ ! -e $T/ow/wait.pid ] && [ -s $T/ow2/watch.until ] && grep -q "APP=\$NX4_APP sh \$NX4_APP/bin/status.sh --once" $DA/svc/dongle.sh' || { cat $T/once.out; echo "ow: $_once"; ls $T/ow2; }
 # 지켜보기는 셸 안에서만 USB 목록을 읽는다(글롭·read, 외부 명령 없음): 5초마다 프로세스를 띄우지 않게
 _usg=$(sed -n '/^usb_sig() {/,/^}/p' $DA/svc/dongle.sh)
 check "  지켜보기의 USB 목록 읽기(usb_sig)는 외부 명령 없이 셸 안에서만(글롭과 read), 기본 5초마다" \
