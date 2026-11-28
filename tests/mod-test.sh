@@ -2048,7 +2048,7 @@ if [ -z "$(cd $B && git status --porcelain -- drivers scripts/build-driver.sh sc
     'grep -q "bcmdhd.ko.txt" $DS/wfcheck.sh && [ "$(cat $DS/wf.rc)" = 0 ] && [ "$(cat $DS/wf2.rc)" != 0 ] && grep -q "빌드 날짜가 .*rtl8831bu/bcmdhd.ko.txt의 build date(Jan  1 2000 00:00:00)와 다릅니다" $DS/wf2.out' || { cat $DS/wfcheck.sh; cat $DS/wf.out $DS/wf2.out; }
   # 맥에서 만들어도 확장 속성(pax 머리의 LIBARCHIVE.xattr·SCHILY.xattr)과 ._ 파일이 들어가지 않음(리눅스 GNU tar 경고, PR #101 리뷰 9)
   check "  묶음에 확장 속성 머리와 ._ 파일이 없음" \
-    '! gzip -dc $DS/out/src.tar.gz | grep -aq "LIBARCHIVE\.xattr\|SCHILY\.xattr" && ! tar -tzf $DS/out/src.tar.gz | grep -q "/\._" && grep -q "COPYFILE_DISABLE=1 tar --no-xattrs" $B/scripts/driver-source.sh'
+    '! gzip -dc $DS/out/src.tar.gz | grep -aq "LIBARCHIVE\.xattr\|SCHILY\.xattr" && ! gzip -dc $DS/out/src.tar.gz | grep -aq "/\._" && grep -q "COPYFILE_DISABLE=1 tar \$NOX" $B/scripts/driver-source.sh'
   # 같은 .ko(md5)를 얻을 경로·커널 판: build-in-container.sh의 값 그대로(PR #101 리뷰 7)
   check "  SOURCE.txt의 손 빌드에 build-in-container.sh의 커널 트리·KVER·드라이버 폴더(-g라 .ko에 경로가 들어감)" \
     'grep -qF "KSRC=/work/k/linux-3.18.24 KVER=3.18.24-tcc" $DR/SOURCE.txt && grep -qF "/work/nx4/<드라이버>" $DR/SOURCE.txt && grep -q "^K=/work/k/linux-3.18.24$" $B/drivers/build-in-container.sh && grep -q "^KREL=3.18.24-tcc$" $B/drivers/build-in-container.sh' || grep -n "KSRC\|/work" $DR/SOURCE.txt
@@ -2065,6 +2065,12 @@ git -C $DS/sh add -A; git -C $DS/sh -c user.name=t -c user.email=t@example.inval
 check "  얕은 클론에서는 틀린 빌드 날짜를 적지 않고 멈춤" '[ "$(git -C $DS/sh rev-parse --is-shallow-repository)" = true ] && [ "$(cat $DS/sh.rc)" != 0 ] && grep -q "얕은 클론에서는 빌드 날짜를 정할 수 없습니다" $DS/sh.out && [ ! -f $DS/out/sh.tar.gz ]' || cat $DS/sh.out
 check "  릴리스 워크플로가 SOURCE.txt의 BUILD_DATE·BUILD_TIME을 빌드한 .ko의 bcmdhd.ko.txt build date와 맞춰 봄" \
   'grep -q "tar -xzOf \"out/hmgapi-nx4-kor-\$V-driver-source.tar.gz\" hmgapi-nx4-kor-driver-source/SOURCE.txt" $B/.github/workflows/release.yml && grep -q "s/^build date //p" $B/.github/workflows/release.yml && grep -q "echo \"build date \$BUILD_DATE \$BUILD_TIME\"" $B/drivers/build-in-container.sh'
+# 묶음을 만드는 tar가 실패하면(busybox·옛 GNU tar가 옵션을 모름 등) 빈 묶음을 "만듦"으로 내지 않고 멈춤(PR #101 리뷰 10).
+# 가짜 tar: 만들기(-cf)만 실패하고 나머지(받은 원본 풀기, 목록)는 진짜 tar로
+mkdir -p $DS/ftar; printf '#!/bin/sh\ncase "$*" in *-cf*) echo "tar: unrecognized option" >&2; exit 1 ;; esac\nexec %s "$@"\n' "$(command -v tar)" > $DS/ftar/tar; chmod +x $DS/ftar/tar
+rm -f $DS/out/src.tar.gz; dsrun PATH=$DS/ftar:$PATH
+check "  묶음을 만드는 tar가 실패하면 멈추고 빈 묶음을 남기지 않음(tar | gzip 파이프는 gzip의 종료 코드만 보임)" \
+  '[ "$(cat $DS/run.rc)" != 0 ] && [ ! -f $DS/out/src.tar.gz ] && [ ! -f $DS/out/src.tar.gz.tmp ] && ! grep -q "^만듦:" $DS/run.out && grep -q "unrecognized option\|커밋하지 않은 수정이 있습니다" $DS/run.out' || cat $DS/run.out
 dsrun NX4_DRVSRC_RTL8831BU_COMMIT=0123456789abcdef0123456789abcdef01234567
 check "  원본 저장소에 고정 커밋이 없으면 만들지 않음" '[ "$(cat $DS/run.rc)" != 0 ] && grep -q "커밋 0123456789abcdef0123456789abcdef01234567이 없습니다\|커밋하지 않은 수정이 있습니다" $DS/run.out' || cat $DS/run.out
 check "  릴리스 워크플로가 이 묶음을 만들어(SOURCE.txt 확인) 넘기고 릴리스 자산으로 올림, 모드의 drivers/SOURCE.txt가 그 자산을 가리킴" \

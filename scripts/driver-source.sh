@@ -88,7 +88,16 @@ NX4 KOR USB Wi-Fi 동글 드라이버의 대응 소스 (GNU GPL-2.0, 전문은 n
 자세한 것은 nx4-kor/drivers/README.md.
 EOF
 mkdir -p "$(dirname "$OUTF")"
-# 맥(bsdtar)은 기본으로 확장 속성(com.apple.provenance 등)과 ._ 파일을 넣어, 리눅스 GNU tar가 항목마다 경고한다. 둘 다 뺀다(PR #101 리뷰 9)
-(cd "$W" && COPYFILE_DISABLE=1 tar --no-xattrs -cf - hmgapi-nx4-kor-driver-source | gzip -9n) > "$OUTF.tmp"
+# 맥(bsdtar)은 기본으로 확장 속성(com.apple.provenance 등)과 ._ 파일을 넣어, 리눅스 GNU tar가 항목마다 경고한다. 둘 다 뺀다(PR #101 리뷰 9).
+# --no-xattrs는 bsdtar에만 준다(GNU tar는 --xattrs 없이는 넣지 않고, busybox·옛 GNU tar는 이 옵션을 몰라 실패함, 리뷰 10)
+NOX=
+case "$(tar --version 2>/dev/null)" in bsdtar*) NOX=--no-xattrs ;; esac
+# tar와 gzip을 따로 돌려 tar가 실패하면 set -e로 멈춘다(파이프면 gzip의 종료 코드만 보여 빈 묶음이 "만듦"이 됨, 리뷰 10)
+(cd "$W" && COPYFILE_DISABLE=1 tar $NOX -cf "$W/bundle.tar" hmgapi-nx4-kor-driver-source)
+gzip -9n < "$W/bundle.tar" > "$OUTF.tmp"
+# 어떤 까닭으로든 빈 묶음을 내놓지 않게 SOURCE.txt가 들었는지 본다(목록은 파일로 받아 찾음)
+tar -tzf "$OUTF.tmp" > "$W/bundle.list"
+grep -qx 'hmgapi-nx4-kor-driver-source/SOURCE.txt' "$W/bundle.list" \
+  || { rm -f "$OUTF.tmp"; echo "만든 묶음에 SOURCE.txt가 없습니다" >&2; exit 1; }
 mv -f "$OUTF.tmp" "$OUTF"
 echo "만듦: $OUTF ($(wc -c < "$OUTF" | tr -d ' ') 바이트, 커밋 $REV)"
