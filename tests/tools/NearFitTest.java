@@ -7,7 +7,9 @@ import java.util.Arrays;
  * (CpTurnsFit.nearDisplay roundabout 32 and the on-ramp default, onRampDefault, facilityNear), CpIcons, and the
  * near-turn distance (PR #87: near() itself with ordinary roads at 600 m, out past 650 m, expressway exits at 1050 m;
  * dynamicD and bar) and far turns as the picture too (#89, farBig: bar 90 past D, the put-off hold, the stale-dist
- * picture, a jump held whatever its distance, the icon for kinds with no picture and no distance; off is KP's way) on the PC.
+ * picture, a jump held whatever its distance, the icon for kinds with no picture; off is KP's way), no distance and the first
+ * put-off as the picture for NO_DIST_PICTURE_MS (#109), and a kind change on the same turn keeping the first distance and D
+ * (#108, staysNear too) on the PC.
  * Compiled with hooks/src against the same classpath as scripts/build-hooks.sh (HMG-API runtime, iAP2 stubs, android.jar).
  * Prints one line per case and "ok" at the end; exits 1 on the first failure.
  */
@@ -127,6 +129,14 @@ public class NearFitTest {
         int[] nd = g.near(7, un, turn, 70);
         is(nd != null && nd[0] == 13 && nd[3] == 90 && nd[4] == 600 && "no-dist".equals(g.nearWhy),
                 "farBig, no distance yet (a guidance start, #109): the picture, bar 90, D 600, not the icon card");
+        g.clock += 4000L;
+        is(g.near(7, un, turn, 70) != null, "farBig, still no distance 5 s after the first (NO_DIST_PICTURE_MS): the picture");
+        g.clock += 1001L;
+        is(g.near(7, un, turn, 70) == null && "no-dist".equals(g.nearWhy),
+                "farBig, no distance past NO_DIST_PICTURE_MS (an app that never sends item 10, PR #112 review 1): the icon");
+        un.nearForget();
+        g.clock += 1000L;
+        is(g.near(7, un, turn, 70) != null, "a new route (nearForget) with no distance: the picture again");
         is(g.near(7, new CpTurnsFit.Update(0, null), dest, 70) == null, "farBig, no distance, destination: the icon still (no picture for the kind)");
         g.farBig = false;
         is(g.near(7, new CpTurnsFit.Update(0, null), turn, 70) == null && "no-dist".equals(g.nearWhy), "farBig off, no distance: the icon (KP)");
@@ -212,6 +222,16 @@ public class NearFitTest {
         nearAt(t8g, u8g, turn, 500);
         int[] g8 = nearAt(t8g, u8g, rturn, 350);
         is(g8 != null && g8[3] == 70 && g8[4] == 500, "farBig off, left 1 becomes right 2 on the same turn: D stays 500, bar 70");
+        // PR #112 리뷰 3: farBig을 꺼도 staysNear는 nearBase를 본다. 출구 23 → 오른쪽 유지 14에서 800 m로 뛰면 D 1050 안이라 한 번 붙잡는다
+        CpTurnsFit t8s = new CpTurnsFit(null, null, null);
+        t8s.clock = 1000L;
+        CpTurnsFit.Update u8s = new CpTurnsFit.Update(0, null);
+        u8s.list = new int[] { 60 };
+        nearAt(t8s, u8s, exit, 1000);
+        nearAt(t8s, u8s, keep, 600);
+        nearAt(t8s, u8s, keep, 550);
+        is(nearAt(t8s, u8s, keep, 800) == null && t8s.nearHeld && "jump-hold".equals(t8s.nearWhy),
+                "farBig off, keep right 14 (was exit 23) jumps 550 -> 800 m: held once, D 1050 from nearBase");
 
         System.out.println(n + " cases");
         System.out.println("ok");

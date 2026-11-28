@@ -24,7 +24,12 @@ package io.github.jayparklab.nx4kor.hook.dipo;
 //   from D as before ("far-big"); a new turn still carrying the last turn's distance gets its picture the same way
 //   (stale-dist, farPicture) and the one put-off update keeps the frame on the cluster (nearHeld, as jump-hold), so no
 //   icon card flashes between two pictures at a turn change; staysNear holds a jump whatever its distance. near()'s
-//   picture part moved to picture(). Kinds with no picture and no distance at all keep the icon. farBig off: KP's way.
+//   picture part moved to picture(). Kinds with no picture keep the icon. farBig off: KP's way.
+// Modified by NX4 KOR, 2026-11-28 (#108, #109, 2.2.0-beta.1 car checks): a new turn is the turn number changing
+//   (turnChanged); a kind change on the same turn (an exit that becomes keep-right) keeps the first distance, the
+//   hysteresis and the largest D base seen (Update.nearBase), so the gauge doesn't refill; staysNear uses that base too.
+//   With farBig, a turn with no distance yet (for NO_DIST_PICTURE_MS from the first such update: a guidance start) and
+//   a put-off with nothing shown yet get the turn's picture with the bar full, not the icon card.
 // Modified by Korea Projection (StopDragon/HMG-API, branch korea-build), 2026-11-07:
 //   - an icon for every maneuver (angle bands, then the type alone, then the blank icon 8);
 //     turn() no longer stops before the distance, HUD and trip when the exact table has none
@@ -283,6 +288,12 @@ final class CpTurnsFit implements CpTbt {
      * REFRESH_MS(900ms) 이상일 때 다시 판단하므로 첫 refresh는 미룬 뒤 0.9~1.9초다: 2초면 첫 refresh에서는 풀지 않고 둘째(1.9~2.9초)부터 푼다
      */
     static final long PUT_OFF_MAX_MS = 2000L;
+    /**
+     * NX4 KOR (#109, PR #112 review 1): with farBig, how long a turn with no distance from the phone (item 10) yet gets the
+     * picture (bar full) instead of the icon card, from the first such update of this guidance. A guidance start sends the
+     * turn before item 10 for about a second; an app that never sends item 10 would otherwise show a full bar to the turn
+     */
+    static final long NO_DIST_PICTURE_MS = 5000L;
     /**
      * 4차 리뷰 중간 2: 같은 회전에서 앞 값보다 이만큼(m) 이상 오른 값을 받고 RISE_SKIP_MS 안에 번호가 바뀌면 "다음 회전의 거리가 먼저 온
      * 것"(카카오내비 순서)으로 보고 미루지 않는다. 카카오내비는 오른 값 뒤 60~140ms에 새 번호를 보냈다(니로 2026-11-15 네 전환:
@@ -1072,7 +1083,9 @@ final class CpTurnsFit implements CpTbt {
         if (nearDisplay(x.type, x.side, x.junction, x.exit, icon) == null) return false;
         // NX4 KOR (#89): with farBig a far value is a picture too, so a jump is held once whatever its distance
         if (farBig) return true;
-        int d = dynamicD(expressway(x.type) ? D_EXPRESSWAY : D_GENERAL, Math.max(u.nearFirst, remain));
+        // NX4 KOR (#108, PR #112 review 3): the same D base as near() (staysNear is asked only on the same key, so nearBase is
+        // this turn's), so a kind change on the same turn doesn't count D from the new kind alone
+        int d = dynamicD(Math.max(u.nearBase, expressway(x.type) ? D_EXPRESSWAY : D_GENERAL), Math.max(u.nearFirst, remain));
         return remain <= (u.nearOn ? d + NEAR_EXIT_MARGIN : d);
     }
 
@@ -1095,8 +1108,12 @@ final class CpTurnsFit implements CpTbt {
         nearD = -1;
         nearHeld = false;
         // NX4 KOR (#109, 2026-11-28 owner's decision): with farBig, a turn the phone hasn't given a distance for yet (a guidance
-        // start: the turn comes before item 10) gets its picture with the bar full, not the icon card. Kinds with no picture: icon
-        if (!u.distNextSeen || u.distNext < 0) return farBig ? farPicture(x, icon) : null;
+        // start: the turn comes before item 10) gets its picture with the bar full, not the icon card. Kinds with no picture: icon.
+        // Only for NO_DIST_PICTURE_MS from the first such update (PR #112 review 1): an app that never sends item 10 gets the icon
+        if (!u.distNextSeen || u.distNext < 0) {
+            if (u.noDistAt < 0) u.noDistAt = now();
+            return farBig && now() - u.noDistAt <= NO_DIST_PICTURE_MS ? farPicture(x, icon) : null;
+        }
         int remain = u.distNext;
         // 이 회전의 처음 거리: 차로가 오기 전부터 센다(폰이 이 회전에 처음 준 거리). 거리가 늘면 새 회전으로 본다
         String turn = id + " " + (u.list == null || u.list.length == 0 ? -1 : u.list[0]);
@@ -1964,6 +1981,8 @@ final class CpTurnsFit implements CpTbt {
         int nearFirst;
         /** NX4 KOR (#108): this turn's D base (600 or 1050 m), the largest of the kinds seen on the same turn number */
         int nearBase = D_GENERAL;
+        /** NX4 KOR (#109): when near() first saw this guidance with no distance (ms, now()), -1 until then; a new route clears it */
+        long noDistAt = -1;
         /** 1.7.3(N-3): 이 회전이 곧 회전으로 들어갔다(나올 때는 D + NEAR_EXIT_MARGIN을 넘어야 함). 회전이 바뀌면 풀린다 */
         boolean nearOn;
         /**
@@ -1989,6 +2008,7 @@ final class CpTurnsFit implements CpTbt {
             nearPutOff = null;
             nearJump = -1;
             nearLastJump = false;
+            noDistAt = -1;
         }
         String road, destination, distLeftStr, nextStr, sourceName;
         long eta, timeLeft;
