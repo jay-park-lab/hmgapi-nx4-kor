@@ -136,6 +136,7 @@ sequenceDiagram
   participant W as 공식 무선 모드 훅
   participant A as HMG-API Wi-Fi 지기
   participant N as nochip 서비스(이 모드)
+  participant D as dongle 서비스(이 모드)
   participant P as 휴대폰
 
   K->>H: 부팅, zygote 시작
@@ -154,6 +155,12 @@ sequenceDiagram
     N->>N: 커널 기록과 USB 장치로 확인(부팅 뒤 50초, 그 앞 40초쯤 USB 포트 전원을 껐다 켬)
     N->>A: wifi/ap.boot에 이번 부팅 id(그 부팅의 다시 시도를 멈춤)
     Note over N,A: QuickBoot에서 깨어나 지기가 ap.boot를 지우면<br/>inotifyd로 알아채 다시 씀(그때 동글이 보이면 물러남)
+    D->>D: 5초마다 USB 목록만 봄(#107)
+    Note over D,A: 그 뒤 동글을 꽂거나 다시 꽂으면 드라이버를 걸고<br/>AP를 껐다 켜 띄움(버튼 없이), 칩 없음 기록을 지움
+  else 동글을 꽂은 채 부팅(칩 없는 내비)
+    D->>D: 동글에 맞는 드라이버를 순정 자리에 걸고 포기한 순정 bcmdhd를 내림
+    D->>A: 포트 전원 껐다 켬(약 40초) 뒤 AP가 없으면<br/>지기의 기록과 상관없이 AP를 껐다 켬(#107)
+    P->>W: 블루투스로 시작 → 프로젝션 AP에 접속
   else 칩은 있는데 AP를 못 띄움
     A->>A: wifi/ap.fail, 약 1분 자주, 그 뒤 30초마다 다시 시도<br/>(시도마다 Dalvik 하나)
   end
