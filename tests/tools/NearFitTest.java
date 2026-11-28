@@ -129,9 +129,9 @@ public class NearFitTest {
         int[] nd = g.near(7, un, turn, 70);
         is(nd != null && nd[0] == 13 && nd[3] == 90 && nd[4] == 600 && "no-dist".equals(g.nearWhy),
                 "farBig, no distance yet (a guidance start, #109): the picture, bar 90, D 600, not the icon card");
-        g.clock += 4000L;
-        is(g.near(7, un, turn, 70) != null, "farBig, still no distance 5 s after the first (NO_DIST_PICTURE_MS): the picture");
-        g.clock += 1001L;
+        g.clock += CpTurnsFit.NO_DIST_PICTURE_MS;
+        is(g.near(7, un, turn, 70) != null, "farBig, still no distance exactly NO_DIST_PICTURE_MS (5000 ms) after the first: the picture");
+        g.clock += 1L;
         is(g.near(7, un, turn, 70) == null && "no-dist".equals(g.nearWhy),
                 "farBig, no distance past NO_DIST_PICTURE_MS (an app that never sends item 10, PR #112 review 1): the icon");
         un.nearForget();
