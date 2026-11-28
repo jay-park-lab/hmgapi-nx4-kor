@@ -145,7 +145,7 @@
 - 오른쪽 칸의 판정: 준비됨·연결됨이면 시안 글자(띠 없음), 확인이 필요하면 노란 띠, 문제면 빨간 띠입니다. 판정은 HMG-API 판, 공식 무선 모드(설치·켜짐·판·훅), HMG-API 훅(map), 프로젝션 AP, Wi-Fi 부품을 차례로 봅니다. 판정 코드별 뜻은 [`docs/design.md`](docs/design.md) "관리 앱".
 - 왼쪽 칸: 요약 3줄(설치 / 무선 Wi-Fi / 폰 연결)과 그 아래 자세한 상태표.
 - 오른쪽 칸 판정 아래의 노란 띠: 설치 중 안내와 알림.
-- **[동글 켜기]**(2.2.0, [지금 재부팅] 위, Wi-Fi 칩이 없는 내비에서 묶음에 동글 드라이버가 있을 때만): 부팅 뒤 USB Wi-Fi 동글(RTL8831BU·RTL88x2BU)을 꽂았을 때 재부팅 없이 켭니다. 동글을 꽂은 뒤 누르면 1~2분 동안 드라이버를 걸고 무선 연결용 Wi-Fi를 다시 켭니다(그동안 무선 카플레이가 끊길 수 있음). 동글을 꽂은 채 시동을 켜면 누르지 않아도 됩니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48), [#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60)).
+- **[동글 켜기]**(2.2.0, [지금 재부팅] 위, Wi-Fi 칩이 없는 내비에서 묶음에 동글 드라이버가 있을 때만): 부팅 뒤 USB Wi-Fi 동글(RTL8831BU·RTL88x2BU)을 꽂았을 때 재부팅 없이 켭니다. 동글을 꽂은 뒤 누르면 1~2분 동안 드라이버를 걸고 무선 연결용 Wi-Fi를 다시 켭니다(그동안 무선 카플레이가 끊길 수 있음). 동글을 꽂은 채 시동을 켜거나, 부팅 뒤 꽂거나 뺐다 다시 꽂으면 이 모드가 알아서 켜므로 보통은 누르지 않아도 됩니다(2.2.0-beta.3부터, [#107](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/107)·[#110](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/110)). 꽂은 지 1분이 넘도록 켜지지 않을 때 누릅니다([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48), [#60](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/60)).
 - **[지금 재부팅]**(오른쪽 칸 맨 아래): 차를 세운 상태에서만 누르세요. 켜진 지 2분이 안 돼 재부팅되거나 꺼지는 일이 6번 이어지면 HMG-API가 훅을 끄므로, 그 횟수에 가까우면 켜진 지 3~5분이 될 때까지 막힙니다. 그래서 재부팅하라는 안내가 나오면 바로 눌러도 됩니다.
 
 더 자세한 기록은 HMG-API 쪽에 있습니다: 프로젝션 AP는 `/data/hmgapi/logs/hmgapi/wifi.log`, 모드·훅은 HMG-API 앱의 Logs 탭. adb가 없으면 설치 USB로 Update OTA를 누르고 확인 창에서 [모으기]를 고르면 USB의 `NX4/diag/<시각>/logs/`에 함께 모입니다.
