@@ -132,6 +132,9 @@ wait $WD 2>/dev/null || true
 echo
 echo "기록: $LOG"
 [ -f "$TOF" ] && echo "알림: ${LIMIT}초가 지나도 끝나지 않아 QEMU를 끝냈습니다(게스트가 멈췄을 수 있음, NX4_QEMU_TIMEOUT)"
-grep -aq "^== 끝" "$LOG" || echo "알림: 게스트가 끝까지 돌지 못했습니다(기록에 \"== 끝\"이 없음. 패닉·멈춤·시간 제한)"
-grep -aq "^1-1 $USB " "$LOG" || echo "알림: VM에 동글($USB)이 보이지 않았습니다. PC에 꽂혀 있는지, 다른 프로그램(가상 머신 등)이 잡고 있지 않은지 봐 주세요"
-grep -aE '^(== |-- )' "$LOG" | grep -av '^== 끝' || true
+# 기록은 바이트로 찾는다(LC_ALL=C): 맥 grep은 UTF-8 로캘에서 직렬 콘솔 기록의 한글 줄을 못 찾을 때가 있다(LC_CTYPE=UTF-8에서 재현).
+# 끝 줄이 기록에 늦게 닿는 경우가 있어(PR #103 테스트에서 화면에는 "== 끝"이 나왔는데 이 확인이 못 봄) 몇 초 기다린 뒤 판정한다
+i=0; while [ $i -lt 5 ] && ! LC_ALL=C grep -aq "^== 끝" "$LOG"; do sleep 1; i=$((i + 1)); done
+LC_ALL=C grep -aq "^== 끝" "$LOG" || echo "알림: 게스트가 끝까지 돌지 못했습니다(기록에 \"== 끝\"이 없음. 패닉·멈춤·시간 제한)"
+LC_ALL=C grep -aq "^1-1 $USB " "$LOG" || echo "알림: VM에 동글($USB)이 보이지 않았습니다. PC에 꽂혀 있는지, 다른 프로그램(가상 머신 등)이 잡고 있지 않은지 봐 주세요"
+LC_ALL=C grep -aE '^(== |-- )' "$LOG" | LC_ALL=C grep -av '^== 끝' || true
