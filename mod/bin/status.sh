@@ -4,6 +4,7 @@
 #   (인자 없음) 상태 파일을 쓰고, 재부팅 요청을 받는 감시자(--watch)를 10분 동안 띄운다.
 #   --wait      설치가 진행 중이면 끝날 때까지(최대 15분) 기다렸다가 상태 파일을 다시 쓴다.
 #   --watch     관리 앱의 [지금 재부팅]·[동글 켜기] 요청을 받는다([동글 켜기]는 svc/dongle.sh --now가 동글 드라이버를 건다).
+#   --once      상태 파일만 새로 쓴다(감시자를 늘리거나 띄우지 않고, 설치 대기도 남기지 않음). svc/dongle.sh --now가 결과 앞에 부른다(#111).
 # 2.1.0의 판정은 "HMG-API + 공식 무선 모드(wireless-carplay-aa) + 이 모드" 구조를 본다: HMG-API 판, 공식 모드가 깔리고 켜졌는지와
 # 그 판·훅, HMG-API 훅(map), HMG-API가 띄우는 프로젝션 AP, Wi-Fi 부품, USB Wi-Fi 동글. 상태 파일을 쓸 때는 읽기만 하고 아무것도 바꾸지 않는다.
 # 상태 파일에는 이름, 버전, 예/아니요, 개수만 넣는다(SSID, 비밀번호, 휴대폰 이름, MAC, IP 없음).
@@ -16,6 +17,7 @@ bbx mkdir -p $W 2>/dev/null
 # --wait: 설치 중에 화면을 열면 뒤에서 한 번 더 돈다. 설치가 끝날 때까지(최대 15분) 기다렸다가 아래 보통 흐름으로
 # 상태 파일을 다시 쓴다. 관리 앱은 진행 막대를 보여 주다가 상태 파일이 새로 쓰이면 결과 화면으로 바뀐다.
 WAITED=0
+ONCE=; [ "$1" = --once ] && ONCE=1
 if [ "$1" = --wait ]; then
   _i=0
   while $BB grep -q '^state=run$' $PROG 2>/dev/null && [ $_i -lt 180 ]; do sleep 5; _i=$((_i+1)); done
@@ -661,7 +663,7 @@ umask 077
 # 감시자를 띄운다. 이미 살아 있으면 끝나는 시각만 늘린다. 설치 대기(--wait)가 끝났을 때도 지금부터 10분 동안 띄운다
 # ([지금 재부팅]이 늘 보이므로, 설치 중 화면을 연 뒤 10분이 지나 버튼이 안 듣는 일이 없게).
 # RPT_SYNC=1(PC 테스트)이면 띄우지 않는다(테스트가 --watch를 직접 부른다).
-if [ "${RPT_SYNC:-0}" != 1 ]; then
+if [ "${RPT_SYNC:-0}" != 1 ] && [ -z "$ONCE" ]; then
   _wn=$(up_s)
   case "$_wn" in
     ''|*[!0-9]*) : ;;
@@ -674,7 +676,7 @@ if [ "${RPT_SYNC:-0}" != 1 ]; then
 fi
 
 # 설치가 아직 진행 중이면 끝난 뒤에 한 번 더 돌도록 뒤에 남긴다(한 번에 하나만, 이번 부팅의 것만)
-if [ $WAITED = 0 ] && $BB grep -q '^state=run$' $PROG 2>/dev/null; then
+if [ $WAITED = 0 ] && [ -z "$ONCE" ] && $BB grep -q '^state=run$' $PROG 2>/dev/null; then
   # wait.pid도 "<pid> <boot_id>"로 쓰고 st_alive로 본다(지난 부팅의 같은 pid를 살아 있는 것으로 보지 않게)
   if ! st_alive $W/wait.pid --wait; then
     BB=$BB $BB setsid sh $APP/bin/status.sh --wait </dev/null >/dev/null 2>&1 &

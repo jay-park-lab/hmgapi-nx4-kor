@@ -1638,7 +1638,7 @@ printf '#!/bin/sh\necho reboot >> %s/rbcalls\nexit 1\n' $RW > $T/bin/fakereboot;
 echo "100.00 50.00" > $RW/uptime; echo 200 > $RW/w/watch.until
 (env PATH=$P0 BB=$T/bin/bb APP=$TP W=$RW/w BK=$RW/bk PROG=$RW/prog NOTICE=$RW/notice BOOT_ID=$T/bootid UPTIME=$RW/uptime PROC=$RW/proc \
    NX4_RBREQ=$RW/reboot.req RBRES=$RW/rbres WATCHF=$RW/watchf NX4_REBOOT=$T/bin/fakereboot NX4_SYNC=true NX4_RB_WAIT=1 NX4_APLOG=$RW/ap.log \
-   HOOKSTARTS=$RW/hook/starts HMGINST=$RW/inst NX4_DMESG=$RW/dmesg NX4_DGREQ=$RW/dongle.req DGRES=$RW/dgres WIFI_SEEN=$RW/noseen SDIO=$RW/nosdio \
+   HOOKSTARTS=$RW/hook/starts HMGINST=$RW/inst NX4_DMESG=$RW/dmesg NX4_DGREQ=$RW/dongle.req DGRES=$RW/dgres NX4_STATUS_CMD=true WIFI_SEEN=$RW/noseen SDIO=$RW/nosdio \
    sh $TP/bin/status.sh --watch) > $RW/watch.out 2>&1 &
 RWP=$!
 # 감시자가 결과 파일에 이 요청 id와 code를 쓸 때까지 기다린다(최대 약 10초)
@@ -1748,7 +1748,7 @@ E
 chmod +x $T/bin/mount $T/bin/umount $T/bin/fakeaptool $T/bin/rmmod
 DM=$T/dm; DA=$DM/data/hmgapi/mods/nx4-kor
 dgreset() {
-  rm -rf $DM $T/dusb $T/dnet $T/dh $T/dsysmod $T/dslot $T/ddongle $T/mcalls $T/ps.out $T/dprocnet $T/dsdio $T/ddgres $T/dw $T/dproc
+  rm -rf $DM $T/dusb $T/dnet $T/dh $T/dsysmod $T/dslot $T/ddongle $T/mcalls $T/ps.out $T/dprocnet $T/dsdio $T/ddgres $T/dw $T/dproc $T/dnochip
   mkdir -p $DM/data/hmgapi/mods $T/dnet $T/dh/state $T/dh/wifi $T/dsysmod $T/dslot $T/dprocnet $T/dsdio
   echo "$DHDL" > $T/ddmesg   # 칩 없는 차: 순정 bcmdhd가 이번 부팅에 칩 켜기를 포기함
   cp -R $TP $DA
@@ -1764,8 +1764,8 @@ dgreset() {
 dgrun() {
   (env PATH=$P0 BB=$T/bin/bb NX4_APP=$DA NX4_ROOT=$T/droot W=$T/dw BOOT_ID=$T/bootid UPTIME=$T/duptime WIFI_SEEN=$T/dseen SDIO=$T/dsdio NX4_DMESG=$T/ddmesg \
      SYSNET=$T/dnet HMGDATA=$T/dh USBDEV=$T/dusb KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/dmountinfo FAKEDATA=$DM/data PROCMOD=$T/dmodules \
-     SYSMOD=$T/dsysmod PROCNET=$T/dprocnet DONGLE=$T/ddongle DGRES=$T/ddgres NX4_APTOOL=$T/bin/fakeaptool NX4_DONGLE_POLL=0.1 NX4_DONGLE_SPOLL=0.1 \
-     NX4_DONGLE_FTRIES=100 NX4_DONGLE_STRIES=200 NX4_DONGLE_LIVE=3 NX4_DONGLE_WLAN=1 NX4_DONGLE_AP=1 \
+     SYSMOD=$T/dsysmod PROCNET=$T/dprocnet DONGLE=$T/ddongle DGRES=$T/ddgres NOCHIP=$T/dnochip NX4_APTOOL=$T/bin/fakeaptool NX4_DONGLE_POLL=0.1 NX4_DONGLE_SPOLL=0.1 \
+     NX4_DONGLE_FTRIES=100 NX4_DONGLE_STRIES=200 NX4_DONGLE_LIVE=3 NX4_DONGLE_WLAN=1 NX4_DONGLE_AP=1 NX4_DONGLE_WATCH=0 \
      "$@" sh $DA/svc/dongle.sh) > $T/dg.out 2>&1; echo $? > $T/dg.rc
 }
 # dgcycle: 서비스가 동글을 건 뒤(기록이 생긴 뒤, 최대 10초) 포트 전원을 껐다 켠 것처럼 동글이 떨어졌다(0.3초) 장치 번호 3으로 다시 붙고,
@@ -1778,14 +1778,19 @@ check "dongle.sh: 꽂힌 동글(0bda:b831)에 맞는 rtl8831bu를 순정 자리�
   '[ "$(cat $T/dg.rc)" = 0 ] && grep -qx "mount -o bind $DA/drivers/rtl8831bu/bcmdhd.ko $T/dslot/bcmdhd.ko" $T/mcalls && [ "$(mounted)" = /hmgapi/mods/nx4-kor/drivers/rtl8831bu/bcmdhd.ko ] && [ "$(ls -l $DA/drivers/rtl8831bu/bcmdhd.ko | cut -c1-10)" = "-rw-r--r--" ] && [ "$(cat $T/ddongle)" = "test-boot-id 0bda:b831 rtl8831bu 3" ] && [ "$(ls -l $T/ddongle | cut -c1-10)" = "-rw-r--r--" ] && grep -q "동글 0bda:b831(4-1): rtl8831bu 드라이버를 $T/dslot/bcmdhd.ko에 걺(부팅 뒤 3초)" $T/dg.out && grep -q "동글이 다시 붙음(포트 전원 껐다 켬, 장치 번호 2 → 3" $T/dg.out && grep -q "AP 떠 있음" $T/dg.out && ! grep -q aptool $T/mcalls' || { cat $T/dg.out $T/mcalls; }
 dgreset; cat $T/bootid > $T/dh/wifi/ap.boot; dgcycle 0x1002; _dc=$!; dgrun; wait $_dc
 check "  다시 붙은 뒤 AP가 없고(wlan0 내려감, hostapd 없음) HMG-API가 이번 부팅에 띄웠다고 적었으면(ap.boot) AP를 한 번 껐다 켬(ApTool restart), 그 결과를 한 줄로" \
-  '[ "$(grep -c "^aptool restart$" $T/mcalls)" = 1 ] && grep -q "AP가 없음(HMG-API는 이번 부팅에 띄웠다고 적음, wlan0 내려감, hostapd 없음): AP를 껐다 켬" $T/dg.out && grep -q "AP 껐다 켜기: projection AP on (it was 13) (종료 코드 0)" $T/dg.out' || cat $T/dg.out $T/mcalls
-dgreset; echo other-boot > $T/dh/wifi/ap.boot; dgcycle 0x1002; _dc=$!; dgrun; wait $_dc
-check "  HMG-API 지기가 아직 띄우지 못했으면(ap.boot가 지난 부팅 것) AP를 건드리지 않고 지기에 맡김" '! grep -q aptool $T/mcalls && grep -q "HMG-API 지기가 다시 시도 중이라 맡김" $T/dg.out' || cat $T/dg.out
+  '[ "$(grep -c "^aptool restart$" $T/mcalls)" = 1 ] && grep -q "AP가 없음(HMG-API 지기는 이번 부팅에 띄웠다고 적음, wlan0 내려감, hostapd 없음): AP를 껐다 켬" $T/dg.out && grep -q "AP 껐다 켜기: projection AP on (it was 13) (종료 코드 0)" $T/dg.out' || cat $T/dg.out $T/mcalls
+dgreset; echo other-boot > $T/dh/wifi/ap.boot; dgcycle 0x1002; _dc=$!; dgrun APTOOL_UP=1; wait $_dc
+check "  HMG-API 지기가 아직 띄우지 못했어도(ap.boot가 지난 부팅 것) 기다린 뒤 AP가 없으면 맡기지 않고 직접 껐다 켬(지기가 AP를 켜진 것으로 보고 손대지 않는 경우, #107), 뜨면 ok" \
+  '[ "$(grep -c "^aptool restart$" $T/mcalls)" = 1 ] && grep -q "AP가 없음(HMG-API 지기는 아직 띄우지 못함, wlan0 내려감, hostapd 없음): AP를 껐다 켬" $T/dg.out && grep -q "AP 떠 있음(wlan0 올라옴, hostapd 돎)$" $T/dg.out && ! grep -q "맡김" $T/dg.out' || cat $T/dg.out $T/mcalls
+dgreset; cat $T/bootid > $T/dh/wifi/ap.boot; cat $T/bootid > $T/dh/wifi/ap.fail; dgcycle 0x1002; _dc=$!; dgrun; wait $_dc
+check "  껐다 켰는데도 NX4_DONGLE_AP초 뒤 AP가 없으면 ap.boot·ap.fail을 지워 지기가 다시 시도하게 함(#107)" \
+  '[ "$(grep -c "^aptool restart$" $T/mcalls)" = 1 ] && [ ! -e $T/dh/wifi/ap.boot ] && [ ! -e $T/dh/wifi/ap.fail ] && grep -q "AP가 아직 없음(1초): HMG-API 지기의 이번 부팅 기록(ap.boot)을 지워 지기가 다시 시도하게 함" $T/dg.out' || cat $T/dg.out $T/mcalls
 dgreset; echo "80.00 1.00" > $T/duptime; mkdir -p $T/dnet/wlan0; echo 0x1003 > $T/dnet/wlan0/flags; echo "1 root 0:00 hostapd x.conf" > $T/ps.out; dgrun
 check "  부팅 뒤 NX4_DONGLE_SETTLE(75)초가 지나면 포트 끄고 켜기를 기다리지 않고 AP를 봄(늦게 시작해도 끝이 있음)" \
   '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "부팅 뒤 80초까지 동글이 다시 붙지 않음" $T/dg.out && grep -q "AP 떠 있음" $T/dg.out' || cat $T/dg.out
-dgreset; echo "80.00 1.00" > $T/duptime; dgrun NX4_DONGLE_WLAN=0
-check "  wlan0이 생기지 않으면 순정 Wi-Fi 서비스에 맡기고 끝남(AP 도구 안 부름)" '! grep -q aptool $T/mcalls && grep -q "wlan0이 생기지 않음" $T/dg.out' || cat $T/dg.out
+dgreset; echo "80.00 1.00" > $T/duptime; dgrun NX4_DONGLE_WLAN=0 APTOOL_UP=1
+check "  wlan0이 생기지 않아도 맡기고 끝내지 않고 AP를 껐다 켜 HAL이 드라이버를 올리게 함(#107), 뜨면 ok" \
+  '[ "$(grep -c "^aptool restart$" $T/mcalls)" = 1 ] && grep -q "wlan0이 생기지 않음(0초): AP를 껐다 켜 HAL이 드라이버를 올리게 함" $T/dg.out && grep -q "AP가 없음(HMG-API 지기는 아직 띄우지 못함, wlan0 없음, hostapd 없음)" $T/dg.out && grep -q "AP 떠 있음" $T/dg.out' || cat $T/dg.out $T/mcalls
 dgreset; : > $T/dseen; dgrun
 check "  Wi-Fi 칩이 있는 내비(public/wifi-chip)면 아무것도 걸지 않음" '[ ! -s $T/mcalls ] && [ ! -e $T/ddongle ] && grep -q "Wi-Fi 칩이 있는 내비: 할 일 없음" $T/dg.out' || cat $T/dg.out
 rm -f $T/dseen
@@ -1831,10 +1836,65 @@ check "  그때 건 것을 풀지 못하면 그렇다고 남김(재부팅하면 
 dgreset; : > $T/ddmesg; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo live > $T/dsysmod/bcmdhd/initstate; dgrun NX4_DONGLE_SETTLE=0
 check "  순정 bcmdhd가 이번 부팅에 칩 켜기를 포기한 줄이 없으면 내리지 않음(동작 중일 수 있음)" '! grep -q "^rmmod" $T/mcalls && grep -q "칩 켜기를 포기한 줄이 없음: 내리지 않음" $T/dg.out' || cat $T/dg.out
 dgreset; ( /bin/sleep 0.3; rm -rf $T/dusb/4-1 ) & _dc=$!; echo "3.00 1.00" > $T/duptime; ( /bin/sleep 0.8; echo "80.00 1.00" > $T/duptime ) & _du=$!; dgrun; wait $_dc $_du
-check "  기다리는 동안 동글이 빠지면 끝냄(다시 꽂으면 관리 앱 [동글 켜기])" '! grep -q aptool $T/mcalls && grep -q "동글이 빠짐: 끝냄" $T/dg.out' || cat $T/dg.out
+check "  기다리는 동안 동글이 빠지면 끝냄(다시 꽂으면 켬)" '! grep -q aptool $T/mcalls && grep -q "동글이 빠짐: 끝냄" $T/dg.out' || cat $T/dg.out
 dgreset; cat $T/bootid > $T/dh/wifi/ap.boot; cat $T/bootid > $T/dh/wifi/ap.fail; dgcycle 0x1002; _dc=$!; dgrun APTOOL_FAIL=1; wait $_dc
 check "  AP를 껐다 켜지 못하면 HMG-API 지기의 이번 부팅 기록(ap.boot·ap.fail)을 지워 지기가 다시 시도하게 함(PR #99 리뷰 4)" \
   'grep -q "(종료 코드 1)" $T/dg.out && [ ! -e $T/dh/wifi/ap.boot ] && [ ! -e $T/dh/wifi/ap.fail ] && grep -q "지기가 다시 시도함" $T/dg.out' || cat $T/dg.out
+# --- 6. 다시 붙는 동글 지켜보기(#107): 부팅 일이 끝난 뒤 NX4_DONGLE_WATCH초마다 USB 목록만 보고, 동글이 새로 붙거나 장치 번호가
+# 바뀌면 --auto로 [동글 켜기]와 같은 일. 테스트는 NX4_DONGLE_WATCHN번만 돈다
+dgreset; cat $T/bootid > $T/dnochip; rm -rf $T/dusb/4-1; echo "30.00 1.00" > $T/duptime
+( _w=0; until grep -q "지켜봄" $T/dg.out 2>/dev/null || [ $_w -ge 100 ]; do /bin/sleep 0.1; _w=$((_w+1)); done
+  /bin/sleep 0.5; usbdev $T/dusb 4-1 0bda b831; echo 5 > $T/dusb/4-1/devnum ) & _dc=$!
+dgrun NX4_DONGLE_WATCH=0.2 NX4_DONGLE_WATCHN=40 APTOOL_UP=1; wait $_dc
+check "dongle.sh 6: 부팅 때 동글이 없었으면 지켜보다가, 나중에 꽂은 동글에 버튼 없이 드라이버를 걸고 AP를 껐다 켜 띄움(결과 파일은 [동글 켜기]의 것이라 쓰지 않음), 칩 없음 기록을 지움, dongle.pid를 놓음" \
+  '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "우리 드라이버가 받는 동글이 없음(부팅 뒤 30초)" $T/dg.out && grep -q "다시 붙는 동글을 지켜봄(0.2초마다 USB 장치 목록만 봄)" $T/dg.out && grep -q "동글 0bda:b831(4-1, 장치 번호 5)가 새로 붙음(부팅 뒤 30초): 켬" $T/dg.out && grep -q "\[다시 붙음\] 켜기 시작(부팅 뒤 30초)" $T/dg.out && grep -qx "mount -o bind $DA/drivers/rtl8831bu/bcmdhd.ko $T/dslot/bcmdhd.ko" $T/mcalls && [ "$(grep -c "^aptool restart$" $T/mcalls)" = 1 ] && grep -q "AP 떠 있음(wlan0 올라옴, hostapd 돎)$" $T/dg.out && [ ! -e $T/ddgres ] && [ ! -e $T/dnochip ] && [ ! -e $T/dw/dongle.pid ] && [ "$(grep -c "켜기 시작" $T/dg.out)" = 1 ]' || { cat $T/dg.out $T/mcalls; }
+# 부팅 때 꽂혀 있어 AP까지 뜬 뒤, 뺐다 다시 꽂음(장치 번호 2 → 7): 한 번만 켜고(AP가 떠 있으면 할 일 없음), 빠진 것도 남김
+dgreset; mkdir -p $T/dnet/wlan0; echo 0x1003 > $T/dnet/wlan0/flags; echo "1 root 0:00 hostapd x.conf" > $T/ps.out
+# 빼기는 지켜보기가 시작된 뒤에(그 줄이 나온 뒤) 한다: 바쁜 PC에서 부팅 일이 늦게 끝나도 빠진 때를 보게
+( _w=0; until grep -q "지켜봄" $T/dg.out 2>/dev/null || [ $_w -ge 100 ]; do /bin/sleep 0.1; _w=$((_w+1)); done
+  /bin/sleep 0.5; rm -rf $T/dusb/4-1; /bin/sleep 0.8; usbdev $T/dusb 4-1 0bda b831; echo 7 > $T/dusb/4-1/devnum ) & _dc=$!
+dgrun NX4_DONGLE_SETTLE=0 NX4_DONGLE_WATCH=0.2 NX4_DONGLE_WATCHN=40; wait $_dc
+check "  부팅 뒤 뺐다 다시 꽂으면(장치 번호 바뀜) 한 번 다시 켬(AP가 떠 있으면 할 일 없음), 빠진 때도 남김, 다시 켠 뒤 같은 동글로 되풀이하지 않음" \
+  'grep -q "동글이 빠짐(다시 꽂으면 켬)" $T/dg.out && grep -q "동글 0bda:b831(4-1, 장치 번호 7)가 새로 붙음" $T/dg.out && [ "$(grep -c "켜기 시작" $T/dg.out)" = 1 ] && [ "$(grep -c "할 일 없음" $T/dg.out)" -ge 2 ] && ! grep -q aptool $T/mcalls' || cat $T/dg.out
+dgreset; : > $T/dseen; dgrun NX4_DONGLE_WATCH=0.2 NX4_DONGLE_WATCHN=3
+check "  Wi-Fi 칩이 있는 내비, 동글 드라이버가 없는 묶음, 다른 것이 자리에 걸린 경우에는 지켜보지 않음" \
+  '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "Wi-Fi 칩이 있는 내비: 할 일 없음" $T/dg.out && ! grep -q "지켜봄" $T/dg.out && grep -q "chip|nodrivers|other|fail) ;; \*) replug_watch" $DA/svc/dongle.sh' || cat $T/dg.out
+rm -f $T/dseen
+# 칩 있는 내비인데 HMG-API 표시 파일이 아직 없는 첫 부팅: 1의 확인 때는 SDIO 칩이 안 보였다가(약 10초에 보임) 동글을 찾는 동안
+# 보이면, 지켜보기 전에 다시 보고 남지 않음(PR #113 리뷰 1)
+# 차례를 시각 하나에 기대지 않게(PR #113 리뷰 7): 찾기는 부팅 뒤 초가 3에 멈춰 있어 끝나지 않고 돈다. 서비스가 dongle.pid를 쓴 뒤
+# (1의 칩 확인은 바로 그 뒤) 칩을 만들고, 칩을 만든 뒤에야 부팅 뒤 초를 30으로 바꿔 찾기를 끝낸다. 그래서 지켜보기 전에는 늘 칩이 있다
+dgreset; rm -rf $T/dusb/4-1
+( _w=0; until [ -s $T/dw/dongle.pid ] || [ $_w -ge 200 ]; do /bin/sleep 0.05; _w=$((_w+1)); done
+  /bin/sleep 0.5; mkdir -p $T/dsdio/mmc1:0001:1; echo "30.00 1.00" > $T/duptime ) & _dc=$!
+dgrun NX4_DONGLE_FTRIES=1000000 NX4_DONGLE_WATCH=0.2 NX4_DONGLE_WATCHN=3; wait $_dc
+check "  1에서 못 본 SDIO 칩이 동글을 찾는 동안 보이면(표시 파일이 아직 없는 칩 차의 첫 부팅) 지켜보지 않고 끝남(PR #113 리뷰 1)" \
+  '[ "$(cat $T/dg.rc)" = 0 ] && grep -q "우리 드라이버가 받는 동글이 없음(부팅 뒤 30초)" $T/dg.out && grep -q "Wi-Fi 칩이 보임: 다시 붙는 동글을 지켜보지 않음" $T/dg.out && ! grep -q "지켜봄(" $T/dg.out' || cat $T/dg.out
+# [동글 켜기] 결과 앞의 상태 쓰기는 status.sh --once: 상태 파일만 쓰고 감시자를 늘리거나 띄우지 않음, 설치 대기도 남기지 않음(PR #113 리뷰 3)
+# status.sh --once를 실제로 돌린다(RPT_SYNC 없이, 설치 진행 중 기록도 둠): 상태 파일은 쓰고, 감시자 끝 시각·설치 대기 pid는
+# 남기지 않음(PR #113 리뷰 8). 틀려서 감시자가 떴으면 테스트가 끝내 둔다
+rm -rf $T/ow $T/once.txt $T/oprog; mkdir -p $T/ow; echo "state=run" > $T/oprog
+(env PATH=$P0 BB=$T/bin/bb APP=$TP W=$T/ow HMGDATA=$SH PROG=$T/oprog BOOT_ID=$T/bootid UPTIME=$T/suptime \
+   WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio SYSNET=$T/sysnet PROCNET=$T/procnet PROC=$T/sproc STATUS=$T/once.txt SRC=$T/softap.conf \
+   HMGINST=$T/sinst HMGLOG=$T/shlog HOOKSTARTS=$T/shook/starts NX4_DMESG=$T/sdmesg NOCHIP=$T/snochip USBDEV=$T/susb \
+   NX4_APLOG=$T/ow/ap.log sh $TP/bin/status.sh --once) > $T/once.out 2>&1
+/bin/sleep 0.3
+for _f in $T/ow/watch.pid $T/ow/wait.pid; do [ -s $_f ] && kill $(cut -d' ' -f1 $_f) 2>/dev/null; done
+_once=$(ls $T/ow | tr '\n' ' ')
+# 같은 환경에서 인자 없이 돌리면 감시자 끝 시각을 쓴다(이 테스트가 늘 통과하는 것이 아님을 보임). 띄운 감시자·설치 대기는 끝낸다
+rm -rf $T/ow2; mkdir -p $T/ow2
+(env PATH=$P0 BB=$T/bin/bb APP=$TP W=$T/ow2 HMGDATA=$SH PROG=$T/oprog BOOT_ID=$T/bootid UPTIME=$T/suptime \
+   WIFI_SEEN=$T/wifiseen SDIO=$T/nosdio SYSNET=$T/sysnet PROCNET=$T/procnet PROC=$T/sproc STATUS=$T/once2.txt SRC=$T/softap.conf \
+   HMGINST=$T/sinst HMGLOG=$T/shlog HOOKSTARTS=$T/shook/starts NX4_DMESG=$T/sdmesg NOCHIP=$T/snochip USBDEV=$T/susb \
+   NX4_APLOG=$T/ow2/ap.log sh $TP/bin/status.sh) > $T/once2.out 2>&1
+/bin/sleep 0.5
+for _f in $T/ow2/watch.pid $T/ow2/wait.pid; do [ -s $_f ] && kill $(cut -d' ' -f1 $_f) 2>/dev/null; done
+check "  결과 앞의 상태 쓰기는 status.sh --once: 실제로 돌리면 상태 파일만 쓰고 감시자 끝 시각·감시자·설치 대기를 남기지 않음(인자 없이 돌리면 남김), dongle.sh가 그것을 부름(PR #113 리뷰 3·8)" \
+  'grep -q "^verdict=" $T/once.txt && [ ! -e $T/ow/watch.until ] && [ ! -e $T/ow/watch.pid ] && [ ! -e $T/ow/wait.pid ] && [ -s $T/ow2/watch.until ] && grep -q "APP=\$NX4_APP sh \$NX4_APP/bin/status.sh --once" $DA/svc/dongle.sh' || { cat $T/once.out; echo "ow: $_once"; ls $T/ow2; }
+# 지켜보기는 셸 안에서만 USB 목록을 읽는다(글롭·read, 외부 명령 없음): 5초마다 프로세스를 띄우지 않게
+_usg=$(sed -n '/^usb_sig() {/,/^}/p' $DA/svc/dongle.sh)
+check "  지켜보기의 USB 목록 읽기(usb_sig)는 외부 명령 없이 셸 안에서만(글롭과 read), 기본 5초마다" \
+  'echo "$_usg" | grep -q "read -r _un" && ! echo "$_usg" | grep -qE "\\\$\(|cat |\\\$BB|ls " && grep -q "^WATCH=\${NX4_DONGLE_WATCH:-5}$" $DA/svc/dongle.sh' || echo "$_usg"
 # --- svc/dongle.sh --now <요청 id>: 관리 앱 [동글 켜기](#60). 감시자가 부른다. 결과(DGRES)와 누르기 전·뒤 기록($W/dongle-*.txt) ---
 dgv() { awk -F= -v k="$1" '$1 == k { print substr($0, length(k) + 2) }' $T/ddgres; }
 # 부팅 뒤 오래(500초) 지나 꽂은 동글, 순정 bcmdhd가 부팅 때 포기한 채 남음, AP 없음 → 걸고, 순정을 내리고, AP를 껐다 켜 뜸
@@ -1844,14 +1904,23 @@ printf '%s\n' "$DHDL" "<6>[  400.100000] usb 4-1: new high-speed USB device numb
 mkdir -p $T/dusbdrv/rtl8851bu; mkdir -p $T/dusb/4-1/4-1:1.0; ln -s $T/dusbdrv/rtl8851bu $T/dusb/4-1/4-1:1.0/driver
 dgnow() { _dn=$1; shift; (env PATH=$P0 BB=$T/bin/bb NX4_APP=$DA NX4_ROOT=$T/droot W=$T/dw BOOT_ID=$T/bootid UPTIME=$T/duptime WIFI_SEEN=$T/dseen SDIO=$T/dsdio NX4_DMESG=$T/ddmesg \
      SYSNET=$T/dnet HMGDATA=$T/dh USBDEV=$T/dusb KO_SLOT=$T/dslot/bcmdhd.ko MOUNTINFO=$T/dmountinfo FAKEDATA=$DM/data PROCMOD=$T/dmodules \
-     SYSMOD=$T/dsysmod PROCNET=$T/dprocnet DONGLE=$T/ddongle DGRES=$T/ddgres NX4_APTOOL=$T/bin/fakeaptool NX4_DONGLE_POLL=0.1 NX4_DONGLE_SPOLL=0.1 \
-     NX4_DONGLE_FTRIES=20 NX4_DONGLE_STRIES=200 NX4_DONGLE_LIVE=3 NX4_DONGLE_WLAN=1 NX4_DONGLE_AP=1 \
+     SYSMOD=$T/dsysmod PROCNET=$T/dprocnet DONGLE=$T/ddongle DGRES=$T/ddgres NOCHIP=$T/dnochip NX4_APTOOL=$T/bin/fakeaptool NX4_DONGLE_POLL=0.1 NX4_DONGLE_SPOLL=0.1 \
+     NX4_DONGLE_FTRIES=20 NX4_DONGLE_STRIES=200 NX4_DONGLE_LIVE=3 NX4_DONGLE_WLAN=1 NX4_DONGLE_AP=1 NX4_STATUS_CMD=$T/bin/fakestatus \
      "$@" sh $DA/svc/dongle.sh --now $_dn) > $T/dg.out 2>&1; echo $? > $T/dg.rc; }
+# 가짜 상태 쓰기(bin/status.sh 자리, #111): 불린 때 결과 파일이 이미 있었는지와 그때 hostapd가 돌았는지를 적는다
+cat > $T/bin/fakestatus <<E
+#!/bin/sh
+echo "status dgres=\$([ -e $T/ddgres ] && echo yes || echo no) ap=\$(grep -q hostapd $T/ps.out 2>/dev/null && echo yes || echo no)" >> $T/dstatus.calls
+E
+chmod +x $T/bin/fakestatus
 dgnow 777001 APTOOL_UP=1
 check "dongle.sh --now: 오래전에 꽂은 동글에 드라이버를 걸고, 포기한 순정 bcmdhd를 내리고, AP가 없으니 껐다 켬(뜸), 결과 id·boot·code=ok·usb·drv(644)" \
   '[ "$(cat $T/dg.rc)" = 0 ] && grep -qx "mount -o bind $DA/drivers/rtl8831bu/bcmdhd.ko $T/dslot/bcmdhd.ko" $T/mcalls && grep -qx "rmmod bcmdhd live" $T/mcalls && grep -qx "aptool restart" $T/mcalls && [ "$(dgv id)" = 777001 ] && [ "$(dgv boot)" = test-boot-id ] && [ "$(dgv code)" = ok ] && [ "$(dgv usb)" = 0bda:b831 ] && [ "$(dgv drv)" = rtl8831bu ] && [ "$(ls -l $T/ddgres | cut -c1-10)" = "-rw-r--r--" ] && grep -q "동글이 붙은 지 오래됨(부팅 뒤 400초)" $T/dg.out && ! grep -q "다시 붙지 않음" $T/dg.out' || { cat $T/dg.out $T/mcalls; }
 check "  누르기 전·뒤 기록($W/dongle-before.txt·after.txt): USB 장치와 붙은 드라이버·자리·bcmdhd·/proc/modules·wlan0·hostapd·커널 줄, 일련번호 줄은 빼고 MAC 꼴 값은 가림(PR #100 리뷰 3), 다 끝나면 dongle.pid를 지움" \
   'grep -q "^usb 4-1 0bda:b831 devnum=2 speed= driver=rtl8851bu$" $T/dw/dongle-before.txt && grep -qx "bcmdhd 1234567 0 - Live 0xbf000000" $T/dw/dongle-before.txt && grep -qx -- "-- /proc/modules" $T/dw/dongle-before.txt && ! grep -qi "serialnumber" $T/dw/dongle-before.txt $T/dw/dongle-after.txt && ! grep -q "00e04c000001" $T/dw/dongle-after.txt && grep -q "usb 4-1: new high-speed USB device number 2" $T/dw/dongle-after.txt &&grep -qx "slot=none" $T/dw/dongle-before.txt && grep -q "^bcmdhd=stock initstate=live" $T/dw/dongle-before.txt && grep -qx "hostapd=no" $T/dw/dongle-before.txt && grep -qx "slot=rtl8831bu" $T/dw/dongle-after.txt && grep -q "^wlan0=yes flags=0x1003" $T/dw/dongle-after.txt && grep -qx "hostapd=yes" $T/dw/dongle-after.txt && grep -q "authenticated with xx:xx:xx:xx:xx:xx" $T/dw/dongle-after.txt && ! grep -q "12:34:56" $T/dw/dongle-after.txt && [ ! -e $T/dw/dongle.pid ]' || { cat $T/dw/dongle-before.txt $T/dw/dongle-after.txt; }
+check "  결과를 쓰기 바로 앞에 상태 파일을 한 번 새로 씀(그때 AP가 떠 있음): 관리 앱이 결과를 받고 다시 읽은 판정 띠가 결과와 맞게(#111)" \
+  '[ "$(cat $T/dstatus.calls)" = "status dgres=no ap=yes" ]' || cat $T/dstatus.calls
+rm -f $T/dstatus.calls
 # 막 꽂은 동글(부팅 뒤 497초에 붙음, 지금 500초): 순정이 약 8초 뒤 포트 전원을 껐다 켬 → 다시 붙을 때까지 기다림
 dgreset; echo "500.00 1.00" > $T/duptime; printf '%s\n' "$DHDL" "<6>[  497.100000] usb 4-1: new high-speed USB device number 2 using ehci-platform" > $T/ddmesg
 dgcycle; _dc=$!; dgnow 777002 APTOOL_UP=1; wait $_dc
@@ -1863,7 +1932,7 @@ check "  동글이 없으면 code=nodongle(찾기는 지금부터 NX4_DONGLE_NOW
 dgreset; echo "500.00 1.00" > $T/duptime; : > $T/ddmesg; dgnow 777005 APTOOL_FAIL=1
 check "  AP를 껐다 켜지 못하면 code=noap, 지기의 이번 부팅 기록을 지움" '[ "$(dgv code)" = noap ] && grep -q "(종료 코드 1)" $T/dg.out' || cat $T/dg.out
 dgreset; echo "500.00 1.00" > $T/duptime; : > $T/ddmesg; dgnow 777006
-check "  AP를 껐다 켰는데도 wlan0·hostapd가 없으면 code=noap(지기에 맡김)" '[ "$(dgv code)" = noap ] && grep -q "AP가 아직 없음(1초): HMG-API 지기에 맡김" $T/dg.out' || cat $T/dg.out
+check "  AP를 껐다 켰는데도 wlan0·hostapd가 없으면 code=noap, ap.boot를 지워 지기가 다시 시도하게 함" '[ "$(dgv code)" = noap ] && grep -q "AP가 아직 없음(1초): HMG-API 지기의 이번 부팅 기록(ap.boot)을 지워" $T/dg.out' || cat $T/dg.out
 dgreset; : > $T/dh/state/wifi.txt; dgnow 777007
 check "  프로젝션 AP 요청이 없으면 걸기만 하고 code=noproj" '[ "$(dgv code)" = noproj ] && grep -q "^mount" $T/mcalls && ! grep -q aptool $T/mcalls' || cat $T/dg.out
 dgreset; : > $T/dseen; dgnow 777008
@@ -1875,7 +1944,8 @@ dgreset; mkdir -p $T/dw; echo "4242 other-boot" > $T/dw/dongle.pid; dgnow 777010
 check "  지난 부팅의 dongle.pid는 보지 않음" '[ "$(dgv code)" = ok ]' || cat $T/dg.out
 dgreset; echo "500.00 1.00" > $T/duptime; echo "bcmdhd 1234567 0 - Live 0xbf000000" > $T/dmodules; mkdir -p $T/dsysmod/bcmdhd/parameters; echo live > $T/dsysmod/bcmdhd/initstate
 : > $T/ddmesg; cat $T/bootid > $T/unochip.dg; dgnow 777011 APTOOL_UP=1 NOCHIP=$T/unochip.dg
-check "  순정의 포기한 줄이 링 버퍼에서 밀려났어도 nochip.sh의 이번 부팅 칩 없음 기록이 있으면 순정을 내림" 'grep -qx "rmmod bcmdhd live" $T/mcalls && [ "$(dgv code)" = ok ]' || cat $T/dg.out
+check "  순정의 포기한 줄이 링 버퍼에서 밀려났어도 nochip.sh의 이번 부팅 칩 없음 기록이 있으면 순정을 내림, AP를 띄우면 그 기록을 지움(관리 앱이 실제 AP를 봄, #107)" \
+  'grep -qx "rmmod bcmdhd live" $T/mcalls && [ "$(dgv code)" = ok ] && [ ! -e $T/unochip.dg ] && grep -q "동글로 AP를 띄워 이번 부팅의 칩 없음 기록을 지움" $T/dg.out' || cat $T/dg.out
 rm -f $T/unochip.dg
 rm -f $T/ps.out
 # lib.sh dongle_present(nochip·관리 앱 판정): 만든 곳 패턴(0bda·2357) 밖이어도 이 묶음의 드라이버가 받는 USB ID면 동글로 봄(PR #99 리뷰 2)

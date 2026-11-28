@@ -535,10 +535,18 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         else if (Report.dgGood(res)) { reShow = ans; reShowBg = Ui.MSG_BG; reShowFg = Color.WHITE; }
         else { reShow = ans; reShowBg = Ui.WARN; reShowFg = Color.BLACK; }
         showMsg(reShow, reShowBg, reShowFg);
-        // 판정 띠와 표(동글·Wi-Fi 칸)가 결과와 어긋나지 않게 상태 파일을 새로 쓰게 한다. 새로 써지면 kickWatch가 다시 그리고,
-        // showStatus가 이 안내를 다시 올린다(PR #100 리뷰 6). 화면을 열 때의 새로 쓰기(10초 안 한 번)와 겹치지 않으므로 그 막음은 푼다
-        kickEl = 0;
-        kickStatus();
+        // busy(다른 동글 작업이 돎)·old·bad(감시자가 받지 않음)는 상태 파일을 새로 쓰지 않고 답한다(PR #113 리뷰 4)
+        String dc = res.get("code").trim();
+        if (ans != null && !"busy".equals(dc) && !"old".equals(dc) && !"bad".equals(dc)) {
+            // 판정 띠와 표(동글·Wi-Fi 칸)를 결과에 맞춘다. root(svc/dongle.sh --now)가 결과를 쓰기 바로 앞에 상태 파일을 새로 썼으므로
+            // 그것을 다시 읽어 그리고, showStatus가 이 안내를 다시 올린다(#111. 예전에는 hmgapid로 새로 쓰게 하고 바뀌기를 기다렸는데,
+            // 띠가 "꺼져 있습니다"로 남은 일이 있었음, PR #100 리뷰 6)
+            showStatus();
+        } else {
+            // 답이 없거나(시간 초과) 상태를 새로 쓰지 않는 답이면 hmgapid로 새로 쓰게 하고 바뀌면 다시 그린다
+            kickEl = 0;
+            kickStatus();
+        }
         return false;
     }
 
