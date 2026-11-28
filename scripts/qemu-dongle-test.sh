@@ -23,7 +23,7 @@ case "$MODE" in matrix) DAP=30 ;; interactive) DAP=180 ;; *) usage ;; esac
 case "$DRIVER" in rtl8831bu) DUSB=0bda:b831 ;; rtl88x2bu) DUSB=0bda:b812 ;; *) usage ;; esac
 USB=${NX4_QEMU_USB:-$DUSB}
 case "$USB" in
-  [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:[0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+  [0123456789abcdef][0123456789abcdef][0123456789abcdef][0123456789abcdef]:[0123456789abcdef][0123456789abcdef][0123456789abcdef][0123456789abcdef]) ;;
   *) echo "NX4_QEMU_USB는 VID:PID(소문자 16진수 넷:넷)입니다: $USB"; exit 1 ;;
 esac
 AP=${NX4_QEMU_AP_SECS:-$DAP}

@@ -34,7 +34,7 @@ make_retry() {
   until make -C "$_dir" "$@" > "$_log.try" 2>&1; do
     cat "$_log.try" >> "$_log"
     if [ $_n -lt $_max ] && grep -q -E 'Segmentation fault|internal compiler error' "$_log.try"; then
-      echo "컴파일러가 멈춤(에뮬레이션), 이어서 다시 돌림($_n번째 실패, 모두 ${_max}번까지)"
+      echo "컴파일러가 멈춤(에뮬레이션), 이어서 다시 돌림(${_n}번째 실패, 모두 ${_max}번까지)"
       grep -o -E '\[scripts/Makefile\.[a-z]+:[0-9]+: [^]]+\]' "$_log.try" | sed -E 's/^\[[^ ]+ //; s/\]$//' | while read -r _t; do
         case "$_t" in /*) ;; *) _t=$_dir/$_t ;; esac
         if [ -f "$_t" ]; then rm -f "$_t"; fi

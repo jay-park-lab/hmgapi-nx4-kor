@@ -76,7 +76,7 @@ get_mobis_src() {
   [ "$(tree_sum $MS/$MOBIS_DIR)" = "$MOBIS_TREE_SHA256" ] || die "모비스 커널 폴더 값이 다릅니다($(tree_sum $MS/$MOBIS_DIR))"
   echo "$MOBIS_SRC_SHA256" > $MS.stamp
 }
-# 툴체인: 모비스 커널 소스에 든 묶음(sha256 고정)을 푼다. 폴더 경로가 .ko의 디버그 정보에 들어가므로 늘 $TC에 둔다
+# 툴체인: 모비스 커널 소스에 든 묶음(sha256 고정)을 푼다. 폴더 경로가 .ko의 디버그 정보에 들어가므로 늘 ${TC}에 둔다
 get_toolchain() {
   T=$MS/$MOBIS_DIR/$TOOLCHAIN_PATH
   [ -x $TC/bin/arm-eabi-gcc ] && [ "$(cat $TC.stamp 2>/dev/null)" = "$TOOLCHAIN_SHA256" ] && return 0

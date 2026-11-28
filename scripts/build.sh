@@ -126,10 +126,10 @@ if [ -n "$NX4_DRIVERS" ]; then
     grep -q "^driver $d [0-9a-f]\{40\}$" "$K.txt" && grep -qx 'module name bcmdhd' "$K.txt" && grep -q '^vermagic 3\.18\.24-tcc SMP preempt mod_unload ARMv7 p2v8' "$K.txt" \
       || { echo "$K.txt가 이 차용 $d 빌드 정보가 아닙니다(driver·module name·vermagic 줄)" >&2; exit 1; }
     if grep -q '^build host .*emulated' "$K.txt"; then
-      echo "$K는 에뮬레이션 빌드입니다(차에 넣지 않음). CI(.github/workflows/drivers.yml)의 drivers-tcc803x를 받아 NX4_DRIVERS로 주세요" >&2; exit 1
+      echo "${K}는 에뮬레이션 빌드입니다(차에 넣지 않음). CI(.github/workflows/drivers.yml)의 drivers-tcc803x를 받아 NX4_DRIVERS로 주세요" >&2; exit 1
     fi
     KS=$( (sha256sum "$K" 2>/dev/null || shasum -a 256 "$K") | cut -d' ' -f1)
-    grep -qx "sha256 $KS" "$K.txt" || { echo "$K가 빌드 정보($K.txt)의 sha256과 다릅니다" >&2; exit 1; }
+    grep -qx "sha256 $KS" "$K.txt" || { echo "${K}가 빌드 정보($K.txt)의 sha256과 다릅니다" >&2; exit 1; }
     mkdir -p "$M/drivers/$d"
     cp "$K" "$K.txt" "$M/drivers/$d/"
     chmod 644 "$M/drivers/$d/bcmdhd.ko" "$M/drivers/$d/bcmdhd.ko.txt"
@@ -238,11 +238,11 @@ LREF=${NX4_LEGACY_REF:-v2.0.4-beta.1}
 for f in bin/uninstall.sh scripts/preun.sh svc/env.sh svc/hotspot.sh mod.json; do
   mkdir -p "$S/NX4/legacy-2.0/$(dirname "$f")"
   (cd "$B" && git show "$LREF:mod/$f") > "$S/NX4/legacy-2.0/$f" 2>/dev/null \
-    || { echo "옛 2.0.x 되돌리기 스크립트(mod/$f)를 git 태그 $LREF에서 꺼내지 못했습니다(git fetch origin --tags)" >&2; exit 1; }
+    || { echo "옛 2.0.x 되돌리기 스크립트(mod/$f)를 git 태그 ${LREF}에서 꺼내지 못했습니다(git fetch origin --tags)" >&2; exit 1; }
 done
 chmod 755 "$S/NX4/legacy-2.0/bin/uninstall.sh" "$S/NX4/legacy-2.0/scripts/preun.sh" "$S/NX4/legacy-2.0/svc/env.sh" "$S/NX4/legacy-2.0/svc/hotspot.sh"
 grep -q '"wireless-carplay-aa"' "$S/NX4/legacy-2.0/mod.json" \
-  || { echo "git 태그 $LREF의 mod/mod.json이 옛 2.0.x(공식 무선 모드와 충돌 선언)가 아닙니다" >&2; exit 1; }
+  || { echo "git 태그 ${LREF}의 mod/mod.json이 옛 2.0.x(공식 무선 모드와 충돌 선언)가 아닙니다" >&2; exit 1; }
 LREV=$(cd "$B" && git rev-parse --short "$LREF^{commit}" 2>/dev/null) || LREV=
 echo "$LREF ${LREV:-커밋 모름}" > "$S/NX4/legacy-2.0/SOURCE"
 # 공식 무선 모드: zip 그대로와, 설치기가 판·HMG-API 최소 판을 풀지 않고 읽을 mod.json
