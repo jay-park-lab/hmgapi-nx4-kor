@@ -2242,6 +2242,25 @@ apok() { PATH=$1:$P0 sh -c '. "$1"; ap_ok "$2" && echo yes || echo no' x $QX/apo
 _ap="$(apok $QX/pyes ' type AP channel 149 (5745 MHz)')$(apok $QX/pno ' type AP channel 149 (5745 MHz)')$(apok $QX/pyes ' type managed channel 36 (5180 MHz)')$(apok $QX/pno '')"
 check "  게스트 init: AP 판정은 끝까지 hostapd가 살아 있고 마지막 정보가 AP일 때만 섬(가짜 pidof로 넷: 살아 있음·AP=섬, 끝남·AP, 살아 있음·managed, 끝남·없음=아님)" \
   '[ "$_ap" = yesnonono ] && grep -q "if ap_ok \"\$t\"; then ok=yes; else ok=no; fi" $B/tests/qemu/nx4init' || echo "  $_ap"
+# interactive의 AP는 DHCP 서버(dnsmasq)도 띄워 폰이 IP를 받게 한다. ap·dhcp_on을 꺼내(/tmp는 테스트 폴더로 바꿔) 가짜 hostapd·iw·ip·
+# dnsmasq로 돌린다: IP 받은 기기 수, 기록에는 종류와 IP만(MAC·폰 이름 없음), dhcp를 주지 않은 AP(matrix)에는 DHCP 줄이 없음
+mkdir -p $QX/fk $QX/gt
+sed -n '/^ap_ok() {/,/^}/p; /^dhcp_on() {/,/^}/p; /^ap() {/,/^}/p' $B/tests/qemu/nx4init | sed "s#/tmp/#$QX/gt/#g" > $QX/apdhcp.sh
+for c in hostapd ip pkill pidof; do printf '#!/bin/sh\nexit 0\n' > $QX/fk/$c; done
+printf '#!/bin/sh\nexec %s 0.3\n' "$(command -v sleep)" > $QX/fk/sleep
+printf '#!/bin/sh\ncase "$*" in *"station dump"*) echo "Station aa:bb:cc:dd:ee:01 (on wlan0)" ;; *info*) printf "\\ttype AP\\n\\tchannel 149 (5745 MHz)\\n" ;; esac\n' > $QX/fk/iw
+cat > $QX/fk/dnsmasq <<EOF
+#!/bin/sh
+echo "\$*" > $QX/dnsmasq.args
+for a; do case \$a in --dhcp-leasefile=*) L=\${a#*=} ;; esac; done
+echo "1800000000 aa:bb:cc:dd:ee:01 192.168.43.23 Jay-iPhone 01:aa:bb:cc:dd:ee:01" > "\$L"
+echo "dnsmasq-dhcp[9]: 1 DHCPDISCOVER(wlan0) aa:bb:cc:dd:ee:01" >&2
+echo "dnsmasq-dhcp[9]: 1 DHCPACK(wlan0) 192.168.43.23 aa:bb:cc:dd:ee:01 Jay-iPhone" >&2
+EOF
+chmod +x $QX/fk/*
+PATH=$QX/fk:$P0 AP_SECS=10 sh -c '. "$1"; ap phone a 149 "" dhcp; ap g6 g 6 ""' x $QX/apdhcp.sh > $QX/apdhcp.out 2>&1
+check "  게스트 init: interactive AP는 wlan0에 192.168.43.1/24를 주고 dnsmasq(게이트웨이·DNS 없음)로 IP를 빌려줌, 결과 줄에 IP 받은 기기 수, 기록은 종류와 IP만(MAC·폰 이름 없음), matrix AP에는 DHCP 없음" \
+  'grep -q "^-- phone 결과: AP로 섬=yes, 가장 많이 붙은 기기 1개, IP 받은 기기 1개(DHCP 돎), 채널:" $QX/apdhcp.out && grep -qx "DHCPACK 192.168.43.23" $QX/apdhcp.out && grep -qx "DHCPDISCOVER " $QX/apdhcp.out && ! grep -q "Jay-iPhone\|aa:bb:cc" $QX/apdhcp.out && grep -q "^-- g6 결과: AP로 섬=yes, 가장 많이 붙은 기기 1개, 채널:" $QX/apdhcp.out && grep -q -- "--log-facility=- .*--interface=wlan0 --bind-interfaces .*--dhcp-range=192.168.43.10,192.168.43.50,255.255.255.0,1h --dhcp-option=3 --dhcp-option=6" $QX/dnsmasq.args && grep -q "ip addr add 192.168.43.1/24 dev wlan0" $B/tests/qemu/nx4init && grep -q "^  ap phone a 149 \"\" dhcp$" $B/tests/qemu/nx4init && grep -q "usr/sbin/dnsmasq" $B/tests/qemu/build-rootfs.sh && grep -q "^QEMU_ALPINE_PKGS=\".* dnsmasq\"$" $B/tests/qemu/inputs.sh' || cat $QX/apdhcp.out
 check "  게스트 init: 차 HAL 인자 그대로 insmod(우리 패치의 기본 KR), matrix는 국가 코드 없음(rtw_country_code= 빈 값)·HAL 인자만 채널 표와 5GHz 149번 AP 넷(국가 코드 없음 + hostapd KR 포함), interactive는 HAL 인자만, 결과 줄에 insmod·채널·rmmod(경고·멈춤 수)" \
   'grep -q "^HAL_ARGS=\"iface_name=wlan0 firmware_path=/data/misc/wifi/fw_bcmdhd.bin nvram_path=/data/misc/wifi/bcmdhd.cal clm_path=/system/wifi/89359.clm_blob\"" $B/tests/qemu/nx4init && grep -q "^  load none rtw_country_code=$" $B/tests/qemu/nx4init && grep -q "^  load none2 rtw_country_code=$" $B/tests/qemu/nx4init && [ "$(grep -c "^  load hal$" $B/tests/qemu/nx4init)" = 2 ] && ! grep -q "rtw_country_code=KR" $B/tests/qemu/nx4init && grep -q "ap a149 a 149 \"\"" $B/tests/qemu/nx4init && grep -q "ap a149kr a 149 KR" $B/tests/qemu/nx4init && grep -q "ap a149none a 149 \"\"" $B/tests/qemu/nx4init && grep -q "ap a149nonekr a 149 KR" $B/tests/qemu/nx4init && grep -q "echo \"-- rmmod 결과(\$1): 종료 코드 \$rc, 경고" $B/tests/qemu/nx4init && grep -q "echo \"-- 채널 결과(\$1)" $B/tests/qemu/nx4init && grep -q "echo \"-- insmod 결과(" $B/tests/qemu/nx4init'
 # lib.sh make_retry: 가짜 make. $MR/plan의 줄마다 한 번씩: segv(에뮬레이션 충돌 꼴, 실패 대상 둘: 상대 경로 호스트 도구와

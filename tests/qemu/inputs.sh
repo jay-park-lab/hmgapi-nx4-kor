@@ -11,4 +11,5 @@ QEMU_APK_STATIC=apk-tools-static-2.14.4-r0.apk
 QEMU_APK_STATIC_SHA256=7ed919a2e4ed18092d909a6f194457f4d74fcc62fd52ac9a80b9b54dc2d561cf
 QEMU_ALPINE_KEYS=alpine-keys-2.4-r1.apk
 QEMU_ALPINE_KEYS_SHA256=880983a4ba0e6403db432e7b2687af976e023567ab11d1428c758351011263e9
-QEMU_ALPINE_PKGS="alpine-baselayout busybox musl hostapd iw iproute2"
+# dnsmasq: interactive의 AP에 붙은 폰에 IP를 주는 DHCP 서버(차의 Android 테더링도 dnsmasq를 씀)
+QEMU_ALPINE_PKGS="alpine-baselayout busybox musl hostapd iw iproute2 dnsmasq"

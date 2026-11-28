@@ -2,7 +2,8 @@
 # QEMU에서 USB Wi-Fi 동글과 우리 드라이버를 테스트한다(#48, docs/qemu-dongle-test.md). PC에서만 돈다. 내비에는 아무것도 하지 않는다.
 # 쓰는 법(저장소 맨 위에서): sh scripts/qemu-dongle-test.sh [matrix|interactive] [rtl8831bu|rtl88x2bu]
 #   matrix(기본)   사람 손 없이: 국가 코드 없이 올린 채널 표, 차 HAL 인자만으로(우리 패치의 기본 KR) 올린 채널 표, 스캔, AP 조합
-#   interactive    HAL 인자만으로(KR) 올려 5GHz 149번 AP(SSID NX4-QEMU-TEST, 비밀번호 nx4-qemu-test)를 띄워 폰으로 붙어 보고,
+#   interactive    HAL 인자만으로(KR) 올려 5GHz 149번 AP(SSID NX4-QEMU-TEST, 비밀번호 nx4-qemu-test)와 DHCP(dnsmasq)를 띄워
+#                  폰으로 붙어 IP를 받아 보고,
 #                  그다음 쓰는 중에 동글을 뽑아 보호 패치를 본다
 # 무엇을 보고 무엇을 못 보는지는 docs/qemu-dongle-test.md. 차의 .ko 자체가 아니라, 같은 판(3.18.24) 커널을 QEMU virt용으로 빌드해
 # 같은 드라이버 소스와 우리 패치를 다시 빌드한 것을 올린다.
@@ -76,7 +77,8 @@ done
 LOG=$OUT/console-$MODE-$(date '+%Y%m%d-%H%M%S').log
 if [ "$MODE" = interactive ]; then
   echo "3. QEMU($MODE, 동글 $USB를 VM으로 넘김, AP ${AP}초, 뽑기 ${UN}초)"
-  echo "   AP가 뜨면 폰에서 NX4-QEMU-TEST(비밀번호 nx4-qemu-test)에 붙어 보고, \"동글을 뽑아 주세요\"가 나오면 PC에서 동글을 뽑아 주세요"
+  echo "   AP가 뜨면 폰에서 NX4-QEMU-TEST(비밀번호 nx4-qemu-test)에 붙어 보고(DHCP로 192.168.43.x를 받음, 인터넷 없음),"
+  echo "   \"동글을 뽑아 주세요\"가 나오면 PC에서 동글을 뽑아 주세요"
 else
   echo "3. QEMU($MODE, 동글 $USB를 VM으로 넘김, AP 하나에 ${AP}초)"
 fi

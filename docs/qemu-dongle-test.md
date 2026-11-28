@@ -26,7 +26,7 @@ PC에 꽂은 동글을 QEMU 가상 머신(ARMv7)으로 넘겨, 우리 동글 드
 | 동글이 이 드라이버로 잡히는지, `wlan0` | 차의 `.ko`와 보드(tcc803x USB) 자체 |
 | 차 HAL 인자를 받는지(모르는 인자는 3.18이 경고만 남김) | 순정 HAL·`netd`·HMG-API가 AP를 켜는 흐름, `mac_address_read`·`wifi_check_module_info` |
 | 채널 표(국가 코드에 따라 5GHz가 막히는지) | 순정이 부팅 약 40초에 포트 전원을 끄고 켜는 것([#48](https://github.com/jay-park-lab/hmgapi-nx4-kor/issues/48#issuecomment-7207207758)) |
-| `hostapd`로 2.4GHz·5GHz 149번 AP, 폰으로 붙기 | 순정 USB 서비스의 AOA 요청 |
+| `hostapd`로 2.4GHz·5GHz 149번 AP, 폰으로 붙어 IP 받기(`interactive`, `dnsmasq` DHCP) | 순정 USB 서비스의 AOA 요청 |
 | 쓰는 중에 뽑았을 때 보호 패치(`nx4-protect:` 줄, 커널 멈춤 여부) | 무선 카플레이·안드로이드 오토 연결 |
 | 드라이버 내리기(`rmmod`) | 드라이버의 wake lock(`CONFIG_WAKELOCK`), 차의 규제 정보 처리(게스트에는 CRDA도 없음) |
 
@@ -35,7 +35,7 @@ PC에 꽂은 동글을 QEMU 가상 머신(ARMv7)으로 넘겨, 우리 동글 드
 - **QEMU**: 맥은 `brew install qemu`(`qemu-system-arm`).
 - **Docker와 드라이버 빌드 볼륨**: `sh scripts/build-driver.sh`를 한 번 돌려 둡니다. 이 테스트는 그 볼륨(`nx4kor-drivers`)에 받아 둔 커널 묶음·툴체인·드라이버 소스를 다시 쓰고, 볼륨의 `/work/qemu`에만 씁니다. Docker context도 `.env.local`의 `NX4_DRV_DOCKER_CONTEXT`를 똑같이 씁니다(`drivers/README.md` "맥에서 빌드").
 - **동글**: PC에 꽂아 둡니다. QEMU가 도는 동안 VM으로 넘어가 PC에서는 쓰지 못합니다.
-- 게스트 루트 파일 시스템은 Alpine Linux 3.18 armv7에 `hostapd`·`iw`·`iproute2`를 넣어 만듭니다. 받는 묶음과 sha256은 `tests/qemu/inputs.sh`에 있습니다.
+- 게스트 루트 파일 시스템은 Alpine Linux 3.18 armv7에 `hostapd`·`iw`·`iproute2`·`dnsmasq`를 넣어 만듭니다. 받는 묶음과 sha256은 `tests/qemu/inputs.sh`에 있습니다.
 
 ## 돌리기
 
@@ -58,6 +58,9 @@ sh scripts/qemu-dongle-test.sh interactive
     - 국가 코드 없이 올린 드라이버: 5GHz 149번(`hostapd` 국가 코드 없음), 5GHz 149번(`hostapd` `country_code=KR`)
 - `interactive`:
   - HAL 인자만으로(기본 KR) 올려 5GHz 149번 AP(SSID `NX4-QEMU-TEST`, 비밀번호 `nx4-qemu-test`)를 3분 띄웁니다. 폰에서 붙어 봅니다.
+  - 이 AP에는 DHCP 서버(`dnsmasq`)가 함께 떠, 폰이 `192.168.43.10`~`.50` 중 하나를 받습니다(AP는 `192.168.43.1`). 인터넷은 없고 게이트웨이·DNS도 알리지 않으므로 폰에는 "인터넷 없음"으로 보일 수 있습니다. 붙은 채로 있으면 됩니다.
+  - 결과 줄에 붙은 기기 수와 IP를 받은 기기 수가 나옵니다. DHCP 기록은 종류와 IP만 남깁니다(MAC·폰 이름은 남기지 않음).
+  - 무선 카플레이·안드로이드 오토는 이어지지 않습니다. 블루투스로 Wi-Fi 정보를 넘기고 차의 인증 칩과 수신 스택이 있어야 해서, 이 테스트는 "AP가 서고 폰이 붙어 IP를 받는다"까지만 봅니다.
   - 그다음 "동글을 뽑아 주세요"가 나오면 PC에서 동글을 뽑습니다.
 - 두 번째 인자로 드라이버를 고릅니다(`rtl8831bu` 기본, `rtl88x2bu`).
 - 환경 변수:
@@ -66,7 +69,7 @@ sh scripts/qemu-dongle-test.sh interactive
   - `NX4_QEMU_NOBUILD=1`: 지난 빌드를 다시 씀
   - `NX4_QEMU_TIMEOUT`: 이 초가 지나도 끝나지 않으면 QEMU를 끝냄(기본은 모드와 AP 초로 셈)
 - 워크트리에는 `.env.local`이 없으니 명령 앞에 `NX4_ENV_FILE=<메인 체크아웃>/.env.local`을 줍니다.
-- 결과는 `out/qemu-test/<드라이버>/`에 남습니다(`console-<모드>-<시각>.log`). 끝에 `== `(단계)와 `-- `(결과) 줄을 모아 보여 줍니다. 결과 줄은 insmod(종료 코드·`wlan0`), 채널(5GHz no IR 수), 스캔, AP마다(끝까지 hostapd가 살아 있고 AP였는지, 붙은 기기 수), rmmod(종료 코드, 그 사이 늘어난 커널 경고·멈춤 줄 수), 뽑기입니다.
+- 결과는 `out/qemu-test/<드라이버>/`에 남습니다(`console-<모드>-<시각>.log`). 끝에 `== `(단계)와 `-- `(결과) 줄을 모아 보여 줍니다. 결과 줄은 insmod(종료 코드·`wlan0`), 채널(5GHz no IR 수), 스캔, AP마다(끝까지 hostapd가 살아 있고 AP였는지, 붙은 기기 수, `interactive`는 IP 받은 기기 수), rmmod(종료 코드, 그 사이 늘어난 커널 경고·멈춤 줄 수), 뽑기입니다.
 - 게스트가 멈춰도 끝납니다. 게스트 커널은 패닉 1초 뒤 재부팅하고(`panic=1`, `-no-reboot`라 QEMU가 끝남), 스크립트는 시간 제한이 지나면 QEMU를 끝냅니다. 기록에 `== 끝`이 없거나 시간 제한에 걸렸으면 알립니다.
 - 중간에 Ctrl-C(또는 TERM)로 멈추면 QEMU와 시간 제한 지킴이도 함께 끝납니다. 동글은 PC로 돌아옵니다. 실행마다 다른 이름의 파일을 써서, 바로 다시 돌려도 앞 실행이 새 실행의 QEMU를 건드리지 않습니다.
 - Docker VM이 저장소나 결과 폴더를 보지 못하면(colima는 홈 폴더 같은 정해진 곳만 붙임) 멈추고 알립니다.
