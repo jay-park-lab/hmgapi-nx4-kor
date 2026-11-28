@@ -2274,7 +2274,8 @@ check "  게스트 init: interactive AP는 wlan0에 192.168.43.1/24를 주고 dn
 _shf=$(cd $B && git ls-files | while read -r f; do
   case $f in (*.sh|.github/workflows/*.yml) echo "$B/$f" ;; (*) head -1 "$f" 2>/dev/null | grep -q '^#!.*sh' && echo "$B/$f" ;; esac
 done)
-_ub=$(LC_ALL=C grep -n '\$[A-Za-z_][A-Za-z0-9_]*[^ -~]' $_shf)
+# 파일을 하나도 못 찾았을 때(git이 없는 곳 등) grep이 표준 입력을 기다리지 않게 /dev/null을 준다. 그때는 아래 대표 파일 확인이 실패한다(리뷰 2)
+_ub=$(LC_ALL=C grep -n '\$[A-Za-z_][A-Za-z0-9_]*[^ -~]' $_shf < /dev/null)
 _shn=$(echo "$_shf" | grep -c .)
 check "  셸 파일(git이 아는 것 모두, ${_shn}개)에 \$VAR 바로 뒤 한글이 없음(맥 sh가 UTF-8 로캘에서 이름으로 읽어 멈춤, #104)" \
   '[ -z "$_ub" ] && echo "$_shf" | grep -q "/usb/troubleShooter$" && echo "$_shf" | grep -q "/tests/qemu/nx4init$" && echo "$_shf" | grep -q "/drivers/lib.sh$"' || echo "$_ub"
