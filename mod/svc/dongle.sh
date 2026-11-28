@@ -28,7 +28,7 @@
 #   - 찾기는 지금부터 NX4_DONGLE_NOWFIND초. 포트 끄고 켜기는 그 장치가 붙은 지(커널 줄 시각) NX4_DONGLE_NOWSETTLE초가 안 됐을 때만
 #     기다린다(부팅 뒤 꽂으면 약 8초 뒤 순정이 껐다 켬).
 #   - AP가 떠 있지 않으면 HMG-API 지기의 기록과 상관없이 ApTool로 한 번 껐다 켠다(그때 HAL이 우리 드라이버를 올림).
-#   - 누르기 전·뒤를 $W/dongle-before.txt·dongle-after.txt에(lib.sh dongle_snap), 결과를 $DGRES에(관리 앱이 읽음) 쓴다.
+#   - 누르기 전·뒤를 $W/dongle-before.txt·dongle-after.txt에(lib.sh dongle_snap), 결과를 ${DGRES}에(관리 앱이 읽음) 쓴다.
 #   부팅 서비스가 아직 돌고 있으면(같은 부팅의 dongle.pid) 하지 않고 busy로 답한다.
 # 이 모드를 끄거나 지우면 hmgapid가 이 서비스의 프로세스 묶음을 내린다. 건 mount는 재부팅하면 풀린다(지울 때는 preun.sh가 푼다).
 # 줄은 hmgapid 서비스 기록(logs/nx4-kor/dongle.log, USB 진단 logs/service/)에 남는다.
@@ -103,9 +103,9 @@ V0=$_DV N0=$_DN D0=$_DD M0=$_DNUM
 boot_secs
 ko_mount $N0; _r=$?
 case $_r in
-  0) say "동글 $V0($D0): $N0 드라이버를 $KO_SLOT에 걺(부팅 뒤 ${_U:-?}초)" ;;
-  2) say "동글 $V0: $KO_SLOT에 다른 것이 걸려 있어 건드리지 않음"; dg_done other ;;
-  *) say "동글 $V0: $N0 드라이버를 $KO_SLOT에 걸지 못함"; dg_done fail ;;
+  0) say "동글 $V0($D0): $N0 드라이버를 ${KO_SLOT}에 걺(부팅 뒤 ${_U:-?}초)" ;;
+  2) say "동글 $V0: ${KO_SLOT}에 다른 것이 걸려 있어 건드리지 않음"; dg_done other ;;
+  *) say "동글 $V0: $N0 드라이버를 ${KO_SLOT}에 걸지 못함"; dg_done fail ;;
 esac
 ( umask 022; echo "$(boot_id) $V0 $N0 ${_U:-?}" > $DONGLE.tmp 2>/dev/null && $BB mv -f $DONGLE.tmp $DONGLE ) || say "기록($DONGLE)을 쓰지 못함"
 
@@ -128,7 +128,7 @@ case $_lm in
     fi
     if [ "$_lm" = stock ] && ! stock_gave_up; then
       say "순정 bcmdhd가 이번 부팅에 칩 켜기를 포기한 줄이 없음: 내리지 않음(이번 부팅에는 우리 드라이버가 올라가지 않을 수 있음, 재부팅하면 다시 봄)"
-    elif bbx rmmod bcmdhd 2>/dev/null; then say "먼저 올라 있던 bcmdhd($_lm)를 내림(부팅 뒤 ${_U:-?}초): 다음 Wi-Fi 요청에 HAL이 $N0을 올림"
+    elif bbx rmmod bcmdhd 2>/dev/null; then say "먼저 올라 있던 bcmdhd($_lm)를 내림(부팅 뒤 ${_U:-?}초): 다음 Wi-Fi 요청에 HAL이 ${N0}을 올림"
     elif ! bcmdhd_loaded; then say "먼저 올라 있던 bcmdhd($_lm)는 이미 내려감(HAL이 내렸음)"
     else say "먼저 올라 있던 bcmdhd($_lm)를 내리지 못함($(cat $SYSMOD/bcmdhd/initstate 2>/dev/null || echo ?)): HAL이 그것을 둔 채라 이번 부팅에는 우리 드라이버가 올라가지 않을 수 있음(재부팅하면 다시 봄)"; fi
     ;;
@@ -162,7 +162,7 @@ if [ -z "$NOW" ]; then
   # 부팅: wlan0을 기다린다(HAL이 우리 것을 올렸으면 동글이 다시 붙을 때 생김). 생기지 않으면 순정 Wi-Fi 서비스에 맡긴다
   _i=0
   while [ ! -d $SYSNET/$WIF ] && [ $_i -lt "$WLWAIT" ]; do sleep 1; _i=$((_i+1)); done
-  [ -d $SYSNET/$WIF ] || { say "$WIF이 생기지 않음(${WLWAIT}초): 순정 Wi-Fi 서비스에 맡김"; dg_done nowlan; }
+  [ -d $SYSNET/$WIF ] || { say "${WIF}이 생기지 않음(${WLWAIT}초): 순정 Wi-Fi 서비스에 맡김"; dg_done nowlan; }
   _i=0
   while ! { wlan_up && ap_on; } && [ $_i -lt "$APWAIT" ]; do sleep 1; _i=$((_i+1)); done
 fi

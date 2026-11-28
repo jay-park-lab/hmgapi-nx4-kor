@@ -638,7 +638,7 @@ check "USB 설치기: ... rc 꼬리까지 비교(1.1.0-rc.3 < $NEEDV), 스틱의
 printf 'version %s\n' $NEEDV > $HD/installed.txt; echo $NEEDV > $U/HMGAPI/install/payload/VERSION
 cp $K/wireless/mod.json $T/wj.keep; modset $K/wireless/mod.json "hmgapi=>=1.2.0"
 ts $U
-check "USB 설치기: 스틱의 공식 무선 모드가 HMG-API 1.2.0 이상을 요구하면 HMG-API $NEEDV에서 멈춤(스틱의 HMG-API도 $NEEDV)" \
+check "USB 설치기: 스틱의 공식 무선 모드가 HMG-API 1.2.0 이상을 요구하면 HMG-API ${NEEDV}에서 멈춤(스틱의 HMG-API도 $NEEDV)" \
   '[ "$(cat $T/ts.rc)" = 1 ] && grep -q "HMG-API 1.2.0 이상으로 먼저 올려" $T/ts.out && ! engcalls'
 cp $T/wj.keep $K/wireless/mod.json
 rm -rf $K/hmgapi $U/HMGAPI $HD/mods/wireless-carplay-aa
@@ -646,7 +646,7 @@ for hv in $NEEDV 1.1.0-rc.11 1.1.0 1.2.0-beta.1; do
   printf 'version %s\n' $hv > $HD/installed.txt
   pset plan-new; mapnew
   ts $U
-  check "USB 설치기: HMG-API $hv는 최소 판 이상이라 설치함" '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^hmgapid engine install .*/nx4-kor.zip$" $T/calls' || cat $T/ts.out
+  check "USB 설치기: HMG-API ${hv}는 최소 판 이상이라 설치함" '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^hmgapid engine install .*/nx4-kor.zip$" $T/calls' || cat $T/ts.out
   rm -rf $HD/mods/nx4-kor $HD/mods/wireless-carplay-aa
 done
 rm -f $HD/installed.txt
@@ -677,7 +677,7 @@ check "USB 설치기: 스틱의 install.log에 이어 씀(앞의 시도 기록�
 # 다른 판이라 예전 판을 정리하고 engine install을 부른다. 끝나면 가짜 engine install이 payload의 판($V)으로 되돌려 놓는다
 modset $HD/mods/nx4-kor/mod.json version=$V-beta.1
 ts $U
-check "USB 설치기: 판은 같은지만 봄. 설치된 판이 $V-beta.1이면 $V와 다른 판이라 예전 판 정리 뒤 engine install(공식 무선 모드는 같은 판이라 그대로)" \
+check "USB 설치기: 판은 같은지만 봄. 설치된 판이 $V-beta.1이면 ${V}와 다른 판이라 예전 판 정리 뒤 engine install(공식 무선 모드는 같은 판이라 그대로)" \
   '[ "$(cat $T/ts.rc)" = 0 ] && grep -q "^hmgapid engine install .*/nx4-kor.zip$" $T/calls && ! grep -q "wireless-carplay-aa.zip" $T/calls && grep -q "$V-beta.1에서 $V(으)로 바꾸는 중" $T/ts.out && ! grep -q "같은 판" $K/install.log && grep -q "\"version\": \"$V\"" $HD/mods/nx4-kor/mod.json && [ "$(pg state)" = reboot ]' || { cat $T/ts.out; cat $K/install.log; }
 # --- HMG-API 기다리기(부팅 직후에 Update OTA를 눌러도 됨, 2026-11-25) --- 대기 간격 1초, 최대 시간은 몇 초로 줄여 돌린다(uptime 100초)
 # 1) hmgapid가 처음 두 번 답하지 않다가 답함: 기다린 뒤 진단 묻기·설치
@@ -1713,7 +1713,7 @@ check "  감시자가 끝 시각 파일(boot·until, 앱이 읽음)을 씀" 'gre
 
 # --- svc/dongle.sh: USB Wi-Fi 동글 드라이버를 순정 자리에 걺(#48, #80 결정). 부팅 때 한 번, 상주 없음 ---
 # 가짜 mount·umount: 받은 명령을 $T/mcalls에 적고, 가짜 mountinfo($MOUNTINFO)에 줄을 더하거나 뺀다. mountinfo의 4번째 칸은
-# 원본 파일 시스템 안의 경로처럼 앞의 $FAKEDATA를 뗀다(차: /data의 /hmgapi/mods/nx4-kor/drivers/<드라이버>/bcmdhd.ko)
+# 원본 파일 시스템 안의 경로처럼 앞의 ${FAKEDATA}를 뗀다(차: /data의 /hmgapi/mods/nx4-kor/drivers/<드라이버>/bcmdhd.ko)
 cat > $T/bin/mount <<E
 #!/bin/sh
 echo "mount \$*" >> $T/mcalls
@@ -2267,10 +2267,15 @@ PATH=$QX/fk:$P0 AP_SECS=10 sh -c '. "$1"; ap phone a 149 "" dhcp; ap g6 g 6 ""' 
 check "  게스트 init: interactive AP는 wlan0에 192.168.43.1/24를 주고 dnsmasq(게이트웨이·DNS 없음)로 IP를 빌려줌, 결과 줄에 IP 받은 기기 수, 기록은 종류와 IP만(MAC·폰 이름 없음), matrix AP에는 DHCP 없음" \
   'grep -q "^-- phone 결과: AP로 섬=yes, 가장 많이 붙은 기기 1개, IP 받은 기기 1개(DHCP 돎), 채널:" $QX/apdhcp.out && grep -qx "DHCPACK 192.168.43.23" $QX/apdhcp.out && grep -qx "DHCPDISCOVER" $QX/apdhcp.out && ! grep -q "DHCPDISCOVER [0-9]" $QX/apdhcp.out && ! grep -q "Jay-iPhone\|aa:bb:cc\|02:1a" $QX/apdhcp.out && grep -q "wlan0: AP-STA-CONNECTED <MAC>" $QX/apdhcp.out && grep -qx "dnsmasq: started, version 2.90 DNS disabled" $QX/apdhcp.out && grep -q "^-- g6 결과: AP로 섬=yes, 가장 많이 붙은 기기 1개, 채널:" $QX/apdhcp.out && grep -q -- "--log-facility=- .*--interface=wlan0 --bind-interfaces .*--dhcp-range=192.168.43.10,192.168.43.50,255.255.255.0,1h --dhcp-option=3 --dhcp-option=6" $QX/dnsmasq.args && grep -q "ip addr add 192.168.43.1/24 dev wlan0" $B/tests/qemu/nx4init && grep -q "^  ap phone a 149 \"\" dhcp$" $B/tests/qemu/nx4init && grep -q "usr/sbin/dnsmasq" $B/tests/qemu/build-rootfs.sh && grep -q "^QEMU_ALPINE_PKGS=\".* dnsmasq\"$" $B/tests/qemu/inputs.sh' || cat $QX/apdhcp.out
 # 맥의 /bin/sh(bash 3.2)는 UTF-8 로캘에서 $VAR 바로 뒤의 한글 바이트를 이름으로 읽어 set -u로 멈춘다("USB�: unbound variable",
-# PR #103 테스트 중). 이 테스트는 부른 쪽 로캘을 물려받아 C 로캘인 PC에서는 그 실패를 못 보므로, QEMU 테스트 파일에 그 꼴
-# (${VAR}로 써야 함)이 없는지 글자로 본다
-_ub=$(LC_ALL=C grep -n '\$[A-Za-z_][A-Za-z0-9_]*[^ -~]' $B/scripts/qemu-dongle-test.sh $B/tests/qemu/nx4init $B/tests/qemu/*.sh)
-check "  QEMU 테스트 파일에 \$VAR 바로 뒤 한글이 없음(맥 sh가 UTF-8 로캘에서 이름으로 읽어 멈춤)" '[ -z "$_ub" ]' || echo "$_ub"
+# PR #103 테스트 중). 이 테스트는 부른 쪽 로캘을 물려받아 C 로캘인 PC에서는 그 실패를 못 보므로, 셸 파일에 그 꼴(${VAR}로 써야 함)이
+# 없는지 글자로 본다(#104). 차의 mksh·busybox에서도 ${VAR}는 같은 뜻이다. drivers/lib.sh의 make_retry도 이 테스트가 맥에서 돌리므로 넣는다
+_ub=$(LC_ALL=C grep -n '\$[A-Za-z_][A-Za-z0-9_]*[^ -~]' $B/scripts/*.sh $B/tests/qemu/nx4init $B/tests/qemu/*.sh $B/tests/emu/*.sh \
+  $B/tests/mod-test.sh $B/usb/troubleShooter $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/drivers/*.sh $B/drivers/*/*.sh \
+  $B/.github/workflows/*.yml)
+check "  셸 파일에 \$VAR 바로 뒤 한글이 없음(맥 sh가 UTF-8 로캘에서 이름으로 읽어 멈춤, #104)" '[ -z "$_ub" ]' || echo "$_ub"
+# case의 [a-f] 같은 범위는 UTF-8 로캘에서 대문자까지 받으므로(맥 sh) VID:PID 확인은 글자를 늘어놓는다(#104)
+check "  QEMU 테스트의 VID:PID 확인은 로캘에 기대는 범위([0-9a-f]) 없이 글자를 늘어놓음" \
+  '! grep -q "\[0-9a-f\]" $B/scripts/qemu-dongle-test.sh && grep -q "\[0123456789abcdef\]" $B/scripts/qemu-dongle-test.sh'
 # 호스트가 기록을 찾는 줄은 바이트로(LC_ALL=C) 찾는다: 맥 grep은 UTF-8 로캘에서 기록 원본의 한글 패턴을 못 찾아, 끝까지 돈 게스트를
 # "끝까지 돌지 못했습니다"로 알렸다(PR #103 첫 실행, 리뷰 4)
 check "  호스트의 기록 판정은 LC_ALL=C로 찾음(맥 grep이 UTF-8 로캘에서 기록의 한글 줄을 못 찾음)" \
@@ -2558,4 +2563,4 @@ else
 fi
 
 echo
-if [ $fails = 0 ]; then echo "모두 통과"; else echo "실패 $fails개"; exit 1; fi
+if [ $fails = 0 ]; then echo "모두 통과"; else echo "실패 ${fails}개"; exit 1; fi

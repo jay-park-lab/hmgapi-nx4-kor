@@ -78,7 +78,7 @@ watch_wake() {
     return 0
   fi
   _fifo=$W/nochip.fifo
-  ( umask 077; mkdir -p $W 2>/dev/null; rm -f $_fifo; $BB mkfifo $_fifo 2>/dev/null ) || { echo "NX4 KOR: $_fifo를 만들지 못해 깨어난 뒤에는 지키지 않음"; return 0; }
+  ( umask 077; mkdir -p $W 2>/dev/null; rm -f $_fifo; $BB mkfifo $_fifo 2>/dev/null ) || { echo "NX4 KOR: ${_fifo}를 만들지 못해 깨어난 뒤에는 지키지 않음"; return 0; }
   $IBB inotifyd - $HMGWIFI:d > $_fifo 2>/dev/null &
   _ip=$!
   while read -r _we _wd _wf; do

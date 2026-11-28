@@ -245,7 +245,7 @@ st_verdict() {
   elif [ "$K_WM" = no ]; then
     _vs nowireless 2 "공식 무선 모드($WM_NAME)가 설치되어 있지 않습니다. NX4 KOR USB 설치기로 다시 설치해 주세요."
   elif [ "$K_WMON" = no ]; then
-    _vs wirelessoff 2 "HMG-API 앱에서 $WM_NAME가 꺼져 있습니다. 켜고 변경 사항을 적용한 뒤 내비를 재부팅해 주세요."
+    _vs wirelessoff 2 "HMG-API 앱에서 ${WM_NAME}가 꺼져 있습니다. 켜고 변경 사항을 적용한 뒤 내비를 재부팅해 주세요."
   elif [ -z "$K_WMV" ] || ver_lt "$K_WMV" $WM_MIN; then
     _vs oldwireless 2 "공식 무선 모드 버전(${K_WMV:-알 수 없음})을 지원하지 않습니다. $WM_MIN 이상으로 업데이트해 주세요."
   elif [ "$K_HK" = off ]; then
@@ -258,8 +258,8 @@ st_verdict() {
   elif [ "$K_MH" = off ]; then
     # 같은 지점을 replace하는 다른 모드와 겹치면(#17) HMG-API는 load 차례가 뒤인 모드를 끄고 이유에 "conflict"를 남긴다
     case "$K_MHWHY" in
-      *conflict*) _vs wmhooksoff 2 "$WM_NAME가 다른 모드와 같은 훅을 써서 꺼졌습니다. HMG-API 앱의 Mods에서 겹치는 모드를 끈 뒤 내비를 재부팅해 주세요." ;;
-      *) _vs wmhooksoff 2 "HMG-API가 이 차에서 $WM_NAME의 훅을 켜지 못했습니다. 내비를 재부팅해도 같으면 HMG-API 앱의 Mods에서 이유를 확인해 주세요." ;;
+      *conflict*) _vs wmhooksoff 2 "${WM_NAME}가 다른 모드와 같은 훅을 써서 꺼졌습니다. HMG-API 앱의 Mods에서 겹치는 모드를 끈 뒤 내비를 재부팅해 주세요." ;;
+      *) _vs wmhooksoff 2 "HMG-API가 이 차에서 ${WM_NAME}의 훅을 켜지 못했습니다. 내비를 재부팅해도 같으면 HMG-API 앱의 Mods에서 이유를 확인해 주세요." ;;
     esac
   elif [ "$K_BRIDGE" = off ]; then
     _vs bridgeoff 2 "HMG-API 앱의 $WM_NAME 설정에서 'Wireless CarPlay'가 꺼져 있습니다. 켜고 변경 사항을 적용한 뒤 내비를 재부팅해 주세요."
@@ -428,7 +428,7 @@ take_rbreq() {
   case "$_un" in ''|*[!0-9]*) aplog "재부팅 요청 거절: 요청 나이를 알 수 없음"; rb_result old; return 1 ;; esac
   # 한도 40초. 앱의 실패 판정(RB_WAIT 80초)은 이 40초 + sync + 재부팅 명령 기다림 30초보다 길다. 나이가 음수(앞으로 온 요청)도 받지 않는다
   _ra=$((_un - RQ_EL))
-  [ $_ra -ge 0 ] || { aplog "재부팅 요청 거절: 요청 시각이 지금보다 뒤임($_ra초)"; rb_result old; return 1; }
+  [ $_ra -ge 0 ] || { aplog "재부팅 요청 거절: 요청 시각이 지금보다 뒤임(${_ra}초)"; rb_result old; return 1; }
   [ $_ra -le ${NX4_RB_MAX:-40} ] || { aplog "재부팅 요청 거절: 오래된 요청(${_ra}초)"; rb_result old; return 1; }
   # 이번 부팅 설치 진행 기록이 run이어도, 마지막으로 쓴 지(ut, 부팅 뒤 초) RB_STALE초(900, 앱의 STALE과 같음)가
   # 넘었으면 멈춘 기록으로 보고 이 이유로는 막지 않는다(HMG-API 적용이 아직 돌면 아래 sysw로 막는다). ut가 없거나 숫자가 아니어도
@@ -482,7 +482,7 @@ take_rbreq() {
 #   - /system remount는 "hmgapid remount rw|ro"(같은 파일 op_remount).
 #   - HMG-API 부팅 스크립트(install/common/boot.sh)가 부팅마다 "sh /data/hmgapi/hook-check.sh"를 돌린다(remount rw → 쓰기 → ro).
 #     엔진 update-hmgapi도 HMG-API 파일을 바꾼다.
-# 빈 명령줄(커널 스레드)은 건너뛴다. 명령줄을 하나도 못 읽으면(busybox 1.8.1 tr이 NUL을 못 다루는 등) $PS로 한 번 더
+# 빈 명령줄(커널 스레드)은 건너뛴다. 명령줄을 하나도 못 읽으면(busybox 1.8.1 tr이 NUL을 못 다루는 등) ${PS}로 한 번 더
 # 본다(엔진 apply 명령줄은 약 60자라 ps의 80칸 안). 그래도 판단이 안 되면 막지 않고 로그만 남긴다(설치기의 쓰기는 진행 기록 run이
 # 따로 막는다. 막는 쪽으로 두면 버튼이 영영 "마무리하는 중"만 보인다). SYSW에 찾은 것을 둔다.
 sys_writer_busy() {

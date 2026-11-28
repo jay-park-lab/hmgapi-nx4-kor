@@ -277,7 +277,7 @@ need_hmg() {
   for _c in "$@"; do
     [ -n "$_c" ] || continue
     vlt "$_n" "$_c"
-    case $? in 0) _n=$_c ;; 2) log "HMG-API 최소 판 $_c를 $_n과 비교하지 못함: 빼고 봄" ;; esac
+    case $? in 0) _n=$_c ;; 2) log "HMG-API 최소 판 ${_c}를 ${_n}과 비교하지 못함: 빼고 봄" ;; esac
   done
   echo "$_n"
 }
@@ -1169,12 +1169,12 @@ if [ -n "$HAVE" ]; then
     SV=
     [ -f $U/HMGAPI/install/payload/VERSION ] && read -r SV < $U/HMGAPI/install/payload/VERSION
     if [ -f $K/hmgapi/troubleShooter ] && [ -n "$SV" ] && hmg_meets "$SV" "$NEED"; then
-      toast "NX4 KOR: HMG-API를 $HAVE에서 $SV(으)로 먼저 올립니다. 재부팅된 뒤 Update OTA를 한 번 더 눌러 주세요."
+      toast "NX4 KOR: HMG-API를 ${HAVE}에서 $SV(으)로 먼저 올립니다. 재부팅된 뒤 Update OTA를 한 번 더 눌러 주세요."
       cp $LOG $K/install.log 2>/dev/null
       [ -n "$ROOT" ] && { echo "HMG-API 설치기로 넘김(업데이트)"; exit 0; }
       exec sh $K/hmgapi/troubleShooter
     fi
-    toast "NX4 KOR: HMG-API $HAVE에는 설치할 수 없습니다. HMG-API $NEED 이상으로 먼저 올려 주세요. 아무것도 바꾸지 않았습니다."
+    toast "NX4 KOR: HMG-API ${HAVE}에는 설치할 수 없습니다. HMG-API $NEED 이상으로 먼저 올려 주세요. 아무것도 바꾸지 않았습니다."
     finish 1
   fi
   [ $rc = 2 ] && log "HMG-API 판($HAVE)과 최소 판($NEED)을 비교하지 못함: 그대로 진행"
@@ -1274,14 +1274,14 @@ if [ -n "$WOLDV" ]; then
   vlt "$WOLDV" "$WNEWV"
   case $? in
     1) if [ -f $K/REINSTALL ] && [ "$WOLDV" = "$WNEWV" ]; then log "공식 무선 모드 $WOLDV: REINSTALL로 다시 설치"
-       else log "공식 무선 모드 $WOLDV가 이미 있음(스틱 $WNEWV): 그대로 둠"; WDO=; fi ;;
+       else log "공식 무선 모드 ${WOLDV}가 이미 있음(스틱 $WNEWV): 그대로 둠"; WDO=; fi ;;
     2) log "공식 무선 모드 판($WOLDV)을 스틱의 판($WNEWV)과 비교하지 못함: 그대로 둠"; WDO= ;;
   esac
 fi
 if [ -n "$WDO" ]; then
   prog 25 run "공식 무선 모드를 설치하는 중입니다"
-  if [ -n "$WOLDV" ]; then toast "NX4 KOR: 공식 무선 모드를 $WOLDV에서 $WNEWV(으)로 바꾸는 중..."
-  else toast "NX4 KOR: 공식 무선 모드 $WNEWV를 설치하는 중..."; fi
+  if [ -n "$WOLDV" ]; then toast "NX4 KOR: 공식 무선 모드를 ${WOLDV}에서 $WNEWV(으)로 바꾸는 중..."
+  else toast "NX4 KOR: 공식 무선 모드 ${WNEWV}를 설치하는 중..."; fi
   # NX4는 공식 모드의 차 목록에 없다: --any-car(HMG-API 앱의 "Install anyway"). zip은 install 바로 뒤에 와야 한다
   $HMGAPID engine install $STAGE/$WMOD.zip --any-car >> $LOG 2>&1 || fail_out "$WFAIL_MSG"
   log "공식 무선 모드 설치됨: $WNEWV"
@@ -1301,7 +1301,7 @@ else
   prog 40 run "NX4 KOR를 설치하는 중입니다"
   RUNSVC=
   if [ -n "$OLDV" ]; then
-    toast "NX4 KOR: $OLDV에서 $NEWV(으)로 바꾸는 중..."
+    toast "NX4 KOR: ${OLDV}에서 $NEWV(으)로 바꾸는 중..."
     # 예전 판의 정리: 서비스를 멈추고 작업 파일만 지운다. 돌던 서비스는 설치 뒤(또는 실패하면 예전 판으로) 다시 띄운다
     RUNSVC=$($HMGAPID services $MOD 2>/dev/null | while read -r _m _n _s _r; do [ "$_m" = $MOD ] && [ "$_s" = running ] && echo $_n; done)
     NX4_APP=$INST sh $INST/bin/uninstall.sh --update >> $LOG 2>&1 || log "예전 판 정리가 실패했지만 계속함"
