@@ -308,6 +308,37 @@ public class ReportTest {
             && Report.rbAnswer(Report.parse("id=12345\nboot=boot-A\n"), "boot-A", 12345) == null
             && Report.rbAnswer(Report.parse(null), "boot-A", 12345) == null && Report.rbAnswer(rr, null, 12345) == null
             && Report.rbAnswer(rr, "boot-A", 0) == null);
+        // [동글 켜기](#60): 결과 해석, 버튼을 보일 때, 표 칸
+        Report dok = Report.parse("id=900\nboot=boot-A\ncode=ok\nusb=0bda:b831\ndrv=rtl8831bu\n");
+        check("동글 켜기: ok·restarted면 좋은 소식(드라이버 화면 이름 RTL8831BU), noap·nowlan은 '걸었지만 아직', 이번 부팅의 내 요청이 아니거나 코드가 없으면 답 없음",
+            Report.dgAnswer(dok, "boot-A", 900).startsWith("동글(RTL8831BU)을 켰습니다.") && Report.dgGood(dok)
+            && Report.dgGood(Report.parse("id=900\nboot=boot-A\ncode=restarted\n"))
+            && Report.dgAnswer(Report.parse("id=900\nboot=boot-A\ncode=noap\ndrv=rtl88x2bu\n"), "boot-A", 900).startsWith("동글 드라이버(RTL88x2BU)는 걸었지만")
+            && Report.dgAnswer(Report.parse("id=900\nboot=boot-A\ncode=nowlan\ndrv=rtl88x2bu\n"), "boot-A", 900).contains("아직 뜨지 않았습니다")
+            && !Report.dgGood(Report.parse("id=900\nboot=boot-A\ncode=noap\n"))
+            && Report.dgAnswer(dok, "boot-A", 901) == null && Report.dgAnswer(dok, "boot-B", 900) == null
+            && Report.dgAnswer(Report.parse("id=900\nboot=boot-A\n"), "boot-A", 900) == null && Report.dgAnswer(dok, null, 900) == null
+            && Report.dgAnswer(dok, "boot-A", 0) == null);
+        check("  코드마다 안내: nodongle·nodrivers·chip·other·gone·busy·old·bad·noproj, 모르는 코드는 코드와 함께 재부팅 안내",
+            Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=nodongle\n"), "b", 9).startsWith("꽂힌 동글을 찾지 못했습니다.")
+            && Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=nodrivers\n"), "b", 9).contains("동글 드라이버가 없습니다")
+            && Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=chip\n"), "b", 9).contains("Wi-Fi 칩이 있어")
+            && Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=other\n"), "b", 9).contains("다른 모드가")
+            && Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=gone\n"), "b", 9).startsWith("동글이 빠졌습니다.")
+            && Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=busy\n"), "b", 9).contains("이미 도는 중")
+            && Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=old\n"), "b", 9).equals(Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=bad\n"), "b", 9))
+            && Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=noproj\ndrv=rtl8831bu\n"), "b", 9).contains("요청하지 않아")
+            && Report.dgAnswer(Report.parse("id=9\nboot=b\ncode=zzz\n"), "b", 9).equals("동글을 켜지 못했습니다(zzz). 재부팅한 뒤 다시 눌러 주세요."));
+        Report dgs = Report.parse("support=ok\ndongle_drivers=yes\ndongle=0bda:b831 rtl8831bu\ndongle_on=rtl8831bu\ndongle_btn=yes\n");
+        boolean dgRow = false;
+        for (String[] row : dgs.rows()) if ("USB Wi-Fi 동글".equals(row[0]) && "RTL8831BU (0bda:b831), 드라이버 걸림".equals(row[1])) dgRow = true;
+        boolean noRow = true;
+        for (String[] row : Report.parse("support=ok\ndongle_drivers=no\n").rows()) if ("USB Wi-Fi 동글".equals(row[0])) noRow = false;
+        check("  표: 묶음에 드라이버가 있으면 'USB Wi-Fi 동글' 줄(걸림·안 걸림·안 꽂힘), 없으면 줄 없음. 버튼은 dongle_btn=yes·busybox 있을 때만",
+            dgRow && noRow && dgs.dongleButton()
+            && "RTL88x2BU (2357:012d), 드라이버 안 걸림".equals(Report.parse("dongle=2357:012d rtl88x2bu\ndongle_on=none\n").dongleCell())
+            && "안 꽂힘".equals(Report.parse("dongle=none\n").dongleCell()) && "안 꽂힘".equals(Report.parse("").dongleCell())
+            && !Report.parse("dongle_btn=no\n").dongleButton() && !Report.parse("support=nobb\ndongle_btn=yes\n").dongleButton());
         String wf = "boot=boot-A\nuntil=700\n";
         check("감시자 끝 시각 전이면 보냄, 끝났거나(3초 여유) 다른 부팅·파일 없음·깨진 값이면 '끝남'",
             !Report.watchGone(wf, "boot-A", 600) && Report.watchGone(wf, "boot-A", 697) && Report.watchGone(wf, "boot-A", 800)

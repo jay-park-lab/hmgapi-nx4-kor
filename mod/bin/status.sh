@@ -3,9 +3,9 @@
 # 앱이 열릴 때 hmgapid service-start launch → svc/launch.sh가 이 스크립트를 root로 부른다.
 #   (인자 없음) 상태 파일을 쓰고, 재부팅 요청을 받는 감시자(--watch)를 10분 동안 띄운다.
 #   --wait      설치가 진행 중이면 끝날 때까지(최대 15분) 기다렸다가 상태 파일을 다시 쓴다.
-#   --watch     관리 앱의 [지금 재부팅] 요청을 받는다.
+#   --watch     관리 앱의 [지금 재부팅]·[동글 켜기] 요청을 받는다([동글 켜기]는 svc/dongle.sh --now가 동글 드라이버를 건다).
 # 2.1.0의 판정은 "HMG-API + 공식 무선 모드(wireless-carplay-aa) + 이 모드" 구조를 본다: HMG-API 판, 공식 모드가 깔리고 켜졌는지와
-# 그 판·훅, HMG-API 훅(map), HMG-API가 띄우는 프로젝션 AP, Wi-Fi 부품. 읽기만 하고 아무것도 바꾸지 않는다.
+# 그 판·훅, HMG-API 훅(map), HMG-API가 띄우는 프로젝션 AP, Wi-Fi 부품, USB Wi-Fi 동글. 상태 파일을 쓸 때는 읽기만 하고 아무것도 바꾸지 않는다.
 # 상태 파일에는 이름, 버전, 예/아니요, 개수만 넣는다(SSID, 비밀번호, 휴대폰 이름, MAC, IP 없음).
 export PATH=/sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
 # busybox는 svc/lib.sh가 고른다(내비의 것, 없으면 모드에 함께 넣은 것)
@@ -159,7 +159,7 @@ NOWIFI_MSG="이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 무�
 # 관리 앱은 상태 파일의 verdict·verdict_lv·verdict_msg를 그대로 보인다.
 # 판정 순서: HMG-API 부팅 보호 → 설치 중 → 이 모드의 차가 아님 → HMG-API 판 → 설치기가 남긴 재부팅 필요·실패 →
 # 공식 무선 모드(설치·켜짐·판) → HMG-API 훅(map) → 공식 모드의 훅 → 무선 카플레이 설정 → 무선 기능 → 프로젝션 AP 요청 →
-# 연결됨 → 다른 Wi-Fi 패키지 → AP 켜짐(준비됨·일반 핫스팟) → Wi-Fi 클라이언트 → 이번 부팅 칩 없음(Wi-Fi 부품 없음) →
+# 연결됨 → 다른 Wi-Fi 패키지 → AP 켜짐(준비됨·일반 핫스팟) → Wi-Fi 클라이언트 → USB Wi-Fi 동글 꽂힘(켜기 전) → 이번 부팅 칩 없음(Wi-Fi 부품 없음) →
 # AP 꺼짐 → 켜는 중(부팅 뒤 5분 전) → Wi-Fi 부품 없음(5분 뒤) → 못 켬.
 st_collect() {
   [ "$SC_DONE" = 1 ] && return 0
@@ -177,6 +177,11 @@ st_collect() {
   K_AP=$(yesno ap_on); K_APMODE=$(ap_ssid); K_FOREIGN=$(yesno foreign_hostapd)
   K_CP=$(cp_count); K_WPA=$(yesno running wpa_supplicant)
   K_WLAN=$(yesno [ -d $SYSNET/$WIF ]); K_CHIP=$(yesno wifi_chip_seen)
+  # USB Wi-Fi 동글(#48·#60, 2.2.0): 이 묶음에 동글 드라이버가 있는가, 꽂힌 동글(USB ID와 그 드라이버), 순정 자리에 건 드라이버,
+  # [동글 켜기]를 보일지(드라이버가 있고 칩이 없는 내비)
+  K_DGDRV=$(yesno [ -r "$DONGLE_IDS" ]); K_DG=none; dongle_find && K_DG="$_DV $_DN"
+  K_DGON=none; ko_on && K_DGON=$_KO
+  K_DGBTN=no; [ $K_DGDRV = yes ] && [ $K_CHIP = no ] && K_DGBTN=yes
   # 이번 부팅에 칩이 없음(svc/nochip.sh의 이번 부팅 기록, 없으면 지금 커널 기록으로 lib.sh nochip_now), 그리고 nochip.sh가 ap.boot를 썼는가
   # 기록 뒤에 동글을 꽂았으면(칩·wlan0·동글이 보임) 기록을 믿지 않는다(lib.sh nochip_mark)
   K_NOCHIPW=$(yesno nochip_mark); K_NOCHIP=$K_NOCHIPW; [ $K_NOCHIP = yes ] || K_NOCHIP=$(yesno nochip_now)
@@ -273,6 +278,11 @@ st_verdict() {
   elif [ "$K_WPA" = yes ]; then
     # 내비의 Wi-Fi 클라이언트(HMG-API 집 Wi-Fi 포함)가 켜져 있으면 HMG-API 지기는 라디오를 건드리지 않는다(Wi-Fi 칩은 하나)
     _vs wificlient 1 "내비가 일반 Wi-Fi에 접속하는 중이라 무선 연결용 Wi-Fi가 꺼져 있습니다. HMG-API 앱의 Home Wi-Fi를 쓰면 주차를 풀 때 돌아옵니다."
+  elif [ "$K_DGBTN" = yes ] && [ "$K_DG" != none ] && [ "$K_DGON" != "${K_DG#* }" ] && [ "$K_DGON" != other ]; then
+    # 다른 모드가 순정 자리에 건 것(other)이면 [동글 켜기]도 건드리지 않고 other로 끝나므로 안내하지 않는다(PR #100 리뷰 7)
+    # USB Wi-Fi 동글(#60): 칩이 없는 내비에 우리 드라이버가 받는 동글이 꽂혔는데 그 드라이버가 순정 자리에 걸리지 않았다(부팅 뒤에 꽂음).
+    # 그대로면 nochip의 ap.boot로 HMG-API 지기가 다시 시도하지 않거나 "켜는 중"·"못 켬"에 머문다. [동글 켜기]로 안내한다(PR #100 리뷰 4)
+    _vs dongleoff 1 "USB Wi-Fi 동글이 꽂혀 있지만 아직 켜지 않았습니다. 오른쪽 아래 [동글 켜기]를 눌러 주세요."
   elif [ "$K_NOCHIP" = yes ] && k_feat com.hkmc.software.wifihotspot; then
     # 이번 부팅에 칩이 없음(nochip.sh 기록 또는 lib.sh nochip_now: 이 내비에서 칩을 본 적 없음, wlan0 없음, 순정 드라이버가 이번 부팅에 칩 켜기를
     # 포기함). 그 부팅에는 칩이 올라오지 않으므로 아래 "켜는 중"(부팅 뒤 5분)을 기다리지 않는다. 핫스팟 기능은 아래와 같이 본다
@@ -302,7 +312,7 @@ st_verdict() {
     installing) V_S1="설치: 진행 중" ;;
     reboot) V_S1="설치: 재부팅 필요" ;;
     bootguard) V_S1="설치: HMG-API 훅 꺼짐(부팅 보호)" ;;
-    ready|connected|aphotspot|wificlient|nowifipart|apoff|apfail|apwait|hooksoff) V_S1="설치: 끝남" ;;
+    ready|connected|aphotspot|wificlient|nowifipart|apoff|apfail|apwait|hooksoff|dongleoff) V_S1="설치: 끝남" ;;
     *) V_S1="설치: 안 됨(오른쪽 안내를 보세요)" ;;
   esac
   if [ "$V_CODE" = otherwifi ]; then V_S2="무선 Wi-Fi: 다른 패키지가 씀"
@@ -311,6 +321,7 @@ st_verdict() {
   elif [ "$V_CODE" = nowifipart ]; then V_S2="무선 Wi-Fi: 부품 없음(USB 동글 필요)"
   elif [ "$V_CODE" = wificlient ]; then V_S2="무선 Wi-Fi: 일반 Wi-Fi 접속 중"
   elif [ "$V_CODE" = apwait ]; then V_S2="무선 Wi-Fi: 켜는 중"
+  elif [ "$V_CODE" = dongleoff ]; then V_S2="무선 Wi-Fi: 동글 꽂힘(켜기 전)"
   else V_S2="무선 Wi-Fi: 꺼짐"; fi
   if [ "${K_CP:-0}" != 0 ]; then V_S3="폰 연결: 카플레이 ${K_CP}대 연결됨"
   else V_S3="폰 연결: 지금 연결된 폰 없음"; fi
@@ -345,6 +356,11 @@ status_kv() {
   echo "feat_wifi=$(yesno k_feat android.hardware.wifi)"
   echo "chip=$K_CHIP"
   echo "wlan0=$K_WLAN"
+  # USB Wi-Fi 동글: 묶음의 드라이버(yes/no), 꽂힌 동글("<vid:pid> <드라이버>" 또는 none), 순정 자리에 건 것(드라이버·other·none), [동글 켜기]
+  echo "dongle_drivers=$K_DGDRV"
+  echo "dongle=$K_DG"
+  echo "dongle_on=$K_DGON"
+  echo "dongle_btn=$K_DGBTN"
   # 이번 부팅에 칩이 없음(순정 드라이버가 포기함, svc/nochip.sh), 그래서 nochip.sh가 HMG-API의 다시 시도를 멈춤(ap.boot를 씀)
   echo "nochip=$K_NOCHIP"
   echo "nochip_mark=$K_NOCHIPW"
@@ -505,7 +521,36 @@ sysw_match() {
   esac
   return 1
 }
-# 감시자: 관리 앱이 열릴 때(launch) 띄운다. 1초마다 재부팅 요청을 본다.
+# [동글 켜기] 요청($DGREQ, lib.sh, #60)을 하나 받는다. 받아도 되면 0. 받으면 바로 지운다. 이전 부팅·이미 받은 요청·깨진 값(bad),
+# 40초(NX4_RB_MAX)보다 오래됨·나이를 모름(old)이면 받지 않고 결과($DGRES)에 남긴다. 그 밖의 결과는 svc/dongle.sh --now가 쓴다
+dg_result() {
+  [ -n "$RQ_ID" ] || return 0
+  ( umask 022
+    { echo "id=$RQ_ID"; echo "boot=$(cat ${BOOT_ID:-/proc/sys/kernel/random/boot_id} 2>/dev/null)"; echo "code=$1"; } > $DGRES.tmp \
+      && $BB chmod 644 $DGRES.tmp && $BB mv -f $DGRES.tmp $DGRES ) 2>/dev/null
+  return 0
+}
+take_dgreq() {
+  if ! req_peek $DGREQ $W/dongle.last; then
+    if [ -n "$RQ_RAW" ]; then
+      if [ "$RQ_RAW" != "$(cat $W/dongle.bad 2>/dev/null)" ]; then
+        echo "$RQ_RAW" > $W/dongle.bad
+        aplog "동글 켜기 요청 거절: 이번 부팅의 새 요청이 아님(이전 부팅·이미 받은 요청·깨진 값)"
+        dg_result bad
+      fi
+      req_drop $DGREQ
+    fi
+    return 1
+  fi
+  req_drop $DGREQ
+  echo "$RQ_ID" > $W/dongle.last
+  _un=$(up_s)
+  case "$_un" in ''|*[!0-9]*) aplog "동글 켜기 요청 거절: 요청 나이를 알 수 없음"; dg_result old; return 1 ;; esac
+  _ra=$((_un - RQ_EL))
+  if [ $_ra -lt 0 ] || [ $_ra -gt ${NX4_RB_MAX:-40} ]; then aplog "동글 켜기 요청 거절: 오래된 요청(${_ra}초)"; dg_result old; return 1; fi
+  return 0
+}
+# 감시자: 관리 앱이 열릴 때(launch) 띄운다. 1초마다 재부팅 요청과 [동글 켜기] 요청을 본다.
 # 끝나는 조건: watch.until(부팅 뒤 초, launch가 "지금+WATCH_SECS"로 씀)이 지남. 화면을 다시 열면 늘어난다.
 # 그 값을 읽지 못하거나 숫자가 아니면 바로 끝난다.
 # 한 번에 하나만: watch.lock 폴더(mkdir은 한 번에 하나만 성공)와 watch.pid "<pid> <boot_id>". 잠금이 있는데 1초 뒤에도
@@ -571,6 +616,12 @@ if [ "$1" = --watch ]; then
       fi
       rb_result cmd
       fi
+    fi
+    # [동글 켜기](#60): 받으면 svc/dongle.sh --now를 뒤에서 띄운다(1~2분 걸림. 그동안에도 감시자는 재부팅 요청을 받는다, PR #100 리뷰 2).
+    # 둘이 겹치지 않게 하는 것은 dongle.sh의 dongle.pid(두 번째는 busy로 답함). 감시자가 먼저 끝나도 계속 돈다. 줄은 ap.log에
+    if [ -f $DGREQ ] && take_dgreq; then
+      aplog "관리 앱에서 동글 켜기 요청: 동글 드라이버를 걸고 무선 연결용 Wi-Fi를 다시 켬"
+      ( NX4_APP=$APP sh $APP/svc/dongle.sh --now $RQ_ID </dev/null >> $APLOG 2>&1 ) &
     fi
     sleep 1
   done

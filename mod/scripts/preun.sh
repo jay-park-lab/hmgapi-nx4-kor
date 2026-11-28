@@ -31,6 +31,8 @@ rm -rf $W
 rm -f /data/local/tmp/nx4-kor-status.txt /data/local/tmp/nx4-kor-status.txt.tmp
 rm -f /data/local/tmp/nx4-kor-watch.txt /data/local/tmp/nx4-kor-watch.txt.tmp
 rm -f $HINT $HINT.tmp
+# [동글 켜기](#60) 결과(누르기 전·뒤 기록은 위 작업 폴더 $W에 있어 함께 지워짐)
+rm -f $DGRES $DGRES.tmp
 # 새 판으로 바꾸기 전(bin/uninstall.sh --update): 여기서 끝낸다. 모드는 HMG-API가 새 판으로 바꾼다
 if [ "$NX4_UPDATE" = 1 ]; then
   echo "NX4 KOR 업데이트: 이전 판 정리"

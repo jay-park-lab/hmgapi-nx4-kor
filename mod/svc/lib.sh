@@ -394,6 +394,59 @@ wlan_up() {
   case "$(cat $SYSNET/$WIF/flags 2>/dev/null)" in *[13579bdfBDF]) return 0 ;; esac
   return 1
 }
+# 순정 bcmdhd가 이번 부팅에 칩 켜기를 포기했는가: 커널 줄(dhd_gave_up). 오래 켜 두어 그 줄이 밀려났으면 svc/nochip.sh의
+# 이번 부팅 칩 없음 기록으로 본다([동글 켜기]는 부팅 뒤 오래 지나 누를 수 있음)
+stock_gave_up() { dhd_gave_up || this_boot $NOCHIP; }
+# 장치($1 sysfs 이름, $2 장치 번호)가 붙은 때(부팅 뒤 정수 초): 커널 줄 "usb <이름>: new … device number <번호> using …"의 시각.
+# 못 찾으면(링 버퍼에서 밀려남) 빈 값
+dongle_since() {
+  klog 2>/dev/null | $BB awk -v d="usb $1: new " -v n="device number $2 using" \
+    'index($0, d) && index($0, n) { s = $0 } END { if (s != "") { sub(/^[^[]*\[ */, "", s); sub(/\].*$/, "", s); print int(s) } }'
+}
+
+# [동글 켜기](#60): 관리 앱이 앱 개인 폴더에 쓰는 요청(꼴은 reboot.req와 같음: "<요청 id> <boot_id> <부팅 뒤 초>", 감시자
+# status.sh --watch만 받음)과 그 결과(644: id·boot·code, 그리고 svc/dongle.sh --now가 쓰면 usb·drv). 다른 앱은 그 폴더에 쓸 수 없다
+DGREQ=${NX4_DGREQ:-/data/data/io.github.jayparklab.nx4kor/files/dongle.req}
+DGRES=${DGRES:-/data/local/tmp/nx4-kor-dongle-result.txt}
+# [동글 켜기]를 누르기 전·뒤의 기록(svc/dongle.sh --now가 $W/dongle-before.txt·dongle-after.txt로 씀. USB 진단 [모으기]가 logs/로 모음,
+# #60 2026-11-26 결정). USB 장치, 순정 자리, bcmdhd, wlan0, hostapd, HMG-API 지기·nochip 기록, 커널 줄 일부. MAC 꼴 값은 가린다
+dongle_snap() {
+  boot_secs
+  echo "uptime=${_U:-?}"
+  echo "boot=$(boot_id)"
+  for _ud in $USBDEV/*; do
+    [ -r "$_ud/idVendor" ] || continue
+    # 붙은 드라이버: 인터페이스(<장치>:1.0 등)의 driver 링크 이름(ls로 읽음, readlink가 없는 툴박스도 됨)
+    _udr=
+    for _ui in "$_ud"/*:*; do
+      [ -e "$_ui/driver" ] || continue
+      _ul=$(ls -ld "$_ui/driver" 2>/dev/null); _ul=${_ul##*/}; _udr="$_udr${_udr:+,}${_ul:-?}"
+    done
+    echo "usb ${_ud##*/} $(cat "$_ud/idVendor" 2>/dev/null):$(cat "$_ud/idProduct" 2>/dev/null) devnum=$(cat "$_ud/devnum" 2>/dev/null) speed=$(cat "$_ud/speed" 2>/dev/null) driver=${_udr:-none}"
+  done
+  ko_on; echo "slot=${_KO:-none}"
+  echo "bcmdhd=$(bcmdhd_drv) initstate=$(cat $SYSMOD/bcmdhd/initstate 2>/dev/null || echo -)"
+  echo "wlan.driver.status=$(getprop wlan.driver.status 2>/dev/null)"
+  echo "-- /proc/modules"
+  cat "$PROCMOD" 2>/dev/null
+  if [ -d $SYSNET/$WIF ]; then echo "wlan0=yes flags=$(cat $SYSNET/$WIF/flags 2>/dev/null) operstate=$(cat $SYSNET/$WIF/operstate 2>/dev/null)"
+  else echo "wlan0=no"; fi
+  ap_on && echo "hostapd=yes" || echo "hostapd=no"
+  this_boot $HMGWIFI/ap.boot && echo "ap_boot=yes" || echo "ap_boot=no"
+  this_boot $HMGWIFI/ap.fail && echo "ap_fail=yes" || echo "ap_fail=no"
+  this_boot $NOCHIP && echo "nochip_mark=yes" || echo "nochip_mark=no"
+  dhd_gave_up && echo "dhd_gave_up=yes" || echo "dhd_gave_up=no"
+  # 일련번호 줄(SerialNumber: Realtek 동글은 MAC에서 나온 값일 때가 많음)은 빼고, MAC 꼴 값은 가린다(2026-11-26 결정). 내비의
+  # busybox(1.8.1)에도 되게 grep -E·sed -E 대신 awk 정규식으로 한다(PR #100 리뷰 3)
+  echo "-- 커널 줄(usb·Wi-Fi, 마지막 80줄. 일련번호 줄 뺌, MAC 꼴 가림)"
+  klog 2>/dev/null | $BB awk '
+    /[Ss]erial[Nn]umber/ { next }
+    /usb|bcmdhd|rtl|RTW|nx4-|vbus|wlan|dwc_otg|DHD/ {
+      gsub(/[0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f][:-][0-9A-Fa-f][0-9A-Fa-f]/, "xx:xx:xx:xx:xx:xx")
+      l[n++ % 80] = $0
+    }
+    END { s = n > 80 ? n - 80 : 0; for (i = s; i < n; i++) print l[i % 80] }'
+}
 
 # mod.json 꼴 파일($1, 없으면 이 모드의 mod.json)의 "version" 값. 못 읽으면 빈 값
 mod_ver() {

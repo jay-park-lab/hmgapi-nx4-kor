@@ -1,7 +1,7 @@
 #!/bin/sh
 # 에뮬레이터에 NX4 KOR 관리 앱용 가짜 상태 파일을 넣는다(시나리오 하나). adb root가 되어 있어야 한다.
 #   sh tests/emu/scen.sh <시나리오>
-#   시나리오: ready | connected | installing | reboot | failed | nowireless | nowifipart | nocar | nobb | hint | bootguard | bootguard2
+#   시나리오: ready | connected | installing | reboot | failed | nowireless | nowifipart | dongleoff | nocar | nobb | hint | bootguard | bootguard2
 # 차에서는 bin/status.sh(상태), USB 설치기(진행·알림)가 쓰는 파일이다. 힌트는 2.0.x 서비스가 쓰던 것(2.1.0에는 쓰는 곳 없음, 앱은 그대로 읽음).
 # 방법은 docs/emulator-test.md.
 B=$(cd "$(dirname "$0")/../.." && pwd)
@@ -90,6 +90,13 @@ case $S in
     M="이 차의 내비에는 Wi-Fi 부품이 없는 것으로 보여 무선 카플레이·안드로이드 오토를 쓸 수 없습니다. 유선 연결과 계기판 길안내는 그대로 쓸 수 있습니다."
     { base | noap | sed -e 's/^chip=yes/chip=no/' -e 's/^wlan0=yes/wlan0=no/' -e 's/^ap_boot=yes/ap_boot=no/' -e 's/^ap_fail=no/ap_fail=yes/'; echo "cp_conn=0"; echo "state=done"
       verdict nowifipart 1 "$M" no "설치: 끝남" "무선 Wi-Fi: 부품 없음(USB 동글 필요)" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
+    prog 100 done "설치를 마쳤습니다." "" > $D/prog ;;
+  dongleoff)
+    # 칩이 없는 내비에 부팅 뒤 USB Wi-Fi 동글을 꽂았고 아직 켜지 않음(#60): [동글 켜기] 버튼과 표의 "USB Wi-Fi 동글" 줄
+    M="USB Wi-Fi 동글이 꽂혀 있지만 아직 켜지 않았습니다. 오른쪽 아래 [동글 켜기]를 눌러 주세요."
+    { base | noap | sed -e 's/^chip=yes/chip=no/' -e 's/^wlan0=yes/wlan0=no/' -e 's/^ap_boot=yes/ap_boot=no/'; echo "cp_conn=0"; echo "state=done"
+      echo "dongle_drivers=yes"; echo "dongle=0bda:b831 rtl8831bu"; echo "dongle_on=none"; echo "dongle_btn=yes"
+      verdict dongleoff 1 "$M" no "설치: 끝남" "무선 Wi-Fi: 동글 꽂힘(켜기 전)" "폰 연결: 지금 연결된 폰 없음"; } > $D/status
     prog 100 done "설치를 마쳤습니다." "" > $D/prog ;;
   nocar)
     M="지원하지 않는 차입니다(투싼 NX4 한국 내수 260902 전용). 아무것도 바꾸지 않았습니다."
