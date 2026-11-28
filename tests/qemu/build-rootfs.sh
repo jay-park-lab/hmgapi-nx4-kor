@@ -23,7 +23,7 @@ mkdir -p $R/lib/modules $R/sbin $R/proc $R/sys $R/dev $R/run $R/tmp $R/var/run $
 cp /src/qemu/nx4init $R/sbin/nx4init
 chmod 755 $R/sbin/nx4init
 cp /out/bcmdhd.ko $R/lib/modules/bcmdhd.ko
-for f in usr/sbin/hostapd usr/sbin/iw sbin/ip bin/busybox usr/sbin/dnsmasq; do [ -x $R/$f ] || { echo "루트 파일 시스템에 $f가 없습니다"; exit 1; }; done
+for f in usr/sbin/hostapd usr/sbin/iw sbin/ip bin/busybox usr/sbin/dnsmasq; do [ -x $R/$f ] || { echo "루트 파일 시스템에 ${f}가 없습니다"; exit 1; }; done
 rm -f /out/rootfs.img
 mkfs.ext4 -q -L nx4root -d $R /out/rootfs.img 256M
 echo "루트 파일 시스템: $(du -sh $R | cut -f1)"

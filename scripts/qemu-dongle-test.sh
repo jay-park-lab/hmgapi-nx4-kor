@@ -71,16 +71,16 @@ if [ "${NX4_QEMU_NOBUILD:-0}" != 1 ]; then
   docker run --rm --platform linux/amd64 -v "$B/tests/qemu":/src/qemu:ro -v "$OUT":/out "$IMG" sh /src/qemu/build-rootfs.sh
 fi
 for f in zImage rootfs.img bcmdhd.ko; do
-  [ -s "$OUT/$f" ] || { echo "$OUT/$f가 없습니다(NX4_QEMU_NOBUILD 없이 다시 돌려 주세요)"; exit 1; }
+  [ -s "$OUT/$f" ] || { echo "$OUT/${f}가 없습니다(NX4_QEMU_NOBUILD 없이 다시 돌려 주세요)"; exit 1; }
 done
 
 LOG=$OUT/console-$MODE-$(date '+%Y%m%d-%H%M%S').log
 if [ "$MODE" = interactive ]; then
-  echo "3. QEMU($MODE, 동글 $USB를 VM으로 넘김, AP ${AP}초, 뽑기 ${UN}초)"
+  echo "3. QEMU($MODE, 동글 ${USB}를 VM으로 넘김, AP ${AP}초, 뽑기 ${UN}초)"
   echo "   AP가 뜨면 폰에서 NX4-QEMU-TEST(비밀번호 nx4-qemu-test)에 붙어 보고(DHCP로 192.168.43.x를 받음, 인터넷 없음),"
   echo "   \"동글을 뽑아 주세요\"가 나오면 PC에서 동글을 뽑아 주세요"
 else
-  echo "3. QEMU($MODE, 동글 $USB를 VM으로 넘김, AP 하나에 ${AP}초)"
+  echo "3. QEMU($MODE, 동글 ${USB}를 VM으로 넘김, AP 하나에 ${AP}초)"
 fi
 # 게스트가 멈춰도 끝나게(PR #93 리뷰 1): 게스트는 panic=1(패닉 1초 뒤 재부팅 → -no-reboot라 QEMU가 끝남), 호스트는 LIMIT초가
 # 지나면 QEMU를 끝낸다(지킴이는 2초마다 끝났는지 보고, QEMU가 끝나면 함께 끝남).

@@ -61,9 +61,11 @@ load() {  # $1 이름(결과 줄용), 그 뒤 HAL_ARGS에 더할 인자
 chans() {
   iw phy | grep -E '^\s+\* (2437|5180|5745|5765|5785|5805|5825) MHz' | sed 's/^[[:space:]]*//'
   ir=$(iw phy | grep -E '^\s+\* 57(45|65|85) MHz' | grep -c 'no IR')
-  echo "-- 채널 결과($1): 5GHz 149·153·157번 중 no IR $ir개"
+  echo "-- 채널 결과($1): 5GHz 149·153·157번 중 no IR ${ir}개"
   iw reg get 2>/dev/null | head -3
 }
+# 콘솔로 내는 hostapd·커널 기록에서 MAC 꼴 값을 가린다(폰 MAC이 결과 기록에 남지 않게, PR #103 리뷰 2)
+nomac() { sed 's/[0-9a-fA-F]\{2\}\(:[0-9a-fA-F]\{2\}\)\{5\}/<MAC>/g'; }
 # 폰이 AP에 붙은 뒤 IP를 받게 DHCP 서버를 띄운다(interactive만). wlan0에 192.168.43.1/24를 주고 dnsmasq가 .10~.50을 빌려준다.
 # 인터넷이 없으므로 게이트웨이·DNS는 알리지 않는다(폰에는 "인터넷 없음"으로 보일 수 있음). 빌려준 기록은 /tmp/dnsmasq.leases
 dhcp_on() {  # $1 이름(기록 파일용)
@@ -101,17 +103,20 @@ ap() {  # $1 이름, $2 hw_mode, $3 channel, $4 country_code(빈 값이면 넣�
       pidof dnsmasq >/dev/null && d=돎 || d=없음
       dl=" DHCP $d, IP 받은 기기 ${ipn}개,"
     fi
-    echo "[$1 $i초] hostapd $h, 연결 ${st}개,$dl$t"
+    echo "[$1 ${i}초] hostapd $h, 연결 ${st}개,$dl$t"
   done
   if ap_ok "$t"; then ok=yes; else ok=no; fi
   dr=
   [ "$5" = dhcp ] && dr=", IP 받은 기기 ${maxip}개(DHCP $(pidof dnsmasq >/dev/null && echo 돎 || echo 없음))"
   echo "-- $1 결과: AP로 섬=$ok, 가장 많이 붙은 기기 ${maxst}개$dr, 채널:$(echo "$t" | sed 's/.*channel//')"
-  grep -vE '^$' /tmp/h-$1.log | tail -12
-  # DHCP 주고받기: 종류와 IP만(줄 끝의 MAC·폰 이름은 남기지 않음)과 주소가 모자랐던 수
+  grep -vE '^$' /tmp/h-$1.log | nomac | tail -12
+  # DHCP 주고받기: 종류와 IP 모양(점 셋)일 때만 IP(줄 끝의 MAC·폰 이름은 남기지 않음. 숫자로 시작하는 MAC이 IP 자리에 남지 않게,
+  # PR #103 리뷰 1), 주소가 모자랐던 수, dnsmasq 자신의 시작·오류 줄(뜨지 못했을 때 이유, 리뷰 3)
   [ "$5" = dhcp ] && {
-    sed -n 's/.*\(DHCP[A-Z]*\)(wlan0) \([0-9.]*\).*/\1 \2/p' /tmp/d-$1.log | tail -8
+    sed -n -e 's/.*\(DHCP[A-Z]*\)(wlan0) \([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1 \2/p' -e 't' \
+      -e 's/.*\(DHCP[A-Z]*\)(wlan0) .*/\1/p' /tmp/d-$1.log | tail -8
     echo "DHCP 줄 주소 없음 $(grep -c 'no address' /tmp/d-$1.log)번"
+    grep -vE 'DHCP[A-Z]+\(|^dnsmasq-dhcp(\[[0-9]+\])?: [0-9]+ ' /tmp/d-$1.log | nomac | head -5
   }
   pkill hostapd 2>/dev/null; pkill dnsmasq 2>/dev/null; sleep 1
 }
@@ -158,13 +163,13 @@ else
   i=0; gone=no
   while [ $i -lt $UNPLUG_SECS ]; do
     sleep 5; i=$((i + 5))
-    [ -d /sys/class/net/wlan0 ] || { echo "[$i초] wlan0이 사라짐(뽑힘)"; gone=yes; break; }
+    [ -d /sys/class/net/wlan0 ] || { echo "[${i}초] wlan0이 사라짐(뽑힘)"; gone=yes; break; }
   done
   sleep 5
-  dmesg | grep -iE 'nx4-protect|disconnect|rtw_dev|bcmdhd|Oops|BUG|Unable to handle|panic|Call trace|Internal error' | tail -30
+  dmesg | grep -iE 'nx4-protect|disconnect|rtw_dev|bcmdhd|Oops|BUG|Unable to handle|panic|Call trace|Internal error' | nomac | tail -30
   kcount
   echo "-- 뽑기 결과: wlan0 사라짐 $gone, nx4-protect 줄 $(dmesg | grep -c 'nx4-protect'), 경고 $((KW - w0))개, 멈춤 $((KO - o0))개, hostapd $(pidof hostapd >/dev/null && echo 돎 || echo 없음)"
-  tail -8 /tmp/h-unplug.log
+  nomac < /tmp/h-unplug.log | tail -8
 fi
 step "rmmod"
 unload 끝
