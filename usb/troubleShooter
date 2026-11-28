@@ -955,6 +955,9 @@ diag() {
   [ -d $HMGDATA/logs/$MOD ] && cp -r $HMGDATA/logs/$MOD $_d/logs/service
   [ -f $HMGDATA/install.log ] && cp $HMGDATA/install.log $_d/logs/hmgapi-install.log
   [ -f $HMGDATA/logs/hmgapi/wifi.log ] && cp $HMGDATA/logs/hmgapi/wifi.log $_d/logs/hmgapi-wifi.log
+  # HMG-API 기록(앱 Logs 탭과 같은 것, 256KB에서 .1로 넘김): 모드의 [mod] 줄과 kor_tbt_log의 CarPlay diag 줄이 여기 있다(#89·#90·#96)
+  [ -f $HMGDATA/logs/hmgapi/log.log ] && cp $HMGDATA/logs/hmgapi/log.log $_d/logs/hmgapi-log.log
+  [ -f $HMGDATA/logs/hmgapi/log.log.1 ] && cp $HMGDATA/logs/hmgapi/log.log.1 $_d/logs/hmgapi-log.log.1
   for _f in $ROOT/data/local/tmp/nx4-kor-*.txt $ROOT/data/local/tmp/nx4-kor/*.txt; do
     [ -f "$_f" ] && cp "$_f" $_d/logs/
   done
