@@ -2269,10 +2269,15 @@ check "  게스트 init: interactive AP는 wlan0에 192.168.43.1/24를 주고 dn
 # 맥의 /bin/sh(bash 3.2)는 UTF-8 로캘에서 $VAR 바로 뒤의 한글 바이트를 이름으로 읽어 set -u로 멈춘다("USB�: unbound variable",
 # PR #103 테스트 중). 이 테스트는 부른 쪽 로캘을 물려받아 C 로캘인 PC에서는 그 실패를 못 보므로, 셸 파일에 그 꼴(${VAR}로 써야 함)이
 # 없는지 글자로 본다(#104). 차의 mksh·busybox에서도 ${VAR}는 같은 뜻이다. drivers/lib.sh의 make_retry도 이 테스트가 맥에서 돌리므로 넣는다
-_ub=$(LC_ALL=C grep -n '\$[A-Za-z_][A-Za-z0-9_]*[^ -~]' $B/scripts/*.sh $B/tests/qemu/nx4init $B/tests/qemu/*.sh $B/tests/emu/*.sh \
-  $B/tests/mod-test.sh $B/usb/troubleShooter $PKG/svc/*.sh $PKG/bin/*.sh $PKG/scripts/*.sh $B/drivers/*.sh $B/drivers/*/*.sh \
-  $B/.github/workflows/*.yml)
-check "  셸 파일에 \$VAR 바로 뒤 한글이 없음(맥 sh가 UTF-8 로캘에서 이름으로 읽어 멈춤, #104)" '[ -z "$_ub" ]' || echo "$_ub"
+# 파일 목록은 정해 두지 않고 git이 아는 파일 중 셸 파일(.sh·워크플로 .yml, 또는 첫 줄이 #!…sh)을 모두 본다(PR #105 리뷰 1)
+# (맥 bash 3.2는 $( ) 안의 case 패턴 끝 ")"를 잘못 읽으므로 앞에 "("를 붙인 꼴을 쓴다)
+_shf=$(cd $B && git ls-files | while read -r f; do
+  case $f in (*.sh|.github/workflows/*.yml) echo "$B/$f" ;; (*) head -1 "$f" 2>/dev/null | grep -q '^#!.*sh' && echo "$B/$f" ;; esac
+done)
+_ub=$(LC_ALL=C grep -n '\$[A-Za-z_][A-Za-z0-9_]*[^ -~]' $_shf)
+_shn=$(echo "$_shf" | grep -c .)
+check "  셸 파일(git이 아는 것 모두, ${_shn}개)에 \$VAR 바로 뒤 한글이 없음(맥 sh가 UTF-8 로캘에서 이름으로 읽어 멈춤, #104)" \
+  '[ -z "$_ub" ] && echo "$_shf" | grep -q "/usb/troubleShooter$" && echo "$_shf" | grep -q "/tests/qemu/nx4init$" && echo "$_shf" | grep -q "/drivers/lib.sh$"' || echo "$_ub"
 # case의 [a-f] 같은 범위는 UTF-8 로캘에서 대문자까지 받으므로(맥 sh) VID:PID 확인은 글자를 늘어놓는다(#104)
 check "  QEMU 테스트의 VID:PID 확인은 로캘에 기대는 범위([0-9a-f]) 없이 글자를 늘어놓음" \
   '! grep -q "\[0-9a-f\]" $B/scripts/qemu-dongle-test.sh && grep -q "\[0123456789abcdef\]" $B/scripts/qemu-dongle-test.sh'
