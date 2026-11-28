@@ -79,10 +79,10 @@ jobs:
           # Git Flow(docs/git-flow.md 규칙 6): 정식 태그는 main의 커밋, 베타 태그는 release/ 브랜치(또는 이미 합친 main)의 커밋
           C=$(git rev-parse HEAD)
           if [ "$PRE" = false ]; then
-            git merge-base --is-ancestor "$C" origin/main || fail "정식 태그 $TAG의 커밋이 main에 없습니다"
+            git merge-base --is-ancestor "$C" origin/main || fail "정식 태그 ${TAG}의 커밋이 main에 없습니다"
           else
             [ -n "$(git branch -r --contains "$C" --list 'origin/release/*' 'origin/main')" ] \
-              || fail "베타 태그 $TAG의 커밋이 release/ 브랜치에도 main에도 없습니다"
+              || fail "베타 태그 ${TAG}의 커밋이 release/ 브랜치에도 main에도 없습니다"
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "prerelease=$PRE" >> "$GITHUB_OUTPUT"
@@ -97,7 +97,7 @@ jobs:
         run: |
           set -eu
           if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "::error::릴리스 $TAG가 이미 있습니다. 고쳐야 하면 다음 번호의 태그를 답니다(docs/release.md)"
+            echo "::error::릴리스 ${TAG}가 이미 있습니다. 고쳐야 하면 다음 번호의 태그를 답니다(docs/release.md)"
             exit 1
           fi
 
@@ -203,7 +203,7 @@ jobs:
             exit 1
           fi
           for f in build-tools/37.0.0/d8 build-tools/37.0.0/apksigner platforms/android-19/android.jar; do
-            [ -f "$SDK/$f" ] || { echo "::error::SDK에 $f가 없습니다"; exit 1; }
+            [ -f "$SDK/$f" ] || { echo "::error::SDK에 ${f}가 없습니다"; exit 1; }
           done
           ls "$SDK/build-tools" "$SDK/platforms"
 
@@ -295,7 +295,7 @@ jobs:
           for f in "$NX4_DRIVERS"/*/bcmdhd.ko.txt; do
             BD=$(sed -n 's/^build date //p' "$f")
             grep -qF "BUILD_DATE=\"${BD% *}\" BUILD_TIME=\"${BD##* }\"" "$RUNNER_TEMP/driver-source.txt" \
-              || { echo "::error::대응 소스 SOURCE.txt의 빌드 날짜가 $f의 build date($BD)와 다릅니다"; exit 1; }
+              || { echo "::error::대응 소스 SOURCE.txt의 빌드 날짜가 ${f}의 build date($BD)와 다릅니다"; exit 1; }
           done
 
       # secret은 화면에 내지 않는다(set -x 금지). 파일은 umask 077, 러너 임시 폴더, 마지막 step에서 지운다
@@ -401,8 +401,8 @@ jobs:
           DRVSUM=
           for d in rtl88x2bu rtl8831bu; do
             cmp -s "$D/NX4/install/payload/drivers/$d/bcmdhd.ko" "$NX4_DRIVERS/$d/bcmdhd.ko" \
-              || { echo "::error::USB 묶음의 nx4-kor에 동글 드라이버 $d가 없거나 빌드한 것과 다릅니다"; exit 1; }
-            grep -q " $d\$" "$D/NX4/install/payload/drivers/usb-ids.txt" || { echo "::error::drivers/usb-ids.txt에 $d가 없습니다"; exit 1; }
+              || { echo "::error::USB 묶음의 nx4-kor에 동글 드라이버 ${d}가 없거나 빌드한 것과 다릅니다"; exit 1; }
+            grep -q " $d\$" "$D/NX4/install/payload/drivers/usb-ids.txt" || { echo "::error::drivers/usb-ids.txt에 ${d}가 없습니다"; exit 1; }
             DRVSUM="$DRVSUM $d $(md5sum "$NX4_DRIVERS/$d/bcmdhd.ko" | cut -d' ' -f1)"
           done
           [ -s "$D/NX4/install/payload/drivers/COPYING" ] && [ -s "$D/NX4/install/payload/drivers/SOURCE.txt" ] \
@@ -474,11 +474,11 @@ jobs:
           F2=out/hmgapi-nx4-kor-$V-usb.zip
           F3=out/hmgapi-nx4-kor-$V-driver-source.tar.gz
           for f in "$F1" "$F2" "$F3"; do
-            [ -f "$f" ] || { echo "::error::$f가 없습니다"; exit 1; }
+            [ -f "$f" ] || { echo "::error::${f}가 없습니다"; exit 1; }
           done
           # check 뒤에 생긴 경우(승인을 기다리는 동안 다른 실행이 올림)도 이미 낸 파일을 바꾸지 않는다
           if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "::error::릴리스 $TAG가 이미 있습니다. 고쳐야 하면 다음 번호의 태그를 답니다(docs/release.md)"
+            echo "::error::릴리스 ${TAG}가 이미 있습니다. 고쳐야 하면 다음 번호의 태그를 답니다(docs/release.md)"
             exit 1
           fi
           case $TAG in
@@ -493,13 +493,13 @@ jobs:
             echo "|---|---|"
             echo "| \`hmgapi-nx4-kor-$V.zip\` | HMG-API 모드(작성자 키로 서명). HMG-API 앱·adb·USB |"
             echo "| \`hmgapi-nx4-kor-$V-driver-source.tar.gz\` | 모드에 든 USB Wi-Fi 동글 드라이버(GPL-2.0)의 대응 소스: 원본 드라이버, 패치·빌드 스크립트, 커널 소스 위치(SOURCE.txt). 설치하지 않습니다 |"
-            echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음(HMG-API $HMGAPI_VER, 공식 무선 모드 $WIRELESS_VER 포함). 빈 USB 맨 위에 풀고 Engineering Mode > USB Copy > DSP > Update OTA. HMG-API가 없거나 $NEED보다 낮은 차는 첫 번째에 HMG-API를 설치하고 재부팅하므로, 같은 USB로 한 번 더 누릅니다 |"
+            echo "| \`hmgapi-nx4-kor-$V-usb.zip\` | USB 묶음(HMG-API $HMGAPI_VER, 공식 무선 모드 $WIRELESS_VER 포함). 빈 USB 맨 위에 풀고 Engineering Mode > USB Copy > DSP > Update OTA. HMG-API가 없거나 ${NEED}보다 낮은 차는 첫 번째에 HMG-API를 설치하고 재부팅하므로, 같은 USB로 한 번 더 누릅니다 |"
             echo
             echo "- 모드 UUID: \`$UUID\`"
             echo "- 관리 앱 서명 인증서 SHA-256: \`$APP_CERT\`"
             echo "- busybox: $BB"
-            echo "- HMG-API: $NEED 이상 필요. USB 묶음에 $HMGAPI_VER를 함께 넣음(대응 소스 https://github.com/Open-HMG/HMG-API/tree/$HMGAPI_COMMIT, 태그 v$HMGAPI_VER)"
-            echo "- 공식 무선 모드: USB 묶음에 wireless-carplay-aa $WIRELESS_VER를 고치지 않고 넣음. USB 설치기가 NX4에 --any-car로 설치(대응 소스 https://github.com/Open-HMG/hmgapi-wireless-cp-aa/tree/v$WIRELESS_VER)"
+            echo "- HMG-API: $NEED 이상 필요. USB 묶음에 ${HMGAPI_VER}를 함께 넣음(대응 소스 https://github.com/Open-HMG/HMG-API/tree/$HMGAPI_COMMIT, 태그 v$HMGAPI_VER)"
+            echo "- 공식 무선 모드: USB 묶음에 wireless-carplay-aa ${WIRELESS_VER}를 고치지 않고 넣음. USB 설치기가 NX4에 --any-car로 설치(대응 소스 https://github.com/Open-HMG/hmgapi-wireless-cp-aa/tree/v$WIRELESS_VER)"
             echo "- 소스 커밋: $SRC"
             echo
             echo '```'

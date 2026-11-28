@@ -2,7 +2,8 @@
 # QEMU에서 USB Wi-Fi 동글과 우리 드라이버를 테스트한다(#48, docs/qemu-dongle-test.md). PC에서만 돈다. 내비에는 아무것도 하지 않는다.
 # 쓰는 법(저장소 맨 위에서): sh scripts/qemu-dongle-test.sh [matrix|interactive] [rtl8831bu|rtl88x2bu]
 #   matrix(기본)   사람 손 없이: 국가 코드 없이 올린 채널 표, 차 HAL 인자만으로(우리 패치의 기본 KR) 올린 채널 표, 스캔, AP 조합
-#   interactive    HAL 인자만으로(KR) 올려 5GHz 149번 AP(SSID NX4-QEMU-TEST, 비밀번호 nx4-qemu-test)를 띄워 폰으로 붙어 보고,
+#   interactive    HAL 인자만으로(KR) 올려 5GHz 149번 AP(SSID NX4-QEMU-TEST, 비밀번호 nx4-qemu-test)와 DHCP(dnsmasq)를 띄워
+#                  폰으로 붙어 IP를 받아 보고,
 #                  그다음 쓰는 중에 동글을 뽑아 보호 패치를 본다
 # 무엇을 보고 무엇을 못 보는지는 docs/qemu-dongle-test.md. 차의 .ko 자체가 아니라, 같은 판(3.18.24) 커널을 QEMU virt용으로 빌드해
 # 같은 드라이버 소스와 우리 패치를 다시 빌드한 것을 올린다.
@@ -22,7 +23,7 @@ case "$MODE" in matrix) DAP=30 ;; interactive) DAP=180 ;; *) usage ;; esac
 case "$DRIVER" in rtl8831bu) DUSB=0bda:b831 ;; rtl88x2bu) DUSB=0bda:b812 ;; *) usage ;; esac
 USB=${NX4_QEMU_USB:-$DUSB}
 case "$USB" in
-  [0-9a-f][0-9a-f][0-9a-f][0-9a-f]:[0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+  [0123456789abcdef][0123456789abcdef][0123456789abcdef][0123456789abcdef]:[0123456789abcdef][0123456789abcdef][0123456789abcdef][0123456789abcdef]) ;;
   *) echo "NX4_QEMU_USB는 VID:PID(소문자 16진수 넷:넷)입니다: $USB"; exit 1 ;;
 esac
 AP=${NX4_QEMU_AP_SECS:-$DAP}
@@ -70,15 +71,16 @@ if [ "${NX4_QEMU_NOBUILD:-0}" != 1 ]; then
   docker run --rm --platform linux/amd64 -v "$B/tests/qemu":/src/qemu:ro -v "$OUT":/out "$IMG" sh /src/qemu/build-rootfs.sh
 fi
 for f in zImage rootfs.img bcmdhd.ko; do
-  [ -s "$OUT/$f" ] || { echo "$OUT/$f가 없습니다(NX4_QEMU_NOBUILD 없이 다시 돌려 주세요)"; exit 1; }
+  [ -s "$OUT/$f" ] || { echo "$OUT/${f}가 없습니다(NX4_QEMU_NOBUILD 없이 다시 돌려 주세요)"; exit 1; }
 done
 
 LOG=$OUT/console-$MODE-$(date '+%Y%m%d-%H%M%S').log
 if [ "$MODE" = interactive ]; then
-  echo "3. QEMU($MODE, 동글 $USB를 VM으로 넘김, AP ${AP}초, 뽑기 ${UN}초)"
-  echo "   AP가 뜨면 폰에서 NX4-QEMU-TEST(비밀번호 nx4-qemu-test)에 붙어 보고, \"동글을 뽑아 주세요\"가 나오면 PC에서 동글을 뽑아 주세요"
+  echo "3. QEMU($MODE, 동글 ${USB}를 VM으로 넘김, AP ${AP}초, 뽑기 ${UN}초)"
+  echo "   AP가 뜨면 폰에서 NX4-QEMU-TEST(비밀번호 nx4-qemu-test)에 붙어 보고(DHCP로 192.168.43.x를 받음, 인터넷 없음),"
+  echo "   \"동글을 뽑아 주세요\"가 나오면 PC에서 동글을 뽑아 주세요"
 else
-  echo "3. QEMU($MODE, 동글 $USB를 VM으로 넘김, AP 하나에 ${AP}초)"
+  echo "3. QEMU($MODE, 동글 ${USB}를 VM으로 넘김, AP 하나에 ${AP}초)"
 fi
 # 게스트가 멈춰도 끝나게(PR #93 리뷰 1): 게스트는 panic=1(패닉 1초 뒤 재부팅 → -no-reboot라 QEMU가 끝남), 호스트는 LIMIT초가
 # 지나면 QEMU를 끝낸다(지킴이는 2초마다 끝났는지 보고, QEMU가 끝나면 함께 끝남).
@@ -130,6 +132,8 @@ wait $WD 2>/dev/null || true
 echo
 echo "기록: $LOG"
 [ -f "$TOF" ] && echo "알림: ${LIMIT}초가 지나도 끝나지 않아 QEMU를 끝냈습니다(게스트가 멈췄을 수 있음, NX4_QEMU_TIMEOUT)"
-grep -aq "^== 끝" "$LOG" || echo "알림: 게스트가 끝까지 돌지 못했습니다(기록에 \"== 끝\"이 없음. 패닉·멈춤·시간 제한)"
-grep -aq "^1-1 $USB " "$LOG" || echo "알림: VM에 동글($USB)이 보이지 않았습니다. PC에 꽂혀 있는지, 다른 프로그램(가상 머신 등)이 잡고 있지 않은지 봐 주세요"
-grep -aE '^(== |-- )' "$LOG" | grep -av '^== 끝' || true
+# 기록은 바이트로 찾는다(LC_ALL=C): 맥 grep은 UTF-8 로캘(LC_CTYPE=UTF-8 등)에서 직렬 콘솔 기록 원본의 한글 패턴을 하나도 못 찾는다.
+# 그래서 게스트가 "== 끝"까지 돌았는데도 "끝까지 돌지 못했습니다"라고 알렸다(PR #103 첫 실행, 리뷰 4에서 원인 확인)
+LC_ALL=C grep -aq "^== 끝" "$LOG" || echo "알림: 게스트가 끝까지 돌지 못했습니다(기록에 \"== 끝\"이 없음. 패닉·멈춤·시간 제한)"
+LC_ALL=C grep -aq "^1-1 $USB " "$LOG" || echo "알림: VM에 동글($USB)이 보이지 않았습니다. PC에 꽂혀 있는지, 다른 프로그램(가상 머신 등)이 잡고 있지 않은지 봐 주세요"
+LC_ALL=C grep -aE '^(== |-- )' "$LOG" | LC_ALL=C grep -av '^== 끝' || true

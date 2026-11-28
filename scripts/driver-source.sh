@@ -23,7 +23,7 @@ RTL88X2BU_COMMIT=${NX4_DRVSRC_RTL88X2BU_COMMIT:-$RTL88X2BU_COMMIT}
 RTL8831BU_COMMIT=${NX4_DRVSRC_RTL8831BU_COMMIT:-$RTL8831BU_COMMIT}
 REV=$(cd "$B" && git rev-parse HEAD)
 [ -z "$(cd "$B" && git status --porcelain -- drivers scripts/build-driver.sh scripts/local-env.sh)" ] \
-  || { echo "drivers/나 scripts/build-driver.sh·local-env.sh에 커밋하지 않은 수정이 있습니다(묶음이 커밋 $REV와 달라짐)" >&2; exit 1; }
+  || { echo "drivers/나 scripts/build-driver.sh·local-env.sh에 커밋하지 않은 수정이 있습니다(묶음이 커밋 ${REV}와 달라짐)" >&2; exit 1; }
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
 R=$W/hmgapi-nx4-kor-driver-source

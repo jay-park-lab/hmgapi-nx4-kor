@@ -26,7 +26,7 @@ K=$Q/linux-3.18.24
 JOBS=${JOBS:-$(nproc)}
 mkdir -p $Q /out
 for f in /work/dl/linux-3.18.24.tar.xz $TC/bin/arm-eabi-gcc /work/dl/$DGIT.git; do
-  [ -e $f ] || { echo "드라이버 빌드 볼륨에 $f가 없습니다. 먼저 sh scripts/build-driver.sh를 한 번 돌려 주세요"; exit 1; }
+  [ -e $f ] || { echo "드라이버 빌드 볼륨에 ${f}가 없습니다. 먼저 sh scripts/build-driver.sh를 한 번 돌려 주세요"; exit 1; }
 done
 export ARCH=arm CROSS_COMPILE=$TC/bin/arm-eabi-
 
