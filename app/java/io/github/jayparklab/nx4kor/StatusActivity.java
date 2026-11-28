@@ -66,9 +66,12 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
     /** [동글 켜기] 버튼(상태 파일이 dongle_btn=yes일 때만), 요청을 보낸 때(부팅 뒤 밀리초, 0이면 없음)와 그 id */
     TextView dongleBtn;
     long dgEl, dgId;
-    /** [동글 켜기] 결과 안내: 상태 파일을 새로 써 화면을 다시 그린 뒤 다시 올린다(PR #100 리뷰 6) */
-    String dgShow;
-    int dgShowBg, dgShowFg;
+    /**
+     * 화면을 다시 그린 뒤(상태 파일이 새로 써짐) 버튼 위에 다시 올릴 마지막 안내 한 칸: [동글 켜기] 결과(PR #100 리뷰 6)와
+     * [지금 재부팅]의 답(리뷰 9). 늦게 온 안내가 앞의 것을 바꾼다
+     */
+    String reShow;
+    int reShowBg, reShowFg;
     /** 띄운 확인 창이 무엇인가(확인 창의 버튼을 이 화면이 받으므로): 1 재부팅, 2 동글 켜기 */
     int dialogFor;
     /** 기다리는 재부팅 요청의 id(요청 파일 첫 칸). 결과 파일과 맞춰 본다 */
@@ -443,10 +446,10 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         } else if (dgw.exists()) {
             try { dgw.delete(); } catch (Exception ignored) { }
         }
-        // 방금 받은 [동글 켜기] 결과 안내(dongleTick): 상태를 새로 읽어 다시 그린 화면에 한 번 다시 올린다(PR #100 리뷰 6)
-        if (dgShow != null) {
-            if (rbEl == 0 && dgEl == 0) showMsg(dgShow, dgShowBg, dgShowFg);
-            dgShow = null;
+        // 방금 받은 [동글 켜기] 결과나 재부팅 답 안내(dongleTick·rebootTick): 상태를 새로 읽어 다시 그린 화면에 한 번 다시 올린다(PR #100 리뷰 6·9)
+        if (reShow != null) {
+            if (rbEl == 0 && dgEl == 0) showMsg(reShow, reShowBg, reShowFg);
+            reShow = null;
         }
         setContentView(root);
     }
@@ -528,10 +531,10 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         if (dongleBtn != null) dongleBtn.setEnabled(true);
         // 재부팅 기다림 중이면 그 안내를 덮지 않는다
         if (rbEl > 0) return false;
-        if (ans == null) { dgShow = Report.DG_TIMEOUT; dgShowBg = Ui.WARN; dgShowFg = Color.BLACK; }
-        else if (Report.dgGood(res)) { dgShow = ans; dgShowBg = Ui.MSG_BG; dgShowFg = Color.WHITE; }
-        else { dgShow = ans; dgShowBg = Ui.WARN; dgShowFg = Color.BLACK; }
-        showMsg(dgShow, dgShowBg, dgShowFg);
+        if (ans == null) { reShow = Report.DG_TIMEOUT; reShowBg = Ui.WARN; reShowFg = Color.BLACK; }
+        else if (Report.dgGood(res)) { reShow = ans; reShowBg = Ui.MSG_BG; reShowFg = Color.WHITE; }
+        else { reShow = ans; reShowBg = Ui.WARN; reShowFg = Color.BLACK; }
+        showMsg(reShow, reShowBg, reShowFg);
         // 판정 띠와 표(동글·Wi-Fi 칸)가 결과와 어긋나지 않게 상태 파일을 새로 쓰게 한다. 새로 써지면 kickWatch가 다시 그리고,
         // showStatus가 이 안내를 다시 올린다(PR #100 리뷰 6). 화면을 열 때의 새로 쓰기(10초 안 한 번)와 겹치지 않으므로 그 막음은 푼다
         kickEl = 0;
@@ -587,8 +590,11 @@ public class StatusActivity extends Activity implements View.OnClickListener, Ru
         try { new File(getFilesDir(), RB_NAME).delete(); } catch (Exception ignored) { }
         // 아무도 답하지 않았으면(감시자 없음) RESET 안내
         if (ans == null) ans = Report.RB_FAILED;
-        if (Report.RB_FAILED.equals(ans)) showMsg(ans, Ui.BAD, Color.WHITE);
-        else showMsg(ans, Ui.WARN, Color.BLACK);
+        reShow = ans;
+        if (Report.RB_FAILED.equals(ans)) { reShowBg = Ui.BAD; reShowFg = Color.WHITE; }
+        else { reShowBg = Ui.WARN; reShowFg = Color.BLACK; }
+        // 늦게 오는 다시 그리기(동글 결과 뒤 상태 새로 쓰기)가 이 답을 지우고 동글 안내를 다시 올리지 않게, 다시 올릴 안내를 이 답으로 바꾼다(리뷰 9)
+        showMsg(reShow, reShowBg, reShowFg);
         if (rebootBtn != null) rebootBtn.setEnabled(true);
         return false;
     }
